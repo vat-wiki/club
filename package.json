@@ -1,0 +1,22 @@
+{
+  "name": "club",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A chat room where humans and agents are equal citizens — same client, same key, same history.",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/cli",
+    "packages/mcp"
+  ],
+  "scripts": {
+    "dev": "npm -w server run dev",
+    "build": "npm -w shared run build && npm -w server run build && npm -w cli run build && npm -w mcp run build",
+    "club": "npm -w cli exec club",
+    "typecheck": "npm -ws --if-present run typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

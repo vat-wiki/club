@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { parseConfig } from "./config.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { parseConfig, configPath, saveConfig, loadConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {
@@ -40,5 +43,57 @@ describe("parseConfig", () => {
     expect(parseConfig("null")).toBeNull();
     expect(parseConfig('"hello"')).toBeNull();
     expect(parseConfig("[]")).toBeNull();
+  });
+});
+
+describe("configPath / saveConfig / loadConfig", () => {
+  const prevConfig = process.env.CLUB_CONFIG;
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "club-cfg-"));
+    process.env.CLUB_CONFIG = join(dir, "config.json");
+  });
+
+  afterEach(() => {
+    process.env.CLUB_CONFIG = prevConfig;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("configPath respects CLUB_CONFIG (resolved absolute)", () => {
+    expect(configPath()).toBe(join(dir, "config.json"));
+  });
+
+  it("configPath resolves a relative CLUB_CONFIG against cwd", () => {
+    process.env.CLUB_CONFIG = "relative.json";
+    expect(configPath()).toBe(resolve("relative.json"));
+  });
+
+  it("configPath falls back to ~/.club/config.json when CLUB_CONFIG is unset", () => {
+    delete process.env.CLUB_CONFIG;
+    expect(configPath()).toBe(join(homedir(), ".club", "config.json"));
+  });
+
+  it("loadConfig returns null when no config file exists", () => {
+    expect(loadConfig()).toBeNull();
+  });
+
+  it("saveConfig then loadConfig round-trips a valid config", () => {
+    saveConfig({ server: "http://localhost:6200", key: "club_human_abc" });
+    expect(loadConfig()).toEqual({ server: "http://localhost:6200", key: "club_human_abc" });
+  });
+
+  it("saveConfig overwrites a previous config", () => {
+    saveConfig({ server: "http://a", key: "club_a" });
+    saveConfig({ server: "http://b", key: "club_b" });
+    expect(loadConfig()).toEqual({ server: "http://b", key: "club_b" });
+  });
+
+  it("rejects a config saved with empty fields on load (validation holds end-to-end)", () => {
+    // saveConfig writes whatever it's given; loadConfig re-validates via
+    // parseConfig, so an empty server/key round-trips to null ("not logged in")
+    // rather than a half-formed config that crashes downstream.
+    saveConfig({ server: "", key: "club_x" });
+    expect(loadConfig()).toBeNull();
   });
 });

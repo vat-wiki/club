@@ -17,7 +17,7 @@ const ConfigSchema = z.object({
 
 // ~/.club/config.json by default; CLUB_CONFIG points elsewhere (used to run
 // a human and an agent against the same server from one machine).
-function configPath(): string {
+export function configPath(): string {
   if (process.env.CLUB_CONFIG) return resolve(process.env.CLUB_CONFIG);
   return join(homedir(), ".club", "config.json");
 }

@@ -14,6 +14,7 @@ import {
 } from "../db.js";
 import { requireAuth } from "../auth.js";
 import { addSubscriber, broadcast } from "../stream.js";
+import { parseLimit } from "../lib.js";
 
 export const messages = new Hono();
 
@@ -56,7 +57,7 @@ messages.post("/", async (c) => {
 // GET /messages?since=<id>&limit=<n> -> Message[]  (chronologic)
 messages.get("/", (c) => {
   const since = c.req.query("since");
-  const limit = Math.min(Number(c.req.query("limit") ?? 100) || 100, 500);
+  const limit = parseLimit(c.req.query("limit"));
   const rows = since ? getMessagesSince(since, limit).messages : getRecentMessages(limit);
   return c.json(rows.map(toMessage));
 });

@@ -6,7 +6,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ClubClient, formatMessage } from "@club/sdk";
 import type { Message } from "@club/shared";
-import { clampLimit, num, str } from "./helpers.js";
+import { clampLimit, matchesMention, num, str } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
@@ -138,7 +138,6 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 function runListen(mention: string | undefined, timeoutMs: number): Promise<{ content: any[] }> {
   return new Promise((resolve) => {
     const matched: Message[] = [];
-    const token = mention ? "@" + mention.toLowerCase() : null;
     let settled = false;
 
     const finish = () => {
@@ -154,7 +153,7 @@ function runListen(mention: string | undefined, timeoutMs: number): Promise<{ co
     };
 
     const sub = client.stream((m) => {
-      if (token && !m.content.toLowerCase().includes(token)) return;
+      if (!matchesMention(m.content, mention)) return;
       matched.push(m);
       finish(); // first match → return (mirrors `listen --once`)
     });

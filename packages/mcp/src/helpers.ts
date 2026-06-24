@@ -28,3 +28,21 @@ export function clampLimit(v: unknown): number {
   const n = typeof v === "number" && Number.isFinite(v) ? v : 50;
   return Math.min(Math.max(1, Math.floor(n)), 500);
 }
+
+/**
+ * Does `content` contain a @mention of `mention`?
+ *
+ * Mirrors the CLI `listen --mention` rule so a CLI agent and an MCP agent wake
+ * on the same triggers: case-insensitive substring match on "@<name>". A
+ * missing/empty `mention` matches every message (the `listen` "no filter" path).
+ *
+ * Pure + unit-tested; extracted from runListen so the matching rule — including
+ * its intentional substring precision — is explicit and pinned by tests.
+ */
+export function matchesMention(
+  content: string,
+  mention: string | null | undefined,
+): boolean {
+  if (!mention) return true;
+  return content.toLowerCase().includes("@" + mention.toLowerCase());
+}

@@ -10,4 +10,6 @@
 
 <!-- 第一条记录由首次运行追加 -->
 
+2026-06-24 11:30 UTC | cli | 新增 zod 校验的纯函数 `parseConfig()`，修复损坏/不完整 config 导致的 "Invalid URL" 等晦涩报错（现按"未登录→club login"清晰提示）；为 cli 引入 vitest 首批测试(8 passing)。注：本轮工作区存在未提交的 `packages/web` 脚手架(缺依赖)使 root build 变红，故隔离验证 cli+shared 并仅提交 cli 文件 | typecheck/build/test=ok(隔离) | f3bd680
+
 2026-06-24 11:01 UTC | mcp | 抽取纯 helpers(str/num/clampLimit)到 `helpers.ts` 并加 vitest 首批测试(11 passing)；硬化 `clampLimit`(NaN/±Inf→50)；顺带修复 root `build`/`dev`/`club` 的 bare `-w` 名不匹配 `@club/*` 导致 `npm run build` 报错 | typecheck/build/test=ok | 692231c

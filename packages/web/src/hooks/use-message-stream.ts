@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { streamMessages, type ClubConn } from "@club/sdk";
+import { ClubClient, type ClubConn } from "@club/sdk";
 import type { Message } from "@club/shared";
 
 type Status = "connecting" | "connected" | "lost";
@@ -28,8 +28,7 @@ export function useMessageStream(conn: ClubConn | null) {
     const connect = () => {
       if (stopped) return;
       setStatus("connecting");
-      sub = streamMessages(
-        conn,
+      sub = new ClubClient(conn).stream(
         (m) => appendRef.current(m),
         {
           // The hook drives its own reconnect so it can track status; route the

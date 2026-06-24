@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { sendMessage } from "../client.js";
+import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 
 export function makeSendCommand(): Command {
@@ -25,7 +25,7 @@ export function makeSendCommand(): Command {
       }
       const cfg = requireConfig();
       try {
-        await sendMessage(cfg, content);
+        await new ClubClient(cfg).send(content);
       } catch (err) {
         console.error((err as Error).message);
         process.exit(1);

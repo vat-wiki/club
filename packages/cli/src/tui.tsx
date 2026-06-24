@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { render, useInput, useApp, Box, Text } from "ink";
 import type { Message, Participant } from "@club/shared";
-import { getMessages, getMe, sendMessage, streamMessages } from "./client.js";
+import { ClubClient } from "@club/sdk";
 import type { ClubConfig } from "./config.js";
 import { formatMessage } from "./commands/format.js";
 
@@ -19,9 +19,10 @@ function App({ cfg }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const m = await getMe(cfg);
+        const c = new ClubClient(cfg);
+        const m = await c.me();
         setMe(m);
-        const recent = await getMessages(cfg, { limit: 50 });
+        const recent = await c.messages({ limit: 50 });
         setLines(recent.map(formatMessage));
       } catch (err) {
         setLines(["error: " + (err as Error).message]);
@@ -31,7 +32,7 @@ function App({ cfg }: Props) {
 
   // live stream
   useEffect(() => {
-    const sub = streamMessages(cfg, (m: Message) => {
+    const sub = new ClubClient(cfg).stream((m: Message) => {
       setLines((prev) => [...prev, formatMessage(m)].slice(-200));
     });
     return () => sub.stop();
@@ -46,7 +47,7 @@ function App({ cfg }: Props) {
       const text = input.trim();
       if (text) {
         // optimistic; server echoes via stream
-        sendMessage(cfg, text).catch((e) =>
+        new ClubClient(cfg).send(text).catch((e) =>
           setLines((prev) => [...prev, "send error: " + (e as Error).message]),
         );
       }

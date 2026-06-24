@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getMe } from "../client.js";
+import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 
 export function makeWhoamiCommand(): Command {
@@ -8,7 +8,7 @@ export function makeWhoamiCommand(): Command {
     .action(async () => {
       const cfg = requireConfig();
       try {
-        const me = await getMe(cfg);
+        const me = await new ClubClient(cfg).me();
         console.log(`${me.name}  (${me.kind})  id=${me.id}`);
       } catch (err) {
         console.error((err as Error).message);

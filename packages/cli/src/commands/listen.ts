@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { streamMessages } from "../client.js";
+import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 import { formatMessage } from "./format.js";
 import type { Message } from "@club/shared";
@@ -15,7 +15,7 @@ export function makeListenCommand(): Command {
       const once = opts.once ?? true; // default: exit on first @
       const token = mention ? "@" + mention.toLowerCase() : null;
 
-      const sub = streamMessages(cfg, (m: Message) => {
+      const sub = new ClubClient(cfg).stream((m: Message) => {
         if (token) {
           const hit = m.content.toLowerCase().includes(token);
           if (!hit) return; // silently skip until matched

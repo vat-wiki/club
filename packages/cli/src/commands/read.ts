@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getMessages } from "../client.js";
+import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 import { formatMessage } from "./format.js";
 
@@ -11,7 +11,7 @@ export function makeReadCommand(): Command {
     .action(async (opts: { since?: string; limit: string }) => {
       const cfg = requireConfig();
       try {
-        const msgs = await getMessages(cfg, {
+        const msgs = await new ClubClient(cfg).messages({
           since: opts.since,
           limit: Number(opts.limit) || 50,
         });

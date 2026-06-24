@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getMembers } from "../client.js";
+import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 
 export function makeMembersCommand(): Command {
@@ -8,7 +8,7 @@ export function makeMembersCommand(): Command {
     .action(async () => {
       const cfg = requireConfig();
       try {
-        const list = await getMembers(cfg);
+        const list = await new ClubClient(cfg).members();
         for (const p of list) {
           const icon = p.kind === "agent" ? "🤖" : "🧑";
           console.log(`${icon}${p.name}  (${p.kind})`);

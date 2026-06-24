@@ -4,22 +4,14 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import {
-  getMe,
-  listMessages,
-  sendMessage,
-  listMembers,
-  streamMessages,
-  formatMessage,
-  type ClubConn,
-} from "@club/sdk";
+import { ClubClient, formatMessage } from "@club/sdk";
 import type { Message } from "@club/shared";
 import { clampLimit, num, str } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
 // with fallbacks to mirror how a human would `club login` first.
-function resolveConn(): ClubConn {
+function resolveConn(): { server: string; key: string } {
   const key = process.env.CLUB_KEY;
   if (!key) {
     console.error("[club-mcp] CLUB_KEY env var not set. Get a key at the /participants page;");
@@ -30,7 +22,7 @@ function resolveConn(): ClubConn {
   return { server, key };
 }
 
-const conn = resolveConn();
+const client = new ClubClient(resolveConn());
 
 const server = new Server(
   { name: "club", version: "0.1.0" },
@@ -105,23 +97,23 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     switch (name) {
       case "whoami": {
-        const me = await getMe(conn);
+        const me = await client.me();
         return text(`You are ${me.name} (${me.kind}). id=${me.id}`);
       }
       case "read": {
         const limit = clampLimit(a.limit);
-        const msgs = await listMessages(conn, { since: str(a.since), limit });
+        const msgs = await client.messages({ since: str(a.since), limit });
         if (msgs.length === 0) return text("(no messages)");
         return text(msgs.map(formatMessage).join("\n"));
       }
       case "send": {
         const content = str(a.content);
         if (!content) return text("error: missing content");
-        const m = await sendMessage(conn, content);
+        const m = await client.send(content);
         return text(`sent: ${formatMessage(m)}`);
       }
       case "members": {
-        const list = await listMembers(conn);
+        const list = await client.members();
         if (list.length === 0) return text("(no members)");
         return text(list.map((p) => `${p.kind === "agent" ? "🤖" : "🧑"}${p.name}`).join("\n"));
       }
@@ -161,7 +153,7 @@ function runListen(mention: string | undefined, timeoutMs: number): Promise<{ co
       }
     };
 
-    const sub = streamMessages(conn, (m) => {
+    const sub = client.stream((m) => {
       if (token && !m.content.toLowerCase().includes(token)) return;
       matched.push(m);
       finish(); // first match → return (mirrors `listen --once`)

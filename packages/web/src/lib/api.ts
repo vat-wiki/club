@@ -1,19 +1,19 @@
-import {
-  getMe,
-  listMessages,
-  sendMessage,
-  listMembers,
-  type ClubConn,
-} from "@club/sdk";
+import { ClubClient, type ClubConn } from "@club/sdk";
 import type { Participant, Message } from "@club/shared";
 
-// Thin re-export so components import from one place. The real HTTP/SSE logic
-// lives in @club/shared and is shared verbatim with the CLI and MCP clients.
+// Thin facade over ClubClient so components import from one place. The real
+// HTTP/SSE logic lives in @club/sdk's ClubClient; this just constructs a client
+// per call from the connection the app holds.
+function client(c: ClubConn): ClubClient {
+  return new ClubClient(c);
+}
+
 export const api = {
-  me: (c: ClubConn): Promise<Participant> => getMe(c),
-  messages: (c: ClubConn, since?: string): Promise<Message[]> => listMessages(c, { since, limit: 50 }),
-  send: (c: ClubConn, content: string): Promise<Message> => sendMessage(c, content),
-  members: (c: ClubConn): Promise<Participant[]> => listMembers(c),
+  me: (c: ClubConn): Promise<Participant> => client(c).me(),
+  messages: (c: ClubConn, since?: string): Promise<Message[]> =>
+    client(c).messages({ since, limit: 50 }),
+  send: (c: ClubConn, content: string): Promise<Message> => client(c).send(content),
+  members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
 };
 
 export async function createParticipant(
@@ -21,12 +21,6 @@ export async function createParticipant(
   name: string,
   kind: "human" | "agent",
 ): Promise<{ key: string }> {
-  const res = await fetch(`${server}/participants`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  return data as { key: string };
+  const { key } = await new ClubClient({ server }).createParticipant({ name, kind });
+  return { key };
 }

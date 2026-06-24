@@ -4,3 +4,6 @@ dist/
 *.db-shm
 *.db-wal
 .DS_Store
+# Claude Code 调度状态（每小时变动，不入库）
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock

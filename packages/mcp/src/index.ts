@@ -14,6 +14,7 @@ import {
   type ClubConn,
   type Message,
 } from "@club/shared";
+import { clampLimit, num, str } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
@@ -174,16 +175,7 @@ function runListen(mention: string | undefined, timeoutMs: number): Promise<{ co
 function text(s: string) {
   return { content: [{ type: "text", text: s }] };
 }
-function str(v: unknown): string {
-  return typeof v === "string" ? v : "";
-}
-function num(v: unknown): number | undefined {
-  return typeof v === "number" ? v : undefined;
-}
-function clampLimit(v: unknown): number {
-  const n = typeof v === "number" ? v : 50;
-  return Math.min(Math.max(1, Math.floor(n)), 500);
-}
+// str / num / clampLimit live in ./helpers.ts (pure + unit-tested).
 
 // ── wire up stdio transport ────────────────────────────────────────────
 const transport = new StdioServerTransport();

@@ -10,6 +10,8 @@
 
 <!-- 第一条记录由首次运行追加 -->
 
+2026-06-24 23:30 UTC | cli | 导出 `configPath()` 并补 7 个测试覆盖配置持久化层（`CLUB_CONFIG` 解析：绝对/相对/默认回退；`loadConfig` 缺文件返回 null；save→load 往返；save 覆盖旧配置；空字段保存后加载被拒=校验端到端成立，共 15 测试）。注：本轮 REPL 长时间关闭导致约 10 次 cron 补发集中在一条消息送达，**只执行 1 轮**（轮转只在真正执行时推进） | typecheck/build/test=ok | ace198d
+
 2026-06-24 13:29 UTC | mcp | 把 `listen` 的 @mention 匹配规则从 `runListen` 内联代码抽成纯函数 `matchesMention()`（行为不变），补 6 个测试覆盖（字面匹配/大小写/必需 `@` 前缀/不匹配/无过滤路径/子串精度，共 17 测试）。本轮基线干净、全量门全绿，正常提交 | typecheck/build/test=ok | 651fdd4
 
 2026-06-24 12:30 UTC | server | 修复 GET /messages 的 `limit` 无下界 bug：负值（如 `?limit=-1`）原样传给 SQLite（负 LIMIT = 无上限，可返回整张 messages 表）；抽取纯函数 `parseLimit()` clamp 到 [1,500] 并对 NaN/0/负数/非数字回退默认值；为 server 引入 vitest 首批测试(8 passing)。注：本轮全量 typecheck 因你正在进行的 `cli/tui.tsx`(shared→sdk) 重构未提交而变红，故隔离验证 server 并仅提交 server 文件 | typecheck/build/test=ok(隔离) | 2f956b3

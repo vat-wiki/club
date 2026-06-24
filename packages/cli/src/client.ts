@@ -1,4 +1,5 @@
-import type { Message, Participant, ClubConn } from "@club/shared";
+import type { Message, Participant } from "@club/shared";
+import type { ClubConn } from "@club/sdk";
 import { requireConfig, type ClubConfig } from "./config.js";
 
 // Thin local re-exports so CLI command code stays unchanged: it imports
@@ -12,7 +13,7 @@ import {
   streamMessages as sharedStream,
   formatMessage as sharedFormat,
   ClubApiError,
-} from "@club/shared";
+} from "@club/sdk";
 
 export { ClubApiError as ApiError, sharedFormat as formatMessage };
 

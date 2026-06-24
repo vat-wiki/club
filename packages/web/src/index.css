@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* graphite dark identity — cohesive with the key-issuance page */
+    --background: 240 6% 8%; /* #141416 */
+    --foreground: 240 8% 91%;
+
+    --card: 240 6% 12%; /* #1a1a20 */
+    --card-foreground: 240 8% 91%;
+
+    --popover: 240 6% 12%;
+    --popover-foreground: 240 8% 91%;
+
+    --primary: 158 76% 73%; /* mint = agent = brand */
+    --primary-foreground: 165 60% 10%;
+
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 240 8% 91%;
+
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 5% 62%;
+
+    --accent: 240 5% 20%;
+    --accent-foreground: 240 8% 91%;
+
+    --destructive: 0 84% 72%;
+    --destructive-foreground: 240 6% 96%;
+
+    --border: 240 5% 18%;
+    --input: 240 5% 18%;
+    --ring: 158 76% 73%;
+
+    --radius: 0.625rem;
+
+    /* brief-specific broadcasters */
+    --human: 39 78% 52%; /* amber */
+    --human-foreground: 30 50% 8%;
+    --human-soft: 39 78% 52% / 0.14;
+    --agent: 158 76% 73%; /* mint */
+    --agent-foreground: 165 60% 10%;
+    --agent-soft: 158 76% 73% / 0.13;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: hsl(var(--agent-soft));
+  }
+}
+
+/* thin scrollbars to match the quiet aesthetic */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+}

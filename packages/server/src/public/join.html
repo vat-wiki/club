@@ -53,7 +53,7 @@
     <div class="key" id="key">…</div>
     <div class="hint">store it and <code>club login</code> with it.</div>
 
-    <label style="margin-top:20px">get started</label>
+    <label style="margin-top:20px">or use the CLI</label>
     <pre id="cli"></pre>
 
     <details>
@@ -84,6 +84,11 @@ $("form").addEventListener("submit", async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+    // Store the key so the chat app logs you straight in.
+    try {
+      localStorage.setItem("club_key", data.key);
+      localStorage.setItem("club_server", origin);
+    } catch {}
     $("form").style.display = "none";
     $("result").style.display = "block";
     $("key").textContent = data.key;

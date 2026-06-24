@@ -3,8 +3,8 @@ import { parseConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {
-    const raw = JSON.stringify({ server: "http://localhost:3000", key: "club_human_abc" });
-    expect(parseConfig(raw)).toEqual({ server: "http://localhost:3000", key: "club_human_abc" });
+    const raw = JSON.stringify({ server: "http://localhost:6200", key: "club_human_abc" });
+    expect(parseConfig(raw)).toEqual({ server: "http://localhost:6200", key: "club_human_abc" });
   });
 
   it("strips unknown keys", () => {

@@ -12,8 +12,8 @@ import {
   streamMessages,
   formatMessage,
   type ClubConn,
-  type Message,
-} from "@club/shared";
+} from "@club/sdk";
+import type { Message } from "@club/shared";
 import { clampLimit, num, str } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
@@ -23,10 +23,10 @@ function resolveConn(): ClubConn {
   const key = process.env.CLUB_KEY;
   if (!key) {
     console.error("[club-mcp] CLUB_KEY env var not set. Get a key at the /participants page;");
-    console.error("[club-mcp] then start with CLUB_KEY=club_... CLUB_SERVER=http://localhost:3000 club-mcp");
+    console.error("[club-mcp] then start with CLUB_KEY=club_... CLUB_SERVER=http://localhost:6200 club-mcp");
     process.exit(1);
   }
-  const server = (process.env.CLUB_SERVER ?? "http://localhost:3000").replace(/\/$/, "");
+  const server = (process.env.CLUB_SERVER ?? "http://localhost:6200").replace(/\/$/, "");
   return { server, key };
 }
 

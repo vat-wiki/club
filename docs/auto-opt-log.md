@@ -10,6 +10,8 @@
 
 <!-- 第一条记录由首次运行追加 -->
 
+2026-06-25 02:29 UTC | cli | 修复 `send --stdin` 在交互式终端（无管道输入）无限挂起、且不处理 stdin 错误的 bug：抽 `readStream(stream)`（注入 stream，TTY 或 error 时 reject 而非挂死），`send.ts` 改用它，真实管道输入行为不变；补 4 个测试（拼接+end/空/TTY 拒绝/error 拒绝）。cli 测试 15→19 | typecheck/build/test=ok | c637932
+
 2026-06-25 01:29 UTC | mcp | 把最复杂、最少测试的 listen 流程从 `runListen` 抽成纯函数 `listenForMatch(subscribe, mention, timeoutMs)`（注入 stream，返回匹配 Messages 或超时 `[]`；index.ts 接 `client.stream` 并格式化，行为不变），补 4 个测试（首条消息/首个 @mention/超时返回 `[]`/resolve 后停止订阅，用 fake timers+假 stream）。mcp 测试 17→21。注：全量 typecheck 因你新增的未提交 web `a11y.test.tsx` 变红，故隔离验证 mcp | typecheck/build/test=ok(隔离) | 5f7856b
 
 2026-06-25 00:29 UTC | server | 把 `parseBearer` 从 `auth.ts` 抽到纯 `lib.ts`（行为不变，避开 import 时的 SQLite 副作用），并为两个安全关键的纯函数补测试：`hashKey`(`crypto.test.ts`，5 测：确定性/64 位 sha256 hex/对齐 node/样本无碰撞/不泄露明文) 与 `parseBearer`(`lib.test.ts` +6：提取 token/大小写不敏感/空白容忍与 trim/缺失或空/无 token/非 Bearer)。server 测试 8→19 | typecheck/build/test=ok | d6a7f19

@@ -4,8 +4,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ClubClient, formatMessage } from "@club/sdk";
-import { clampLimit, listenForMatch, num, str } from "./helpers.js";
+import { ClubClient } from "@club/sdk";
+import { dispatchTool } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
@@ -89,44 +89,13 @@ const TOOLS = [
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
 // ── Tool dispatcher ────────────────────────────────────────────────────
+// dispatchTool() lives in ./helpers.ts (pure + unit-tested, with the client
+// injected). The handler shuttles the MCP request into it and wraps either the
+// returned text or a thrown error as a tool text response.
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
-  const a = (args ?? {}) as Record<string, unknown>;
-
   try {
-    switch (name) {
-      case "whoami": {
-        const me = await client.me();
-        return text(`You are ${me.name} (${me.kind}). id=${me.id}`);
-      }
-      case "read": {
-        const limit = clampLimit(a.limit);
-        const msgs = await client.messages({ since: str(a.since), limit });
-        if (msgs.length === 0) return text("(no messages)");
-        return text(msgs.map(formatMessage).join("\n"));
-      }
-      case "send": {
-        const content = str(a.content);
-        if (!content) return text("error: missing content");
-        const m = await client.send(content);
-        return text(`sent: ${formatMessage(m)}`);
-      }
-      case "members": {
-        const list = await client.members();
-        if (list.length === 0) return text("(no members)");
-        return text(list.map((p) => `${p.kind === "agent" ? "🤖" : "🧑"}${p.name}`).join("\n"));
-      }
-      case "listen": {
-        const mention = str(a.mention) || undefined;
-        const timeoutMs = num(a.timeoutMs) ?? 60000;
-        const matched = await listenForMatch((cb) => client.stream(cb), mention, timeoutMs);
-        return matched.length > 0
-          ? text(matched.map(formatMessage).join("\n"))
-          : text("(no matching messages within timeout)");
-      }
-      default:
-        return text(`error: unknown tool "${name}"`);
-    }
+    return text(await dispatchTool(name, (args ?? {}) as Record<string, unknown>, client));
   } catch (err) {
     return text(`error: ${(err as Error).message}`);
   }

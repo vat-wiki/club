@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
+import { parseLimit } from "../limit.js";
 import { formatMessage } from "./format.js";
 
 export function makeReadCommand(): Command {
@@ -13,7 +14,7 @@ export function makeReadCommand(): Command {
       try {
         const msgs = await new ClubClient(cfg).messages({
           since: opts.since,
-          limit: Number(opts.limit) || 50,
+          limit: parseLimit(opts.limit),
         });
         for (const m of msgs) console.log(formatMessage(m));
         if (msgs.length === 0) console.log("(no messages)");

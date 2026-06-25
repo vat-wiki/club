@@ -10,6 +10,8 @@
 
 <!-- 第一条记录由首次运行追加 -->
 
+2026-06-25 04:41 UTC | mcp | 把工具分发器（index.ts 的 switch——5 个工具的格式化/空结果/缺参/错误处理，此前零测试，只有 input-coercion helpers 被测）抽成 `dispatchTool(name, args, client)` 放进 helpers.ts（注入 `DispatchClient` 接口，与 ClubClient 类解耦但结构兼容；index.ts 改为只穿梭请求并包裹结果/异常为 text，行为完全不变）。补 13 个分发器测试（fake client：whoami / read+limit clamp+since 游标 / send+缺参守卫 / members+按 kind 出图标 / listen+命中+超时 / 未知工具 / 错误传播）。mcp 测试 21→34 | typecheck/build/test=ok | 27e6ebd
+
 2026-06-25 04:01 UTC | server | 修复 GET `/members` 契约漂移：`getAllParticipants()` 返回 DB row（snake_case `created_at`），路由原样吐出，违反 shared 的 `Participant.createdAt`（camelCase）契约——`/me`、`/messages` 都做了 row→domain 映射，唯独 `/members` 漏了；TS 抓不到（fetch 结果运行时无类型）。加局部 `toParticipant()` 映射（与 `messages.ts` 的 `toMessage` 对称），补路由级回归测试（camelCase 精确形状 / 无 snake_case 泄漏 / 按 createdAt 升序，挂真实 SQLite 临时库经 Hono `app.request` 跑通）。server 测试 19→21。本轮工作区有既有未提交的 vitepress docs 脚手架改动，仅提交 server 文件 | typecheck/build/test=ok | e87323e
 
 2026-06-25 02:29 UTC | cli | 修复 `send --stdin` 在交互式终端（无管道输入）无限挂起、且不处理 stdin 错误的 bug：抽 `readStream(stream)`（注入 stream，TTY 或 error 时 reject 而非挂死），`send.ts` 改用它，真实管道输入行为不变；补 4 个测试（拼接+end/空/TTY 拒绝/error 拒绝）。cli 测试 15→19 | typecheck/build/test=ok | c637932

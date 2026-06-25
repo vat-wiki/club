@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
+import { readStream, type ReadableLike } from "../stdin.js";
 
 export function makeSendCommand(): Command {
   return new Command("send")
@@ -10,7 +11,9 @@ export function makeSendCommand(): Command {
     .action(async (text: string[], opts: { stdin?: boolean }) => {
       let content: string;
       if (opts.stdin) {
-        content = await readStdin();
+        // process.stdin has isTTY/setEncoding/on at runtime; the narrow
+        // ReadableLike interface is just for testability, so assert the shape.
+        content = await readStream(process.stdin as unknown as ReadableLike);
       } else {
         if (text.length === 0) {
           console.error("no message. pass text or use --stdin");
@@ -31,13 +34,4 @@ export function makeSendCommand(): Command {
         process.exit(1);
       }
     });
-}
-
-function readStdin(): Promise<string> {
-  return new Promise((resolve) => {
-    let data = "";
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => (data += chunk));
-    process.stdin.on("end", () => resolve(data));
-  });
 }

@@ -12,3 +12,18 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.min(Math.max(1, Math.floor(n)), 500);
 }
+
+/**
+ * Extract a bearer token from an Authorization header value.
+ *
+ * Accepts "Bearer <token>" case-insensitively, tolerates extra/leading spaces,
+ * trims the token, and returns undefined for anything that isn't a Bearer
+ * scheme (missing/empty header, "Basic ...", "Bearer" with no token). Pure and
+ * unit-tested; extracted from auth.ts so it can be tested without pulling in
+ * the SQLite connection that auth.ts wires up at import time.
+ */
+export function parseBearer(auth: string | undefined): string | undefined {
+  if (!auth) return undefined;
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : undefined;
+}

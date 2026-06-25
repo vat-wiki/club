@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import type { Participant, ParticipantKind } from "@club/shared";
 import { getParticipantByKeyHash } from "./db.js";
 import { hashKey } from "./crypto.js";
+import { parseBearer } from "./lib.js";
 
 export { hashKey };
 
@@ -11,11 +12,7 @@ declare module "hono" {
   }
 }
 
-function parseBearer(auth: string | undefined): string | undefined {
-  if (!auth) return undefined;
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  return m ? m[1].trim() : undefined;
-}
+// parseBearer() lives in ./lib.ts (pure + unit-tested).
 
 export const requireAuth = createMiddleware(async (c, next) => {
   const key = parseBearer(c.req.header("Authorization"));

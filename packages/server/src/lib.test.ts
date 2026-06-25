@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseLimit } from "./lib.js";
+import { parseLimit, parseBearer } from "./lib.js";
 
 describe("parseLimit", () => {
   it("returns the fallback for missing/undefined input", () => {
@@ -43,5 +43,36 @@ describe("parseLimit", () => {
   it("floors fractional values within range", () => {
     expect(parseLimit("10.9")).toBe(10);
     expect(parseLimit(2.5)).toBe(2);
+  });
+});
+
+describe("parseBearer", () => {
+  it("extracts the token from a well-formed Bearer header", () => {
+    expect(parseBearer("Bearer club_human_abc")).toBe("club_human_abc");
+  });
+
+  it("is case-insensitive on the scheme word", () => {
+    expect(parseBearer("bearer club_x")).toBe("club_x");
+    expect(parseBearer("BEARER club_x")).toBe("club_x");
+  });
+
+  it("tolerates extra whitespace and trims the token", () => {
+    expect(parseBearer("Bearer   club_x")).toBe("club_x");
+    expect(parseBearer("Bearer club_x   ")).toBe("club_x");
+  });
+
+  it("returns undefined when the header is missing or empty", () => {
+    expect(parseBearer(undefined)).toBeUndefined();
+    expect(parseBearer("")).toBeUndefined();
+  });
+
+  it("returns undefined for 'Bearer' with no token", () => {
+    expect(parseBearer("Bearer")).toBeUndefined();
+    expect(parseBearer("Bearer ")).toBeUndefined();
+  });
+
+  it("returns undefined for non-Bearer schemes", () => {
+    expect(parseBearer("Basic dXNlcjpwYXNz")).toBeUndefined();
+    expect(parseBearer("Token club_x")).toBeUndefined();
   });
 });

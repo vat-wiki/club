@@ -2,6 +2,7 @@ import type {
   CreateParticipantRequest,
   CreateParticipantResponse,
   ListMessagesQuery,
+  Mention,
   Message,
   Participant,
 } from "@club/shared";
@@ -11,7 +12,9 @@ import {
   createParticipant as createParticipantFn,
   getMe,
   listMembers,
+  listMentions,
   listMessages,
+  markMentionRead,
   sendMessage,
 } from "./transport.js";
 import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
@@ -62,6 +65,16 @@ export class ClubClient {
   /** GET /members — roster of the room. */
   members(): Promise<Participant[]> {
     return listMembers(this.conn(), this.callOpts());
+  }
+
+  /** GET /me/mentions — the caller's UNREAD @-mentions, oldest first. */
+  mentions(): Promise<Mention[]> {
+    return listMentions(this.conn(), this.callOpts());
+  }
+
+  /** POST /me/mentions/:id/read — mark one mention as read. */
+  markMentionRead(id: string): Promise<Mention> {
+    return markMentionRead(this.conn(), id, { timeoutMs: this.timeoutMs });
   }
 
   /** GET /messages — recent history, optionally after `since` (message id). */

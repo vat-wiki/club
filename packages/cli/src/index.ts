@@ -6,6 +6,7 @@ import { makeSendCommand } from "./commands/send.js";
 import { makeReadCommand } from "./commands/read.js";
 import { makeMembersCommand } from "./commands/members.js";
 import { makeListenCommand } from "./commands/listen.js";
+import { makeMentionsCommand } from "./commands/mentions.js";
 import { runTui } from "./tui.js";
 
 const program = new Command();
@@ -21,6 +22,7 @@ program.addCommand(makeSendCommand());
 program.addCommand(makeReadCommand());
 program.addCommand(makeMembersCommand());
 program.addCommand(makeListenCommand());
+program.addCommand(makeMentionsCommand());
 
 // No subcommand -> interactive TUI for a human.
 program.action(() => {

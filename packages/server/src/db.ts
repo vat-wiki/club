@@ -10,6 +10,10 @@ if (!existsSync(dirname(dbPath))) mkdirSync(dirname(dbPath), { recursive: true }
 export const db: Database.Database = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 
+// Baseline schema: participants + messages, created with CREATE TABLE IF NOT
+// EXISTS since the very first release. We keep this as-is (idempotent) rather
+// than retrofitting it into the migration list — existing deployments already
+// have these tables, and re-running the statements is a no-op for them.
 db.exec(`
 CREATE TABLE IF NOT EXISTS participants (
   id          TEXT PRIMARY KEY,
@@ -26,6 +30,67 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 `);
+
+// ── Schema migrations ─────────────────────────────────────────────────
+// A tiny, dependency-free migration runner. Each migration is an ordered DDL
+// block identified by an integer version; we track the highest applied
+// version in a single-row `schema_version` table and apply anything newer
+// inside a transaction at startup. This is intentionally lighter than a full
+// migration framework (no up/down, no SQL files) — it matches the project's
+// "no entity without need" stance while unblocking safe schema evolution.
+//
+// Add new migrations by appending to the array; never edit or reorder an
+// already-shipped migration.
+type Migration = { version: number; description: string; sql: string };
+const migrations: Migration[] = [
+  {
+    version: 1,
+    description: "mentions table (per-participant @-mention inbox)",
+    // One row per (message, mentioned participant). UNIQUE(message_id,
+    // participant_id) prevents duplicate inbox entries if a message @-mentions
+    // the same participant twice in its text. read_at is NULL until the
+    // recipient marks it read; an index on (participant_id, read_at) backs the
+    // unread-inbox query.
+    sql: `
+      CREATE TABLE IF NOT EXISTS mentions (
+        id             TEXT PRIMARY KEY,
+        message_id     TEXT NOT NULL REFERENCES messages(id),
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        author_id      TEXT NOT NULL REFERENCES participants(id),
+        read_at        INTEGER,
+        created_at     INTEGER NOT NULL,
+        UNIQUE(message_id, participant_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_mentions_unread
+        ON mentions(participant_id, read_at, created_at);
+    `,
+  },
+];
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS schema_version (
+  version INTEGER NOT NULL
+);
+`);
+// Seed the version row at 0 the first time (baseline schema above is "v0").
+db.prepare(
+  `INSERT OR IGNORE INTO schema_version (version) VALUES (0)`,
+).run();
+
+const currentVersion = (
+  db
+    .prepare<[], { version: number }>(`SELECT version FROM schema_version`)
+    .get() ?? { version: 0 }
+).version;
+
+for (const m of migrations) {
+  if (m.version <= currentVersion) continue;
+  const tx = db.transaction(() => {
+    db.exec(m.sql);
+    db.prepare(`UPDATE schema_version SET version = ?`).run(m.version);
+  });
+  tx();
+}
 
 // Order messages by insertion time. We keep a rowid so 'since' cursor can use
 // a monotonic sequence rather than the (sortable but ulid) id comparison,
@@ -119,4 +184,106 @@ export function insertParticipant(
   db.prepare(
     `INSERT INTO participants (id, name, kind, key_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
   ).run(id, name, kind, keyHash, createdAt);
+}
+
+// ── Mentions (per-participant @-mention inbox) ──────────────────────
+
+export interface MentionRow {
+  id: string;
+  message_id: string;
+  participant_id: string;
+  author_id: string;
+  author_name: string;
+  author_kind: "human" | "agent";
+  content: string;
+  message_created_at: number;
+  read_at: number | null;
+}
+
+const allParticipantsStmt = db.prepare<
+  [],
+  { id: string; name: string; kind: "human" | "agent" }
+>(`SELECT id, name, kind FROM participants`);
+
+/** Lightweight roster for mention parsing: every (id, name). */
+export function getAllParticipantNames(): { id: string; name: string }[] {
+  return allParticipantsStmt.all().map((r) => ({ id: r.id, name: r.name }));
+}
+
+const insertMentionStmt = db.prepare(
+  `INSERT OR IGNORE INTO mentions
+     (id, message_id, participant_id, author_id, read_at, created_at)
+   VALUES (?, ?, ?, ?, NULL, ?)`,
+);
+
+/**
+ * Insert one inbox row. `INSERT OR IGNORE` so a duplicate (same message +
+ * recipient) is silently dropped rather than throwing — matches the UNIQUE
+ * constraint intent. Returns whether a row was actually inserted.
+ */
+export function insertMention(
+  id: string,
+  messageId: string,
+  participantId: string,
+  authorId: string,
+  createdAt: number,
+): boolean {
+  return insertMentionStmt.run(id, messageId, participantId, authorId, createdAt)
+    .changes > 0;
+}
+
+const unreadMentionsStmt = db.prepare<[string], MentionRow>(
+  `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
+          p.name AS author_name, p.kind AS author_kind,
+          m.content AS content, m.created_at AS message_created_at,
+          mn.read_at
+   FROM mentions mn
+   JOIN messages m ON m.id = mn.message_id
+   JOIN participants p ON p.id = mn.author_id
+   WHERE mn.participant_id = ? AND mn.read_at IS NULL
+   ORDER BY m.created_at ASC`,
+);
+
+/** Unread mentions for `participantId`, oldest first. */
+export function getUnreadMentions(participantId: string): MentionRow[] {
+  return unreadMentionsStmt.all(participantId);
+}
+
+const mentionByIdStmt = db.prepare<
+  [string],
+  { id: string; participant_id: string; read_at: number | null }
+>(`SELECT id, participant_id, read_at FROM mentions WHERE id = ?`);
+
+/** A single mention row, or undefined. Only the fields the caller needs. */
+export function getMentionById(id: string) {
+  return mentionByIdStmt.get(id);
+}
+
+const mentionFullStmt = db.prepare<[string], MentionRow>(
+  `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
+          p.name AS author_name, p.kind AS author_kind,
+          m.content AS content, m.created_at AS message_created_at,
+          mn.read_at
+   FROM mentions mn
+   JOIN messages m ON m.id = mn.message_id
+   JOIN participants p ON p.id = mn.author_id
+   WHERE mn.id = ?`,
+);
+
+/** A single mention, fully joined (author + message content) for display. */
+export function getMentionFull(id: string): MentionRow | undefined {
+  return mentionFullStmt.get(id);
+}
+
+const markReadStmt = db.prepare(
+  `UPDATE mentions SET read_at = ? WHERE id = ? AND read_at IS NULL`,
+);
+
+/**
+ * Mark one mention read. Returns whether a row was actually updated (false if
+ * it didn't exist or was already read). `readAt` is taken as a parameter so
+ * callers/tests can pin the timestamp.
+ */
+export function markMentionRead(id: string, readAt: number): boolean {
+  return markReadStmt.run(readAt, id).changes > 0;
 }

@@ -10,11 +10,14 @@ import {
   getRecentMessages,
   getMessagesSince,
   insertMessage,
+  getAllParticipantNames,
+  insertMention,
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
 import { addSubscriber, broadcast } from "../stream.js";
 import { parseLimit } from "../lib.js";
+import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
 
@@ -42,6 +45,21 @@ messages.post("/", async (c) => {
   const id = ulid();
   const createdAt = Date.now();
   insertMessage(id, me.id, parsed.data.content, createdAt);
+
+  // Persist a per-participant inbox row for everyone @-mentioned in the text.
+  // The recipient list is computed server-side (see mention.ts) so it is the
+  // single source of truth — clients no longer have to each re-derive it, and
+  // an offline recipient still finds the mention on next poll. We do NOT
+  // exclude the author: the client-side `listen --mention` matcher doesn't
+  // either, so the inbox must agree with what a live listen would have caught.
+  const mentioned = extractMentionedParticipants(
+    parsed.data.content,
+    getAllParticipantNames(),
+  );
+  for (const m of mentioned) {
+    insertMention(ulid(), id, m.id, me.id, createdAt);
+  }
+
   const msg: Message = {
     id,
     participantId: me.id,

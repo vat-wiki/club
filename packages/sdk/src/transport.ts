@@ -2,6 +2,7 @@ import type {
   CreateParticipantRequest,
   CreateParticipantResponse,
   ListMessagesQuery,
+  Mention,
   Message,
   Participant,
 } from "@club/shared";
@@ -149,6 +150,30 @@ export async function sendMessage(
 
 export async function listMembers(c: ClubConn, opts: CallOpts = {}): Promise<Participant[]> {
   return request<Participant[]>(c, "/members", opts);
+}
+
+// GET /me/mentions — the authenticated participant's UNREAD @-mentions, oldest
+// first. This is the "inbox" an agent polls when it wakes up: anything here
+// happened while it was offline (or otherwise uncaught by a live listen).
+export async function listMentions(
+  c: ClubConn,
+  opts: CallOpts = {},
+): Promise<Mention[]> {
+  return request<Mention[]>(c, "/me/mentions", opts);
+}
+
+// POST /me/mentions/:id/read — mark one mention as read. Returns the updated
+// Mention. Throws ClubApiError(404) if no such mention belongs to the caller,
+// or ClubApiError(409) if it was already read.
+export async function markMentionRead(
+  c: ClubConn,
+  id: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<Mention> {
+  return request<Mention>(c, `/me/mentions/${encodeURIComponent(id)}/read`, {
+    method: "POST",
+    ...opts,
+  });
 }
 
 // Mint a participant + single-use key. Unauthenticated (POST /participants);

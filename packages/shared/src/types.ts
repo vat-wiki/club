@@ -21,6 +21,24 @@ export interface Message {
   createdAt: number;
 }
 
+// A @-mention of one participant by another. Persisted server-side so an agent
+// (or human) that is offline when the mention happens can catch up later —
+// this is the "inbox" that makes agents first-class without requiring them to
+// be permanently online. `readAt` is null until the recipient marks it read.
+export interface Mention {
+  id: string;
+  messageId: string;
+  // Who was @-mentioned (the recipient / inbox owner).
+  participantId: string;
+  // Who sent the mentioning message (denormalized for display without a join).
+  authorId: string;
+  authorName: string;
+  authorKind: ParticipantKind;
+  content: string;
+  messageCreatedAt: number;
+  readAt: number | null;
+}
+
 // ── API request/response shapes ─────────────────────────────────────
 
 export const CreateParticipantRequest = z.object({

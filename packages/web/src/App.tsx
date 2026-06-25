@@ -82,11 +82,17 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <Topbar meName={me?.name ?? null} status={status} onSignOut={handleSignOut} />
+      <Topbar
+        meName={me?.name ?? null}
+        status={status}
+        members={members}
+        selfId={me?.id}
+        onSignOut={handleSignOut}
+      />
       <div className="flex min-h-0 flex-1">
         <Roster members={members} selfId={me?.id} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <MessageList messages={messages} me={me} members={members} />
+          <MessageList messages={messages} me={me} members={members} status={status} />
           <Composer onSend={handleSend} disabled={!me} />
         </div>
       </div>

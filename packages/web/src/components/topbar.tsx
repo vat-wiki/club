@@ -1,6 +1,8 @@
 import { LogOut, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MobileRoster } from "@/components/mobile-roster";
 import { cn } from "@/lib/utils";
+import type { Participant } from "@club/shared";
 
 type Status = "connecting" | "connected" | "lost";
 
@@ -18,10 +20,14 @@ const statusLabel: Record<Status, string> = {
 export function Topbar({
   meName,
   status,
+  members,
+  selfId,
   onSignOut,
 }: {
   meName: string | null;
   status: Status;
+  members: Participant[];
+  selfId?: string;
   onSignOut: () => void;
 }) {
   return (
@@ -43,9 +49,19 @@ export function Topbar({
         {statusLabel[status]}
       </span>
 
-      <Button variant="outline" size="sm" className="gap-2" onClick={onSignOut} title="switch identity">
+      {/* Mobile-only roster trigger + sheet (hidden on >= md where the aside shows) */}
+      <MobileRoster members={members} selfId={selfId} onlineCount={members.length} />
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2"
+        onClick={onSignOut}
+        aria-label={`sign out (${meName ?? "switch identity"})`}
+        title="switch identity"
+      >
         <span className="max-w-[10ch] truncate font-mono text-xs">{meName ?? "switch"}</span>
-        <LogOut className="h-3.5 w-3.5" />
+        <LogOut className="h-3.5 w-3.5" aria-hidden />
       </Button>
     </header>
   );

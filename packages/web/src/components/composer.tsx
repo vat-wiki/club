@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { AlertTriangle, Send } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -12,6 +12,9 @@ export function Composer({
 }) {
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
+  // last failed draft — restored into the textarea on failure so the user can
+  // edit/redo and resend, instead of the message vanishing silently.
+  const [error, setError] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const autosize = () => {
@@ -25,10 +28,20 @@ export function Composer({
     const content = value.trim();
     if (!content || sending) return;
     setSending(true);
+    setError(false);
     setValue("");
     requestAnimationFrame(autosize);
     try {
       await onSend(content);
+    } catch {
+      // Send failed: put the draft back so the user isn't left thinking it
+      // went through, and surface a visible inline error.
+      setError(true);
+      setValue(content);
+      requestAnimationFrame(() => {
+        autosize();
+        ref.current?.focus();
+      });
     } finally {
       setSending(false);
     }
@@ -59,6 +72,7 @@ export function Composer({
           className="min-h-[42px] resize-none"
           onChange={(e) => {
             setValue(e.target.value);
+            setError(false);
             autosize();
           }}
           onKeyDown={onKeyDown}
@@ -68,9 +82,19 @@ export function Composer({
           send
         </Button>
       </div>
-      <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
-        enter to transmit · shift+enter for a new line
-      </p>
+      {error ? (
+        <p
+          role="alert"
+          className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-destructive"
+        >
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+          couldn't send — check your connection and try again
+        </p>
+      ) : (
+        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90">
+          enter to transmit · shift+enter for a new line
+        </p>
+      )}
     </form>
   );
 }

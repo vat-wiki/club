@@ -21,7 +21,7 @@
     --secondary-foreground: 240 8% 91%;
 
     --muted: 240 5% 16%;
-    --muted-foreground: 240 5% 62%;
+    --muted-foreground: 240 5% 68%;
 
     --accent: 240 5% 20%;
     --accent-foreground: 240 8% 91%;
@@ -76,5 +76,18 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 999px;
+  }
+}
+
+/* Respect users who prefer reduced motion (WCAG 2.3.3). The agent pulse and
+   message slide-in are decorative; collapse them to near-instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

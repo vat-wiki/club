@@ -11,6 +11,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Pre-bundle workspace deps so HMR doesn't occasionally drop `streamMessages`
+  // (or other SDK exports) when their dist changes during a dev session.
+  optimizeDeps: {
+    include: ["@club/sdk", "@club/shared"],
+  },
   server: {
     port: 6100,
     // Proxy REST + SSE endpoints to the club backend so the web app is

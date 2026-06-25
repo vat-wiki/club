@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { createParticipant } from "@/lib/api";
+import { api, createParticipant } from "@/lib/api";
 import { API_URL } from "@/lib/auth";
 
 type Mode = "create" | "paste";
@@ -22,6 +22,7 @@ export function AuthDialog({
   const [pasteKey, setPasteKey] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const keyInputRef = useRef<HTMLInputElement>(null);
 
   const create = async () => {
     setError("");
@@ -40,20 +41,42 @@ export function AuthDialog({
     }
   };
 
+  // Validate the pasted key before handing it to the app: call /me to confirm
+  // it's recognized, so an invalid key produces an inline error instead of
+  // flashing an empty app and silently reopening the dialog.
   const paste = async () => {
     setError("");
-    if (!pasteKey.trim()) {
+    const key = pasteKey.trim();
+    if (!key) {
       setError("paste a key");
       return;
     }
-    onAuthed(pasteKey.trim());
+    setBusy(true);
+    try {
+      await api.me({ server: API_URL, key });
+      onAuthed(key);
+    } catch {
+      setError("that key wasn't recognized — check it and try again");
+      setPasteKey("");
+      requestAnimationFrame(() => keyInputRef.current?.focus());
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Dialog open={open}>
+    <Dialog
+      open={open}
+      // Never close via outside interaction / Esc until authenticated; the
+      // app controls open state. Ignore any close attempt.
+      onOpenChange={(o) => {
+        if (!o) return;
+      }}
+    >
       <DialogContent
         className="max-w-[420px] gap-5"
         // not dismissible until authenticated
+        showClose={false}
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -95,9 +118,9 @@ export function AuthDialog({
                       "rounded-md border px-3 py-2 text-sm transition-colors",
                       kind === k
                         ? k === "agent"
-                          ? "border-agent/40 bg-agent-soft text-agent"
-                          : "border-human/40 bg-human-soft text-human"
-                        : "border-border text-muted-foreground hover:text-foreground",
+                          ? "border-agent/50 bg-agent-soft text-agent ring-1 ring-agent/60"
+                          : "border-human/50 bg-human-soft text-human ring-1 ring-human/60"
+                        : "border-border bg-secondary/40 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground",
                     )}
                   >
                     {k === "agent" ? "🤖 agent" : "🧑 human"}
@@ -114,21 +137,28 @@ export function AuthDialog({
             <div className="space-y-2">
               <Label htmlFor="key">paste an existing key</Label>
               <Input
+                ref={keyInputRef}
                 id="key"
                 value={pasteKey}
                 placeholder="club_…"
                 autoComplete="off"
+                aria-invalid={!!error}
+                aria-describedby={error ? "key-error" : undefined}
                 onChange={(e) => setPasteKey(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && paste()}
               />
             </div>
-            <Button className="w-full" onClick={paste}>
-              enter
+            <Button className="w-full" disabled={busy} onClick={paste}>
+              {busy ? "checking…" : "enter"}
             </Button>
           </div>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p id="key-error" role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <button
           type="button"

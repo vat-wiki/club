@@ -4,6 +4,13 @@
 
 @layer base {
   :root {
+    /* Force the UA dark form controls / scrollbar styling. A `<meta
+       name="color-scheme">` is ignored when the page sets an inline
+       color-scheme elsewhere, so declare it here on the root instead.
+       WCAG 1.4.11 (non-text contrast) benefits from native controls that
+       match the dark surface. */
+    color-scheme: dark;
+
     /* graphite dark identity — cohesive with the key-issuance page */
     --background: 240 6% 8%; /* #141416 */
     --foreground: 240 8% 91%;
@@ -76,6 +83,22 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 999px;
+  }
+
+  /* Unified tap-target sizing (WCAG 2.5.5). Mobile/touch viewports get a
+     guaranteed ≥44×44px hit area for every interactive control; on desktop
+     (md and up, where there's no touch) we relax back to the compact visual
+     height so the topbar layout isn't inflated. Apply to any button that
+     lives in the chrome (topbar, dialog close, etc.). */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  @media (min-width: 768px) {
+    .tap-target {
+      min-height: 36px;
+      min-width: 0;
+    }
   }
 }
 

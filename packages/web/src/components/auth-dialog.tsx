@@ -101,33 +101,55 @@ export function AuthDialog({
                 maxLength={40}
                 placeholder="alice"
                 autoComplete="off"
+                aria-required="true"
+                aria-invalid={!!error}
+                aria-describedby={error ? "key-error" : undefined}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && create()}
               />
             </div>
-            <div className="space-y-2">
-              <Label>who are you</Label>
+            {/* Kind is a mutually-exclusive choice → fieldset/legend is the
+                correct semantic group (WCAG 1.3.1). The toggle buttons keep
+                their native button semantics + aria-pressed. */}
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                who are you
+              </legend>
               <div className="grid grid-cols-2 gap-2">
-                {(["human", "agent"] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    aria-pressed={kind === k}
-                    onClick={() => setKind(k)}
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-sm transition-colors",
-                      kind === k
-                        ? k === "agent"
-                          ? "border-agent/50 bg-agent-soft text-agent ring-1 ring-agent/60"
-                          : "border-human/50 bg-human-soft text-human ring-1 ring-human/60"
-                        : "border-border bg-secondary/40 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground",
-                    )}
-                  >
-                    {k === "agent" ? "🤖 agent" : "🧑 human"}
-                  </button>
-                ))}
+                {(["human", "agent"] as const).map((k) => {
+                  const selected = kind === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setKind(k)}
+                      className={cn(
+                        "flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
+                        selected
+                          ? k === "agent"
+                            ? "border-agent bg-agent/15 text-foreground ring-2 ring-agent"
+                            : "border-human bg-human/15 text-foreground ring-2 ring-human"
+                          : "border-border bg-secondary/40 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground",
+                      )}
+                    >
+                      {/* Solid dot is the non-color selectedness cue (WCAG
+                          1.4.1): visible only on the active option, so the
+                          state doesn't rely on the tint/ring alone. */}
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "h-2 w-2 shrink-0 rounded-full transition-opacity",
+                          k === "agent" ? "bg-agent" : "bg-human",
+                          selected ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      {k === "agent" ? "agent" : "human"}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
+            </fieldset>
             <Button className="w-full" disabled={busy} onClick={create}>
               {busy ? "joining…" : "join the frequency"}
             </Button>

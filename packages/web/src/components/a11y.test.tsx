@@ -1,0 +1,165 @@
+import { describe, it, expect } from "vitest";
+import { render } from "@testing-library/react";
+import * as axe from "axe-core";
+import type { AxeResults, RunOptions } from "axe-core";
+import type { ReactNode } from "react";
+import type { Message, Participant } from "@club/shared";
+
+import { Composer } from "./composer";
+import { Roster } from "./roster";
+import { Topbar } from "./topbar";
+import { MessageList } from "./message-list";
+import { AuthDialog } from "./auth-dialog";
+import { MobileRoster } from "./mobile-roster";
+
+const axeOptions: RunOptions = {
+  runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+  rules: {
+    // color-contrast needs a real layout/computed-style engine; jsdom can't
+    // provide it, so the rule is non-deterministic here and spams stderr.
+    // Contrast is verified at the browser level (see a11y audit script).
+    "color-contrast": { enabled: false },
+  },
+};
+
+function summarize(results: AxeResults): string {
+  return results.violations
+    .map(
+      (v: AxeResults["violations"][number]) =>
+        `[${v.id}] ${v.help} (${v.nodes.length} nodes): ` +
+        v.nodes.map((n) => n.target.join(",")).join(" | "),
+    )
+    .join("\n");
+}
+
+// Helper: render into a clean body so axe sees a complete document and run
+// the WCAG 2.1 A/AA rule sets. Color-contrast is auto-skipped under jsdom
+// (no layout engine); it is covered by the browser-level audit instead.
+async function expectNoViolations(ui: ReactNode) {
+  const { container } = render(ui);
+  document.body.innerHTML = "";
+  document.body.appendChild(container);
+  const results: AxeResults = await axe.run(container, axeOptions);
+  expect(results.violations, summarize(results)).toEqual([]);
+}
+
+// Portal-aware variant: Radix Dialog renders into document.body via a portal,
+// so (a) we must let the portal mount before running axe, and (b) we must
+// tear down with unmount() rather than clobbering body.innerHTML (which races
+// with Radix's own portal cleanup and throws NotFoundError).
+async function expectNoViolationsPortal(ui: ReactNode) {
+  const rendered = render(ui);
+  // Let Radix mount the portal content into body.
+  await new Promise((r) => setTimeout(r, 0));
+  const results: AxeResults = await axe.run(document.body, axeOptions);
+  expect(results.violations, summarize(results)).toEqual([]);
+  rendered.unmount();
+}
+
+const me: Participant = {
+  id: "p1",
+  name: "alice",
+  kind: "human",
+  createdAt: Date.now(),
+};
+const members: Participant[] = [
+  me,
+  { id: "p2", name: "bot", kind: "agent", createdAt: Date.now() },
+];
+
+const messages: Message[] = [
+  {
+    id: "m1",
+    participantId: "p1",
+    authorName: "alice",
+    authorKind: "human",
+    content: "hello world",
+    createdAt: Date.now(),
+  },
+  {
+    id: "m2",
+    participantId: "p2",
+    authorName: "bot",
+    authorKind: "agent",
+    content: "hi @alice",
+    createdAt: Date.now(),
+  },
+];
+
+describe("a11y (axe-core, WCAG 2.1 AA)", () => {
+  it("Composer has no violations", async () => {
+    await expectNoViolations(<Composer onSend={async () => {}} disabled={false} />);
+  });
+
+  it("Composer has no violations when disabled", async () => {
+    await expectNoViolations(<Composer onSend={async () => {}} disabled />);
+  });
+
+  it("Roster has no violations", async () => {
+    await expectNoViolations(<Roster members={members} selfId={me.id} />);
+  });
+
+  it("Topbar has no violations", async () => {
+    await expectNoViolations(
+      <Topbar
+        meName="alice"
+        status="connected"
+        members={members}
+        selfId={me.id}
+        onSignOut={() => {}}
+      />,
+    );
+  });
+
+  it("MessageList has no violations (with messages)", async () => {
+    await expectNoViolations(
+      <MessageList messages={messages} me={me} members={members} status="connected" />,
+    );
+  });
+
+  it("MessageList has no violations (empty state)", async () => {
+    await expectNoViolations(
+      <MessageList messages={[]} me={me} members={members} status="connected" />,
+    );
+  });
+
+  it("MessageList has no violations (connection lost banner)", async () => {
+    await expectNoViolations(
+      <MessageList messages={messages} me={me} members={members} status="lost" />,
+    );
+  });
+
+  it("AuthDialog has no violations", async () => {
+    await expectNoViolationsPortal(<AuthDialog open onAuthed={() => {}} />);
+  });
+
+  it("MobileRoster trigger meets the mobile tap-target minimum (44px)", async () => {
+    const { container } = render(
+      <MobileRoster members={members} selfId={me.id} onlineCount={members.length} />,
+    );
+    const trigger = container.querySelector("button");
+    expect(trigger).toBeTruthy();
+    // The .tap-target utility enforces min-h/min-w 44px on touch viewports.
+    // jsdom has no layout engine, so assert the class as a regression guard.
+    expect(trigger?.className).toContain("tap-target");
+  });
+
+  it("Topbar sign-out button meets the mobile tap-target minimum (44px)", async () => {
+    const { container } = render(
+      <Topbar
+        meName="alice"
+        status="connected"
+        members={members}
+        selfId={me.id}
+        onSignOut={() => {}}
+      />,
+    );
+    // The sign-out button is the last button in the topbar; locate it via its
+    // aria-label rather than positional order for robustness.
+    const signOut = container.querySelector<HTMLButtonElement>(
+      'button[aria-label^="sign out"]',
+    );
+    expect(signOut).toBeTruthy();
+    expect(signOut?.className).toContain("tap-target");
+  });
+});

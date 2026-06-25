@@ -63,13 +63,21 @@ export function Composer({
       }}
     >
       <div className="flex items-end gap-2.5">
+        {/* Visually-hidden label gives the textarea an accessible name; the
+            placeholder alone is not a substitute (WCAG 1.3.1 / 3.3.2). */}
+        <label htmlFor="composer-input" className="sr-only">
+          Message #general
+        </label>
         <Textarea
           ref={ref}
+          id="composer-input"
           value={value}
           rows={1}
           disabled={disabled}
           placeholder="transmit to #general…"
           className="min-h-[42px] resize-none"
+          aria-describedby="composer-hint"
+          aria-invalid={error}
           onChange={(e) => {
             setValue(e.target.value);
             setError(false);
@@ -77,8 +85,13 @@ export function Composer({
           }}
           onKeyDown={onKeyDown}
         />
-        <Button type="submit" size="default" disabled={disabled || sending || !value.trim()} className="h-[42px] gap-1.5">
-          <Send className="h-4 w-4" />
+        <Button
+          type="submit"
+          size="default"
+          disabled={disabled || sending || !value.trim()}
+          className="h-[42px] gap-1.5"
+        >
+          <Send className="h-4 w-4" aria-hidden />
           send
         </Button>
       </div>
@@ -91,7 +104,10 @@ export function Composer({
           couldn't send — check your connection and try again
         </p>
       ) : (
-        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90">
+        <p
+          id="composer-hint"
+          className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90"
+        >
           enter to transmit · shift+enter for a new line
         </p>
       )}

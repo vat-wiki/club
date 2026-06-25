@@ -43,9 +43,17 @@ export function Topbar({
 
       <div className="flex-1" />
 
-      <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-        <Radio className="h-3.5 w-3.5" />
-        <span className={cn("h-2 w-2 rounded-full", statusColor[status])} />
+      <span
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
+        // Live connection state: announce changes (e.g. "lost") without
+        // stealing focus. role=status is implicitly aria-live=polite.
+        role="status"
+        aria-live="polite"
+      >
+        <Radio className="h-3.5 w-3.5" aria-hidden />
+        {/* The dot duplicates the visible status word; hide it from AT so the
+            state isn't announced twice. Color is never the sole signal. */}
+        <span className={cn("h-2 w-2 rounded-full", statusColor[status])} aria-hidden />
         {statusLabel[status]}
       </span>
 
@@ -54,13 +62,19 @@ export function Topbar({
 
       <Button
         variant="outline"
-        size="sm"
-        className="gap-2"
+        className="tap-target gap-1.5 px-2.5 sm:px-3"
         onClick={onSignOut}
         aria-label={`sign out (${meName ?? "switch identity"})`}
-        title="switch identity"
+        title="sign out"
       >
         <span className="max-w-[10ch] truncate font-mono text-xs">{meName ?? "switch"}</span>
+        {/* Always-visible label so the action is discoverable without hover
+            (the LogOut icon alone is ambiguous). Muted + tiny to stay quiet
+            visually; aria-hidden because the button's accessible name already
+            spells it out via aria-label. */}
+        <span aria-hidden className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          sign out
+        </span>
         <LogOut className="h-3.5 w-3.5" aria-hidden />
       </Button>
     </header>

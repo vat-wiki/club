@@ -48,7 +48,10 @@ export function RosterSections({ members, selfId }: { members: Participant[]; se
 
 export function Roster({ members, selfId }: { members: Participant[]; selfId?: string }) {
   return (
-    <aside className="hidden w-56 flex-none flex-col gap-4 overflow-y-auto border-r border-border bg-card p-3 scrollbar-thin md:flex">
+    <aside
+      aria-label="Members online"
+      className="hidden w-56 flex-none flex-col gap-4 overflow-y-auto border-r border-border bg-card p-3 scrollbar-thin md:flex"
+    >
       <RosterSections members={members} selfId={selfId} />
     </aside>
   );

@@ -116,6 +116,13 @@ export function MessageList({
       <div
         ref={wrapRef}
         onScroll={onScroll}
+        // role=log + aria-live turns this into a live region so screen-reader
+        // users hear new messages arrive without leaving the composer. The
+        // visible label is hidden but names the region for SR navigation.
+        role="log"
+        aria-label="Messages in #general"
+        aria-live="polite"
+        aria-relevant="additions"
         className="flex-1 overflow-y-auto py-5 scrollbar-thin"
         style={{
           backgroundImage: "radial-gradient(900px 360px at 78% -8%, hsl(var(--agent-soft)), transparent 70%)",

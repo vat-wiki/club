@@ -5,8 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ClubClient, formatMessage } from "@club/sdk";
-import type { Message } from "@club/shared";
-import { clampLimit, matchesMention, num, str } from "./helpers.js";
+import { clampLimit, listenForMatch, num, str } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
@@ -120,7 +119,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case "listen": {
         const mention = str(a.mention) || undefined;
         const timeoutMs = num(a.timeoutMs) ?? 60000;
-        return await runListen(mention, timeoutMs);
+        const matched = await listenForMatch((cb) => client.stream(cb), mention, timeoutMs);
+        return matched.length > 0
+          ? text(matched.map(formatMessage).join("\n"))
+          : text("(no matching messages within timeout)");
       }
       default:
         return text(`error: unknown tool "${name}"`);
@@ -131,36 +133,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 // ── listen impl: stream until a @mention match (or timeout) ───────────
-// MCP tool calls are synchronous request/response — we can't keep a stream
-// open across calls. So `listen` holds the connection for the duration of
-// ONE tool call, completes on the first match, and returns. A dispatcher
-// agent loops `listen` in its run loop to stay "present".
-function runListen(mention: string | undefined, timeoutMs: number): Promise<{ content: any[] }> {
-  return new Promise((resolve) => {
-    const matched: Message[] = [];
-    let settled = false;
-
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      sub.stop();
-      clearTimeout(timer);
-      if (matched.length > 0) {
-        resolve(text(matched.map(formatMessage).join("\n")));
-      } else {
-        resolve(text("(no matching messages within timeout)"));
-      }
-    };
-
-    const sub = client.stream((m) => {
-      if (!matchesMention(m.content, mention)) return;
-      matched.push(m);
-      finish(); // first match → return (mirrors `listen --once`)
-    });
-
-    const timer = setTimeout(finish, timeoutMs);
-  });
-}
+// listenForMatch() lives in ./helpers.ts (pure + unit-tested, with the stream
+// injected). MCP tool calls are synchronous request/response — we can't keep a
+// stream open across calls — so `listen` holds the connection for ONE call,
+// completes on the first match, and returns. A dispatcher agent loops it.
 
 // ── helpers ────────────────────────────────────────────────────────────
 function text(s: string) {

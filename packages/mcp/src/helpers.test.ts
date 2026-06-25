@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { str, num, clampLimit, matchesMention } from "./helpers.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Message } from "@club/shared";
+import { str, num, clampLimit, matchesMention, listenForMatch } from "./helpers.js";
 
 describe("str", () => {
   it("returns a real string unchanged", () => {
@@ -114,5 +115,64 @@ describe("matchesMention", () => {
   it("is substring-based (intentional): short mentions match longer tokens", () => {
     expect(matchesMention("ping @alicia", "al")).toBe(true); // @al inside @alicia
     expect(matchesMention("see @editorial", "ed")).toBe(true);
+  });
+});
+
+function makeMsg(content: string): Message {
+  return {
+    id: "m_" + content,
+    participantId: "p1",
+    authorName: "alice",
+    authorKind: "human",
+    content,
+    createdAt: 0,
+  };
+}
+
+describe("listenForMatch", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("resolves with the first message when no mention filter is set", async () => {
+    let emit: (m: Message) => void = () => {};
+    const p = listenForMatch((cb) => {
+      emit = cb;
+      return { stop: () => {} };
+    }, undefined, 1000);
+    emit(makeMsg("hello"));
+    expect(await p).toEqual([makeMsg("hello")]);
+  });
+
+  it("ignores non-matching messages and resolves on the first @mention", async () => {
+    let emit: (m: Message) => void = () => {};
+    const p = listenForMatch((cb) => {
+      emit = cb;
+      return { stop: () => {} };
+    }, "alice", 1000);
+    emit(makeMsg("hey @bob")); // filtered out
+    emit(makeMsg("yo @alice hi")); // match
+    expect(await p).toEqual([makeMsg("yo @alice hi")]);
+  });
+
+  it("resolves with [] when nothing matches before the timeout", async () => {
+    const p = listenForMatch(() => ({ stop: () => {} }), "nobody", 1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await p).toEqual([]);
+  });
+
+  it("stops the subscription once it resolves", async () => {
+    let emit: (m: Message) => void = () => {};
+    let stopped = false;
+    const p = listenForMatch(
+      (cb) => {
+        emit = cb;
+        return { stop: () => { stopped = true; } };
+      },
+      undefined,
+      1000,
+    );
+    emit(makeMsg("hi"));
+    await p;
+    expect(stopped).toBe(true);
   });
 });

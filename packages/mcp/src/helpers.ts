@@ -5,6 +5,8 @@
 // (resolveConn → process.exit, server.connect) that make importing it directly
 // impractical from a test.
 
+import type { Message } from "@club/shared";
+
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
 export function str(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -45,4 +47,46 @@ export function matchesMention(
 ): boolean {
   if (!mention) return true;
   return content.toLowerCase().includes("@" + mention.toLowerCase());
+}
+
+/** A stream subscription handle, as returned by ClubClient#stream. */
+export type Subscribe = (onMessage: (m: Message) => void) => { stop: () => void };
+
+/**
+ * Run one `listen` cycle against an injected message stream: resolve with the
+ * matched messages on the first @mention hit (or the first message, when no
+ * mention is set), or with an empty array if nothing matches before timeoutMs.
+ *
+ * The only I/O is the injected `subscribe`, so this is unit-testable with a
+ * fake stream + fake timers. Extracted from index.ts runListen so the listen
+ * flow — first-match-returns, settled guard, timeout — is covered; behavior is
+ * unchanged (the caller formats + wraps the result as before).
+ */
+export function listenForMatch(
+  subscribe: Subscribe,
+  mention: string | undefined,
+  timeoutMs: number,
+): Promise<Message[]> {
+  return new Promise((resolve) => {
+    const matched: Message[] = [];
+    let settled = false;
+    let handle: { stop: () => void } = { stop: () => {} };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      handle.stop();
+      if (timer) clearTimeout(timer);
+      resolve(matched);
+    };
+
+    handle = subscribe((m) => {
+      if (!matchesMention(m.content, mention)) return;
+      matched.push(m);
+      finish();
+    });
+
+    timer = setTimeout(finish, timeoutMs);
+  });
 }

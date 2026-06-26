@@ -105,7 +105,7 @@ export default function App() {
               duplicating the visible topbar wordmark. */}
           <h1 className="sr-only">club — #general chat</h1>
           <MessageList messages={messages} me={me} members={members} status={status} />
-          <Composer onSend={handleSend} disabled={!me} />
+          <Composer onSend={handleSend} disabled={!me} members={members} selfId={me?.id} />
         </main>
       </div>
 

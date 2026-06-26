@@ -11,11 +11,16 @@
        match the dark surface. */
     color-scheme: dark;
 
-    /* graphite dark identity — cohesive with the key-issuance page */
-    --background: 240 6% 8%; /* #141416 */
+    /* graphite dark identity — cohesive with the key-issuance page.
+       Three-tier neutral ramp establishes depth without shadows:
+       content (background, darkest) → chrome (frames) → card/popovers (raised). */
+    --background: 240 6% 7%; /* #121214 content area, slightly deeper */
     --foreground: 240 8% 91%;
 
-    --card: 240 6% 12%; /* #1a1a20 */
+    --chrome: 240 6% 10%; /* #191920 shared frame surface (topbar/roster/composer) */
+    --chrome-foreground: 240 8% 91%;
+
+    --card: 240 6% 12%; /* #1a1a20 raised surfaces / dialogs */
     --card-foreground: 240 8% 91%;
 
     --popover: 240 6% 12%;
@@ -30,17 +35,23 @@
     --muted: 240 5% 16%;
     --muted-foreground: 240 5% 68%;
 
-    --accent: 240 5% 20%;
+    --accent: 240 5% 24%; /* hover/active — brightened from 20% so feedback reads */
     --accent-foreground: 240 8% 91%;
 
     --destructive: 0 84% 72%;
     --destructive-foreground: 240 6% 96%;
 
-    --border: 240 5% 18%;
-    --input: 240 5% 18%;
+    --border: 240 5% 20%; /* +2% L so dividers stay visible on deep neutrals */
+    --input: 240 5% 20%;
     --ring: 158 76% 73%;
 
     --radius: 0.625rem;
+
+    /* Dark-surface pop shadow: long soft drop + a 1px top highlight + near edge
+       outline. Light-theme black/0.1 shadows vanish on graphite; this reads. */
+    --shadow-pop: 0 1px 0 0 hsl(240 6% 100% / 0.04),
+      0 8px 24px -8px hsl(0 0% 0% / 0.6),
+      0 2px 6px -4px hsl(0 0% 0% / 0.5);
 
     /* brief-specific broadcasters */
     --human: 39 78% 52%; /* amber */

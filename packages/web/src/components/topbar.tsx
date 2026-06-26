@@ -31,10 +31,10 @@ export function Topbar({
   onSignOut: () => void;
 }) {
   return (
-    <header className="flex flex-none items-center gap-3 border-b border-border bg-gradient-to-b from-card to-background px-4 py-3">
+    <header className="flex flex-none items-center gap-3 border-b border-border bg-chrome px-4 py-2.5">
       <div className="flex items-baseline gap-2">
-        <span className="font-display text-lg font-semibold tracking-tight">
-          club<span className="text-agent">.</span>
+        <span className="font-display text-xl font-semibold tracking-tight">
+          club<span className="text-agent animate-brand-pulse">.</span>
         </span>
         <span className="rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
           #general
@@ -56,6 +56,8 @@ export function Topbar({
         <span className={cn("h-2 w-2 rounded-full", statusColor[status])} aria-hidden />
         {statusLabel[status]}
       </span>
+
+      <span aria-hidden className="h-4 w-px flex-none bg-border" />
 
       {/* Mobile-only roster trigger + sheet (hidden on >= md where the aside shows) */}
       <MobileRoster members={members} selfId={selfId} onlineCount={members.length} />

@@ -22,7 +22,7 @@ export function MobileRoster({
         <button
           type="button"
           aria-label={`members — ${onlineCount} online`}
-          className="tap-target inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden"
+          className="tap-target inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden"
         >
           <Users className="h-3.5 w-3.5" aria-hidden />
           <span>{onlineCount}</span>
@@ -30,7 +30,7 @@ export function MobileRoster({
       </DialogTrigger>
       <DialogContent
         showClose
-        className="left-auto right-0 top-0 h-full max-h-full w-[80vw] max-w-[320px] translate-x-0 translate-y-0 rounded-none rounded-l-lg border-l border-border p-0 sm:rounded-l-lg"
+        className="left-auto right-0 top-0 h-full max-h-full w-[80vw] max-w-[320px] translate-x-0 translate-y-0 rounded-none rounded-l-lg border-l border-border p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-right-full data-[state=closed]:zoom-out-100 data-[state=closed]:slide-out-to-right-full sm:rounded-l-lg"
       >
         {/* Visually-hidden title keeps the dialog accessible; the visible
             heading below is for sighted users. */}

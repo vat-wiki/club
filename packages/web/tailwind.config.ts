@@ -46,6 +46,10 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        chrome: {
+          DEFAULT: "hsl(var(--chrome))",
+          foreground: "hsl(var(--chrome-foreground))",
+        },
         // brief-specific: who is broadcasting
         human: {
           DEFAULT: "hsl(var(--human))",
@@ -63,19 +67,39 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      // Tuned motion curves/durations — replaces Tailwind's Material-default
+      // (0.15s cubic-bezier(0.4,0,0.2,1)) with a softer out-quint. Every
+      // `transition-*` utility now reads these, so the whole app gets a
+      // gentler "吸附" feel without touching individual components.
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.16, 1, 0.3, 1)", // out-quint
+        "out-soft": "cubic-bezier(0.22, 1, 0.36, 1)", // micro hover/press
+        spring: "cubic-bezier(0.34, 1.56, 0.64, 1)", // gentle overshoot
+      },
+      transitionDuration: {
+        DEFAULT: "200ms",
+        fast: "120ms",
+        slow: "320ms",
+      },
       keyframes: {
         "agent-pulse": {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.35" },
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.55", transform: "scale(0.85)" },
         },
         "slide-in": {
-          from: { opacity: "0", transform: "translateY(4px)" },
+          from: { opacity: "0", transform: "translateY(6px)" },
           to: { opacity: "1", transform: "none" },
+        },
+        // Brand "heartbeat" for the wordmark dot — very slow, very light.
+        "brand-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.65" },
         },
       },
       animation: {
-        "agent-pulse": "agent-pulse 2.6s ease-in-out infinite",
-        "slide-in": "slide-in 0.28s ease",
+        "agent-pulse": "agent-pulse 2s cubic-bezier(0.16,1,0.3,1) infinite",
+        "slide-in": "slide-in 0.32s cubic-bezier(0.16,1,0.3,1)",
+        "brand-pulse": "brand-pulse 4s ease-in-out infinite",
       },
     },
   },

@@ -65,19 +65,17 @@ export function KeyRevealDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-human" aria-hidden />
-            save your login key
+            请保存你的登录密钥
           </DialogTitle>
           <DialogDescription>
-            This is the only credential that lets you back into this identity.
-            Save it somewhere safe — club does not store it for you, and it
-            cannot be recovered if lost.
+            这是回到当前身份的唯一凭证。请妥善保存——club 不会替你保存，丢失后也无法找回。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="space-y-1.5">
             <p id="key-reveal-label" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              your login key
+              你的登录密钥
             </p>
             {/* Break-all so the long key wraps instead of overflowing on
                 narrow viewports; font-mono so it's unambiguous. */}
@@ -101,19 +99,19 @@ export function KeyRevealDialog({
               {copied ? (
                 <>
                   <Check className="h-4 w-4" aria-hidden />
-                  copied
+                  已复制
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  copy login key
+                  复制登录密钥
                 </>
               )}
             </Button>
 
             {failed && (
               <p role="alert" className="text-sm text-destructive">
-                copy failed — select the key above and copy manually.
+                复制失败——请手动选中上方的密钥进行复制。
               </p>
             )}
 
@@ -125,13 +123,13 @@ export function KeyRevealDialog({
               aria-live="polite"
               className="sr-only"
             >
-              {copied ? "login key copied to clipboard" : ""}
+              {copied ? "登录密钥已复制到剪贴板" : ""}
             </p>
           </div>
         </div>
 
         <Button className="w-full" onClick={onSaved}>
-          i've saved it — enter
+          已保存，进入聊天室
         </Button>
       </DialogContent>
     </Dialog>

@@ -56,7 +56,7 @@ export function MentionPopup({
       ref={listRef}
       role="listbox"
       id="mention-listbox"
-      aria-label="Mention someone"
+      aria-label="提及某人"
       data-testid="mention-popup"
       className="absolute z-50 max-h-[min(240px,60vh)] w-64 overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/40 scrollbar-thin"
       style={{
@@ -73,7 +73,7 @@ export function MentionPopup({
           role="presentation"
           className="px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground"
         >
-          no one matches “{query}”
+          没有匹配“{query}”的成员
         </li>
       ) : (
         visible.map((m, i) => (
@@ -105,7 +105,7 @@ export function MentionPopup({
             />
             <span className="truncate">{m.name}</span>
             <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              {m.kind}
+              {m.kind === "agent" ? "智能体" : "人类"}
             </span>
           </li>
         ))
@@ -115,7 +115,7 @@ export function MentionPopup({
           aria-hidden
           className="px-2.5 py-1 text-center font-mono text-[10px] text-muted-foreground/80"
         >
-          +{members.length - MENTION_MAX_VISIBLE} more — keep typing to narrow
+          +{members.length - MENTION_MAX_VISIBLE} 个更多——继续输入以缩小范围
         </li>
       )}
     </ul>

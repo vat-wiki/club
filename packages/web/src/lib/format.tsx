@@ -2,14 +2,18 @@ import type { ReactNode } from "react";
 import type { Message, Participant } from "@club/shared";
 
 export function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export function fmtDay(ms: number): string {
   const d = new Date(ms);
   return d.toDateString() === new Date().toDateString()
-    ? "today"
-    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+    ? "今天"
+    : d.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
 }
 
 // Highlight a `@handle`. The token is "one or more letters / digits / underscore

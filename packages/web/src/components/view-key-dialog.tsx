@@ -37,8 +37,8 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
         <button
           type="button"
           className="tap-target inline-flex items-center justify-center rounded-md border border-border bg-transparent px-2 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          aria-label="view your login key"
-          title="your login key"
+          aria-label="查看你的登录密钥"
+          title="你的登录密钥"
         >
           <Key className="h-3.5 w-3.5" aria-hidden />
         </button>
@@ -47,12 +47,10 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Key className="h-5 w-5 text-human" aria-hidden />
-            your login key
+            你的登录密钥
           </DialogTitle>
           <DialogDescription>
-            This is your identity's only credential. Save it somewhere safe —
-            you'll need it to come back from a new browser or after clearing
-            cache. club can't recover it for you.
+            这是你当前身份的唯一凭证。请妥善保存——换浏览器或清理缓存后需要用它回到这里。club 无法替你找回。
           </DialogDescription>
         </DialogHeader>
 
@@ -60,7 +58,7 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
           <div className="space-y-3">
             <div className="space-y-1.5">
               <p id="viewkey-label" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                login key
+                登录密钥
               </p>
               <output
                 aria-labelledby="viewkey-label"
@@ -79,19 +77,19 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
               {copied ? (
                 <>
                   <Check className="h-4 w-4" aria-hidden />
-                  copied
+                  已复制
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  copy login key
+                  复制登录密钥
                 </>
               )}
             </Button>
 
             {failed && (
               <p role="alert" className="text-sm text-destructive">
-                copy failed — select the key above and copy manually.
+                复制失败——请手动选中上方的密钥进行复制。
               </p>
             )}
 
@@ -101,11 +99,11 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
               aria-live="polite"
               className="sr-only"
             >
-              {copied ? "login key copied to clipboard" : ""}
+              {copied ? "登录密钥已复制到剪贴板" : ""}
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">no key found.</p>
+          <p className="text-sm text-muted-foreground">未找到密钥。</p>
         )}
       </DialogContent>
     </Dialog>

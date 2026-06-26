@@ -198,7 +198,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     // The sign-out button is the last button in the topbar; locate it via its
     // aria-label rather than positional order for robustness.
     const signOut = container.querySelector<HTMLButtonElement>(
-      'button[aria-label^="sign out"]',
+      'button[aria-label^="退出登录"]',
     );
     expect(signOut).toBeTruthy();
     expect(signOut?.className).toContain("tap-target");
@@ -216,7 +216,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
       />,
     );
     const viewKey = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="view your login key"]',
+      'button[aria-label="查看你的登录密钥"]',
     );
     expect(viewKey).toBeTruthy();
     expect(viewKey?.className).toContain("tap-target");

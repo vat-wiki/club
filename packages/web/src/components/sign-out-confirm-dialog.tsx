@@ -36,20 +36,17 @@ export function SignOutConfirmDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LogOut className="h-5 w-5 text-human" aria-hidden />
-            sign out?
+            确认退出登录？
           </DialogTitle>
           <DialogDescription>
-            Signing out clears this browser's login key. To return to this
-            identity later (new browser, cleared cache, reinstall) you'll need
-            the key. If you haven't saved it yet, copy it now — there is no way
-            to recover it after sign-out.
+            退出会清除当前浏览器的登录密钥。之后若想回到这个身份（换浏览器、清缓存、重装），需要用到密钥。如果还没保存，请现在复制——退出后无法找回。
           </DialogDescription>
         </DialogHeader>
 
         {key_ && (
           <div className="space-y-2">
             <p id="signout-key-label" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              your login key
+              你的登录密钥
             </p>
             <output
               aria-labelledby="signout-key-label"
@@ -66,19 +63,19 @@ export function SignOutConfirmDialog({
               {copied ? (
                 <>
                   <Check className="h-4 w-4" aria-hidden />
-                  copied
+                  已复制
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  copy login key
+                  复制登录密钥
                 </>
               )}
             </Button>
 
             {failed && (
               <p role="alert" className="text-sm text-destructive">
-                copy failed — select the key above and copy manually.
+                复制失败——请手动选中上方的密钥进行复制。
               </p>
             )}
 
@@ -88,17 +85,17 @@ export function SignOutConfirmDialog({
               aria-live="polite"
               className="sr-only"
             >
-              {copied ? "login key copied to clipboard" : ""}
+              {copied ? "登录密钥已复制到剪贴板" : ""}
             </p>
           </div>
         )}
 
         <div className="flex flex-row gap-2 sm:justify-between">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            cancel
+            取消
           </Button>
           <Button variant="destructive" onClick={onConfirm}>
-            sign out
+            退出登录
           </Button>
         </div>
       </DialogContent>

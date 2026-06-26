@@ -3,15 +3,15 @@ import { render } from "@testing-library/react";
 import { fmtTime, fmtDay, renderContent, mentionsSelf } from "./format";
 
 describe("fmtDay", () => {
-  it("labels today as 'today'", () => {
-    expect(fmtDay(Date.now())).toBe("today");
+  it("labels today as '今天'", () => {
+    expect(fmtDay(Date.now())).toBe("今天");
   });
 
-  it("labels an older date with something other than 'today'", () => {
+  it("labels an older date with something other than '今天'", () => {
     const d = new Date();
     d.setDate(d.getDate() - 5);
     const label = fmtDay(d.getTime());
-    expect(label).not.toBe("today");
+    expect(label).not.toBe("今天");
     expect(label).toMatch(/\d/); // locale-independent: a day number is present
   });
 });

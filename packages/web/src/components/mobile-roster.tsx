@@ -21,7 +21,7 @@ export function MobileRoster({
       <DialogTrigger asChild>
         <button
           type="button"
-          aria-label={`members — ${onlineCount} online`}
+          aria-label={`成员——${onlineCount} 人在线`}
           className="tap-target inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden"
         >
           <Users className="h-3.5 w-3.5" aria-hidden />
@@ -34,10 +34,10 @@ export function MobileRoster({
       >
         {/* Visually-hidden title keeps the dialog accessible; the visible
             heading below is for sighted users. */}
-        <DialogTitle className="sr-only">members</DialogTitle>
+        <DialogTitle className="sr-only">成员</DialogTitle>
         <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 scrollbar-thin">
           <h2 className="font-display text-sm font-semibold tracking-tight">
-            members<span className="text-agent">.</span>
+            成员<span className="text-agent">.</span>
           </h2>
           <RosterSections members={members} selfId={selfId} />
         </div>

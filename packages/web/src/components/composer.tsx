@@ -310,7 +310,7 @@ export function Composer({
         {/* Visually-hidden label gives the textarea an accessible name; the
             placeholder alone is not a substitute (WCAG 1.3.1 / 3.3.2). */}
         <label htmlFor="composer-input" className="sr-only">
-          Message #general
+          给 #general 发消息
         </label>
         <Textarea
           ref={ref}
@@ -318,7 +318,7 @@ export function Composer({
           value={value}
           rows={1}
           disabled={disabled}
-          placeholder="transmit a message to #general…"
+          placeholder="给 #general 发条消息…"
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
           // own, so the container edge is the single, clean input boundary
@@ -390,7 +390,7 @@ export function Composer({
           className="min-h-[48px] gap-1.5 enabled:bg-primary enabled:text-primary-foreground disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:min-h-[56px]"
         >
           <Send className="h-4 w-4" aria-hidden />
-          send
+          发送
         </Button>
       </div>
       {error ? (
@@ -399,15 +399,15 @@ export function Composer({
           className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-destructive"
         >
           <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-          couldn't send — check your connection and try again
+          发送失败——请检查网络后重试
         </p>
       ) : (
         <p
           id="composer-hint"
           className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90"
         >
-          enter to transmit · shift+enter for a new line
-          {popupOpen ? " · ↑↓ to pick · enter to mention · esc to cancel" : ""}
+          回车发送 · shift+回车换行
+          {popupOpen ? " · ↑↓ 选择 · 回车@提及 · esc 取消" : ""}
         </p>
       )}
     </form>

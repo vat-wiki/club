@@ -13,9 +13,9 @@ const statusColor: Record<Status, string> = {
   lost: "bg-destructive",
 };
 const statusLabel: Record<Status, string> = {
-  connected: "connected",
-  connecting: "connecting",
-  lost: "reconnecting",
+  connected: "已连接",
+  connecting: "连接中",
+  lost: "重新连接中",
 };
 
 export function Topbar({
@@ -79,16 +79,16 @@ export function Topbar({
         variant="outline"
         className="tap-target gap-1.5 px-2.5 sm:px-3"
         onClick={onSignOutRequest}
-        aria-label={`sign out (${meName ?? "switch identity"})`}
-        title="sign out"
+        aria-label={`退出登录（${meName ?? "切换身份"}）`}
+        title="退出登录"
       >
-        <span className="max-w-[6ch] truncate font-mono text-xs sm:max-w-[10ch]">{meName ?? "switch"}</span>
+        <span className="max-w-[6ch] truncate font-mono text-xs sm:max-w-[10ch]">{meName ?? "切换"}</span>
         {/* Always-visible label so the action is discoverable without hover
             (the LogOut icon alone is ambiguous). Muted + tiny to stay quiet
             visually; aria-hidden because the button's accessible name already
             spells it out via aria-label. */}
         <span aria-hidden className="hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
-          sign out
+          退出
         </span>
         <LogOut className="h-3.5 w-3.5" aria-hidden />
       </Button>

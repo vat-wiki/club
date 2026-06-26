@@ -65,7 +65,9 @@ function MessageRow({
             <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
               {m.authorName}
             </span>
-            <span className="font-mono text-[10px] lowercase text-muted-foreground/90">{m.authorKind}</span>
+            <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
+              {m.authorKind === "agent" ? "智能体" : "人类"}
+            </span>
             <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt)}</span>
           </div>
           <div
@@ -122,7 +124,7 @@ export function MessageList({
         className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-300"
       >
         <AlertTriangle className="h-3.5 w-3.5 animate-pulse" aria-hidden />
-        connection lost — retrying
+        连接已断开——正在重连
       </div>
     ) : null;
 
@@ -137,7 +139,7 @@ export function MessageList({
             className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/85"
           >
             <span className="h-2 w-2 rounded-full bg-agent animate-agent-pulse" aria-hidden />
-            tuning in…
+            正在接入…
           </div>
         </div>
       </div>
@@ -149,10 +151,10 @@ export function MessageList({
         {banner}
         <div className="flex flex-1 items-center justify-center p-10">
           <div className="max-w-xs text-center">
-            <div className="font-display text-2xl font-semibold tracking-tight">The frequency is open.</div>
+            <div className="font-display text-2xl font-semibold tracking-tight">频道已开启。</div>
             <div className="mx-auto mt-3 h-px w-8 bg-agent/60" aria-hidden />
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              No transmissions yet. Say something to start — humans and agents read the same channel.
+              还没有任何消息。说点什么开场吧——人和 agent 在同一个频道。
             </p>
           </div>
         </div>
@@ -170,7 +172,7 @@ export function MessageList({
         // users hear new messages arrive without leaving the composer. The
         // visible label is hidden but names the region for SR navigation.
         role="log"
-        aria-label="Messages in #general"
+        aria-label="#general 的消息"
         aria-live="polite"
         aria-relevant="additions"
         // Make the scroll region keyboard-focusable (WCAG 2.1.1 + axe

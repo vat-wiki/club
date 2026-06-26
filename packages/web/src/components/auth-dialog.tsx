@@ -32,7 +32,7 @@ export function AuthDialog({
   const create = async () => {
     setError("");
     if (!name.trim()) {
-      setError("pick a nickname first");
+      setError("先起个昵称吧");
       return;
     }
     setBusy(true);
@@ -56,7 +56,7 @@ export function AuthDialog({
     setError("");
     const key = pasteKey.trim();
     if (!key) {
-      setError("paste a key");
+      setError("请粘贴你的登录密钥");
       return;
     }
     setBusy(true);
@@ -64,7 +64,7 @@ export function AuthDialog({
       await api.me({ server: API_URL, key });
       onAuthed(key);
     } catch {
-      setError("that key wasn't recognized — check it and try again");
+      setError("这个密钥无法识别——请检查后重试");
       setPasteKey("");
       requestAnimationFrame(() => keyInputRef.current?.focus());
     } finally {
@@ -94,20 +94,20 @@ export function AuthDialog({
           </DialogTitle>
           <DialogDescription>
             {mode === "create"
-              ? "Pick a nickname to join."
-              : "Enter with an existing key."}
+              ? "起个昵称加入聊天室。"
+              : "用已有的登录密钥进入。"}
           </DialogDescription>
         </DialogHeader>
 
         {mode === "create" ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">nickname</Label>
+              <Label htmlFor="name">昵称</Label>
               <Input
                 id="name"
                 value={name}
                 maxLength={40}
-                placeholder="alice"
+                placeholder="例如：小明"
                 autoComplete="off"
                 aria-required="true"
                 aria-invalid={!!error}
@@ -117,13 +117,13 @@ export function AuthDialog({
               />
             </div>
             <Button className="w-full" disabled={busy} onClick={create}>
-              {busy ? "joining…" : "join"}
+              {busy ? "加入中…" : "加入"}
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="key">paste an existing key</Label>
+              <Label htmlFor="key">粘贴已有密钥</Label>
               <Input
                 ref={keyInputRef}
                 id="key"
@@ -137,7 +137,7 @@ export function AuthDialog({
               />
             </div>
             <Button className="w-full" disabled={busy} onClick={paste}>
-              {busy ? "checking…" : "enter"}
+              {busy ? "验证中…" : "进入"}
             </Button>
           </div>
         )}
@@ -156,7 +156,7 @@ export function AuthDialog({
             setMode(mode === "create" ? "paste" : "create");
           }}
         >
-          {mode === "create" ? "already have a key?" : "create a new one"}
+          {mode === "create" ? "已有密钥？" : "创建一个新的"}
         </button>
       </DialogContent>
     </Dialog>

@@ -13,7 +13,7 @@ function Row({ p, self }: { p: Participant; self: boolean }) {
       />
       <span className={cn("truncate", self ? "text-foreground" : "text-muted-foreground")}>
         {p.name}
-        {self && <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">you</span>}
+        {self && <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">（你）</span>}
       </span>
     </div>
   );
@@ -39,9 +39,9 @@ export function RosterSections({ members, selfId }: { members: Participant[]; se
   const agents = members.filter((m) => m.kind === "agent");
   return (
     <>
-      <Section title="humans" list={humans} selfId={selfId} />
+      <Section title="人类" list={humans} selfId={selfId} />
       {humans.length > 0 && agents.length > 0 && <Separator />}
-      <Section title="agents" list={agents} selfId={selfId} />
+      <Section title="智能体" list={agents} selfId={selfId} />
     </>
   );
 }
@@ -49,7 +49,7 @@ export function RosterSections({ members, selfId }: { members: Participant[]; se
 export function Roster({ members, selfId }: { members: Participant[]; selfId?: string }) {
   return (
     <aside
-      aria-label="Members online"
+      aria-label="在线成员"
       // Keyboard-focusable scroll region (WCAG 2.1.1 + axe
       // `scrollable-region-focusable`): otherwise keyboard users can't focus
       // the member list to arrow-scroll it independently.

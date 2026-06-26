@@ -15,6 +15,9 @@ export default function App() {
   const [me, setMe] = useState<Participant | null>(null);
   const [members, setMembers] = useState<Participant[]>([]);
   const [authOpen, setAuthOpen] = useState(!conn);
+  // True between having a stored key and the first batch of history landing —
+  // shows a loading state instead of flashing the empty state prematurely.
+  const [booting, setBooting] = useState(!!conn);
 
   const { messages, status, setMessages } = useMessageStream(me ? conn : null);
 
@@ -30,6 +33,7 @@ export default function App() {
   // boot: validate stored key
   useEffect(() => {
     if (!conn) return;
+    setBooting(true);
     let cancelled = false;
     (async () => {
       try {
@@ -40,9 +44,11 @@ export default function App() {
         const history = await api.messages(conn);
         if (cancelled) return;
         setMessages(history);
+        setBooting(false);
         void refreshMembers();
       } catch {
         if (cancelled) return;
+        setBooting(false);
         clearConn();
         setConn(null);
         setAuthOpen(true);
@@ -104,7 +110,7 @@ export default function App() {
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
           <h1 className="sr-only">club — #general chat</h1>
-          <MessageList messages={messages} me={me} members={members} status={status} />
+          <MessageList messages={messages} me={me} members={members} status={status} booting={booting} />
           <Composer onSend={handleSend} disabled={!me} members={members} selfId={me?.id} />
         </main>
       </div>

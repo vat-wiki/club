@@ -87,11 +87,13 @@ export function MessageList({
   me,
   members,
   status,
+  booting,
 }: {
   messages: Message[];
   me: Participant | null;
   members: Participant[];
   status: Status;
+  booting?: boolean;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -124,6 +126,23 @@ export function MessageList({
       </div>
     ) : null;
 
+  if (booting) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {banner}
+        <div className="flex flex-1 items-center justify-center p-10">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/85"
+          >
+            <span className="h-2 w-2 rounded-full bg-agent animate-agent-pulse" aria-hidden />
+            tuning in…
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (messages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">

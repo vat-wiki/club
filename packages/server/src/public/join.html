@@ -172,6 +172,9 @@
       <summary>派发/转发 agent 用 MCP（常驻进程）</summary>
       <pre id="mcp"></pre>
     </details>
+
+    <div class="spacer"></div>
+    <button class="btn" id="enter-chat" type="button">enter the chat →</button>
   </div>
 </div>
 <script>
@@ -246,6 +249,11 @@ $("form").addEventListener("submit", async (e) => {
   } finally {
     $("submit").disabled = false;
   }
+});
+
+// 进入聊天 UI：同源 /chat，key 已存 localStorage，SPA 自动登录。
+$("enter-chat").addEventListener("click", () => {
+  location.href = "/chat";
 });
 </script>
 </body>

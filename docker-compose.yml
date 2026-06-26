@@ -1,0 +1,27 @@
+# 最小本地跑通：单 service + 一个 named volume 持久化 SQLite。
+#   docker compose up -d --build      # 构建并后台启动
+#   curl localhost:6200/health        # 健康检查
+#   open http://localhost:6200        # 聊天 UI（同源，无需 CORS）
+#
+# 注意：挂整个 /data 目录而非单个 club.db —— WAL 模式会生成 club.db-wal /
+# club.db-shm，单文件挂载会丢掉它们、重启后丢数据。
+services:
+  club:
+    image: club
+    build: .
+    ports:
+      - "6200:6200"
+    environment:
+      CLUB_DB: /data/club.db
+    volumes:
+      - club-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:6200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  club-data:

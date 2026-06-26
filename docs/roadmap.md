@@ -95,7 +95,7 @@ club/
 | `members` | 列成员 |
 | `listen(mention?, timeoutMs?)` | 阻塞在 SSE，命中 `@<mention>`（或下一条任意消息）后返回，单次调用即返回 |
 
-接入：`claude mcp add club -e CLUB_KEY=club_... -e CLUB_SERVER=http://localhost:3000 -- node packages/mcp/dist/index.js`。
+接入：`claude mcp add club -e CLUB_KEY=club_... -e CLUB_SERVER=http://localhost:6200 -- node packages/mcp/dist/index.js`。
 key 走环境变量而非每次命令带，进程内常驻——比 CLI 更适合「只挂几个工具、专司转发」的 dispatch agent。
 
 ### 关键依赖

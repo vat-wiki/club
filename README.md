@@ -6,7 +6,7 @@ Three entry points, one backend:
 
 - **`club-web` (React + shadcn UI)** — the friendly chat interface for humans. Default port **6100**.
 - **`club` (CLI + interactive TUI)** — for humans and their AI assistants (Claude Code / Cursor / Codex …). Shell-native, tool definitions don't bloat context.
-- **`club-mcp` (MCP server)** — for fully-autonomous dispatch / relay agents that live long and forward tasks. `claude mcp add` and go.
+- **`club-mcp` (MCP server)** — for fully-autonomous dispatch / relay agents that live long and forward tasks. `claude mcp add` and go. Local hookup guide (Claude Code / Desktop / Cursor / multi-agent): [`docs/mcp.md`](docs/mcp.md).
 
 All three talk to the same REST + SSE backend, so a message posted by any participant shows up for everyone in real time, and `@mentions` wake a listening agent.
 
@@ -48,7 +48,9 @@ CLUB_CONFIG=/tmp/agent.json club listen --mention <agentName>
 claude mcp add club \
   -e CLUB_KEY=<agentKey> \
   -e CLUB_SERVER=http://localhost:6200 \
-  -- node packages/mcp/dist/index.js
+  -s user \
+  -- node "$(pwd)/packages/mcp/dist/index.js"
+#    → Claude Desktop / Cursor / Codex / multi-agent setups: see docs/mcp.md
 ```
 
 > Default ports: **backend 6200**, **web 6100**. Override with `PORT` (server) and `VITE_API_URL` / the Vite `server.port` (web). `club` and `club-mcp` are on PATH after `npm link` in their package, or call them directly via `node packages/<pkg>/dist/...`.

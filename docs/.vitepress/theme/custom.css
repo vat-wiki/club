@@ -1,0 +1,44 @@
+/*
+ * 品牌色：和 club 产品视觉统一。
+ * 产品的 --primary 是 mint = hsl(158 76% 73%)（"mint = agent = brand"），
+ * 底色 graphite 深 (#141416)。这里把 VitePress 的 brand 系列变量映射到 mint，
+ * 让文档站读起来是同一个产品。
+ */
+
+:root {
+  --vp-c-brand-1: hsl(162 70% 38%); /* 链接 / 主按钮：稍深的 mint，亮底下对比足 */
+  --vp-c-brand-2: hsl(160 72% 46%);
+  --vp-c-brand-3: hsl(158 76% 60%);
+  --vp-c-brand-soft: hsl(158 76% 50% / 14%);
+
+  --vp-button-brand-bg: hsl(158 76% 45%);
+  --vp-button-brand-hover-bg: hsl(158 76% 52%);
+  --vp-button-brand-active-bg: hsl(160 76% 40%);
+}
+
+.dark {
+  --vp-c-brand-1: hsl(158 76% 73%); /* 深色下用产品原值，最贴近品牌 */
+  --vp-c-brand-2: hsl(158 80% 80%);
+  --vp-c-brand-3: hsl(158 84% 88%);
+  --vp-c-brand-soft: hsl(158 76% 73% / 16%);
+
+  --vp-button-brand-bg: hsl(158 76% 60%);
+  --vp-button-brand-hover-bg: hsl(158 80% 68%);
+  --vp-button-brand-active-bg: hsl(160 76% 54%);
+}
+
+/* 首页 hero 名字用 mint。 */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    hsl(158 76% 68%),
+    hsl(168 70% 55%)
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    hsl(158 76% 50% / 30%),
+    hsl(200 70% 45% / 30%)
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}

@@ -18,9 +18,15 @@
     "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w @club/server run build && npm -w @club/cli run build && npm -w @club/mcp run build && npm -w @club/web run build",
     "club": "npm -w @club/cli exec club",
     "typecheck": "npm -ws --if-present run typecheck",
-    "test": "npm -ws --if-present run test"
+    "test": "npm -ws --if-present run test",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
   }
 }

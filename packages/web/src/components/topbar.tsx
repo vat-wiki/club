@@ -1,6 +1,7 @@
 import { LogOut, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MobileRoster } from "@/components/mobile-roster";
+import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { cn } from "@/lib/utils";
 import type { Participant } from "@club/shared";
 
@@ -22,13 +23,20 @@ export function Topbar({
   status,
   members,
   selfId,
-  onSignOut,
+  // The current user's login key, read from localStorage. Null when signed
+  // out (and the topbar is hidden then anyway). Passed down so the ViewKey
+  // dialog and SignOut flow can show/copy it.
+  key_,
+  onSignOutRequest,
 }: {
   meName: string | null;
   status: Status;
   members: Participant[];
   selfId?: string;
-  onSignOut: () => void;
+  key_: string | null;
+  // Triggered by the sign-out button; opens the confirmation dialog rather
+  // than signing out immediately, so the user has a chance to save the key.
+  onSignOutRequest: () => void;
 }) {
   return (
     <header className="flex flex-none items-center gap-3 border-b border-border bg-chrome px-4 py-2.5">
@@ -59,13 +67,18 @@ export function Topbar({
 
       <span aria-hidden className="h-4 w-px flex-none bg-border" />
 
+      {/* View / copy the current login key. Hidden on the tiniest screens'
+          topbar row to avoid crowding; the action is also reachable via the
+          sign-out confirmation dialog. md+ keeps it inline. */}
+      <ViewKeyDialog key_={key_} />
+
       {/* Mobile-only roster trigger + sheet (hidden on >= md where the aside shows) */}
       <MobileRoster members={members} selfId={selfId} onlineCount={members.length} />
 
       <Button
         variant="outline"
         className="tap-target gap-1.5 px-2.5 sm:px-3"
-        onClick={onSignOut}
+        onClick={onSignOutRequest}
         aria-label={`sign out (${meName ?? "switch identity"})`}
         title="sign out"
       >

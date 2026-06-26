@@ -11,6 +11,11 @@ import { Topbar } from "./topbar";
 import { MessageList } from "./message-list";
 import { AuthDialog } from "./auth-dialog";
 import { MobileRoster } from "./mobile-roster";
+import { KeyRevealDialog } from "./key-reveal-dialog";
+import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
+import { ViewKeyDialog } from "./view-key-dialog";
+
+const TEST_KEY = "club_human_test_0123456789abcdef";
 
 const axeOptions: RunOptions = {
   runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
@@ -106,7 +111,8 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         status="connected"
         members={members}
         selfId={me.id}
-        onSignOut={() => {}}
+        key_={TEST_KEY}
+        onSignOutRequest={() => {}}
       />,
     );
   });
@@ -130,7 +136,41 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   });
 
   it("AuthDialog has no violations", async () => {
-    await expectNoViolationsPortal(<AuthDialog open onAuthed={() => {}} />);
+    await expectNoViolationsPortal(
+      <AuthDialog open onCreated={() => {}} onAuthed={() => {}} />,
+    );
+  });
+
+  it("KeyRevealDialog has no violations", async () => {
+    await expectNoViolationsPortal(
+      <KeyRevealDialog open key_={TEST_KEY} onSaved={() => {}} />,
+    );
+  });
+
+  it("SignOutConfirmDialog has no violations", async () => {
+    await expectNoViolationsPortal(
+      <SignOutConfirmDialog
+        open
+        onOpenChange={() => {}}
+        key_={TEST_KEY}
+        onConfirm={() => {}}
+      />,
+    );
+  });
+
+  it("SignOutConfirmDialog has no violations when key is null", async () => {
+    await expectNoViolationsPortal(
+      <SignOutConfirmDialog
+        open
+        onOpenChange={() => {}}
+        key_={null}
+        onConfirm={() => {}}
+      />,
+    );
+  });
+
+  it("ViewKeyDialog has no violations (closed trigger)", async () => {
+    await expectNoViolations(<ViewKeyDialog key_={TEST_KEY} />);
   });
 
   it("MobileRoster trigger meets the mobile tap-target minimum (44px)", async () => {
@@ -151,7 +191,8 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         status="connected"
         members={members}
         selfId={me.id}
-        onSignOut={() => {}}
+        key_={TEST_KEY}
+        onSignOutRequest={() => {}}
       />,
     );
     // The sign-out button is the last button in the topbar; locate it via its
@@ -161,5 +202,23 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     );
     expect(signOut).toBeTruthy();
     expect(signOut?.className).toContain("tap-target");
+  });
+
+  it("Topbar view-key button has an accessible name and tap-target sizing", async () => {
+    const { container } = render(
+      <Topbar
+        meName="alice"
+        status="connected"
+        members={members}
+        selfId={me.id}
+        key_={TEST_KEY}
+        onSignOutRequest={() => {}}
+      />,
+    );
+    const viewKey = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="view your login key"]',
+    );
+    expect(viewKey).toBeTruthy();
+    expect(viewKey?.className).toContain("tap-target");
   });
 });

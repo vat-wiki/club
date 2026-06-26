@@ -10,9 +10,16 @@ type Mode = "create" | "paste";
 
 export function AuthDialog({
   open,
+  // Fired after a brand-new identity is minted. The app intercepts this to
+  // reveal the key before persisting it, so the user actually sees (and can
+  // save) the only credential that lets them back in.
+  onCreated,
+  // Fired after an existing key is validated. Goes straight in — the user
+  // already had the key, so there's nothing to reveal.
   onAuthed,
 }: {
   open: boolean;
+  onCreated: (key: string) => void;
   onAuthed: (key: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("create");
@@ -31,7 +38,10 @@ export function AuthDialog({
     setBusy(true);
     try {
       const { key } = await createParticipant(API_URL, name.trim(), "human");
-      onAuthed(key);
+      // Hand the freshly-minted key to the app WITHOUT persisting it; the app
+      // shows the "your login key" reveal and only saves once the user
+      // acknowledges they've saved it.
+      onCreated(key);
     } catch (e) {
       setError((e as Error).message);
     } finally {

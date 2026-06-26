@@ -22,3 +22,10 @@ export function clearConn() {
   localStorage.removeItem(KEY);
   localStorage.removeItem(SERVER);
 }
+
+// Read the current key from storage without constructing a full ClubConn.
+// Used by UI that just wants to display/copy the key (it may differ from the
+// in-memory conn.key briefly, but for display purposes that's fine).
+export function getKey(): string | null {
+  return localStorage.getItem(KEY);
+}

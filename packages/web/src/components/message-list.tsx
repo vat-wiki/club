@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Message, Participant } from "@club/shared";
-import { fmtTime, fmtDay, renderContent } from "@/lib/format";
+import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Status = "connecting" | "connected" | "lost";
@@ -20,31 +20,61 @@ function MessageRow({
   m,
   self,
   known,
+  selfName,
   showDay,
 }: {
   m: Message;
   self: boolean;
   known: string[];
+  selfName?: string;
   showDay: boolean;
 }) {
   const isAgent = m.authorKind === "agent";
+  const pinged = mentionsSelf(m.content, selfName);
+  // Bubble + alignment scheme (the standard chat-app mental model):
+  //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
+  //   - others: left-aligned, body in a raised-surface bubble (bg-card)
+  // The author kind dot moves to the leading edge of the bubble in both cases
+  // (i.e. on the right for self, on the left for others) via flex-row-reverse,
+  // so it never sits awkwardly on the wrong side after alignment flips.
+  // When a row pings the current user, the whole row gets a faint primary wash
+  // + a left accent bar so it stands out at a glance even while scrolling.
   return (
     <>
       {showDay && <DayRule ms={m.createdAt} />}
-      <div className={cn("grid grid-cols-[14px_1fr] gap-x-2.5 rounded-md px-6 py-1 animate-slide-in transition-colors hover:bg-accent/40", self && "")}>
-        <div className="flex justify-center pt-[7px]">
-          <span className={cn("h-[7px] w-[7px] rounded-full", isAgent ? "bg-agent animate-agent-pulse" : "bg-human")} />
+      <div
+        className={cn(
+          "flex gap-x-2.5 rounded-md px-6 py-1.5 animate-slide-in transition-colors hover:bg-accent/70",
+          self && "flex-row-reverse",
+          pinged && "border-l-2 border-l-primary/40 bg-primary/5",
+        )}
+      >
+        <div className={cn("flex justify-center pt-[7px]", self && "flex-row-reverse")}>
+          <span
+            aria-hidden
+            className={cn("h-[7px] w-[7px] rounded-full", isAgent ? "bg-agent animate-agent-pulse" : "bg-human")}
+          />
         </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-baseline gap-x-2.5">
+        <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
+          <div
+            className={cn(
+              "flex flex-wrap items-baseline gap-x-2.5",
+              self && "flex-row-reverse",
+            )}
+          >
             <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
               {m.authorName}
             </span>
             <span className="font-mono text-[10px] lowercase text-muted-foreground/90">{m.authorKind}</span>
-            <span className="font-mono text-[11px] text-muted-foreground/90">{fmtTime(m.createdAt)}</span>
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt)}</span>
           </div>
-          <div className={cn("whitespace-pre-wrap break-words pb-0.5", self ? "text-foreground" : "text-foreground/90")}>
-            {renderContent(m.content, known)}
+          <div
+            className={cn(
+              "mt-0.5 max-w-[min(100%,44ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
+              self ? "bg-primary/15 text-foreground" : "bg-card text-foreground",
+            )}
+          >
+            {renderContent(m.content, known, selfName)}
           </div>
         </div>
       </div>
@@ -87,9 +117,9 @@ export function MessageList({
     status === "lost" ? (
       <div
         role="status"
-        className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 font-mono text-[11px] text-destructive"
+        className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-300"
       >
-        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+        <AlertTriangle className="h-3.5 w-3.5 animate-pulse" aria-hidden />
         connection lost — retrying
       </div>
     ) : null;
@@ -99,9 +129,10 @@ export function MessageList({
       <div className="flex min-h-0 flex-1 flex-col">
         {banner}
         <div className="flex flex-1 items-center justify-center p-10">
-          <div className="max-w-md text-center">
-            <div className="font-display text-lg font-semibold">The frequency is open.</div>
-            <p className="mt-2 text-sm text-muted-foreground">
+          <div className="max-w-xs text-center">
+            <div className="font-display text-2xl font-semibold tracking-tight">The frequency is open.</div>
+            <div className="mx-auto mt-3 h-px w-8 bg-agent/60" aria-hidden />
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               No transmissions yet. Say something to start — humans and agents read the same channel.
             </p>
           </div>
@@ -133,7 +164,14 @@ export function MessageList({
           const showDay = day !== lastDay;
           lastDay = day;
           return (
-            <MessageRow key={m.id} m={m} self={!!me && m.participantId === me.id} known={known} showDay={showDay} />
+            <MessageRow
+              key={m.id}
+              m={m}
+              self={!!me && m.participantId === me.id}
+              known={known}
+              selfName={me?.name}
+              showDay={showDay}
+            />
           );
         })}
         <div ref={bottomRef} />

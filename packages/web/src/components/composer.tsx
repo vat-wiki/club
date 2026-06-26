@@ -284,7 +284,7 @@ export function Composer({
           rows={1}
           disabled={disabled}
           placeholder="transmit to #general…"
-          className="min-h-[42px] resize-none"
+          className="min-h-[44px] resize-none"
           aria-describedby="composer-hint"
           aria-invalid={error}
           // Combobox semantics: the textarea acts as the input of a combobox
@@ -320,7 +320,7 @@ export function Composer({
           type="submit"
           size="default"
           disabled={disabled || sending || !value.trim()}
-          className="h-[42px] gap-1.5"
+          className="h-[44px] gap-1.5"
         >
           <Send className="h-4 w-4" aria-hidden />
           send

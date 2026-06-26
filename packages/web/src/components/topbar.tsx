@@ -54,7 +54,7 @@ export function Topbar({
         {/* The dot duplicates the visible status word; hide it from AT so the
             state isn't announced twice. Color is never the sole signal. */}
         <span className={cn("h-2 w-2 rounded-full", statusColor[status])} aria-hidden />
-        {statusLabel[status]}
+        <span className="sr-only sm:not-sr-only">{statusLabel[status]}</span>
       </span>
 
       <span aria-hidden className="h-4 w-px flex-none bg-border" />
@@ -69,12 +69,12 @@ export function Topbar({
         aria-label={`sign out (${meName ?? "switch identity"})`}
         title="sign out"
       >
-        <span className="max-w-[10ch] truncate font-mono text-xs">{meName ?? "switch"}</span>
+        <span className="max-w-[6ch] truncate font-mono text-xs sm:max-w-[10ch]">{meName ?? "switch"}</span>
         {/* Always-visible label so the action is discoverable without hover
             (the LogOut icon alone is ambiguous). Muted + tiny to stay quiet
             visually; aria-hidden because the button's accessible name already
             spells it out via aria-label. */}
-        <span aria-hidden className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span aria-hidden className="hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
           sign out
         </span>
         <LogOut className="h-3.5 w-3.5" aria-hidden />

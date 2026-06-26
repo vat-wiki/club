@@ -70,7 +70,10 @@ export function Composer({
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    // Cap auto-growth at 200px (matches the CSS max-h-[200px] on the element);
+    // beyond that the textarea scrolls internally so a long draft doesn't
+    // squeeze the message list out of view.
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, []);
 
   // Measure the caret's pixel position (relative to the textarea's offset
@@ -253,13 +256,32 @@ export function Composer({
 
   return (
     <form
-      className="relative flex-none border-t border-border bg-chrome px-5 py-3 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-agent/0 after:to-transparent after:transition-colors after:duration-slow focus-within:after:via-agent/60"
+      className="relative flex-none border-t border-border bg-chrome px-5 py-3 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-agent/60 after:to-transparent after:opacity-0 after:transition-opacity after:duration-slow focus-within:after:opacity-100"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
       }}
     >
-      <div className="relative flex items-end gap-2.5">
+      {/*
+        The flex row is itself the "input bar" container: one shared raised
+        surface (bg-card, one step above the message-list bg) + a visible
+        border (L26%, ~2.3:1 on the deep neutral — a real edge instead of the
+        near-invisible default). textarea and send button read as two parts of
+        a single bar, not two unrelated widgets. p-0.5 insets them so the mint
+        button never kisses the container edge. Pure CSS — no extra DOM.
+
+        Focus linkage (P1): on focus-within the container border switches from
+        the neutral L26 grey to brand mint at 50% opacity (border-agent/50),
+        concentrating the brand signal on a SINGLE container edge — Linear /
+        Vercel style — instead of three scattered mint signals (inner textarea
+        ring + neutral container edge + bottom gradient). The textarea's own
+        ring is dropped (see below) so there's no "inner mint + outer grey"
+        double-line. transition-colors respects prefers-reduced-motion via the
+        global * wildcard in index.css. No box-shadow glow: the single mint
+        edge is already a clear, AA-compliant focus indicator (≥3:1 on the
+        adjacent chrome), so a glow would be over-design.
+      */}
+      <div className="relative flex items-end gap-2.5 rounded-md border border-[hsl(240_5%_26%)] bg-card p-0.5 transition-colors duration-150 focus-within:border-agent/50">
         {/* Mention popup: anchored relative to this flex row (the textarea's
             offset parent). Rendered above the caret line. */}
         {popupOpen && (
@@ -284,7 +306,22 @@ export function Composer({
           rows={1}
           disabled={disabled}
           placeholder="transmit to #general…"
-          className="min-h-[44px] resize-none"
+          // The textarea dissolves into the input-bar container: transparent
+          // background (inherits the container's bg-card) and no border of its
+          // own, so the container edge is the single, clean input boundary
+          // (P0-1/P0-4). Focus feedback is carried SOLELY by the container's
+          // mint border (focus-within:border-agent/50, see the flex row above)
+          // plus the form's bottom `after:` baseline — a single brand edge,
+          // not an inner textarea ring + outer grey edge double-line (P1).
+          // The native caret still marks the insertion point. Per WCAG 2.4.7
+          // the container mint border is the visible focus indicator (≥3:1 on
+          // adjacent chrome), so no per-field ring is needed.
+          //
+          // Height: ~48px on mobile (narrow viewport, don't eat message
+          // space), 56px (~1.5 lines) from sm up — a chat-sized surface, not
+          // a search-box sliver (P0-5). max-h + internal scroll cap long
+          // drafts so the message list stays visible.
+          className="min-h-[48px] resize-none border-0 bg-transparent px-3.5 py-3 focus-visible:ring-0 focus-visible:ring-offset-0 sm:min-h-[56px] max-h-[200px] overflow-y-auto"
           aria-describedby="composer-hint"
           aria-invalid={error}
           // Combobox semantics: the textarea acts as the input of a combobox
@@ -320,7 +357,16 @@ export function Composer({
           type="submit"
           size="default"
           disabled={disabled || sending || !value.trim()}
-          className="h-[44px] gap-1.5"
+          // Match the textarea's min-height (48px mobile / 56px sm up) so the
+          // button and the textarea are co-heighted in the common single-line
+          // case. The container is `items-end`, so when both share the same
+          // height they're not only bottom-aligned but also vertically
+          // centered — fixing the "send button sits too low / off-center in
+          // the focused input bar" issue (the 44px fixed button left a 12px
+          // gap on top, 3px on bottom → button center 6px below textarea
+          // center). When the textarea grows past min-height (multi-line),
+          // `items-end` still correctly anchors the button to the bottom.
+          className="min-h-[48px] gap-1.5 sm:min-h-[56px]"
         >
           <Send className="h-4 w-4" aria-hidden />
           send

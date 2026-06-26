@@ -154,7 +154,11 @@ export function MessageList({
         aria-label="Messages in #general"
         aria-live="polite"
         aria-relevant="additions"
-        className="flex-1 overflow-y-auto py-5 scrollbar-thin"
+        // Make the scroll region keyboard-focusable (WCAG 2.1.1 + axe
+        // `scrollable-region-focusable`): without tabindex, keyboard-only users
+        // can't bring the log into focus to arrow-scroll through history.
+        tabIndex={0}
+        className="flex-1 overflow-y-auto py-5 scrollbar-thin outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring/40"
         style={{
           backgroundImage: "radial-gradient(900px 360px at 78% -8%, hsl(var(--agent-soft)), transparent 70%)",
         }}

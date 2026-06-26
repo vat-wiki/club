@@ -8,7 +8,7 @@ type Status = "connecting" | "connected" | "lost";
 
 function DayRule({ ms }: { ms: number }) {
   return (
-    <div className="mx-6 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/85">
+    <div className="mx-6 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85">
       <span className="h-px flex-1 bg-border/60" />
       {fmtDay(ms)}
       <span className="h-px flex-1 bg-border/60" />

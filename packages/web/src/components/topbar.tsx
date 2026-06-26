@@ -53,7 +53,7 @@ export function Topbar({
         <Radio className="h-3.5 w-3.5" aria-hidden />
         {/* The dot duplicates the visible status word; hide it from AT so the
             state isn't announced twice. Color is never the sole signal. */}
-        <span className={cn("h-2 w-2 rounded-full", statusColor[status])} aria-hidden />
+        <span className={cn("h-2 w-2 rounded-full transition-colors duration-slow", statusColor[status])} aria-hidden />
         <span className="sr-only sm:not-sr-only">{statusLabel[status]}</span>
       </span>
 

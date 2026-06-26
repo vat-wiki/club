@@ -256,7 +256,20 @@ export function Composer({
 
   return (
     <form
-      className="relative flex-none border-t border-border bg-chrome px-5 py-3 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-agent/60 after:to-transparent after:opacity-0 after:transition-opacity after:duration-slow focus-within:after:opacity-100"
+      // Surface & chrome. The `after:` baseline is a brand "breath" line: at
+      // rest a barely-there mint at opacity 0.08 (a hint of the input edge,
+      // not noise), brightening to opacity 0.6 on focus-within, eased via
+      // transition-opacity. The whole form lifts -1px on focus with a soft
+      // up-shadow (P2-1) — read as the input bar "waking up".
+      // Reduced-motion: the global `* { transition-duration: 0.001ms }` in
+      // index.css only collapses the *easing*, not the end-state, so the -1px
+      // lift and the shadow would still apply under prefers-reduced-motion.
+      // We guard them explicitly with `motion-reduce:!transform-none` +
+      // `motion-reduce:!shadow-none` (the `!` is required: same-specificity
+      // variants would otherwise let focus-within win). (The after-opacity
+      // state switch is a
+      // state signal, not motion, so it intentionally stays.)
+      className="relative flex-none border-t border-border bg-chrome px-5 py-3 transition-transform duration-200 ease-out focus-within:-translate-y-px focus-within:shadow-[0_-4px_16px_-8px_hsl(0_0%_0%/0.5)] motion-reduce:!transform-none motion-reduce:!shadow-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-agent after:to-transparent after:opacity-[0.08] after:transition-opacity after:duration-300 after:ease-out focus-within:after:opacity-60"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -305,7 +318,7 @@ export function Composer({
           value={value}
           rows={1}
           disabled={disabled}
-          placeholder="transmit to #general…"
+          placeholder="transmit a message to #general…"
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
           // own, so the container edge is the single, clean input boundary
@@ -366,7 +379,15 @@ export function Composer({
           // gap on top, 3px on bottom → button center 6px below textarea
           // center). When the textarea grows past min-height (multi-line),
           // `items-end` still correctly anchors the button to the bottom.
-          className="min-h-[48px] gap-1.5 sm:min-h-[56px]"
+          // P2-2: disabled collapses to a neutral grey (bg-muted + muted-
+          // foreground, opacity 100 so the text stays legible) — the mint is
+          // reserved as the "ready to send" signal, lit only when there's
+          // something to transmit. This stops the empty-state mint button from
+          // out-shouting the input. base Button applies disabled:opacity-50;
+          // we override to 100 because opacity-50 on muted text would push it
+          // below AA. disabled text/bg still clear AA here (≈6.5:1), and the
+          // disabled control is itself WCAG-eligible but we keep it legible.
+          className="min-h-[48px] gap-1.5 enabled:bg-primary enabled:text-primary-foreground disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:min-h-[56px]"
         >
           <Send className="h-4 w-4" aria-hidden />
           send

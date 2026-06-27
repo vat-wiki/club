@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
 import type { Message, Participant } from "@club/shared";
 
+import { renderWithI18n } from "@/test/i18n-wrap";
 import { MessageList } from "./message-list";
 
 // Behavioral coverage for the bubble + alignment scheme (P0-1) and the
@@ -41,7 +41,7 @@ describe("MessageList — own vs others + self-mention signal", () => {
       mk(me, "hello from alice herself", "own"),
       mk(bot, "hi from the bot here", "other"),
     ];
-    const { container } = render(
+    const { container } = renderWithI18n(
       <MessageList messages={messages} me={me} members={members} status="connected" />,
     );
 
@@ -69,7 +69,7 @@ describe("MessageList — own vs others + self-mention signal", () => {
       mk(bot, "hey @alice you there", "pinged"),
       mk(bot, "just chatting here", "other"),
     ];
-    const { container } = render(
+    const { container } = renderWithI18n(
       <MessageList messages={messages} me={me} members={members} status="connected" />,
     );
     const pingedRow = rowContaining(container, "@alice you there");
@@ -82,7 +82,7 @@ describe("MessageList — own vs others + self-mention signal", () => {
 
   it("renders the inline self-mention mark in the primary palette (not amber)", () => {
     const messages = [mk(bot, "hey @alice you there", "pinged")];
-    const { container } = render(
+    const { container } = renderWithI18n(
       <MessageList messages={messages} me={me} members={members} status="connected" />,
     );
     const mark = container.querySelector("mark");
@@ -96,7 +96,7 @@ describe("MessageList — own vs others + self-mention signal", () => {
   it("renders an other-mention mark in the amber palette", () => {
     // alice's own message pinging bot — bot is NOT self, so amber
     const messages = [mk(me, "ping @bot please", "m1")];
-    const { container } = render(
+    const { container } = renderWithI18n(
       <MessageList messages={messages} me={me} members={members} status="connected" />,
     );
     const mark = container.querySelector("mark");

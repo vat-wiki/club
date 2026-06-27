@@ -1,19 +1,30 @@
 import type { ReactNode } from "react";
 import type { Message, Participant } from "@club/shared";
 
-export function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString("zh-CN", {
+// Default locale keeps the previous zh-CN behavior when a caller doesn't pass
+// one (e.g. unit tests). Components pass the active locale from useI18n() so
+// the rendered time/day follows the user's language choice.
+const DEFAULT_LOCALE = "zh-CN";
+
+export function fmtTime(ms: number, locale: string = DEFAULT_LOCALE): string {
+  return new Date(ms).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
 }
 
-export function fmtDay(ms: number): string {
+// `todayLabel` lets the caller localize the "Today" separator without this
+// module depending on the i18n dictionary. Falls back to the zh "今天".
+export function fmtDay(
+  ms: number,
+  locale: string = DEFAULT_LOCALE,
+  todayLabel: string = "今天",
+): string {
   const d = new Date(ms);
   return d.toDateString() === new Date().toDateString()
-    ? "今天"
-    : d.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+    ? todayLabel
+    : d.toLocaleDateString(locale, { month: "long", day: "numeric" });
 }
 
 // Highlight a `@handle`. The token is "one or more letters / digits / underscore

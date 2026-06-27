@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useCopy } from "@/hooks/use-copy";
+import { useT } from "@/lib/i18n";
 
 // Confirmation shown before sign-out. clearConn wipes the key from this
 // machine, so we give the user one last chance to copy it. Without this, a
@@ -26,27 +27,26 @@ export function SignOutConfirmDialog({
   key_: string | null;
   onConfirm: () => void;
 }) {
+  const t = useT();
   const { state, copy } = useCopy();
   const copied = state === "copied";
   const failed = state === "failed";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[440px] gap-5">
+      <DialogContent className="max-w-[440px] gap-5" closeLabel={t("dialog.close")}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LogOut className="h-5 w-5 text-human" aria-hidden />
-            确认退出登录？
+            {t("signOut.title")}
           </DialogTitle>
-          <DialogDescription>
-            退出会清除当前浏览器的登录密钥。之后若想回到这个身份（换浏览器、清缓存、重装），需要用到密钥。如果还没保存，请现在复制——退出后无法找回。
-          </DialogDescription>
+          <DialogDescription>{t("signOut.desc")}</DialogDescription>
         </DialogHeader>
 
         {key_ && (
           <div className="space-y-2">
             <p id="signout-key-label" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              你的登录密钥
+              {t("signOut.label")}
             </p>
             <output
               aria-labelledby="signout-key-label"
@@ -63,19 +63,19 @@ export function SignOutConfirmDialog({
               {copied ? (
                 <>
                   <Check className="h-4 w-4" aria-hidden />
-                  已复制
+                  {t("signOut.copied")}
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  复制登录密钥
+                  {t("signOut.copy")}
                 </>
               )}
             </Button>
 
             {failed && (
               <p role="alert" className="text-sm text-destructive">
-                复制失败——请手动选中上方的密钥进行复制。
+                {t("signOut.copyFailed")}
               </p>
             )}
 
@@ -85,17 +85,17 @@ export function SignOutConfirmDialog({
               aria-live="polite"
               className="sr-only"
             >
-              {copied ? "登录密钥已复制到剪贴板" : ""}
+              {copied ? t("signOut.copyAnnounced") : ""}
             </p>
           </div>
         )}
 
         <div className="flex flex-row gap-2 sm:justify-between">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
+            {t("signOut.cancel")}
           </Button>
           <Button variant="destructive" onClick={onConfirm}>
-            退出登录
+            {t("signOut.confirm")}
           </Button>
         </div>
       </DialogContent>

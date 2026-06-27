@@ -4,6 +4,7 @@ import type { ClubConn } from "@club/sdk";
 import { loadConn, saveConn, clearConn, API_URL, getKey } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useMessageStream } from "@/hooks/use-message-stream";
+import { useI18n } from "@/lib/i18n";
 import { Topbar } from "@/components/topbar";
 import { Roster } from "@/components/roster";
 import { MessageList } from "@/components/message-list";
@@ -13,6 +14,7 @@ import { KeyRevealDialog } from "@/components/key-reveal-dialog";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 
 export default function App() {
+  const { t } = useI18n();
   const [conn, setConn] = useState<ClubConn | null>(() => loadConn());
   const [me, setMe] = useState<Participant | null>(null);
   const [members, setMembers] = useState<Participant[]>([]);
@@ -108,6 +110,11 @@ export default function App() {
     setAuthOpen(true);
   };
 
+  // Keep the document title in sync with the active language.
+  useEffect(() => {
+    document.title = t("app.title");
+  }, [t]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Skip link: first focusable element, lets keyboard/SR users jump to the
@@ -116,7 +123,7 @@ export default function App() {
         href="#main"
         className="sr-only z-[60] rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:left-3 focus:top-3"
       >
-        跳到聊天
+        {t("app.skipToChat")}
       </a>
 
       {me && (
@@ -135,7 +142,7 @@ export default function App() {
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
-          <h1 className="sr-only">club — #general 聊天室</h1>
+          <h1 className="sr-only">{t("app.h1")}</h1>
           <MessageList messages={messages} me={me} members={members} status={status} booting={booting} />
           <Composer onSend={handleSend} disabled={!me} members={members} selfId={me?.id} />
         </main>

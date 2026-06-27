@@ -14,6 +14,15 @@ describe("fmtDay", () => {
     expect(label).not.toBe("今天");
     expect(label).toMatch(/\d/); // locale-independent: a day number is present
   });
+
+  it("honors a caller-supplied locale + today label (i18n)", () => {
+    // Today, in English: the localized "Today" label wins.
+    expect(fmtDay(Date.now(), "en-US", "Today")).toBe("Today");
+    // A passed locale shapes the older-date format.
+    const d = new Date();
+    d.setDate(d.getDate() - 5);
+    expect(fmtDay(d.getTime(), "en-US", "Today")).not.toBe("Today");
+  });
 });
 
 describe("fmtTime", () => {

@@ -1,8 +1,10 @@
 import type { Participant } from "@club/shared";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 
 function Row({ p, self }: { p: Participant; self: boolean }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 rounded-md px-4 py-1.5 text-sm transition-colors hover:bg-accent/70">
       <span
@@ -13,7 +15,7 @@ function Row({ p, self }: { p: Participant; self: boolean }) {
       />
       <span className={cn("truncate", self ? "text-foreground" : "text-muted-foreground")}>
         {p.name}
-        {self && <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">（你）</span>}
+        {self && <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">{t("roster.you")}</span>}
       </span>
     </div>
   );
@@ -35,21 +37,23 @@ function Section({ title, list, selfId }: { title: string; list: Participant[]; 
 
 // Shared roster body — rendered inside the desktop aside and the mobile sheet.
 export function RosterSections({ members, selfId }: { members: Participant[]; selfId?: string }) {
+  const t = useT();
   const humans = members.filter((m) => m.kind === "human");
   const agents = members.filter((m) => m.kind === "agent");
   return (
     <>
-      <Section title="人类" list={humans} selfId={selfId} />
+      <Section title={t("roster.humans")} list={humans} selfId={selfId} />
       {humans.length > 0 && agents.length > 0 && <Separator />}
-      <Section title="智能体" list={agents} selfId={selfId} />
+      <Section title={t("roster.agents")} list={agents} selfId={selfId} />
     </>
   );
 }
 
 export function Roster({ members, selfId }: { members: Participant[]; selfId?: string }) {
+  const t = useT();
   return (
     <aside
-      aria-label="在线成员"
+      aria-label={t("roster.onlineLabel")}
       // Keyboard-focusable scroll region (WCAG 2.1.1 + axe
       // `scrollable-region-focusable`): otherwise keyboard users can't focus
       // the member list to arrow-scroll it independently.

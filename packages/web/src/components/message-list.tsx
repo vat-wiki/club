@@ -2,15 +2,17 @@ import { useEffect, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Message, Participant } from "@club/shared";
 import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Status = "connecting" | "connected" | "lost";
 
 function DayRule({ ms }: { ms: number }) {
+  const { locale, t } = useI18n();
   return (
     <div className="mx-6 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85">
       <span className="h-px flex-1 bg-border/60" />
-      {fmtDay(ms)}
+      {fmtDay(ms, locale, t("date.today"))}
       <span className="h-px flex-1 bg-border/60" />
     </div>
   );
@@ -29,6 +31,7 @@ function MessageRow({
   selfName?: string;
   showDay: boolean;
 }) {
+  const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
   const pinged = mentionsSelf(m.content, selfName);
   // Bubble + alignment scheme (the standard chat-app mental model):
@@ -66,9 +69,9 @@ function MessageRow({
               {m.authorName}
             </span>
             <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
-              {m.authorKind === "agent" ? "智能体" : "人类"}
+              {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
             </span>
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt)}</span>
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
           </div>
           <div
             className={cn(
@@ -97,6 +100,7 @@ export function MessageList({
   status: Status;
   booting?: boolean;
 }) {
+  const { locale, t } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -124,7 +128,7 @@ export function MessageList({
         className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-300"
       >
         <AlertTriangle className="h-3.5 w-3.5 animate-pulse" aria-hidden />
-        连接已断开——正在重连
+        {t("msg.disconnected")}
       </div>
     ) : null;
 
@@ -139,7 +143,7 @@ export function MessageList({
             className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/85"
           >
             <span className="h-2 w-2 rounded-full bg-agent animate-agent-pulse" aria-hidden />
-            正在接入…
+            {t("msg.connecting")}
           </div>
         </div>
       </div>
@@ -151,10 +155,10 @@ export function MessageList({
         {banner}
         <div className="flex flex-1 items-center justify-center p-10">
           <div className="max-w-xs text-center">
-            <div className="font-display text-2xl font-semibold tracking-tight">频道已开启。</div>
+            <div className="font-display text-2xl font-semibold tracking-tight">{t("msg.empty.title")}</div>
             <div className="mx-auto mt-3 h-px w-8 bg-agent/60" aria-hidden />
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              还没有任何消息。说点什么开场吧——人和 agent 在同一个频道。
+              {t("msg.empty.body")}
             </p>
           </div>
         </div>
@@ -172,7 +176,7 @@ export function MessageList({
         // users hear new messages arrive without leaving the composer. The
         // visible label is hidden but names the region for SR navigation.
         role="log"
-        aria-label="#general 的消息"
+        aria-label={t("msg.logLabel")}
         aria-live="polite"
         aria-relevant="additions"
         // Make the scroll region keyboard-focusable (WCAG 2.1.1 + axe
@@ -185,7 +189,7 @@ export function MessageList({
         }}
       >
         {messages.map((m) => {
-          const day = fmtDay(m.createdAt);
+          const day = fmtDay(m.createdAt, locale, t("date.today"));
           const showDay = day !== lastDay;
           lastDay = day;
           return (

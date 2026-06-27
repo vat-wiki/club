@@ -2,6 +2,8 @@ import { LogOut, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MobileRoster } from "@/components/mobile-roster";
 import { ViewKeyDialog } from "@/components/view-key-dialog";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Participant } from "@club/shared";
 
@@ -12,10 +14,11 @@ const statusColor: Record<Status, string> = {
   connecting: "bg-human",
   lost: "bg-destructive",
 };
-const statusLabel: Record<Status, string> = {
-  connected: "已连接",
-  connecting: "连接中",
-  lost: "重新连接中",
+// Status word keys, resolved via t() so they follow the active language.
+const statusKey: Record<Status, string> = {
+  connected: "status.connected",
+  connecting: "status.connecting",
+  lost: "status.reconnecting",
 };
 
 export function Topbar({
@@ -38,6 +41,7 @@ export function Topbar({
   // than signing out immediately, so the user has a chance to save the key.
   onSignOutRequest: () => void;
 }) {
+  const t = useT();
   return (
     <header className="flex flex-none items-center gap-3 border-b border-border bg-chrome px-4 py-2.5">
       <div className="flex items-baseline gap-2">
@@ -62,10 +66,13 @@ export function Topbar({
         {/* The dot duplicates the visible status word; hide it from AT so the
             state isn't announced twice. Color is never the sole signal. */}
         <span className={cn("h-2 w-2 rounded-full transition-colors duration-slow", statusColor[status])} aria-hidden />
-        <span className="sr-only sm:not-sr-only">{statusLabel[status]}</span>
+        <span className="sr-only sm:not-sr-only">{t(statusKey[status])}</span>
       </span>
 
       <span aria-hidden className="h-4 w-px flex-none bg-border" />
+
+      {/* Language switcher: persists the choice to localStorage. */}
+      <LanguageSwitcher />
 
       {/* View / copy the current login key. Hidden on the tiniest screens'
           topbar row to avoid crowding; the action is also reachable via the
@@ -79,16 +86,21 @@ export function Topbar({
         variant="outline"
         className="tap-target gap-1.5 px-2.5 sm:px-3"
         onClick={onSignOutRequest}
-        aria-label={`退出登录（${meName ?? "切换身份"}）`}
-        title="退出登录"
+        aria-label={t("topbar.signOut.aria", {
+          name: meName ?? t("topbar.signOut.switchIdentity"),
+        })}
+        title={t("topbar.signOut.title")}
+        data-testid="sign-out-button"
       >
-        <span className="max-w-[6ch] truncate font-mono text-xs sm:max-w-[10ch]">{meName ?? "切换"}</span>
+        <span className="max-w-[6ch] truncate font-mono text-xs sm:max-w-[10ch]">
+          {meName ?? t("topbar.signOut.short")}
+        </span>
         {/* Always-visible label so the action is discoverable without hover
             (the LogOut icon alone is ambiguous). Muted + tiny to stay quiet
             visually; aria-hidden because the button's accessible name already
             spells it out via aria-label. */}
         <span aria-hidden className="hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
-          退出
+          {t("topbar.signOut.label")}
         </span>
         <LogOut className="h-3.5 w-3.5" aria-hidden />
       </Button>

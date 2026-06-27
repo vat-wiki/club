@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useCopy } from "@/hooks/use-copy";
+import { useT } from "@/lib/i18n";
 
 // Shown right after a brand-new identity is minted. The app has NOT persisted
 // the key yet — it only does so once the user clicks "I've saved it". This is
@@ -28,6 +29,7 @@ export function KeyRevealDialog({
   // persists the key and enters the room.
   onSaved: () => void;
 }) {
+  const t = useT();
   const { state, copy } = useCopy();
   const savedRef = useRef<HTMLButtonElement>(null);
 
@@ -65,17 +67,15 @@ export function KeyRevealDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-human" aria-hidden />
-            请保存你的登录密钥
+            {t("keyReveal.title")}
           </DialogTitle>
-          <DialogDescription>
-            这是回到当前身份的唯一凭证。请妥善保存——club 不会替你保存，丢失后也无法找回。
-          </DialogDescription>
+          <DialogDescription>{t("keyReveal.desc")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="space-y-1.5">
             <p id="key-reveal-label" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              你的登录密钥
+              {t("keyReveal.label")}
             </p>
             {/* Break-all so the long key wraps instead of overflowing on
                 narrow viewports; font-mono so it's unambiguous. */}
@@ -99,19 +99,19 @@ export function KeyRevealDialog({
               {copied ? (
                 <>
                   <Check className="h-4 w-4" aria-hidden />
-                  已复制
+                  {t("keyReveal.copied")}
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  复制登录密钥
+                  {t("keyReveal.copy")}
                 </>
               )}
             </Button>
 
             {failed && (
               <p role="alert" className="text-sm text-destructive">
-                复制失败——请手动选中上方的密钥进行复制。
+                {t("keyReveal.copyFailed")}
               </p>
             )}
 
@@ -123,13 +123,13 @@ export function KeyRevealDialog({
               aria-live="polite"
               className="sr-only"
             >
-              {copied ? "登录密钥已复制到剪贴板" : ""}
+              {copied ? t("keyReveal.copyAnnounced") : ""}
             </p>
           </div>
         </div>
 
         <Button className="w-full" onClick={onSaved}>
-          已保存，进入聊天室
+          {t("keyReveal.saved")}
         </Button>
       </DialogContent>
     </Dialog>

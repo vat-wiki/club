@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { api, createParticipant } from "@/lib/api";
 import { API_URL } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 
 type Mode = "create" | "paste";
 
@@ -22,6 +23,7 @@ export function AuthDialog({
   onCreated: (key: string) => void;
   onAuthed: (key: string) => void;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<Mode>("create");
   const [name, setName] = useState("");
   const [pasteKey, setPasteKey] = useState("");
@@ -32,7 +34,7 @@ export function AuthDialog({
   const create = async () => {
     setError("");
     if (!name.trim()) {
-      setError("先起个昵称吧");
+      setError(t("auth.nameRequired"));
       return;
     }
     setBusy(true);
@@ -56,7 +58,7 @@ export function AuthDialog({
     setError("");
     const key = pasteKey.trim();
     if (!key) {
-      setError("请粘贴你的登录密钥");
+      setError(t("auth.pasteRequired"));
       return;
     }
     setBusy(true);
@@ -64,7 +66,7 @@ export function AuthDialog({
       await api.me({ server: API_URL, key });
       onAuthed(key);
     } catch {
-      setError("这个密钥无法识别——请检查后重试");
+      setError(t("auth.keyUnrecognized"));
       setPasteKey("");
       requestAnimationFrame(() => keyInputRef.current?.focus());
     } finally {
@@ -93,21 +95,19 @@ export function AuthDialog({
             club<span className="text-agent">.</span>
           </DialogTitle>
           <DialogDescription>
-            {mode === "create"
-              ? "起个昵称加入聊天室。"
-              : "用已有的登录密钥进入。"}
+            {mode === "create" ? t("auth.desc.create") : t("auth.desc.paste")}
           </DialogDescription>
         </DialogHeader>
 
         {mode === "create" ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">昵称</Label>
+              <Label htmlFor="name">{t("auth.field.nickname")}</Label>
               <Input
                 id="name"
                 value={name}
                 maxLength={40}
-                placeholder="例如：小明"
+                placeholder={t("auth.field.nicknamePlaceholder")}
                 autoComplete="off"
                 aria-required="true"
                 aria-invalid={!!error}
@@ -117,13 +117,13 @@ export function AuthDialog({
               />
             </div>
             <Button className="w-full" disabled={busy} onClick={create}>
-              {busy ? "加入中…" : "加入"}
+              {busy ? t("auth.join.busy") : t("auth.join")}
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="key">粘贴已有密钥</Label>
+              <Label htmlFor="key">{t("auth.field.pasteKey")}</Label>
               <Input
                 ref={keyInputRef}
                 id="key"
@@ -137,7 +137,7 @@ export function AuthDialog({
               />
             </div>
             <Button className="w-full" disabled={busy} onClick={paste}>
-              {busy ? "验证中…" : "进入"}
+              {busy ? t("auth.enter.busy") : t("auth.enter")}
             </Button>
           </div>
         )}
@@ -156,7 +156,7 @@ export function AuthDialog({
             setMode(mode === "create" ? "paste" : "create");
           }}
         >
-          {mode === "create" ? "已有密钥？" : "创建一个新的"}
+          {mode === "create" ? t("auth.switchToPaste") : t("auth.switchToCreate")}
         </button>
       </DialogContent>
     </Dialog>

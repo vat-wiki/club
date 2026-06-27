@@ -4,6 +4,7 @@ import type { Participant } from "@club/shared";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MentionPopup } from "@/components/mention-popup";
+import { useT } from "@/lib/i18n";
 import {
   applyMention,
   detectMention,
@@ -25,6 +26,7 @@ export function Composer({
   /** Current participant id; excluded from mention candidates. */
   selfId?: string;
 }) {
+  const t = useT();
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
   // last failed draft — restored into the textarea on failure so the user can
@@ -310,7 +312,7 @@ export function Composer({
         {/* Visually-hidden label gives the textarea an accessible name; the
             placeholder alone is not a substitute (WCAG 1.3.1 / 3.3.2). */}
         <label htmlFor="composer-input" className="sr-only">
-          给 #general 发消息
+          {t("composer.label")}
         </label>
         <Textarea
           ref={ref}
@@ -318,7 +320,7 @@ export function Composer({
           value={value}
           rows={1}
           disabled={disabled}
-          placeholder="给 #general 发条消息…"
+          placeholder={t("composer.placeholder")}
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
           // own, so the container edge is the single, clean input boundary
@@ -390,7 +392,7 @@ export function Composer({
           className="min-h-[48px] gap-1.5 enabled:bg-primary enabled:text-primary-foreground disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:min-h-[56px]"
         >
           <Send className="h-4 w-4" aria-hidden />
-          发送
+          {t("composer.send")}
         </Button>
       </div>
       {error ? (
@@ -399,15 +401,15 @@ export function Composer({
           className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-destructive"
         >
           <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-          发送失败——请检查网络后重试
+          {t("composer.sendFailed")}
         </p>
       ) : (
         <p
           id="composer-hint"
           className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90"
         >
-          回车发送 · shift+回车换行
-          {popupOpen ? " · ↑↓ 选择 · 回车@提及 · esc 取消" : ""}
+          {t("composer.hint")}
+          {popupOpen ? t("composer.hintMention") : ""}
         </p>
       )}
     </form>

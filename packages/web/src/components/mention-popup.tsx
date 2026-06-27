@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Participant } from "@club/shared";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { MENTION_MAX_VISIBLE } from "@/lib/mention";
 
 /**
@@ -34,6 +35,7 @@ export function MentionPopup({
   onHover?: (index: number) => void;
 }) {
   const listRef = useRef<HTMLUListElement>(null);
+  const t = useT();
   const visible = members.slice(0, MENTION_MAX_VISIBLE);
   const hasOverflow = members.length > MENTION_MAX_VISIBLE;
 
@@ -56,7 +58,7 @@ export function MentionPopup({
       ref={listRef}
       role="listbox"
       id="mention-listbox"
-      aria-label="提及某人"
+      aria-label={t("mention.aria")}
       data-testid="mention-popup"
       className="absolute z-50 max-h-[min(240px,60vh)] w-64 overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/40 scrollbar-thin"
       style={{
@@ -73,7 +75,7 @@ export function MentionPopup({
           role="presentation"
           className="px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground"
         >
-          没有匹配“{query}”的成员
+          {t("mention.noMatch", { query })}
         </li>
       ) : (
         visible.map((m, i) => (
@@ -105,7 +107,7 @@ export function MentionPopup({
             />
             <span className="truncate">{m.name}</span>
             <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              {m.kind === "agent" ? "智能体" : "人类"}
+              {m.kind === "agent" ? t("mention.kindAgent") : t("mention.kindHuman")}
             </span>
           </li>
         ))
@@ -115,7 +117,7 @@ export function MentionPopup({
           aria-hidden
           className="px-2.5 py-1 text-center font-mono text-[10px] text-muted-foreground/80"
         >
-          +{members.length - MENTION_MAX_VISIBLE} 个更多——继续输入以缩小范围
+          {t("mention.more", { count: members.length - MENTION_MAX_VISIBLE })}
         </li>
       )}
     </ul>

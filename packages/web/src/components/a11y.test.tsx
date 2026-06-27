@@ -14,6 +14,7 @@ import { MobileRoster } from "./mobile-roster";
 import { KeyRevealDialog } from "./key-reveal-dialog";
 import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { ViewKeyDialog } from "./view-key-dialog";
+import { withI18n } from "@/test/i18n-wrap";
 
 const TEST_KEY = "club_human_test_0123456789abcdef";
 
@@ -41,7 +42,7 @@ function summarize(results: AxeResults): string {
 // the WCAG 2.1 A/AA rule sets. Color-contrast is auto-skipped under jsdom
 // (no layout engine); it is covered by the browser-level audit instead.
 async function expectNoViolations(ui: ReactNode) {
-  const { container } = render(ui);
+  const { container } = render(withI18n(ui));
   document.body.innerHTML = "";
   document.body.appendChild(container);
   const results: AxeResults = await axe.run(container, axeOptions);
@@ -53,7 +54,7 @@ async function expectNoViolations(ui: ReactNode) {
 // tear down with unmount() rather than clobbering body.innerHTML (which races
 // with Radix's own portal cleanup and throws NotFoundError).
 async function expectNoViolationsPortal(ui: ReactNode) {
-  const rendered = render(ui);
+  const rendered = render(withI18n(ui));
   // Let Radix mount the portal content into body.
   await new Promise((r) => setTimeout(r, 0));
   const results: AxeResults = await axe.run(document.body, axeOptions);
@@ -175,7 +176,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MobileRoster trigger meets the mobile tap-target minimum (44px)", async () => {
     const { container } = render(
-      <MobileRoster members={members} selfId={me.id} onlineCount={members.length} />,
+      withI18n(<MobileRoster members={members} selfId={me.id} onlineCount={members.length} />),
     );
     const trigger = container.querySelector("button");
     expect(trigger).toBeTruthy();
@@ -186,19 +187,21 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("Topbar sign-out button meets the mobile tap-target minimum (44px)", async () => {
     const { container } = render(
-      <Topbar
-        meName="alice"
-        status="connected"
-        members={members}
-        selfId={me.id}
-        key_={TEST_KEY}
-        onSignOutRequest={() => {}}
-      />,
+      withI18n(
+        <Topbar
+          meName="alice"
+          status="connected"
+          members={members}
+          selfId={me.id}
+          key_={TEST_KEY}
+          onSignOutRequest={() => {}}
+        />,
+      ),
     );
-    // The sign-out button is the last button in the topbar; locate it via its
-    // aria-label rather than positional order for robustness.
+    // Locate the sign-out button by its stable testid (the visible/aria text is
+    // now language-dependent, so we don't key off a localized string).
     const signOut = container.querySelector<HTMLButtonElement>(
-      'button[aria-label^="退出登录"]',
+      '[data-testid="sign-out-button"]',
     );
     expect(signOut).toBeTruthy();
     expect(signOut?.className).toContain("tap-target");
@@ -206,17 +209,21 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("Topbar view-key button has an accessible name and tap-target sizing", async () => {
     const { container } = render(
-      <Topbar
-        meName="alice"
-        status="connected"
-        members={members}
-        selfId={me.id}
-        key_={TEST_KEY}
-        onSignOutRequest={() => {}}
-      />,
+      withI18n(
+        <Topbar
+          meName="alice"
+          status="connected"
+          members={members}
+          selfId={me.id}
+          key_={TEST_KEY}
+          onSignOutRequest={() => {}}
+        />,
+      ),
     );
+    // The view-key trigger carries a stable testid; its accessible name is
+    // localized (zh here) and asserted implicitly via axe in the ViewKey test.
     const viewKey = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="查看你的登录密钥"]',
+      '[data-testid="view-key-trigger"]',
     );
     expect(viewKey).toBeTruthy();
     expect(viewKey?.className).toContain("tap-target");

@@ -1,20 +1,49 @@
-# 最小本地跑通：单 service + 一个 named volume 持久化 SQLite。
-#   docker compose up -d --build      # 构建并后台启动
-#   curl localhost:6200/health        # 健康检查
-#   open http://localhost:6200        # 聊天 UI（同源，无需 CORS）
+# club — prod + test(staging) 双环境：一台机器、两个容器、按端口区分（内网，无 TLS）。
+#
+# 镜像版本管理（npm semver）：每个 service 从 .env 读取自己要跑的版本（package.json 的 version），
+# prod 和 test 可以各 pin 各的——test 跑新版验证时 prod 仍停在旧版，验证 OK 再 promote。
+# 旧版本镜像不会被覆盖，回滚就是改 .env 里 PROD_TAG 再 up。
+#
+# 日常流程（用脚本，别手改）：
+#   npm version patch                   # 先 bump 版本（自动 commit + 打 git tag v0.x.y）
+#   ./scripts/deploy.sh build           # 建 club:<版本> → 写 TEST_TAG → 重启 test(:6600)
+#   ./scripts/deploy.sh promote         # 把 test 验证通过的版本推广到 prod(:6500)
+#   ./scripts/deploy.sh rollback <版本> # prod 回滚到指定版本
+# 也可手动：docker build -t club:<版本> -t club:latest . 后改 .env 再 docker compose up -d <service>
 #
 # 注意：挂整个 /data 目录而非单个 club.db —— WAL 模式会生成 club.db-wal /
 # club.db-shm，单文件挂载会丢掉它们、重启后丢数据。
 services:
-  club:
-    image: club
-    build: .
+  club:                    # 生产  (host :6500)
+    image: club:${CLUB_PROD_TAG:?CLUB_PROD_TAG 必须在 .env 里设置}
     ports:
-      - "6200:6200"
+      - "6500:6200"
     environment:
       CLUB_DB: /data/club.db
     volumes:
-      - club-data:/data
+      - club-data-prod:/data
+    networks:
+      dev-lan:
+        ipv4_address: 10.88.0.21   # 生产，内网固定 IP
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:6200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  club-test:               # 预发布 / staging (host :6600)
+    image: club:${CLUB_TEST_TAG:?CLUB_TEST_TAG 必须在 .env 里设置}
+    ports:
+      - "6600:6200"
+    environment:
+      CLUB_DB: /data/club.db
+    volumes:
+      - club-data-test:/data
+    networks:
+      dev-lan:
+        ipv4_address: 10.88.0.22   # 预发布，内网固定 IP
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:6200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -24,4 +53,10 @@ services:
       start_period: 10s
 
 volumes:
-  club-data:
+  club-data-prod:
+  club-data-test:
+
+networks:
+  dev-lan:                       # 共享内网（与 ~/projects/dener 的 dev 容器同网段；外部已建好）
+    name: dev-lan
+    external: true

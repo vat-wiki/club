@@ -23,6 +23,9 @@ export default function App() {
   // show the KeyRevealDialog instead of entering the room — the user must
   // acknowledge they've saved the key before it lands in localStorage.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  // The one-time recovery code minted alongside the pending key, surfaced on
+  // the reveal dialog so the user records both before entering (PRD §7.1 AC1).
+  const [pendingRecoverCode, setPendingRecoverCode] = useState<string>("");
   const [signOutOpen, setSignOutOpen] = useState(false);
   // True between having a stored key and the first batch of history landing —
   // shows a loading state instead of flashing the empty state prematurely.
@@ -80,18 +83,20 @@ export default function App() {
     setConn({ server: API_URL, key });
   };
 
-  // A brand-new identity was minted. Don't persist yet — hand the key to the
-  // reveal dialog so the user can see/copy it first. saveConn + enter only
-  // happens when they acknowledge.
-  const handleCreated = (key: string) => {
+  // A brand-new identity was minted. Don't persist yet — hand the key +
+  // recovery code to the reveal dialog so the user can see/copy them first.
+  // saveConn + enter only happens when they acknowledge.
+  const handleCreated = (key: string, recoverCode: string) => {
     setAuthOpen(false);
     setPendingKey(key);
+    setPendingRecoverCode(recoverCode);
   };
 
   const handleKeySaved = () => {
     if (!pendingKey) return;
     handleAuthed(pendingKey);
     setPendingKey(null);
+    setPendingRecoverCode("");
   };
 
   const handleSend = async (content: string) => {
@@ -167,6 +172,7 @@ export default function App() {
       <KeyRevealDialog
         open={!!pendingKey}
         key_={pendingKey ?? ""}
+        recoverCode={pendingRecoverCode}
         onSaved={handleKeySaved}
       />
 

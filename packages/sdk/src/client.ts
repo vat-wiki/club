@@ -5,6 +5,8 @@ import type {
   Mention,
   Message,
   Participant,
+  RecoverParticipantRequest,
+  RecoverParticipantResponse,
 } from "@club/shared";
 import {
   type CallOpts,
@@ -15,6 +17,7 @@ import {
   listMentions,
   listMessages,
   markMentionRead,
+  recoverParticipant as recoverParticipantFn,
   sendMessage,
 } from "./transport.js";
 import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
@@ -92,6 +95,15 @@ export class ClubClient {
     input: CreateParticipantRequest,
   ): Promise<CreateParticipantResponse> {
     return createParticipantFn(this.conn(), input, { timeoutMs: this.timeoutMs });
+  }
+
+  /** POST /participants/recover — recover an identity by callsign + recovery
+   *  code; reissues the key (and a fresh recovery code), reusing the id+name.
+   *  No auth needed. */
+  recoverParticipant(
+    input: RecoverParticipantRequest,
+  ): Promise<RecoverParticipantResponse> {
+    return recoverParticipantFn(this.conn(), input, { timeoutMs: this.timeoutMs });
   }
 
   /** GET /messages/stream — live feed with auto-reconnect + catch-up. */

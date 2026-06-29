@@ -98,7 +98,7 @@ bug 是「代码行为偏离了设计」。而这里**设计本身就是缺的**
 - **做法**：组合拳——
   1. **创建时**：发 key 的**同时**，生成一个一次性的**恢复码**（`club_recover_<base64url>`，和 key 同熵级别、同样不可记忆），**强制**展示给用户并要求复制/下载（A 的内核）。
   2. **server**：participants 表加 `recover_hash`（sha256(恢复码)），和 `key_hash` 并列。
-  3. **找回时**：web 提供"找回身份"入口，用户输入 **name + 恢复码**，server 校验 `recover_hash`，通过后**换发一个新 key**（更新该 participant 的 `key_hash`，**复用原 `participant_id` 和 name**），返回新 key 明文。**恢复码一次性、用后作废**（防止恢复码泄漏后被反复冒领）。
+  3. **找回时**：web 提供"找回身份"入口，用户输入 **name + 恢复码**，server 校验 `recover_hash`，通过后**换发一个新 key**（更新该 participant 的 `key_hash`，**复用原 `participant_id` 和 name**），返回新 key 明文。**恢复码一次性、用后换发**（找回成功同时换发新恢复码，旧码失效；防止恢复码泄漏后被反复冒领。详见 §5.4 / `first-contact.md` §8.4 决策）。
 - **为什么不是 B**：恢复码**不让用户记**，而是让用户**存**——和方向 A 同性质（"请保存这个"），但额外给了"已经丢了 key 但还留着恢复码"这条退路。passphrase（B）的劣势是熵不够、是把 club 拖向账号体系；恢复码（D）用机器生成的高熵串避开这两点，代价是"用户必须存"。
 - **灵魂评估**：保留「key 即身份」哲学（key 仍是日常凭据，恢复码只是 fallback）；三端可对等（恢复码是个字符串，CLI 也能用）；不引入密码学意义上的"密码"。
 
@@ -133,7 +133,7 @@ bug 是「代码行为偏离了设计」。而这里**设计本身就是缺的**
 **用恢复码找回时，换发新 key，而不是返回原 key 明文。** 理由：
 - server 从不存 key 明文（现状），返回原 key 意味着要改架构去存明文——**倒退**，破坏现有安全模型。
 - 换发新 key 只需更新 `key_hash`，key 明文依然从不落地存储，和现状一致。
-- **恢复码一次性、用后作废**：找回成功后，server 把该 participant 的 `recover_hash` 置空（或换发新的恢复码一并返回）。防止恢复码泄漏后被反复使用。
+- **恢复码一次性、用后换发**：找回成功后，server 把该 participant 的 `recover_hash` **换发为新值**（同时返回新恢复码让用户重新保存），而非置空。防止旧恢复码泄漏后被反复使用，且保证每个 participant 始终有一个可用恢复码。（此"换发"策略由 `first-contact.md` §8.4 拍板，原"作废 vs 换发"开放问题已定。）
 
 ---
 
@@ -142,13 +142,13 @@ bug 是「代码行为偏离了设计」。而这里**设计本身就是缺的**
 ### 6.1 数据层（`packages/server/src/db.ts`）
 
 - **migration v2**：`participants` 表新增 `recover_hash TEXT`（nullable，sha256(恢复码)；NULL 表示已用或未设）。
-- 新增 db helper：`getParticipantForRecover(name)`（按 name 取行，含 `recover_hash`）、`updateParticipantKey(id, newKeyHash)`、`clearParticipantRecover(id)`（或 `updateParticipantRecover(id, newHash)`，配合"换发恢复码"策略）。
+- 新增 db helper：`getParticipantForRecover(name)`（按 name 取行，含 `recover_hash`）、`updateParticipantKey(id, newKeyHash)`、`updateParticipantRecover(id, newHash)`（**换发恢复码**策略，配合 §5.4 / `first-contact.md` §8.4 决策）。
 
 ### 6.2 端点（`packages/server/src/routes/participants.ts` 扩展）
 
 - **`POST /participants`**（改造）：响应体从 `{ key, participant }` 扩展为 `{ key, recoverCode, participant }`。**恢复码明文一次性返回**，和 key 同样性质。
 - **`POST /participants/recover`**（新增）：入参 `{ name, recoverCode }`，校验 `sha256(recoverCode) === participants.recover_hash`（且 `recover_hash` 非空）。
-  - 成功：生成新 key，`updateParticipantKey` + `clearParticipantRecover`（或换发新恢复码），返回 `{ key, recoverCode?, participant }`。**`participant` 复用原 id 与 name**。
+  - 成功：生成新 key，`updateParticipantKey` + `updateParticipantRecover(newHash)`（**换发新恢复码**，由 `first-contact.md` §8.4 拍板），返回 `{ key, recoverCode, participant }`（`recoverCode` 为新换发的，用户重新保存）。**`participant` 复用原 id 与 name**。
   - 失败：`401 invalid recovery code`（**不区分"恢复码错"和"name 不存在"**，避免 name 枚举）。
 - **恢复码生成**：复用 `newKey` 的熵源，前缀 `club_recover_`，与 key 区分。
 
@@ -160,7 +160,7 @@ bug 是「代码行为偏离了设计」。而这里**设计本身就是缺的**
 ### 6.4 安全注意（写进验收）
 
 - 恢复码错误响应**不得泄露 name 是否存在**（统一 401）。
-- 找回端点**不限流是已知风险**（design.md 把限流划到 Phase 3）——恢复码是高熵串（和 key 同级），在线暴力不可行，可接受；但**恢复码用后必须作废**，防止泄漏后被永久持有。
+- 找回端点**不限流是已知风险**（design.md 把限流划到 Phase 3）——恢复码是高熵串（和 key 同级），在线暴力不可行，可接受；但**恢复码用后必须换发作废旧值**（§5.4），防止泄漏后被永久持有。
 - 恢复码明文**仅在创建和找回成功时各返回一次**，其余时刻不可获取。
 
 ---
@@ -197,7 +197,7 @@ bug 是「代码行为偏离了设计」。而这里**设计本身就是缺的**
 
 ## 8. 开放问题
 
-1. **恢复码用后是"作废"还是"换发新恢复码"？** 推荐"换发"（找回成功后返回新恢复码，用户重新保存）——保持每个 participant 始终有一个可用恢复码，体验更连贯；代价是多一次交互。待王后端/王体验确认。
+1. **~~恢复码用后是"作废"还是"换发新恢复码"？~~** → **已决策：换发。**（找回成功后返回新恢复码，用户重新保存）——保持每个 participant 始终有一个可用恢复码，体验更连贯。由 `first-contact.md` §8.4 拍板，已落实到 §5.4 / §6.2。
 2. **是否要"主动重置恢复码"入口**（已登录状态下，`POST /me/recover-code` 生成新的）？推荐做——既服务于存量迁移（§6.3），也让用户怀疑恢复码泄漏时能自助换。优先级 P1，不阻塞 P0 找回闭环。
 3. **agent 身份找回**：本期不做。但若日后 agent 用户也想要找回（key 丢了），同套机制可复用——恢复码本就与 `kind` 无关。留作 P2。
 4. **恢复码的展示形态**：纯文本 vs 二维码（方便手机拍照存档）。倾向纯文本起步，二维码 P2。

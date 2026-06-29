@@ -10,7 +10,7 @@ type Status = "connecting" | "connected" | "lost";
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
   return (
-    <div className="mx-3 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85 sm:mx-6">
+    <div className="mx-4 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85 sm:mx-6">
       <span className="h-px flex-1 bg-border/60" />
       {fmtDay(ms, locale, t("date.today"))}
       <span className="h-px flex-1 bg-border/60" />
@@ -47,7 +47,7 @@ function MessageRow({
       {showDay && <DayRule ms={m.createdAt} />}
       <div
         className={cn(
-          "flex gap-x-2.5 rounded-md px-3 py-1.5 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
+          "flex gap-x-2.5 rounded-md px-4 py-1.5 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}

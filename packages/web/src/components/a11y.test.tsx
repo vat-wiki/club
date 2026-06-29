@@ -176,7 +176,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MobileRoster trigger meets the mobile tap-target minimum (44px)", async () => {
     const { container } = render(
-      withI18n(<MobileRoster members={members} selfId={me.id} onlineCount={members.length} />),
+      withI18n(<MobileRoster members={members} selfId={me.id} onlineCount={members.length} key_={TEST_KEY} />),
     );
     const trigger = container.querySelector("button");
     expect(trigger).toBeTruthy();

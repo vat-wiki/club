@@ -115,6 +115,28 @@
       min-width: 0;
     }
   }
+
+  /* Reveal-on-sm: collapses to zero width/opacity below the sm breakpoint and
+     expands above it, animating so the breakpoint transition reads as a smooth
+     morph instead of a display:none snap. Used for topbar chrome that's only
+     decorative on mobile (e.g. the #general channel badge). The element stays
+     in flow at width 0, so pair it with a collapsing margin (ml-0 sm:ml-*) to
+     avoid a leftover gap next to its sibling. */
+  .sm-reveal {
+    max-width: 0;
+    min-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease-out,
+      margin 200ms ease-out;
+  }
+  @media (min-width: 640px) {
+    .sm-reveal {
+      max-width: 8rem;
+      opacity: 1;
+    }
+  }
 }
 
 /* Respect users who prefer reduced motion (WCAG 2.3.3). The agent pulse and

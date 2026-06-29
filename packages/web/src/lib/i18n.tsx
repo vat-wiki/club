@@ -131,6 +131,7 @@ const zh: Dict = {
   // View key dialog
   "viewKey.trigger.aria": "查看你的登录密钥",
   "viewKey.trigger.title": "你的登录密钥",
+  "viewKey.open": "查看我的密钥",
   "viewKey.title": "你的登录密钥",
   "viewKey.desc":
     "这是你当前身份的唯一凭证。请妥善保存——换浏览器或清理缓存后需要用它回到这里。club 无法替你找回。",
@@ -239,6 +240,7 @@ const en: Dict = {
   // View key dialog
   "viewKey.trigger.aria": "View your login key",
   "viewKey.trigger.title": "Your login key",
+  "viewKey.open": "View my key",
   "viewKey.title": "Your login key",
   "viewKey.desc":
     "This is the only credential for your current identity. Save it — you'll need it to come back after switching browsers or clearing cache. club can't recover it for you.",

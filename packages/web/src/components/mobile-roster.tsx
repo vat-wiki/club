@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RosterSections } from "@/components/roster";
+import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { useT } from "@/lib/i18n";
 import type { Participant } from "@club/shared";
 
@@ -10,10 +11,12 @@ export function MobileRoster({
   members,
   selfId,
   onlineCount,
+  key_,
 }: {
   members: Participant[];
   selfId?: string;
   onlineCount: number;
+  key_: string | null;
 }) {
   const t = useT();
   return (
@@ -42,6 +45,14 @@ export function MobileRoster({
           <h2 className="font-display text-sm font-semibold tracking-tight">
             {t("roster.mobile.title")}<span className="text-agent">.</span>
           </h2>
+          {/* The login key is the only credential for this identity. On mobile
+              the topbar trigger is hidden to save space, so the roster sheet is
+              where users view/copy it — keeping "see my key" in the identity
+              panel instead of buried behind the sign-out flow. Pinned right
+              under the title so it's reachable without scrolling past a long
+              member list. */}
+          <ViewKeyDialog key_={key_} triggerLabel={t("viewKey.open")} />
+
           <RosterSections members={members} selfId={selfId} />
         </div>
       </DialogContent>

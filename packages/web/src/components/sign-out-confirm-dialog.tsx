@@ -91,10 +91,10 @@ export function SignOutConfirmDialog({
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => onOpenChange(false)}>
             {t("signOut.cancel")}
           </Button>
-          <Button variant="destructive" className="w-full sm:w-auto" onClick={onConfirm}>
+          <Button variant="destructive" className="min-h-[44px] w-full sm:w-auto" onClick={onConfirm}>
             {t("signOut.confirm")}
           </Button>
         </div>

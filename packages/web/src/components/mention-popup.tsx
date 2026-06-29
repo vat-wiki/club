@@ -87,7 +87,7 @@ export function MentionPopup({
             data-testid="mention-option"
             data-active={i === activeIndex ? "" : undefined}
             className={cn(
-              "flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-colors",
+              "flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-colors active:bg-accent/70",
               i === activeIndex
                 ? "bg-accent text-accent-foreground"
                 : "text-popover-foreground",

@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCopy } from "@/hooks/use-copy";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 // Lets an already-signed-in user view + copy their own login key at any time.
 // The key lives in localStorage (club_key); this is the "I skipped saving it
@@ -18,7 +19,17 @@ import { useT } from "@/lib/i18n";
 
 const COPY_LIVE = "viewkey-copy-status";
 
-export function ViewKeyDialog({ key_ }: { key_: string | null }) {
+export function ViewKeyDialog({
+  key_,
+  triggerLabel,
+  triggerClassName,
+}: {
+  key_: string | null;
+  /** When set, the trigger renders as a labelled row (used inside the mobile
+      roster sheet). Omit for the compact icon-only topbar trigger. */
+  triggerLabel?: string;
+  triggerClassName?: string;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const { state, copy, reset } = useCopy();
@@ -38,12 +49,17 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="tap-target hidden items-center justify-center rounded-md border border-border bg-transparent px-2 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline-flex"
+          className={cn(
+            "tap-target inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-transparent text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            triggerLabel ? "w-full justify-start px-3 text-sm" : "hidden px-2 sm:inline-flex",
+            triggerClassName,
+          )}
           aria-label={t("viewKey.trigger.aria")}
           title={t("viewKey.trigger.title")}
           data-testid="view-key-trigger"
         >
-          <Key className="h-3.5 w-3.5" aria-hidden />
+          <Key className={triggerLabel ? "h-4 w-4" : "h-3.5 w-3.5"} aria-hidden />
+          {triggerLabel && <span className="truncate">{triggerLabel}</span>}
         </button>
       </DialogTrigger>
       <DialogContent className="max-w-[440px] gap-5" closeLabel={t("dialog.close")}>

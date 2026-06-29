@@ -125,7 +125,7 @@ export function MessageList({
     status === "lost" ? (
       <div
         role="status"
-        className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-300"
+        className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-slow"
       >
         <AlertTriangle className="h-3.5 w-3.5 animate-pulse" aria-hidden />
         {t("msg.disconnected")}

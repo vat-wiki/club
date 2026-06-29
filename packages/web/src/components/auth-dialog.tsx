@@ -200,7 +200,7 @@ export function AuthDialog({
         {mode === "paste" && (
           <button
             type="button"
-            className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            className="text-center text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             onClick={() => setRecoverOpen(true)}
           >
             {t("auth.recover.entry")}

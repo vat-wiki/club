@@ -71,6 +71,10 @@
   body,
   #root {
     height: 100%;
+    /* 100dvh accounts for mobile browser chrome (address bar show/hide) so the
+       composer is never pushed off-screen. Older browsers ignore dvh and use
+       the 100% declared above. */
+    height: 100dvh;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;

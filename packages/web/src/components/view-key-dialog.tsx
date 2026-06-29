@@ -38,7 +38,7 @@ export function ViewKeyDialog({ key_ }: { key_: string | null }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="tap-target inline-flex items-center justify-center rounded-md border border-border bg-transparent px-2 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="tap-target hidden items-center justify-center rounded-md border border-border bg-transparent px-2 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline-flex"
           aria-label={t("viewKey.trigger.aria")}
           title={t("viewKey.trigger.title")}
           data-testid="view-key-trigger"

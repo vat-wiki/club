@@ -60,7 +60,7 @@ export function MentionPopup({
       id="mention-listbox"
       aria-label={t("mention.aria")}
       data-testid="mention-popup"
-      className="absolute z-50 max-h-[min(240px,60vh)] w-64 overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/40 scrollbar-thin"
+      className="absolute z-50 max-h-[min(240px,60vh)] w-60 max-w-[calc(100vw-1.5rem)] overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/40 scrollbar-thin"
       style={{
         left: anchor.left,
         // Place the popup's bottom edge 6px above the anchor line.

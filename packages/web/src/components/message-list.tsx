@@ -10,7 +10,7 @@ type Status = "connecting" | "connected" | "lost";
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
   return (
-    <div className="mx-6 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85">
+    <div className="mx-3 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85 sm:mx-6">
       <span className="h-px flex-1 bg-border/60" />
       {fmtDay(ms, locale, t("date.today"))}
       <span className="h-px flex-1 bg-border/60" />
@@ -47,7 +47,7 @@ function MessageRow({
       {showDay && <DayRule ms={m.createdAt} />}
       <div
         className={cn(
-          "flex gap-x-2.5 rounded-md px-6 py-1.5 animate-slide-in transition-colors hover:bg-accent/70",
+          "flex gap-x-2.5 rounded-md px-3 py-1.5 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}
@@ -136,7 +136,7 @@ export function MessageList({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {banner}
-        <div className="flex flex-1 items-center justify-center p-10">
+        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
           <div
             role="status"
             aria-live="polite"
@@ -153,7 +153,7 @@ export function MessageList({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {banner}
-        <div className="flex flex-1 items-center justify-center p-10">
+        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
           <div className="max-w-xs text-center">
             <div className="font-display text-2xl font-semibold tracking-tight">{t("msg.empty.title")}</div>
             <div className="mx-auto mt-3 h-px w-8 bg-agent/60" aria-hidden />

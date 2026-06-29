@@ -43,12 +43,12 @@ export function Topbar({
 }) {
   const t = useT();
   return (
-    <header className="flex flex-none items-center gap-3 border-b border-border bg-chrome px-4 py-2.5">
+    <header className="flex flex-none items-center gap-2 overflow-hidden border-b border-border bg-chrome px-3 py-2.5 sm:gap-3 sm:px-4">
       <div className="flex items-baseline gap-2">
         <span className="font-display text-xl font-semibold tracking-tight">
           club<span className="text-agent animate-brand-pulse">.</span>
         </span>
-        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
+        <span className="hidden rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
           #general
         </span>
       </div>

@@ -5,7 +5,7 @@
 // (resolveConn → process.exit, server.connect) that make importing it directly
 // impractical from a test.
 
-import type { Message, Participant } from "@club/shared";
+import { mentionMatches, type Message, type Participant } from "@club/shared";
 import { formatMessage } from "@club/sdk";
 
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
@@ -35,19 +35,19 @@ export function clampLimit(v: unknown): number {
 /**
  * Does `content` contain a @mention of `mention`?
  *
- * Mirrors the CLI `listen --mention` rule so a CLI agent and an MCP agent wake
- * on the same triggers: case-insensitive substring match on "@<name>". A
- * missing/empty `mention` matches every message (the `listen` "no filter" path).
+ * Delegates to @club/shared `mentionMatches` so an MCP agent wakes on exactly
+ * the same triggers as the CLI `listen --mention` and the server's mention inbox
+ * (single source of truth, word-boundary aware). A missing/empty `mention`
+ * matches every message (the `listen` "no filter" path).
  *
- * Pure + unit-tested; extracted from runListen so the matching rule — including
- * its intentional substring precision — is explicit and pinned by tests.
+ * Pure + unit-tested.
  */
 export function matchesMention(
   content: string,
   mention: string | null | undefined,
 ): boolean {
   if (!mention) return true;
-  return content.toLowerCase().includes("@" + mention.toLowerCase());
+  return mentionMatches(content, mention);
 }
 
 /** A stream subscription handle, as returned by ClubClient#stream. */

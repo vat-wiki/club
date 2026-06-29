@@ -116,13 +116,14 @@ describe("matchesMention", () => {
     expect(matchesMention("anyone there?", "alice")).toBe(false);
   });
 
-  // Pinned explicitly: matching is a case-insensitive *substring* on "@<name>",
-  // so a short mention can match a longer token. This mirrors the CLI and is a
-  // deliberate trade-off (simplicity over precision); a change here must be
-  // intentional and should be mirrored in the CLI's listen command.
-  it("is substring-based (intentional): short mentions match longer tokens", () => {
-    expect(matchesMention("ping @alicia", "al")).toBe(true); // @al inside @alicia
-    expect(matchesMention("see @editorial", "ed")).toBe(true);
+  // Word boundary: a short mention must NOT match a longer @-tag. The rule is
+  // shared with the CLI and the server inbox via @club/shared mentionMatches.
+  it("respects word boundaries: short mentions do not match longer tokens", () => {
+    expect(matchesMention("ping @alicia", "al")).toBe(false); // @al inside @alicia
+    expect(matchesMention("see @editorial", "ed")).toBe(false);
+    // CJK prefix collision: 走查-体验 is a prefix of 走查-体验2.
+    expect(matchesMention("@走查-体验2 看下", "走查-体验")).toBe(false);
+    expect(matchesMention("@走查-体验2 看下", "走查-体验2")).toBe(true);
   });
 });
 

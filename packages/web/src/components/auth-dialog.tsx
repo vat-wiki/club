@@ -7,6 +7,7 @@ import { api, createParticipant } from "@/lib/api";
 import { API_URL } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { RecoverDialog } from "@/components/recover-dialog";
 
 type Mode = "create" | "paste";
 
@@ -14,14 +15,16 @@ export function AuthDialog({
   open,
   // Fired after a brand-new identity is minted. The app intercepts this to
   // reveal the key before persisting it, so the user actually sees (and can
-  // save) the only credential that lets them back in.
+  // save) the only credential that lets them back in. Carries the one-time
+  // recovery code too — shown alongside the key on the reveal dialog.
   onCreated,
-  // Fired after an existing key is validated. Goes straight in — the user
-  // already had the key, so there's nothing to reveal.
+  // Fired after an existing key is validated (paste path) OR after a recovery
+  // reissues a fresh key. Goes straight in — the user already had the key (or
+  // just re-took the identity), so there's nothing to reveal.
   onAuthed,
 }: {
   open: boolean;
-  onCreated: (key: string) => void;
+  onCreated: (key: string, recoverCode: string) => void;
   onAuthed: (key: string) => void;
 }) {
   const t = useT();
@@ -30,6 +33,9 @@ export function AuthDialog({
   const [pasteKey, setPasteKey] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // "Recover identity" is a secondary entry off the paste path (PRD §8.2: not
+  // a third main route). It opens its own dialog on top of this one.
+  const [recoverOpen, setRecoverOpen] = useState(false);
   const keyInputRef = useRef<HTMLInputElement>(null);
 
   const create = async () => {
@@ -40,11 +46,11 @@ export function AuthDialog({
     }
     setBusy(true);
     try {
-      const { key } = await createParticipant(API_URL, name.trim(), "human");
-      // Hand the freshly-minted key to the app WITHOUT persisting it; the app
-      // shows the "your login key" reveal and only saves once the user
-      // acknowledges they've saved it.
-      onCreated(key);
+      const { key, recoverCode } = await createParticipant(API_URL, name.trim(), "human");
+      // Hand the freshly-minted key + recovery code to the app WITHOUT
+      // persisting; the app shows the reveal and only saves once the user
+      // acknowledges they've saved both.
+      onCreated(key, recoverCode);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -127,10 +133,16 @@ export function AuthDialog({
                 autoComplete="off"
                 aria-required="true"
                 aria-invalid={!!error}
-                aria-describedby={error ? "key-error" : undefined}
+                aria-describedby={error ? "key-error" : "name-hint"}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && create()}
               />
+              {/* Helper mirrors the /join page's "昵称（也是你的 @提及名）" label so
+                  the two entry points share one mental model (PRD §3, two-entry
+                  convergence): the nickname is also the @mention handle. */}
+              <p id="name-hint" className="text-xs text-muted-foreground">
+                {t("auth.field.nicknameHint")}
+              </p>
             </div>
             <Button className="w-full" disabled={busy} onClick={create}>
               {busy ? t("auth.join.busy") : t("auth.join")}
@@ -164,16 +176,45 @@ export function AuthDialog({
           </p>
         )}
 
-        <button
+        {/* Two equal-weight paths (FC2): create is the primary route, paste is a
+            clearly delineated secondary button — not a single gray link that
+            buries the alternative. Both directions use the same button treatment
+            so switching either way feels symmetric. */}
+        <Button
           type="button"
-          className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          variant="outline"
+          className="w-full"
           onClick={() => {
             setError("");
             setMode(mode === "create" ? "paste" : "create");
           }}
         >
           {mode === "create" ? t("auth.switchToPaste") : t("auth.switchToCreate")}
-        </button>
+        </Button>
+
+        {/* Recover identity: a SECONDARY entry off the paste path only (PRD
+            §8.2 — not a third main route). Hidden on the create path so it
+            doesn't compete with onboarding; reachable once the user has
+            explicitly chosen "I already have credentials" but realizes they
+            have the recovery code, not the key. */}
+        {mode === "paste" && (
+          <button
+            type="button"
+            className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={() => setRecoverOpen(true)}
+          >
+            {t("auth.recover.entry")}
+          </button>
+        )}
+
+        <RecoverDialog
+          open={recoverOpen}
+          onOpenChange={setRecoverOpen}
+          onRecovered={(key) => {
+            setRecoverOpen(false);
+            onAuthed(key);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

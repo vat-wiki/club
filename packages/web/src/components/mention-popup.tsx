@@ -100,9 +100,12 @@ export function MentionPopup({
           >
             <span
               aria-hidden
+              // Agent dot pulses (same as roster/message row) so "@person vs
+              // @agent" is visually distinguishable in the option list, not
+              // only by the trailing kind label.
               className={cn(
                 "h-2 w-2 flex-none rounded-full",
-                m.kind === "agent" ? "bg-agent" : "bg-human",
+                m.kind === "agent" ? "bg-agent animate-agent-pulse" : "bg-human",
               )}
             />
             <span className="truncate">{m.name}</span>

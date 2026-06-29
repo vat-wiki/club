@@ -68,7 +68,10 @@ export function SignOutConfirmDialog({
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  {t("signOut.copy")}
+                  {/* "Copy first" framing makes the inline copy read as a
+                      deliberate pre-sign-out step, not a stray utility: one
+                      tap copies the key without leaving this dialog. */}
+                  {t("signOut.copyFirst")}
                 </>
               )}
             </Button>

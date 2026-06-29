@@ -12,6 +12,7 @@ import { MessageList } from "./message-list";
 import { AuthDialog } from "./auth-dialog";
 import { MobileRoster } from "./mobile-roster";
 import { KeyRevealDialog } from "./key-reveal-dialog";
+import { RecoverDialog } from "./recover-dialog";
 import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { ViewKeyDialog } from "./view-key-dialog";
 import { withI18n } from "@/test/i18n-wrap";
@@ -144,7 +145,22 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("KeyRevealDialog has no violations", async () => {
     await expectNoViolationsPortal(
-      <KeyRevealDialog open key_={TEST_KEY} onSaved={() => {}} />,
+      <KeyRevealDialog
+        open
+        key_={TEST_KEY}
+        recoverCode="club_recover_test"
+        onSaved={() => {}}
+      />,
+    );
+  });
+
+  it("RecoverDialog has no violations", async () => {
+    await expectNoViolationsPortal(
+      <RecoverDialog
+        open
+        onOpenChange={() => {}}
+        onRecovered={() => {}}
+      />,
     );
   });
 

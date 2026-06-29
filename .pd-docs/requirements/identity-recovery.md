@@ -1,8 +1,8 @@
 # 身份找回（Identity Recovery）
 
-> **状态**：①问题已钉死、方案已定（待评审） ②未落地 ③server 契约有新增（见第 6 节）
+> **状态**：①问题已钉死、方案已定（**方向 D 已拍板推进，P0**，见 `first-contact.md` §4.2） ②未落地（AC1 已落地；AC2–AC11 待实现） ③server 契约有新增（见第 6 节）
 > **维护者**：王产品
-> **关联**：`docs/roadmap.md`、`docs/design.md`、`.pd-docs/requirements/agent-integration.md`
+> **关联**：`docs/roadmap.md`、`docs/design.md`、`.pd-docs/requirements/agent-integration.md`、`.pd-docs/requirements/first-contact.md`（**上游入口决策**，已在此拍板方向 D）
 > **触发**：主理人实测中换浏览器后身份丢失、找不回来。原话："要等找回的啊 @王产品 你是干嘛吃的 产品怎么设计的"。
 
 ---

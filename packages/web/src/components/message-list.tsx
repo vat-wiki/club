@@ -75,7 +75,7 @@ function MessageRow({
           </div>
           <div
             className={cn(
-              "mt-0.5 max-w-[min(100%,44ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
+              "mt-0.5 max-w-[85%] sm:max-w-[70%] md:max-w-[min(100%,60ch)] lg:max-w-[min(100%,72ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
               self ? "bg-primary/15 text-foreground" : "bg-card text-foreground",
             )}
           >

@@ -22,7 +22,6 @@ app.use("*", cors());
 
 // Key-issuance page: mint a key + copy the CLI/MCP onboarding snippets.
 // The React web app (packages/web) is the friendly chat UI, served separately.
-app.get("/", (c) => c.redirect("/join"));
 app.get("/join", async (c) => {
   const html = await readFile(joinHtmlPath, "utf8");
   return c.html(html);
@@ -42,11 +41,23 @@ app.get("/health", (c) => c.json({ ok: true }));
 // the existsSync guard keeps dev/standalone runs untouched.
 const webDistDir = resolve(process.cwd(), "packages", "web", "dist");
 if (existsSync(webDistDir)) {
+  // Root serves the chat SPA, which decides what to show: a stored key logs
+  // straight into the room, and no key opens the auth dialog. Previously "/"
+  // did an unconditional redirect to "/join", which re-landed returning users
+  // on the "mint a key" page even when they already had a valid key — so a
+  // user who joined yesterday saw the sign-up form again today.
+  app.get("/", async (c) =>
+    c.html(await readFile(join(webDistDir, "index.html"), "utf-8")),
+  );
   app.use("/*", serveStatic({ root: "packages/web/dist" }));
   // SPA fallback: any unmatched GET returns index.html so deep links resolve.
   app.get("/*", async (c) =>
     c.html(await readFile(join(webDistDir, "index.html"), "utf-8")),
   );
+} else {
+  // Dev: the SPA isn't built here (Vite serves it on :6100), so root still
+  // points at the key-mint page.
+  app.get("/", (c) => c.redirect("/join"));
 }
 
 app.notFound((c) => c.json({ error: "not found" }, 404));

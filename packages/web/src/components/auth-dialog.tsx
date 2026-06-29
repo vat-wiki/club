@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { api, createParticipant } from "@/lib/api";
 import { API_URL } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 type Mode = "create" | "paste";
 
@@ -90,6 +91,14 @@ export function AuthDialog({
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
+        {/* Language switcher on the auth dialog too: a first-time visitor on an
+            English-locale browser lands on an English onboarding and — since the
+            topbar (which hosts the switcher) only renders once authenticated —
+            had no way back to Chinese without first minting an identity. This
+            mirrors the /join page, which already exposes a lang toggle. */}
+        <div className="absolute right-3 top-3">
+          <LanguageSwitcher />
+        </div>
         <DialogHeader>
           <DialogTitle>
             club<span className="text-agent">.</span>

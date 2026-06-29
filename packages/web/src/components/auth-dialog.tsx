@@ -68,8 +68,15 @@ export function AuthDialog({
       onAuthed(key);
     } catch {
       setError(t("auth.keyUnrecognized"));
-      setPasteKey("");
-      requestAnimationFrame(() => keyInputRef.current?.focus());
+      // Keep the pasted value so the user can fix a typo instead of re-pasting
+      // a long opaque key. Select-all on refocus: one keystroke replaces it,
+      // arrow-keys edit it — both flows are cheap.
+      requestAnimationFrame(() => {
+        const el = keyInputRef.current;
+        if (!el) return;
+        el.focus();
+        el.select();
+      });
     } finally {
       setBusy(false);
     }

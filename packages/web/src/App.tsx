@@ -94,9 +94,9 @@ export default function App() {
     setPendingKey(null);
   };
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachmentIds: readonly string[]) => {
     if (!conn) return;
-    await api.send(conn, content);
+    await api.send(conn, content, attachmentIds);
     void refreshMembers();
   };
 
@@ -144,7 +144,13 @@ export default function App() {
               duplicating the visible topbar wordmark. */}
           <h1 className="sr-only">{t("app.h1")}</h1>
           <MessageList messages={messages} me={me} members={members} status={status} booting={booting} />
-          <Composer onSend={handleSend} disabled={!me} members={members} selfId={me?.id} />
+          <Composer
+            onSend={handleSend}
+            disabled={!me}
+            members={members}
+            selfId={me?.id}
+            conn={conn}
+          />
         </main>
       </div>
 

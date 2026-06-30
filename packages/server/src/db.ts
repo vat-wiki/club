@@ -65,6 +65,29 @@ const migrations: Migration[] = [
         ON mentions(participant_id, read_at, created_at);
     `,
   },
+  {
+    version: 2,
+    description: "image attachments on messages + uploaded-file metadata",
+    // `attachments` is a JSON column (NULL/empty = no images) rather than a
+    // separate table: attachments are never queried independently — they're
+    // always read alongside their message — so a join table would be entity
+    // without need. `files` records upload metadata so the server is the sole
+    // source of truth for mime/width/height/size and can rehydrate attachments
+    // from just the `id`s a client sends with POST /messages (dimensions can't
+    // be forged). The `id` doubles as the public /files/{id} path.
+    sql: `
+      ALTER TABLE messages ADD COLUMN attachments TEXT;
+      CREATE TABLE IF NOT EXISTS files (
+        id             TEXT PRIMARY KEY,
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        mime           TEXT NOT NULL,
+        width          INTEGER,
+        height         INTEGER,
+        size           INTEGER NOT NULL,
+        created_at     INTEGER NOT NULL
+      );
+    `,
+  },
 ];
 
 db.exec(`
@@ -103,6 +126,7 @@ export interface MessageRow {
   participant_id: string;
   author_name: string;
   author_kind: "human" | "agent";
+  attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
 }
 
 export function insertMessage(
@@ -110,10 +134,12 @@ export function insertMessage(
   participantId: string,
   content: string,
   createdAt: number,
+  attachments: string | null,
 ): void {
   db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at) VALUES (?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt);
+    `INSERT INTO messages (id, participant_id, content, created_at, attachments)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, participantId, content, createdAt, attachments);
 }
 
 export function getAllParticipants() {
@@ -125,14 +151,14 @@ export function getAllParticipants() {
 }
 
 const afterStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid > ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    ORDER BY m.rowid DESC LIMIT ?`,
@@ -286,4 +312,62 @@ const markReadStmt = db.prepare(
  */
 export function markMentionRead(id: string, readAt: number): boolean {
   return markReadStmt.run(readAt, id).changes > 0;
+}
+
+// ── Uploaded files (image metadata) ──────────────────────────────────
+
+// The DB row for an uploaded image. `id` doubles as the public /files/{id}
+// path; `participant_id` is the uploader, checked at POST /messages time so a
+// sender can only attach files it uploaded (not another participant's).
+export interface FileRow {
+  id: string;
+  participant_id: string;
+  mime: string;
+  width: number | null;
+  height: number | null;
+  size: number;
+  created_at: number;
+}
+
+const insertFileStmt = db.prepare(
+  `INSERT INTO files (id, participant_id, mime, width, height, size, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+);
+
+export function insertFile(f: Omit<FileRow, never>): void {
+  insertFileStmt.run(
+    f.id,
+    f.participant_id,
+    f.mime,
+    f.width,
+    f.height,
+    f.size,
+    f.created_at,
+  );
+}
+
+const fileByIdStmt = db.prepare<[string], FileRow>(
+  `SELECT id, participant_id, mime, width, height, size, created_at
+   FROM files WHERE id = ?`,
+);
+
+export function getFile(id: string): FileRow | undefined {
+  return fileByIdStmt.get(id);
+}
+
+// Fetch several files by id, preserving the requested order. Used by
+// POST /messages to rehydrate attachments from the client's `attachmentIds` —
+// order matters so the message shows images in the order the user picked them.
+export function getFilesByIds(ids: string[]): FileRow[] {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = db
+    .prepare<string[], FileRow>(
+      `SELECT id, participant_id, mime, width, height, size, created_at
+       FROM files WHERE id IN (${placeholders})`,
+    )
+    .all(...ids);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // Filter undefined (id not found) but keep order; caller validates ownership.
+  return ids.map((id) => byId.get(id)).filter((r): r is FileRow => !!r);
 }

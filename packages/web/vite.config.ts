@@ -25,6 +25,9 @@ export default defineConfig({
       "/me": "http://localhost:6200",
       "/messages": "http://localhost:6200",
       "/members": "http://localhost:6200",
+      // Image upload + serving (POST /files, GET /files/:id). Same-origin in
+      // dev so the multipart upload and the <img src> resolve through Vite.
+      "/files": "http://localhost:6200",
       "/health": "http://localhost:6200",
     },
   },

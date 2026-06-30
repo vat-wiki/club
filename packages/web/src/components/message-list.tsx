@@ -1,11 +1,82 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import type { Message, Participant } from "@club/shared";
+import type { Message, MessageAttachment, Participant } from "@club/shared";
 import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ImageLightbox } from "@/components/image-lightbox";
 
 type Status = "connecting" | "connected" | "lost";
+
+// Resolve a root-relative attachment url (e.g. "/files/abc") against the
+// current origin so <img src> works in dev (Vite proxy) and prod (same-origin).
+// Falls back to the bare url when no window (SSR/test safety).
+function resolveUrl(url: string): string {
+  if (typeof window === "undefined") return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+// Inline image gallery rendered inside the bubble (design §3). Single image:
+// a 4/3 thumbnail capped at 320px; multiple: a 2-col grid of square thumbs.
+// Rounded-md (one step smaller than the bubble's rounded-lg) to read as
+// "image < bubble". Clicking any thumb opens the shared ImageLightbox at full
+// size. Thumbnails shimmer (animate-shimmer) until onLoad to avoid a white
+// flash. Each thumb is a <button> (keyboard-reachable lightbox trigger) with a
+// descriptive aria-label.
+function AttachmentGallery({
+  attachments,
+  openLabel,
+}: {
+  attachments: MessageAttachment[];
+  openLabel: string;
+}) {
+  const [active, setActive] = useState<number | null>(null);
+  const multi = attachments.length > 1;
+  const activeSrc = active != null ? resolveUrl(attachments[active].url) : "";
+
+  return (
+    <>
+      <div className={cn("mt-1.5 w-full max-w-[320px]", multi ? "grid grid-cols-2 gap-1" : "")}>
+        {attachments.map((a, i) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => setActive(i)}
+            aria-label={`${openLabel} ${i + 1}`}
+            className={cn(
+              "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              multi ? "aspect-square" : "aspect-[4/3]",
+            )}
+          >
+            <img
+              src={resolveUrl(a.url)}
+              alt=""
+              // Loading shimmer until the bytes arrive; on load the image fades
+              // in over the shimmering placeholder. The infinite shimmer is
+              // collapsed to a single frame under prefers-reduced-motion
+              // (global wildcard in index.css).
+              loading="lazy"
+              draggable={false}
+              onLoad={(e) => {
+                e.currentTarget.classList.remove("opacity-0");
+              }}
+              className="h-full w-full bg-gradient-to-r from-muted via-accent/40 to-muted bg-[length:200%_100%] object-cover opacity-0 animate-shimmer transition-opacity duration-200"
+            />
+          </button>
+        ))}
+      </div>
+      <ImageLightbox
+        src={activeSrc}
+        alt={openLabel}
+        open={active != null}
+        onOpenChange={(o) => {
+          if (!o) setActive(null);
+        }}
+      />
+    </>
+  );
+}
 
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
@@ -79,7 +150,10 @@ function MessageRow({
               self ? "bg-primary/15 text-foreground" : "bg-card text-foreground",
             )}
           >
-            {renderContent(m.content, known, selfName)}
+            {m.content.length > 0 && renderContent(m.content, known, selfName)}
+            {m.attachments && m.attachments.length > 0 && (
+              <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
+            )}
           </div>
         </div>
       </div>

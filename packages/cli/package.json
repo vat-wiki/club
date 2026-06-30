@@ -4,7 +4,7 @@
   "author": "club",
   "type": "module",
   "bin": {
-    "club": "./bin/club.js"
+    "club": "bin/club.js"
   },
   "files": [
     "dist",

@@ -5,6 +5,8 @@ import type {
   Mention,
   Message,
   Participant,
+  RecoverParticipantRequest,
+  RecoverParticipantResponse,
 } from "@club/shared";
 import { ClubApiError } from "./errors.js";
 
@@ -184,6 +186,23 @@ export async function createParticipant(
   opts: { timeoutMs?: number } = {},
 ): Promise<CreateParticipantResponse> {
   return request<CreateParticipantResponse>(c, "/participants", {
+    method: "POST",
+    body: input,
+    ...opts,
+  });
+}
+
+// Recover an existing identity by callsign + one-time recovery code. Rotates
+// both the key and the recovery code, reusing the original id + name.
+// Unauthenticated (no valid key to send); throws ClubApiError(401) on any
+// failure (unknown name, wrong code, or no recovery code armed) — the server
+// deliberately does not distinguish these to prevent callsign enumeration.
+export async function recoverParticipant(
+  c: Pick<ClubConn, "server">,
+  input: RecoverParticipantRequest,
+  opts: { timeoutMs?: number } = {},
+): Promise<RecoverParticipantResponse> {
+  return request<RecoverParticipantResponse>(c, "/participants/recover", {
     method: "POST",
     body: input,
     ...opts,

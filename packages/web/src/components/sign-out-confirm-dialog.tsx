@@ -68,7 +68,10 @@ export function SignOutConfirmDialog({
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  {t("signOut.copy")}
+                  {/* "Copy first" framing makes the inline copy read as a
+                      deliberate pre-sign-out step, not a stray utility: one
+                      tap copies the key without leaving this dialog. */}
+                  {t("signOut.copyFirst")}
                 </>
               )}
             </Button>
@@ -90,11 +93,11 @@ export function SignOutConfirmDialog({
           </div>
         )}
 
-        <div className="flex flex-row gap-2 sm:justify-between">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+          <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => onOpenChange(false)}>
             {t("signOut.cancel")}
           </Button>
-          <Button variant="destructive" onClick={onConfirm}>
+          <Button variant="destructive" className="min-h-[44px] w-full sm:w-auto" onClick={onConfirm}>
             {t("signOut.confirm")}
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Message, MessageAttachment, Participant } from "@club/shared";
 import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
@@ -78,10 +78,25 @@ function AttachmentGallery({
   );
 }
 
+// Imperative handle exposed via the MessageList ref. `scrollToBottom` re-pins
+// the list to the latest message — but only when the user was already pinned
+// to the bottom, so it never yanks someone who scrolled up to read history.
+export type MessageListHandle = {
+  scrollToBottomIfPinned: () => void;
+};
+
+type MessageListProps = {
+  messages: Message[];
+  me: Participant | null;
+  members: Participant[];
+  status: Status;
+  booting?: boolean;
+};
+
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
   return (
-    <div className="mx-6 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85">
+    <div className="mx-4 my-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85 sm:mx-6">
       <span className="h-px flex-1 bg-border/60" />
       {fmtDay(ms, locale, t("date.today"))}
       <span className="h-px flex-1 bg-border/60" />
@@ -118,7 +133,7 @@ function MessageRow({
       {showDay && <DayRule ms={m.createdAt} />}
       <div
         className={cn(
-          "flex gap-x-2.5 rounded-md px-6 py-1.5 animate-slide-in transition-colors hover:bg-accent/70",
+          "flex gap-x-2.5 rounded-md px-4 py-1.5 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}
@@ -146,7 +161,7 @@ function MessageRow({
           </div>
           <div
             className={cn(
-              "mt-0.5 max-w-[min(100%,44ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
+              "mt-0.5 max-w-[85%] sm:max-w-[70%] md:max-w-[min(100%,60ch)] lg:max-w-[min(100%,72ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
               self ? "bg-primary/15 text-foreground" : "bg-card text-foreground",
             )}
           >
@@ -161,23 +176,29 @@ function MessageRow({
   );
 }
 
-export function MessageList({
-  messages,
-  me,
-  members,
-  status,
-  booting,
-}: {
-  messages: Message[];
-  me: Participant | null;
-  members: Participant[];
-  status: Status;
-  booting?: boolean;
-}) {
+export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
+  { messages, me, members, status, booting },
+  ref,
+) {
   const { locale, t } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+
+  // Expose a "scroll to bottom, but only if already pinned" command so callers
+  // (e.g. the visual-viewport keyboard handler) can re-pin the list after the
+  // visible area shrinks. Safe in every render branch: bottomRef.current is
+  // null in the booting/empty branches, and scrollIntoView is stubbed in tests.
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToBottomIfPinned: () => {
+        if (!atBottomRef.current) return;
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      },
+    }),
+    [],
+  );
 
   // track whether the user is pinned to the bottom (don't auto-scroll if they scrolled up)
   const onScroll = () => {
@@ -199,7 +220,7 @@ export function MessageList({
     status === "lost" ? (
       <div
         role="status"
-        className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-300"
+        className="flex flex-none items-center justify-center gap-2 border-b border-destructive/30 border-l-2 border-l-destructive bg-destructive/15 px-4 py-1.5 font-mono text-[11px] text-destructive animate-in slide-in-from-top-2 duration-slow"
       >
         <AlertTriangle className="h-3.5 w-3.5 animate-pulse" aria-hidden />
         {t("msg.disconnected")}
@@ -210,7 +231,7 @@ export function MessageList({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {banner}
-        <div className="flex flex-1 items-center justify-center p-10">
+        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
           <div
             role="status"
             aria-live="polite"
@@ -227,7 +248,7 @@ export function MessageList({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {banner}
-        <div className="flex flex-1 items-center justify-center p-10">
+        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
           <div className="max-w-xs text-center">
             <div className="font-display text-2xl font-semibold tracking-tight">{t("msg.empty.title")}</div>
             <div className="mx-auto mt-3 h-px w-8 bg-agent/60" aria-hidden />
@@ -281,4 +302,4 @@ export function MessageList({
       </div>
     </div>
   );
-}
+});

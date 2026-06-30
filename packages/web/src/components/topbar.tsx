@@ -43,12 +43,16 @@ export function Topbar({
 }) {
   const t = useT();
   return (
-    <header className="flex flex-none items-center gap-3 border-b border-border bg-chrome px-4 py-2.5">
-      <div className="flex items-baseline gap-2">
+    <header className="flex flex-none items-center gap-2 overflow-hidden border-b border-border bg-chrome px-3 py-2.5 sm:gap-3 sm:px-4">
+      <div className="flex items-baseline">
         <span className="font-display text-xl font-semibold tracking-tight">
           club<span className="text-agent animate-brand-pulse">.</span>
         </span>
-        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
+        {/* sm-reveal morphs the badge in/out at the sm breakpoint instead of the
+            display:none snap of `hidden sm:inline-block`, so rotating the device
+            feels like a collapse/expand rather than a jump. ml-0 sm:ml-2 keeps
+            the gap from lingering when the badge is collapsed. */}
+        <span className="sm-reveal ml-0 rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground sm:ml-2">
           #general
         </span>
       </div>
@@ -65,8 +69,11 @@ export function Topbar({
         <Radio className="h-3.5 w-3.5" aria-hidden />
         {/* The dot duplicates the visible status word; hide it from AT so the
             state isn't announced twice. Color is never the sole signal. */}
-        <span className={cn("h-2 w-2 rounded-full transition-colors duration-slow", statusColor[status])} aria-hidden />
-        <span className="sr-only sm:not-sr-only">{t(statusKey[status])}</span>
+        <span className={cn("h-2.5 w-2.5 rounded-full transition-colors duration-slow", statusColor[status])} aria-hidden />
+        {/* "connecting" is the one state worth a visible label on mobile (no
+            banner fallback yet), so show it even below sm; the others stay
+            icon-only on mobile to keep the crowded topbar quiet. */}
+        <span className={cn(status === "connecting" ? "" : "sr-only", "sm:not-sr-only")}>{t(statusKey[status])}</span>
       </span>
 
       <span aria-hidden className="h-4 w-px flex-none bg-border" />
@@ -80,11 +87,11 @@ export function Topbar({
       <ViewKeyDialog key_={key_} />
 
       {/* Mobile-only roster trigger + sheet (hidden on >= md where the aside shows) */}
-      <MobileRoster members={members} selfId={selfId} onlineCount={members.length} />
+      <MobileRoster members={members} selfId={selfId} onlineCount={members.length} key_={key_} />
 
       <Button
         variant="outline"
-        className="tap-target gap-1.5 px-2.5 sm:px-3"
+        className="tap-target gap-1.5 px-2.5 active:bg-accent sm:px-3"
         onClick={onSignOutRequest}
         aria-label={t("topbar.signOut.aria", {
           name: meName ?? t("topbar.signOut.switchIdentity"),

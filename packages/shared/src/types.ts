@@ -76,10 +76,31 @@ export const CreateParticipantRequest = z.object({
 });
 export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
 
-// Returned exactly once by POST /participants; the plaintext key is never
-// persisted server-side.
+// Returned exactly once by POST /participants; the plaintext key and recovery
+// code are never persisted server-side (only their sha256 hashes are stored).
+// The recovery code is a fallback credential: present it with the callsign at
+// POST /participants/recover to reissue the key (and a fresh recovery code)
+// after losing the original key.
 export interface CreateParticipantResponse {
   key: string;
+  recoverCode: string;
+  participant: Participant;
+}
+
+// Recover an existing identity by callsign + one-time recovery code. On
+// success the server reissues a fresh key AND a fresh recovery code (the old
+// recovery code is single-use and rotated), reusing the original id + name.
+// On failure a uniform 401 is returned regardless of whether the name exists
+// or the code is wrong, to prevent callsign enumeration.
+export const RecoverParticipantRequest = z.object({
+  name: z.string().min(1).max(40),
+  recoverCode: z.string().min(1),
+});
+export type RecoverParticipantRequest = z.infer<typeof RecoverParticipantRequest>;
+
+export interface RecoverParticipantResponse {
+  key: string;
+  recoverCode: string;
   participant: Participant;
 }
 

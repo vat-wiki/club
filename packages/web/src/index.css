@@ -71,6 +71,28 @@
   body,
   #root {
     height: 100%;
+    /* 100dvh accounts for mobile browser chrome (address bar show/hide) so the
+       composer is never pushed off-screen. Older browsers ignore dvh and use
+       the 100% declared above. #root overrides this with --app-height below. */
+    height: 100dvh;
+    /* Lock the root chain so the page itself never becomes a scroll surface.
+       On iOS Safari the soft keyboard shrinks visualViewport but NOT the layout
+       viewport; if the document is taller than the visible area the whole page
+       becomes draggable, and the flex-none composer (pinned to the document
+       bottom) gets dragged out of view. overflow:hidden together with the
+       --app-height-driven #root height makes the composer hug the keyboard and
+       be undraggable. The message list keeps its own overflow-y-auto scroll, so
+       history remains keyboard/touch scrollable. */
+    overflow: hidden;
+    /* Forbid touch overscroll (bounce / drag-through) on the root chain. */
+    overscroll-behavior: none;
+  }
+  /* #root tracks the visual viewport so it actually shrinks when the iOS soft
+     keyboard opens (the layout viewport doesn't). Falls back to 100dvh on
+     desktop / older browsers where --app-height is never set. Set by
+     useVisualViewportHeight (src/hooks/use-visual-viewport-height.ts). */
+  #root {
+    height: var(--app-height, 100dvh);
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
@@ -109,6 +131,28 @@
     .tap-target {
       min-height: 36px;
       min-width: 0;
+    }
+  }
+
+  /* Reveal-on-sm: collapses to zero width/opacity below the sm breakpoint and
+     expands above it, animating so the breakpoint transition reads as a smooth
+     morph instead of a display:none snap. Used for topbar chrome that's only
+     decorative on mobile (e.g. the #general channel badge). The element stays
+     in flow at width 0, so pair it with a collapsing margin (ml-0 sm:ml-*) to
+     avoid a leftover gap next to its sibling. */
+  .sm-reveal {
+    max-width: 0;
+    min-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease-out,
+      margin 200ms ease-out;
+  }
+  @media (min-width: 640px) {
+    .sm-reveal {
+      max-width: 8rem;
+      opacity: 1;
     }
   }
 }

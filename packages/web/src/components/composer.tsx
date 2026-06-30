@@ -430,7 +430,7 @@ export function Composer({
       // variants would otherwise let focus-within win). (The after-opacity
       // state switch is a
       // state signal, not motion, so it intentionally stays.)
-      className="relative flex-none border-t border-border bg-chrome px-5 py-3 transition-transform duration-200 ease-out focus-within:-translate-y-px focus-within:shadow-[0_-4px_16px_-8px_hsl(0_0%_0%/0.5)] motion-reduce:!transform-none motion-reduce:!shadow-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-agent after:to-transparent after:opacity-[0.08] after:transition-opacity after:duration-300 after:ease-out focus-within:after:opacity-60"
+      className="relative flex-none border-t border-border bg-chrome px-4 py-3 transition-transform sm:focus-within:-translate-y-px sm:focus-within:shadow-[0_-4px_16px_-8px_hsl(0_0%_0%/0.5)] motion-reduce:!transform-none motion-reduce:!shadow-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-agent after:to-transparent after:opacity-[0.08] after:transition-opacity after:duration-slow focus-within:after:opacity-60 sm:px-5"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -678,7 +678,7 @@ export function Composer({
           className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90"
         >
           {t("composer.hint")}
-          {popupOpen ? t("composer.hintMention") : ""}
+          {popupOpen ? <span className="hidden sm:inline">{t("composer.hintMention")}</span> : null}
         </p>
       )}
     </form>

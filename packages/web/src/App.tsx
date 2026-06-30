@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Participant } from "@club/shared";
 import type { ClubConn } from "@club/sdk";
 import { loadConn, saveConn, clearConn, API_URL, getKey } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useMessageStream } from "@/hooks/use-message-stream";
+import { useVisualViewportHeight } from "@/hooks/use-visual-viewport-height";
 import { useI18n } from "@/lib/i18n";
 import { Topbar } from "@/components/topbar";
 import { Roster } from "@/components/roster";
-import { MessageList } from "@/components/message-list";
+import { MessageList, type MessageListHandle } from "@/components/message-list";
 import { Composer } from "@/components/composer";
 import { AuthDialog } from "@/components/auth-dialog";
 import { KeyRevealDialog } from "@/components/key-reveal-dialog";
@@ -15,6 +16,14 @@ import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 
 export default function App() {
   const { t } = useI18n();
+  const messageListRef = useRef<MessageListHandle>(null);
+  // Drive #root height from the visual viewport so the composer stays visible
+  // above the mobile soft keyboard and the page can't be dragged off-screen.
+  // No-op on desktop / browsers without visualViewport. On shrink (keyboard
+  // opening), re-pin the message list to the bottom so the latest message
+  // isn't hidden behind the keyboard — but only if the user was already
+  // pinned there.
+  useVisualViewportHeight(() => messageListRef.current?.scrollToBottomIfPinned());
   const [conn, setConn] = useState<ClubConn | null>(() => loadConn());
   const [me, setMe] = useState<Participant | null>(null);
   const [members, setMembers] = useState<Participant[]>([]);
@@ -148,7 +157,14 @@ export default function App() {
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
           <h1 className="sr-only">{t("app.h1")}</h1>
-          <MessageList messages={messages} me={me} members={members} status={status} booting={booting} />
+          <MessageList
+            ref={messageListRef}
+            messages={messages}
+            me={me}
+            members={members}
+            status={status}
+            booting={booting}
+          />
           <Composer onSend={handleSend} disabled={!me} members={members} selfId={me?.id} />
         </main>
       </div>

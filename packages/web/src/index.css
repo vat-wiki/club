@@ -73,8 +73,26 @@
     height: 100%;
     /* 100dvh accounts for mobile browser chrome (address bar show/hide) so the
        composer is never pushed off-screen. Older browsers ignore dvh and use
-       the 100% declared above. */
+       the 100% declared above. #root overrides this with --app-height below. */
     height: 100dvh;
+    /* Lock the root chain so the page itself never becomes a scroll surface.
+       On iOS Safari the soft keyboard shrinks visualViewport but NOT the layout
+       viewport; if the document is taller than the visible area the whole page
+       becomes draggable, and the flex-none composer (pinned to the document
+       bottom) gets dragged out of view. overflow:hidden together with the
+       --app-height-driven #root height makes the composer hug the keyboard and
+       be undraggable. The message list keeps its own overflow-y-auto scroll, so
+       history remains keyboard/touch scrollable. */
+    overflow: hidden;
+    /* Forbid touch overscroll (bounce / drag-through) on the root chain. */
+    overscroll-behavior: none;
+  }
+  /* #root tracks the visual viewport so it actually shrinks when the iOS soft
+     keyboard opens (the layout viewport doesn't). Falls back to 100dvh on
+     desktop / older browsers where --app-height is never set. Set by
+     useVisualViewportHeight (src/hooks/use-visual-viewport-height.ts). */
+  #root {
+    height: var(--app-height, 100dvh);
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;

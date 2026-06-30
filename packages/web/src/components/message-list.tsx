@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Message, Participant } from "@club/shared";
 import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
@@ -6,6 +6,21 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Status = "connecting" | "connected" | "lost";
+
+// Imperative handle exposed via the MessageList ref. `scrollToBottom` re-pins
+// the list to the latest message — but only when the user was already pinned
+// to the bottom, so it never yanks someone who scrolled up to read history.
+export type MessageListHandle = {
+  scrollToBottomIfPinned: () => void;
+};
+
+type MessageListProps = {
+  messages: Message[];
+  me: Participant | null;
+  members: Participant[];
+  status: Status;
+  booting?: boolean;
+};
 
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
@@ -87,23 +102,29 @@ function MessageRow({
   );
 }
 
-export function MessageList({
-  messages,
-  me,
-  members,
-  status,
-  booting,
-}: {
-  messages: Message[];
-  me: Participant | null;
-  members: Participant[];
-  status: Status;
-  booting?: boolean;
-}) {
+export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
+  { messages, me, members, status, booting },
+  ref,
+) {
   const { locale, t } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+
+  // Expose a "scroll to bottom, but only if already pinned" command so callers
+  // (e.g. the visual-viewport keyboard handler) can re-pin the list after the
+  // visible area shrinks. Safe in every render branch: bottomRef.current is
+  // null in the booting/empty branches, and scrollIntoView is stubbed in tests.
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToBottomIfPinned: () => {
+        if (!atBottomRef.current) return;
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      },
+    }),
+    [],
+  );
 
   // track whether the user is pinned to the bottom (don't auto-scroll if they scrolled up)
   const onScroll = () => {
@@ -207,4 +228,4 @@ export function MessageList({
       </div>
     </div>
   );
-}
+});

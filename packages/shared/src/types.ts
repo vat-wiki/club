@@ -19,6 +19,35 @@ export interface Message {
   authorKind: ParticipantKind;
   content: string;
   createdAt: number;
+  // Images attached to the message; absent/empty = a plain text message
+  // (backward compatible — old clients/rows simply have none). MVP scope: an
+  // image is a *shareable/displayable* carrier, symmetric for humans and agents
+  // (same history); it is NOT yet an agent multimodal input. The structured
+  // shape is forward-compatible so "letting an agent see it" can arrive later
+  // without a contract change.
+  attachments?: MessageAttachment[];
+}
+
+// The MIME types club accepts as images. Single source of truth shared by the
+// upload route (authoritative), the web client (pre-flight local reject), and
+// the SDK/CLI.
+export const ImageMime = z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+export type ImageMime = z.infer<typeof ImageMime>;
+
+// One image attached to a message. `id` is a server-generated unguessable random
+// slug that doubles as the public `/files/{id}` path (serving is intentionally
+// unauthenticated — `<img src>` cannot carry the bearer header, and club is a
+// single room whose history every member sees anyway). `url` is root-relative so
+// each client resolves it against its own server origin. The server is the sole
+// source of truth for mime/width/height/size; clients only echo `id`s back when
+// sending, so dimensions can't be forged.
+export interface MessageAttachment {
+  id: string;
+  url: string; // root-relative, e.g. "/files/{id}"
+  mime: ImageMime;
+  width?: number; // px, lets the client reserve layout before the image loads
+  height?: number;
+  size: number; // bytes
 }
 
 // A @-mention of one participant by another. Persisted server-side so an agent
@@ -75,10 +104,28 @@ export interface RecoverParticipantResponse {
   participant: Participant;
 }
 
+// Image-input limits — shared so the web client's pre-flight checks and the
+// upload route's authoritative checks can never drift apart.
+export const MAX_MESSAGE_CONTENT = 4000;
+export const MAX_IMAGES_PER_MESSAGE = 8;
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// content is optional IFF at least one attachment is supplied ("text-optional"
+// keeps the common screenshot-then-send path frictionless — a bare image is a
+// legitimate intent). The cross-field "content.trim() OR attachmentIds.length"
+// rule is enforced in the route, not the schema, because zod can't express it
+// cleanly. attachmentIds reference previously-uploaded files (POST /files); the
+// server rehydrates their full metadata so clients can't forge dimensions.
 export const CreateMessageRequest = z.object({
-  content: z.string().min(1).max(4000),
+  content: z.string().max(MAX_MESSAGE_CONTENT).default(""),
+  attachmentIds: z.array(z.string().min(1).max(64)).max(MAX_IMAGES_PER_MESSAGE).default([]),
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
+
+// POST /files (multipart, field "file") returns a single attachment descriptor;
+// the client then references its `id` in a later POST /messages. Structurally a
+// MessageAttachment — declared separately only to name the response shape.
+export type UploadFileResponse = MessageAttachment;
 
 export interface ListMessagesQuery {
   since?: string; // message id — return messages after this one

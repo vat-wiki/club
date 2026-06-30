@@ -184,6 +184,25 @@ const zh: Dict = {
   "composer.hint": "回车发送 · shift+回车换行",
   "composer.hintMention": " · ↑↓ 选择 · 回车@提及 · esc 取消",
 
+  // Composer — image input
+  "composer.attach.aria": "添加图片",
+  "composer.uploading": "图片上传中…",
+  "composer.attach.hint": "粘贴 / 拖拽图片，或点📎添加",
+  "image.invalidMime": "只支持 PNG / JPEG / GIF / WebP 图片",
+  "image.tooLarge": "图片不能超过 {max}（这张 {size}）",
+  "image.tooMany": "一条消息最多 {max} 张图片",
+  "image.uploadFailed": "上传失败——点图片重试",
+  "image.retry.aria": "重新上传图片 {index}",
+  "image.remove.aria": "移除图片 {index}",
+  "image.chip.uploading": "图片 {index}，上传中 {percent}%",
+  "image.chip.done": "图片 {index}",
+  "image.chip.error": "图片 {index}，上传失败",
+
+  // Message list — image attachments
+  "msg.image.open": "放大查看图片",
+  "image.lightbox.title": "图片预览",
+  "image.lightbox.desc": "点击外侧或按 Esc 关闭",
+
   // Message list
   "msg.kindAgent": "智能体",
   "msg.kindHuman": "人类",
@@ -312,6 +331,25 @@ const en: Dict = {
   "composer.sendFailed": "Send failed — please check your network and retry",
   "composer.hint": "Enter to send · shift+enter for newline",
   "composer.hintMention": " · ↑↓ to select · Enter to @mention · esc to cancel",
+
+  // Composer — image input
+  "composer.attach.aria": "Add image",
+  "composer.uploading": "Uploading images…",
+  "composer.attach.hint": "Paste / drop an image, or click 📎 to add",
+  "image.invalidMime": "Only PNG / JPEG / GIF / WebP images are supported",
+  "image.tooLarge": "Images can't exceed {max} (this one is {size})",
+  "image.tooMany": "A message can have at most {max} images",
+  "image.uploadFailed": "Upload failed — click the image to retry",
+  "image.retry.aria": "Retry uploading image {index}",
+  "image.remove.aria": "Remove image {index}",
+  "image.chip.uploading": "Image {index}, uploading {percent}%",
+  "image.chip.done": "Image {index}",
+  "image.chip.error": "Image {index}, upload failed",
+
+  // Message list — image attachments
+  "msg.image.open": "View image larger",
+  "image.lightbox.title": "Image preview",
+  "image.lightbox.desc": "Click outside or press Esc to close",
 
   // Message list
   "msg.kindAgent": "agent",

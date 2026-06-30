@@ -125,6 +125,51 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     );
   });
 
+  it("MessageList has no violations (with image attachments)", async () => {
+    const withImages: Message[] = [
+      {
+        ...messages[0],
+        content: "a screenshot",
+        attachments: [
+          {
+            id: "a1",
+            url: "/files/a1",
+            mime: "image/png",
+            width: 100,
+            height: 75,
+            size: 1234,
+          },
+          {
+            id: "a2",
+            url: "/files/a2",
+            mime: "image/jpeg",
+            width: 100,
+            height: 75,
+            size: 1234,
+          },
+        ],
+      },
+    ];
+    await expectNoViolations(
+      <MessageList messages={withImages} me={me} members={members} status="connected" />,
+    );
+  });
+
+  it("MessageList has no violations (pure-image message, empty text)", async () => {
+    const pureImage: Message[] = [
+      {
+        ...messages[0],
+        content: "",
+        attachments: [
+          { id: "a1", url: "/files/a1", mime: "image/png", width: 100, height: 75, size: 1234 },
+        ],
+      },
+    ];
+    await expectNoViolations(
+      <MessageList messages={pureImage} me={me} members={members} status="connected" />,
+    );
+  });
+
   it("MessageList has no violations (empty state)", async () => {
     await expectNoViolations(
       <MessageList messages={[]} me={me} members={members} status="connected" />,

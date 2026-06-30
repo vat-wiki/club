@@ -11,6 +11,9 @@ dist/
 *.tsbuildinfo
 # Playwright 自动化运行产物（时间戳日志/快照）
 .playwright-cli/
+# 图片上传运行时存储（见 packages/server/src/files-dir.ts；生产用 CLUB_FILES 指向）
+packages/server/files/
+/files/
 # VitePress 文档站构建产物与缓存
 docs/.vitepress/cache/
 docs/.vitepress/dist/

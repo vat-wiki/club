@@ -108,9 +108,9 @@ export default function App() {
     setPendingRecoverCode("");
   };
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachmentIds: readonly string[]) => {
     if (!conn) return;
-    await api.send(conn, content);
+    await api.send(conn, content, attachmentIds);
     void refreshMembers();
   };
 
@@ -165,7 +165,13 @@ export default function App() {
             status={status}
             booting={booting}
           />
-          <Composer onSend={handleSend} disabled={!me} members={members} selfId={me?.id} />
+          <Composer
+            onSend={handleSend}
+            disabled={!me}
+            members={members}
+            selfId={me?.id}
+            conn={conn}
+          />
         </main>
       </div>
 

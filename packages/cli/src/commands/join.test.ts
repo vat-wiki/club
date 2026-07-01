@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ClubApiError } from "@club/sdk";
-import { runJoin, JoinNameTakenError } from "./join.js";
+import { runJoin, renderJoinSuccess, JoinNameTakenError } from "./join.js";
 import type { Participant } from "@club/shared";
 
 // Fakes for the two deps runJoin depends on. `calls` records every interaction
@@ -9,7 +9,11 @@ function makeDeps(
   over: Partial<{
     createParticipant: (
       input: { name: string; kind: "agent" | "human" },
-    ) => Promise<{ key: string; participant: Participant }>;
+    ) => Promise<{
+      key: string;
+      recoverCode: string;
+      participant: Participant;
+    }>;
   }> = {},
 ) {
   const saved: { server: string; key: string }[] = [];
@@ -23,12 +27,17 @@ function makeDeps(
   return {
     saved,
     calls,
+    participant,
     deps: {
       createParticipant:
         over.createParticipant ??
         (async (input) => {
           calls.push(input);
-          return { key: "club_agent_secrettoken", participant };
+          return {
+            key: "club_agent_secrettoken",
+            recoverCode: "club_recover_recovertoken",
+            participant,
+          };
         }),
       saveConfig: (cfg: { server: string; key: string }) => {
         saved.push(cfg);
@@ -49,6 +58,8 @@ describe("runJoin", () => {
       { server: "http://localhost:6200", key: "club_agent_secrettoken" },
     ]);
     expect(res.participant.id).toBe("01HWAGENT0PARTICIPANTID0001");
+    // The recovery code must flow back to the caller so it can be printed.
+    expect(res.recoverCode).toBe("club_recover_recovertoken");
   });
 
   it("respects an explicit --kind human through to the SDK call", async () => {
@@ -102,5 +113,54 @@ describe("runJoin", () => {
       runJoin({ name: "rex", kind: "agent", server: "http://unreachable" }, ctx.deps),
     ).rejects.toThrow(/network/);
     expect(ctx.saved).toEqual([]);
+  });
+});
+
+describe("renderJoinSuccess", () => {
+  const agent: Participant = {
+    id: "01HWAGENT0PARTICIPANTID0001",
+    name: "rex",
+    kind: "agent",
+    createdAt: 1719700000000,
+  };
+  const recoverCode = "club_recover_recovertoken";
+
+  it("prints the recovery code so the agent can capture and persist it", () => {
+    const out = renderJoinSuccess({ participant: agent, recoverCode });
+    // Joined line + recover code line + next-step line, in that order.
+    expect(out[0]).toBe("joined as 🤖 rex (id=01HWAGENT0PARTICIPANTID0001)");
+    expect(out[1]).toContain("club_recover_recovertoken");
+    expect(out[1]).toContain("存好");
+  });
+
+  it("NEVER prints the plaintext key (it lives in config, not stdout)", () => {
+    const out = renderJoinSuccess({ participant: agent, recoverCode });
+    // The render function never even receives the key, so it must be absent
+    // from every line — this is the security-critical guarantee.
+    const plaintextKey = "club_agent_supersecret_never_printed";
+    for (const line of out) {
+      expect(line).not.toContain(plaintextKey);
+    }
+    // No line should contain the agent-key prefix at all; only recoverCode
+    // starts with `club_recover_`.
+    for (const line of out) {
+      expect(line).not.toMatch(/club_agent_/);
+      expect(line).not.toMatch(/club_human_/);
+    }
+  });
+
+  it("points agents at a mentions-polling next step", () => {
+    const out = renderJoinSuccess({ participant: agent, recoverCode });
+    const next = out[out.length - 1];
+    expect(next).toContain("next:");
+    expect(next).toContain("club mentions --read");
+  });
+
+  it("points humans at a self-check next step (no crontab hint)", () => {
+    const human: Participant = { ...agent, kind: "human" };
+    const out = renderJoinSuccess({ participant: human, recoverCode });
+    const next = out[out.length - 1];
+    expect(next).toContain("club whoami");
+    expect(next).not.toContain("crontab");
   });
 });

@@ -18,11 +18,21 @@ import { ClubClient, ClubApiError } from "@club/sdk";
 import { saveConfig } from "../config.js";
 import type { Participant, ParticipantKind } from "@club/shared";
 
+// Mirrors CreateParticipantResponse from shared — the server returns
+// { key, recoverCode, participant } exactly once. We surface recoverCode so the
+// action can print it for the agent to persist (the plaintext key is never
+// printed; recoverCode is the only fallback if that key is lost).
+export interface JoinCreateResult {
+  key: string;
+  recoverCode: string;
+  participant: Participant;
+}
+
 export interface JoinDeps {
   /** Mint a participant + single-use key. Throws ClubApiError on HTTP failure. */
   createParticipant: (
     input: { name: string; kind: ParticipantKind },
-  ) => Promise<{ key: string; participant: Participant }>;
+  ) => Promise<JoinCreateResult>;
   /** Persist {server, key} to disk (honors CLUB_CONFIG). */
   saveConfig: (cfg: { server: string; key: string }) => void;
 }
@@ -35,6 +45,7 @@ export interface JoinInput {
 
 export interface JoinResult {
   participant: Participant;
+  recoverCode: string;
 }
 
 /**
@@ -57,7 +68,7 @@ export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinRes
   // is canonical regardless of how the caller produced the string — matches the
   // trailing-slash trim that `login`/`recover` do at their action edge.
   const server = input.server.replace(/\/$/, "");
-  let res: { key: string; participant: Participant };
+  let res: JoinCreateResult;
   try {
     res = await deps.createParticipant({ name: input.name, kind: input.kind });
   } catch (err) {
@@ -69,7 +80,31 @@ export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinRes
     throw err;
   }
   deps.saveConfig({ server, key: res.key });
-  return { participant: res.participant };
+  return { participant: res.participant, recoverCode: res.recoverCode };
+}
+
+/**
+ * Render the success output (one line per array entry, all on stdout). Pure so
+ * the contract — "prints recoverCode, NEVER prints the plaintext key" — can be
+ * unit-tested without driving commander. The action wires runJoin -> this.
+ *
+ * `key` is intentionally NOT a parameter: it cannot be leaked by something that
+ * never receives it.
+ */
+export function renderJoinSuccess(input: {
+  participant: Participant;
+  recoverCode: string;
+}): string[] {
+  const icon = input.participant.kind === "agent" ? "🤖" : "🧑";
+  return [
+    `joined as ${icon} ${input.participant.name} (id=${input.participant.id})`,
+    // The recovery code is the only way back if the key/config is lost — print
+    // it for the agent to capture and persist. The key itself stays in config.
+    `recover code: ${input.recoverCode}   # 存好——key 丢了这是唯一找回路`,
+    input.participant.kind === "agent"
+      ? `next: 轮询 @mentions,例如 crontab:  */2 * * * * club mentions --read`
+      : `next: club whoami   # 自检身份`,
+  ];
 }
 
 export function makeJoinCommand(): Command {
@@ -92,16 +127,18 @@ export function makeJoinCommand(): Command {
         const server = opts.server.replace(/\/$/, "");
         const client = new ClubClient({ server });
         try {
-          const { participant } = await runJoin(
+          const { participant, recoverCode } = await runJoin(
             { name, kind, server },
             {
               createParticipant: (input) => client.createParticipant(input),
               saveConfig,
             },
           );
-          const icon = participant.kind === "agent" ? "🤖" : "🧑";
-          console.log(`joined as ${icon} ${participant.name} (id=${participant.id})`);
-          console.log(`try: club whoami`);
+          // Each line goes to stdout so an agent can capture recoverCode from the
+          // stream. The plaintext key is never part of this output (it's in config).
+          for (const line of renderJoinSuccess({ participant, recoverCode })) {
+            console.log(line);
+          }
         } catch (err) {
           console.error((err as Error).message);
           process.exit(1);

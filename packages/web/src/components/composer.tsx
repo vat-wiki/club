@@ -495,6 +495,7 @@ export function Composer({
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || attachments.length >= MAX_IMAGES_PER_MESSAGE}
           aria-label={t("composer.attach.aria")}
+          data-testid="composer-attach-button"
           className="min-h-[48px] shrink-0 px-2 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[56px]"
         >
           <Paperclip className="h-4 w-4" aria-hidden />
@@ -532,6 +533,7 @@ export function Composer({
           value={value}
           rows={1}
           disabled={disabled}
+          data-testid="composer-input"
           placeholder={t("composer.placeholder")}
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
@@ -600,7 +602,7 @@ export function Composer({
             chips wrap to a second line; gap-2 + px-1 pt-1 keep them aligned to
             the textarea's text column. */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-1 pt-1">
+          <div className="flex flex-wrap gap-2 px-1 pt-1" data-testid="composer-attachments">
             {attachments.map((d, i) => (
               <ImagePreviewChip
                 key={d.key}
@@ -621,6 +623,7 @@ export function Composer({
           type="submit"
           size="default"
           disabled={disabled || sending || !canSend}
+          data-testid="composer-send-button"
           // Match the textarea's min-height (48px mobile / 56px sm up) so the
           // button and the textarea are co-heighted in the common single-line
           // case. The container is `items-end`, so when both share the same

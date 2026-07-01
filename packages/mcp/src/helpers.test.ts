@@ -7,6 +7,7 @@ import {
   matchesMention,
   listenForMatch,
   dispatchTool,
+  strArray,
   type DispatchClient,
 } from "./helpers.js";
 
@@ -45,6 +46,25 @@ describe("num", () => {
     expect(num(NaN)).toBeNaN();
     expect(num(Infinity)).toBe(Infinity);
     expect(num(-Infinity)).toBe(-Infinity);
+  });
+});
+
+describe("strArray", () => {
+  it("returns [] for absent / non-string / non-array input", () => {
+    expect(strArray(undefined)).toEqual([]);
+    expect(strArray(null)).toEqual([]);
+    expect(strArray(42)).toEqual([]);
+    expect(strArray({})).toEqual([]);
+  });
+
+  it("wraps a bare string into a one-element array (dropping empty strings)", () => {
+    expect(strArray("a.png")).toEqual(["a.png"]);
+    expect(strArray("  ")).toEqual([]);
+  });
+
+  it("filters an array down to just its string elements", () => {
+    expect(strArray(["a.png", "b.jpg"])).toEqual(["a.png", "b.jpg"]);
+    expect(strArray(["a.png", 7, null, "b.jpg"])).toEqual(["a.png", "b.jpg"]);
   });
 });
 
@@ -127,7 +147,7 @@ describe("matchesMention", () => {
   });
 });
 
-function makeMsg(content: string): Message {
+function makeMsg(content: string, attachments?: Message["attachments"]): Message {
   return {
     id: "m_" + content,
     participantId: "p1",
@@ -135,6 +155,7 @@ function makeMsg(content: string): Message {
     authorKind: "human",
     content,
     createdAt: 0,
+    ...(attachments ? { attachments } : {}),
   };
 }
 
@@ -197,6 +218,7 @@ function fakeClient(over: Partial<DispatchClient> = {}): DispatchClient {
     me: async () => makeP("alice"),
     messages: async () => [],
     send: async (content: string) => makeMsg(content),
+    uploadImage: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
     members: async () => [],
     stream: () => ({ stop: () => {} }),
     ...over,
@@ -256,6 +278,70 @@ describe("dispatchTool", () => {
     const out = await dispatchTool("send", { content: "hi there" }, fakeClient());
     expect(out).toMatch(/^sent: /);
     expect(out).toContain("hi there");
+  });
+
+  it("send with images uploads each path then sends with attachmentIds", async () => {
+    const uploaded: string[] = [];
+    let sentIds: string[] | undefined;
+    const client = fakeClient({
+      uploadImage: async (p: string) => {
+        const id = "att_" + p;
+        uploaded.push(p);
+        return { id };
+      },
+      send: async (_content: string, attachmentIds?: string[]) => {
+        sentIds = attachmentIds;
+        return makeMsg("look", [
+          { id: "att_a.png", url: "/files/att_a.png", mime: "image/png", size: 10 },
+          { id: "att_b.jpg", url: "/files/att_b.jpg", mime: "image/jpeg", size: 20 },
+        ]);
+      },
+    });
+    const out = await dispatchTool("send", { content: "look", images: ["a.png", "b.jpg"] }, client);
+    expect(uploaded).toEqual(["a.png", "b.jpg"]);
+    expect(sentIds).toEqual(["att_a.png", "att_b.jpg"]);
+    // The attachments render into the formatted line (cross-client visibility).
+    expect(out).toContain("[图片: /files/att_a.png]");
+    expect(out).toContain("[图片: /files/att_b.jpg]");
+  });
+
+  it("send accepts a bare image (no content) — text-optional path", async () => {
+    const client = fakeClient({
+      uploadImage: async () => ({ id: "x" }),
+      send: async (_c, attachmentIds) =>
+        makeMsg("", [{ id: "x", url: "/files/x", mime: "image/png", size: 1 }]),
+    });
+    const out = await dispatchTool("send", { images: ["only.png"] }, client);
+    expect(out).toContain("[图片: /files/x]");
+  });
+
+  it("send tolerates `images` passed as a single string", async () => {
+    const client = fakeClient({
+      uploadImage: async (p) => ({ id: "u_" + p }),
+      send: async () => makeMsg("t"),
+    });
+    await dispatchTool("send", { content: "t", images: "one.png" }, client);
+    // single-string images should be treated as a one-element list.
+  });
+
+  it("send fails fast on too many images without uploading any", async () => {
+    const uploadImage = vi.fn(async () => ({ id: "x" }));
+    const client = fakeClient({ uploadImage });
+    await expect(
+      dispatchTool("send", { images: Array(9).fill("a.png") }, client),
+    ).rejects.toThrow(/too many images/);
+    expect(uploadImage).not.toHaveBeenCalled();
+  });
+
+  it("send propagates an upload failure as an error", async () => {
+    const client = fakeClient({
+      uploadImage: async () => {
+        throw new Error("not a recognized image");
+      },
+    });
+    await expect(dispatchTool("send", { images: ["bad.png"] }, client)).rejects.toThrow(
+      /not a recognized image/,
+    );
   });
 
   it("members renders humans and agents with the right icon, one per line", async () => {

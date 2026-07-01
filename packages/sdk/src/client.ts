@@ -5,6 +5,9 @@ import type {
   Mention,
   Message,
   Participant,
+  RecoverParticipantRequest,
+  RecoverParticipantResponse,
+  UploadFileResponse,
 } from "@club/shared";
 import {
   type CallOpts,
@@ -15,7 +18,10 @@ import {
   listMentions,
   listMessages,
   markMentionRead,
+  recoverParticipant as recoverParticipantFn,
   sendMessage,
+  uploadFile,
+  type UploadFileInput,
 } from "./transport.js";
 import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
 
@@ -82,9 +88,27 @@ export class ClubClient {
     return listMessages(this.conn(), { ...opts, ...this.callOpts() });
   }
 
-  /** POST /messages — send a message as the authenticated participant. */
-  send(content: string): Promise<Message> {
-    return sendMessage(this.conn(), content, { timeoutMs: this.timeoutMs });
+  /** POST /messages — send a message as the authenticated participant.
+   *  `attachmentIds` references files previously uploaded via `uploadFile`;
+   *  when omitted the body is the legacy `{ content }` shape. Pass an empty
+   *  content with attachmentIds to send an image-only message. */
+  send(content: string, attachmentIds?: string[]): Promise<Message> {
+    return sendMessage(this.conn(), content, {
+      ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
+      timeoutMs: this.timeoutMs,
+    });
+  }
+
+  /** POST /files — upload one image (multipart), returning its attachment
+   *  descriptor. The id it returns is what you pass to `send` as an
+   *  attachmentId. Pre-flight mime/size locally before calling.
+   *
+   *  NOTE: the Node convenience `uploadImage(path)` that reads + sniffs + calls
+   *  this lives in `@club/sdk/node`, NOT on this class — this package's main
+   *  entry is browser-safe (web imports `ClubClient`), so the fs/image-size
+   *  helpers are isolated behind the Node-only subpath. */
+  uploadFile(input: UploadFileInput): Promise<UploadFileResponse> {
+    return uploadFile(this.conn(), input, { timeoutMs: this.timeoutMs });
   }
 
   /** POST /participants — mint a participant + single-use key (no auth needed). */
@@ -92,6 +116,15 @@ export class ClubClient {
     input: CreateParticipantRequest,
   ): Promise<CreateParticipantResponse> {
     return createParticipantFn(this.conn(), input, { timeoutMs: this.timeoutMs });
+  }
+
+  /** POST /participants/recover — recover an identity by callsign + recovery
+   *  code; reissues the key (and a fresh recovery code), reusing the id+name.
+   *  No auth needed. */
+  recoverParticipant(
+    input: RecoverParticipantRequest,
+  ): Promise<RecoverParticipantResponse> {
+    return recoverParticipantFn(this.conn(), input, { timeoutMs: this.timeoutMs });
   }
 
   /** GET /messages/stream — live feed with auto-reconnect + catch-up. */

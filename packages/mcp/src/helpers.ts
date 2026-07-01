@@ -1,3 +1,5 @@
+import { assertImageCount } from "@club/sdk/node";
+
 // Pure input-coercion helpers used by the MCP tool dispatcher.
 //
 // Kept side-effect-free and in their own module so they can be unit-tested in
@@ -5,12 +7,23 @@
 // (resolveConn → process.exit, server.connect) that make importing it directly
 // impractical from a test.
 
-import type { Message, Participant } from "@club/shared";
+import { mentionMatches, type Message, type Participant } from "@club/shared";
 import { formatMessage } from "@club/sdk";
 
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
 export function str(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+
+/**
+ * Coerce an MCP tool argument into a string[], tolerating the shapes an LLM
+ * might send: a single string, or an array of strings. Anything else → [].
+ * Used for the `send` tool's `images` parameter (a list of local file paths).
+ */
+export function strArray(v: unknown): string[] {
+  if (typeof v === "string") return v.trim() ? [v] : [];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  return [];
 }
 
 /**
@@ -35,19 +48,19 @@ export function clampLimit(v: unknown): number {
 /**
  * Does `content` contain a @mention of `mention`?
  *
- * Mirrors the CLI `listen --mention` rule so a CLI agent and an MCP agent wake
- * on the same triggers: case-insensitive substring match on "@<name>". A
- * missing/empty `mention` matches every message (the `listen` "no filter" path).
+ * Delegates to @club/shared `mentionMatches` so an MCP agent wakes on exactly
+ * the same triggers as the CLI `listen --mention` and the server's mention inbox
+ * (single source of truth, word-boundary aware). A missing/empty `mention`
+ * matches every message (the `listen` "no filter" path).
  *
- * Pure + unit-tested; extracted from runListen so the matching rule — including
- * its intentional substring precision — is explicit and pinned by tests.
+ * Pure + unit-tested.
  */
 export function matchesMention(
   content: string,
   mention: string | null | undefined,
 ): boolean {
   if (!mention) return true;
-  return content.toLowerCase().includes("@" + mention.toLowerCase());
+  return mentionMatches(content, mention);
 }
 
 /** A stream subscription handle, as returned by ClubClient#stream. */
@@ -100,7 +113,11 @@ export function listenForMatch(
 export interface DispatchClient {
   me(): Promise<Participant>;
   messages(opts: { since?: string; limit: number }): Promise<Message[]>;
-  send(content: string): Promise<Message>;
+  send(content: string, attachmentIds?: string[]): Promise<Message>;
+  /** Upload one local image file, returning its attachment descriptor.
+   *  Index.ts wires this to @club/sdk uploadImageFile (read→sniff→validate→
+   *  POST /files); declared on the interface so dispatchTool stays fakeable. */
+  uploadImage(path: string): Promise<{ id: string }>;
   members(): Promise<Participant[]>;
   stream(onMessage: (m: Message) => void): { stop: () => void };
 }
@@ -134,8 +151,24 @@ export async function dispatchTool(
     }
     case "send": {
       const content = str(args.content);
-      if (!content) return "error: missing content";
-      const m = await client.send(content);
+      const images = strArray(args.images);
+      // Need at least one of: text or images. A bare image is a legitimate
+      // intent ("text-optional"), mirroring the CLI and web.
+      if (!content && images.length === 0) return "error: missing content";
+      // Fail fast on too many images before any upload happens.
+      assertImageCount(images);
+      let attachmentIds: string[] | undefined;
+      if (images.length > 0) {
+        // Pre-flight + upload each image; an unsupported/missing/too-large file
+        // throws and index.ts surfaces it as `error: <msg>`.
+        const ids: string[] = [];
+        for (const p of images) {
+          const att = await client.uploadImage(p);
+          ids.push(att.id);
+        }
+        attachmentIds = ids;
+      }
+      const m = await client.send(content, attachmentIds);
       return `sent: ${formatMessage(m)}`;
     }
     case "members": {

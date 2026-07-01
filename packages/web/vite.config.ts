@@ -18,6 +18,10 @@ export default defineConfig({
   },
   server: {
     port: 6100,
+    // Bind to all interfaces (not just localhost) so the dev server is
+    // reachable from the host when developing inside a container/VM, e.g.
+    // via the container IP like http://10.88.0.15:6100.
+    host: true,
     // Proxy REST + SSE endpoints to the club backend so the web app is
     // same-origin in dev. Authorization headers pass through unchanged.
     proxy: {
@@ -25,6 +29,9 @@ export default defineConfig({
       "/me": "http://localhost:6200",
       "/messages": "http://localhost:6200",
       "/members": "http://localhost:6200",
+      // Image upload + serving (POST /files, GET /files/:id). Same-origin in
+      // dev so the multipart upload and the <img src> resolve through Vite.
+      "/files": "http://localhost:6200",
       "/health": "http://localhost:6200",
     },
   },

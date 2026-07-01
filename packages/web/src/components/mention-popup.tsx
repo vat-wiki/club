@@ -60,7 +60,7 @@ export function MentionPopup({
       id="mention-listbox"
       aria-label={t("mention.aria")}
       data-testid="mention-popup"
-      className="absolute z-50 max-h-[min(240px,60vh)] w-64 overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/40 scrollbar-thin"
+      className="absolute z-50 max-h-[min(240px,60vh)] w-60 max-w-[calc(100vw-1.5rem)] overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/40 scrollbar-thin"
       style={{
         left: anchor.left,
         // Place the popup's bottom edge 6px above the anchor line.
@@ -87,7 +87,7 @@ export function MentionPopup({
             data-testid="mention-option"
             data-active={i === activeIndex ? "" : undefined}
             className={cn(
-              "flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-colors",
+              "flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-colors active:bg-accent/70",
               i === activeIndex
                 ? "bg-accent text-accent-foreground"
                 : "text-popover-foreground",
@@ -100,9 +100,12 @@ export function MentionPopup({
           >
             <span
               aria-hidden
+              // Agent dot pulses (same as roster/message row) so "@person vs
+              // @agent" is visually distinguishable in the option list, not
+              // only by the trailing kind label.
               className={cn(
                 "h-2 w-2 flex-none rounded-full",
-                m.kind === "agent" ? "bg-agent" : "bg-human",
+                m.kind === "agent" ? "bg-agent animate-agent-pulse" : "bg-human",
               )}
             />
             <span className="truncate">{m.name}</span>

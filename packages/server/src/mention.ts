@@ -1,3 +1,5 @@
+import { mentionMatches } from "@club/shared";
+
 /**
  * Server-side @-mention parsing.
  *
@@ -7,12 +9,11 @@
  * server now needs to know too, so it can persist per-participant inbox rows
  * that survive the recipient being offline.
  *
- * Semantics are deliberately aligned with the client-side matcher
- * (packages/mcp/src/helpers.ts `matchesMention` and
- * packages/cli/src/commands/listen.ts): a case-insensitive substring match on
- * `"@" + name`. A change here MUST stay in lockstep with those two — an agent
- * that wakes from its inbox should see exactly the messages it would have
- * caught live via `listen --mention <its-name>`.
+ * The actual match rule lives in @club/shared `mentionMatches` and is shared
+ * with the client-side matchers (packages/mcp/src/helpers.ts `matchesMention`
+ * and packages/cli/src/commands/listen.ts), so an agent that wakes from its
+ * inbox sees exactly the messages it would have caught live via
+ * `listen --mention <its-name>`. See `mentionMatches` for the word-boundary rule.
  */
 
 export interface NamedParticipant {
@@ -23,10 +24,10 @@ export interface NamedParticipant {
 /**
  * Return the roster entries that `content` @-mentions.
  *
- * Case-insensitive substring match on `"@" + name`, mirroring the client-side
- * rule. A name with an empty string is skipped (it would match any "@" in the
- * text). Duplicate ids in the input are de-duplicated so a participant is
- * mentioned at most once per message.
+ * Matching is delegated to @club/shared `mentionMatches` (word-boundary aware)
+ * so the server's inbox agrees with the CLI/MCP live matchers. A name with an
+ * empty string is skipped. Duplicate ids in the input are de-duplicated so a
+ * participant is mentioned at most once per message.
  *
  * Pure and unit-tested; the caller (POST /messages) handles persistence.
  */
@@ -34,13 +35,12 @@ export function extractMentionedParticipants(
   content: string,
   roster: readonly NamedParticipant[],
 ): NamedParticipant[] {
-  const lower = content.toLowerCase();
   const seen = new Set<string>();
   const out: NamedParticipant[] = [];
   for (const p of roster) {
     if (!p.name) continue;
     if (seen.has(p.id)) continue;
-    if (lower.includes("@" + p.name.toLowerCase())) {
+    if (mentionMatches(content, p.name)) {
       seen.add(p.id);
       out.push(p);
     }

@@ -52,15 +52,16 @@ describe("extractMentionedParticipants", () => {
     ).toEqual([P("1", "alice")]);
   });
 
-  it("is substring-based, intentionally (mirrors the client rule)", () => {
-    // Pinned: the client matcher is a substring match on "@<name>", so a short
-    // name matches a longer token. This is a known trade-off (simplicity over
-    // precision); changing it MUST be done in lockstep with cli/mcp.
-    expect(extractMentionedParticipants("ping @alicia", [P("1", "al")])).toEqual([
-      P("1", "al"),
-    ]);
-    expect(extractMentionedParticipants("see @editorial", [P("1", "ed")])).toEqual([
-      P("1", "ed"),
+  it("does not let a short name match a longer @-tag (word boundary, via shared mentionMatches)", () => {
+    // A short name must NOT be mentioned by a longer @-tag: "@alicia" is not a
+    // mention of "al". The rule is shared with cli/mcp through @club/shared.
+    expect(extractMentionedParticipants("ping @alicia", [P("1", "al")])).toEqual([]);
+    expect(extractMentionedParticipants("see @editorial", [P("1", "ed")])).toEqual([]);
+    // CJK prefix collision that actually occurred in the room: 走查-体验 is a
+    // prefix of 走查-体验2, so @走查-体验2 must ping only 走查-体验2, not 走查-体验.
+    const roster = [P("1", "走查-体验"), P("2", "走查-体验2")];
+    expect(extractMentionedParticipants("@走查-体验2 看下", roster)).toEqual([
+      P("2", "走查-体验2"),
     ]);
   });
 

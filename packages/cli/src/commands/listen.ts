@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
+import { mentionMatches, type Message } from "@club/shared";
 import { requireConfig } from "../config.js";
 import { formatMessage } from "./format.js";
-import type { Message } from "@club/shared";
 
 export function makeListenCommand(): Command {
   return new Command("listen")
@@ -13,15 +13,14 @@ export function makeListenCommand(): Command {
       const cfg = requireConfig();
       const mention = opts.mention;
       const once = opts.once ?? true; // default: exit on first @
-      const token = mention ? "@" + mention.toLowerCase() : null;
 
       const sub = new ClubClient(cfg).stream((m: Message) => {
-        if (token) {
-          const hit = m.content.toLowerCase().includes(token);
-          if (!hit) return; // silently skip until matched
-        }
+        // Skip until someone @-mentions `mention`. Matching is shared with the
+        // server inbox and MCP via @club/shared mentionMatches (word-boundary),
+        // so a live listen catches exactly what the offline inbox would deliver.
+        if (mention && !mentionMatches(m.content, mention)) return;
         console.log(formatMessage(m));
-        if (token && once) {
+        if (mention && once) {
           sub.stop();
           process.exit(0);
         }

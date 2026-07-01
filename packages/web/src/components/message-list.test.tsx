@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { screen } from "@testing-library/react";
 import type { Message, Participant } from "@club/shared";
 
 import { renderWithI18n } from "@/test/i18n-wrap";
@@ -104,5 +105,65 @@ describe("MessageList — own vs others + self-mention signal", () => {
     expect(mark?.className).toContain("bg-human-soft");
     expect(mark?.className).toContain("text-human");
     expect(mark?.className).not.toContain("bg-primary");
+  });
+});
+
+describe("MessageList — image attachments", () => {
+  function mkWithAttachments(
+    p: Participant,
+    content: string,
+    id: string,
+    attachments: Message["attachments"],
+  ): Message {
+    return { ...mk(p, content, id), attachments };
+  }
+
+  const single = [
+    {
+      id: "att1",
+      url: "/files/att1",
+      mime: "image/png" as const,
+      width: 100,
+      height: 100,
+      size: 100,
+    },
+  ];
+
+  it("renders a single-image thumbnail inside the bubble with an accessible open button", () => {
+    const messages = [mkWithAttachments(bot, "see this", "m1", single)];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" />,
+    );
+    const img = container.querySelector("img");
+    expect(img).toBeTruthy();
+    // src resolved against the origin
+    expect(img?.getAttribute("src")).toContain("/files/att1");
+    // the thumbnail is a button (keyboard-reachable lightbox trigger)
+    const openBtn = screen.getByLabelText(/放大查看图片 1/);
+    expect(openBtn.tagName).toBe("BUTTON");
+  });
+
+  it("renders a pure-image message (no text) with just the gallery", () => {
+    const messages = [mkWithAttachments(bot, "", "m1", single)];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" />,
+    );
+    expect(container.querySelector("img")).toBeTruthy();
+    expect(screen.getByLabelText(/放大查看图片 1/)).toBeTruthy();
+  });
+
+  it("uses a 2-col grid for multiple images", () => {
+    const two = [
+      ...single,
+      { id: "att2", url: "/files/att2", mime: "image/png" as const, width: 1, height: 1, size: 1 },
+    ];
+    const messages = [mkWithAttachments(bot, "two imgs", "m1", two)];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" />,
+    );
+    // the grid wrapper carries grid-cols-2; thumbnails are aspect-square
+    const grid = container.querySelector('[class~="grid-cols-2"]');
+    expect(grid).toBeTruthy();
+    expect(container.querySelectorAll("img")).toHaveLength(2);
   });
 });

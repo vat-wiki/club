@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RosterSections } from "@/components/roster";
+import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { useT } from "@/lib/i18n";
 import type { Participant } from "@club/shared";
 
@@ -10,10 +11,12 @@ export function MobileRoster({
   members,
   selfId,
   onlineCount,
+  key_,
 }: {
   members: Participant[];
   selfId?: string;
   onlineCount: number;
+  key_: string | null;
 }) {
   const t = useT();
   return (
@@ -33,15 +36,23 @@ export function MobileRoster({
       <DialogContent
         showClose
         closeLabel={t("dialog.close")}
-        className="left-auto right-0 top-0 h-full max-h-full w-[80vw] max-w-[320px] translate-x-0 translate-y-0 rounded-none rounded-l-lg border-l border-border p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-right-full data-[state=closed]:zoom-out-100 data-[state=closed]:slide-out-to-right-full sm:rounded-l-lg"
+        className="left-auto right-0 top-0 h-[100dvh] max-h-full w-[80vw] max-w-[320px] translate-x-0 translate-y-0 rounded-none rounded-l-lg border-l border-border p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-right-full data-[state=closed]:zoom-out-100 data-[state=closed]:slide-out-to-right-full sm:rounded-l-lg"
       >
         {/* Visually-hidden title keeps the dialog accessible; the visible
             heading below is for sighted users. */}
         <DialogTitle className="sr-only">{t("roster.mobile.title")}</DialogTitle>
-        <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 scrollbar-thin">
+        <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] scrollbar-thin">
           <h2 className="font-display text-sm font-semibold tracking-tight">
             {t("roster.mobile.title")}<span className="text-agent">.</span>
           </h2>
+          {/* The login key is the only credential for this identity. On mobile
+              the topbar trigger is hidden to save space, so the roster sheet is
+              where users view/copy it — keeping "see my key" in the identity
+              panel instead of buried behind the sign-out flow. Pinned right
+              under the title so it's reachable without scrolling past a long
+              member list. */}
+          <ViewKeyDialog key_={key_} triggerLabel={t("viewKey.open")} />
+
           <RosterSections members={members} selfId={selfId} />
         </div>
       </DialogContent>

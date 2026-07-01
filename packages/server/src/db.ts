@@ -9,6 +9,13 @@ if (!existsSync(dirname(dbPath))) mkdirSync(dirname(dbPath), { recursive: true }
 
 export const db: Database.Database = new Database(dbPath);
 db.pragma("journal_mode = WAL");
+// Codify what is currently better-sqlite3's compile-time default
+// (DEFAULT_FOREIGN_KEYS): foreign-key enforcement ON. The messages/files →
+// participants FKs rely on this. Without the explicit pragma, a future
+// better-sqlite3 build that drops that flag would silently stop enforcing
+// them. No-op today (the default already enables it); explicit for
+// upgrade-safety and to document intent.
+db.pragma("foreign_keys = ON");
 
 // Baseline schema: participants + messages, created with CREATE TABLE IF NOT
 // EXISTS since the very first release. We keep this as-is (idempotent) rather
@@ -65,6 +72,40 @@ const migrations: Migration[] = [
         ON mentions(participant_id, read_at, created_at);
     `,
   },
+  {
+    version: 2,
+    description: "identity recovery: per-participant recover_hash",
+    // nullable recover_hash: NULL means the participant has no recovery code
+    // set yet (pre-recovery-deployment participants, or a freshly rotated code
+    // whose plaintext has already been returned once). sha256(plaintext
+    // recovery code); the plaintext is never stored, mirroring key_hash.
+    sql: `
+      ALTER TABLE participants ADD COLUMN recover_hash TEXT;
+    `,
+  },
+  {
+    version: 3,
+    description: "image attachments on messages + uploaded-file metadata",
+    // `attachments` is a JSON column (NULL/empty = no images) rather than a
+    // separate table: attachments are never queried independently — they're
+    // always read alongside their message — so a join table would be entity
+    // without need. `files` records upload metadata so the server is the sole
+    // source of truth for mime/width/height/size and can rehydrate attachments
+    // from just the `id`s a client sends with POST /messages (dimensions can't
+    // be forged). The `id` doubles as the public /files/{id} path.
+    sql: `
+      ALTER TABLE messages ADD COLUMN attachments TEXT;
+      CREATE TABLE IF NOT EXISTS files (
+        id             TEXT PRIMARY KEY,
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        mime           TEXT NOT NULL,
+        width          INTEGER,
+        height         INTEGER,
+        size           INTEGER NOT NULL,
+        created_at     INTEGER NOT NULL
+      );
+    `,
+  },
 ];
 
 db.exec(`
@@ -103,6 +144,7 @@ export interface MessageRow {
   participant_id: string;
   author_name: string;
   author_kind: "human" | "agent";
+  attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
 }
 
 export function insertMessage(
@@ -110,10 +152,12 @@ export function insertMessage(
   participantId: string,
   content: string,
   createdAt: number,
+  attachments: string | null,
 ): void {
   db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at) VALUES (?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt);
+    `INSERT INTO messages (id, participant_id, content, created_at, attachments)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, participantId, content, createdAt, attachments);
 }
 
 export function getAllParticipants() {
@@ -125,14 +169,14 @@ export function getAllParticipants() {
 }
 
 const afterStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid > ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    ORDER BY m.rowid DESC LIMIT ?`,
@@ -179,11 +223,59 @@ export function insertParticipant(
   name: string,
   kind: "human" | "agent",
   keyHash: string,
+  recoverHash: string,
   createdAt: number,
 ): void {
   db.prepare(
-    `INSERT INTO participants (id, name, kind, key_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, name, kind, keyHash, createdAt);
+    `INSERT INTO participants (id, name, kind, key_hash, recover_hash, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, name, kind, keyHash, recoverHash, createdAt);
+}
+
+// ── Identity recovery ───────────────────────────────────────────────
+// Recovery works by callsign + one-time recovery code. On a successful
+// recovery the server reissues BOTH a fresh key (key_hash rotated) and a fresh
+// recovery code (recover_hash rotated) — see PRD identity-recovery.md §5.4 /
+// §8.1 ("换发新恢复码"). recover_hash is nullable: NULL means "no recovery
+// code currently active" (old participants predating the feature, or after a
+// successful recovery until the new code's hash is written).
+
+export interface ParticipantRecoverRow {
+  id: string;
+  name: string;
+  kind: "human" | "agent";
+  created_at: number;
+  recover_hash: string | null;
+}
+
+const getParticipantForRecoverStmt = db.prepare<
+  [string],
+  ParticipantRecoverRow
+>(`SELECT id, name, kind, created_at, recover_hash FROM participants WHERE name = ?`);
+
+/** A participant row including recover_hash, looked up by callsign (for the
+ *  recovery endpoint). Returns undefined if the name doesn't exist. */
+export function getParticipantForRecover(name: string): ParticipantRecoverRow | undefined {
+  return getParticipantForRecoverStmt.get(name);
+}
+
+const updateParticipantKeyStmt = db.prepare(
+  `UPDATE participants SET key_hash = ? WHERE id = ?`,
+);
+
+/** Rotate the participant's key (recovery flow). Idempotent at the row level. */
+export function updateParticipantKey(id: string, newKeyHash: string): void {
+  updateParticipantKeyStmt.run(newKeyHash, id);
+}
+
+const updateParticipantRecoverStmt = db.prepare(
+  `UPDATE participants SET recover_hash = ? WHERE id = ?`,
+);
+
+/** Set the participant's recover_hash. Pass null to clear (invalidate) it,
+ *  or a sha256 hex string to arm a new recovery code. */
+export function updateParticipantRecover(id: string, newHash: string | null): void {
+  updateParticipantRecoverStmt.run(newHash, id);
 }
 
 // ── Mentions (per-participant @-mention inbox) ──────────────────────
@@ -286,4 +378,62 @@ const markReadStmt = db.prepare(
  */
 export function markMentionRead(id: string, readAt: number): boolean {
   return markReadStmt.run(readAt, id).changes > 0;
+}
+
+// ── Uploaded files (image metadata) ──────────────────────────────────
+
+// The DB row for an uploaded image. `id` doubles as the public /files/{id}
+// path; `participant_id` is the uploader, checked at POST /messages time so a
+// sender can only attach files it uploaded (not another participant's).
+export interface FileRow {
+  id: string;
+  participant_id: string;
+  mime: string;
+  width: number | null;
+  height: number | null;
+  size: number;
+  created_at: number;
+}
+
+const insertFileStmt = db.prepare(
+  `INSERT INTO files (id, participant_id, mime, width, height, size, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+);
+
+export function insertFile(f: Omit<FileRow, never>): void {
+  insertFileStmt.run(
+    f.id,
+    f.participant_id,
+    f.mime,
+    f.width,
+    f.height,
+    f.size,
+    f.created_at,
+  );
+}
+
+const fileByIdStmt = db.prepare<[string], FileRow>(
+  `SELECT id, participant_id, mime, width, height, size, created_at
+   FROM files WHERE id = ?`,
+);
+
+export function getFile(id: string): FileRow | undefined {
+  return fileByIdStmt.get(id);
+}
+
+// Fetch several files by id, preserving the requested order. Used by
+// POST /messages to rehydrate attachments from the client's `attachmentIds` —
+// order matters so the message shows images in the order the user picked them.
+export function getFilesByIds(ids: string[]): FileRow[] {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = db
+    .prepare<string[], FileRow>(
+      `SELECT id, participant_id, mime, width, height, size, created_at
+       FROM files WHERE id IN (${placeholders})`,
+    )
+    .all(...ids);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // Filter undefined (id not found) but keep order; caller validates ownership.
+  return ids.map((id) => byId.get(id)).filter((r): r is FileRow => !!r);
 }

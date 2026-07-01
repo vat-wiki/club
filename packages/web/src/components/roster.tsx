@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 function Row({ p, self }: { p: Participant; self: boolean }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-2 rounded-md px-4 py-1.5 text-sm transition-colors hover:bg-accent/70">
+    <div className="flex min-h-[44px] items-center gap-2 rounded-md px-4 py-1.5 text-sm transition-colors hover:bg-accent/70 active:bg-accent">
       <span
         className={cn(
           "h-2 w-2 flex-none rounded-full",

@@ -12,6 +12,7 @@ import { MessageList } from "./message-list";
 import { AuthDialog } from "./auth-dialog";
 import { MobileRoster } from "./mobile-roster";
 import { KeyRevealDialog } from "./key-reveal-dialog";
+import { RecoverDialog } from "./recover-dialog";
 import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { ViewKeyDialog } from "./view-key-dialog";
 import { withI18n } from "@/test/i18n-wrap";
@@ -124,6 +125,51 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     );
   });
 
+  it("MessageList has no violations (with image attachments)", async () => {
+    const withImages: Message[] = [
+      {
+        ...messages[0],
+        content: "a screenshot",
+        attachments: [
+          {
+            id: "a1",
+            url: "/files/a1",
+            mime: "image/png",
+            width: 100,
+            height: 75,
+            size: 1234,
+          },
+          {
+            id: "a2",
+            url: "/files/a2",
+            mime: "image/jpeg",
+            width: 100,
+            height: 75,
+            size: 1234,
+          },
+        ],
+      },
+    ];
+    await expectNoViolations(
+      <MessageList messages={withImages} me={me} members={members} status="connected" />,
+    );
+  });
+
+  it("MessageList has no violations (pure-image message, empty text)", async () => {
+    const pureImage: Message[] = [
+      {
+        ...messages[0],
+        content: "",
+        attachments: [
+          { id: "a1", url: "/files/a1", mime: "image/png", width: 100, height: 75, size: 1234 },
+        ],
+      },
+    ];
+    await expectNoViolations(
+      <MessageList messages={pureImage} me={me} members={members} status="connected" />,
+    );
+  });
+
   it("MessageList has no violations (empty state)", async () => {
     await expectNoViolations(
       <MessageList messages={[]} me={me} members={members} status="connected" />,
@@ -144,7 +190,22 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("KeyRevealDialog has no violations", async () => {
     await expectNoViolationsPortal(
-      <KeyRevealDialog open key_={TEST_KEY} onSaved={() => {}} />,
+      <KeyRevealDialog
+        open
+        key_={TEST_KEY}
+        recoverCode="club_recover_test"
+        onSaved={() => {}}
+      />,
+    );
+  });
+
+  it("RecoverDialog has no violations", async () => {
+    await expectNoViolationsPortal(
+      <RecoverDialog
+        open
+        onOpenChange={() => {}}
+        onRecovered={() => {}}
+      />,
     );
   });
 
@@ -176,7 +237,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MobileRoster trigger meets the mobile tap-target minimum (44px)", async () => {
     const { container } = render(
-      withI18n(<MobileRoster members={members} selfId={me.id} onlineCount={members.length} />),
+      withI18n(<MobileRoster members={members} selfId={me.id} onlineCount={members.length} key_={TEST_KEY} />),
     );
     const trigger = container.querySelector("button");
     expect(trigger).toBeTruthy();

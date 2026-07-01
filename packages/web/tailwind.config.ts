@@ -95,11 +95,21 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.65" },
         },
+        // Image-thumbnail loading shimmer: a slow horizontal sheen sweeping
+        // across the muted placeholder while the thumbnail decodes. Same
+        // out-quint easing as the rest of the motion language. The infinite
+        // iteration is collapsed to a single frame under prefers-reduced-motion
+        // by the global `animation-iteration-count: 1 !important` in index.css.
+        "shimmer": {
+          "0%": { backgroundPosition: "200% 0" },
+          "100%": { backgroundPosition: "-200% 0" },
+        },
       },
       animation: {
         "agent-pulse": "agent-pulse 2s cubic-bezier(0.16,1,0.3,1) infinite",
         "slide-in": "slide-in 0.32s cubic-bezier(0.16,1,0.3,1)",
         "brand-pulse": "brand-pulse 4s ease-in-out infinite",
+        "shimmer": "shimmer 1.4s cubic-bezier(0.16,1,0.3,1) infinite",
       },
     },
   },

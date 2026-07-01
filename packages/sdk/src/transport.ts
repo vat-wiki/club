@@ -5,6 +5,9 @@ import type {
   Mention,
   Message,
   Participant,
+  RecoverParticipantRequest,
+  RecoverParticipantResponse,
+  UploadFileResponse,
 } from "@club/shared";
 import { ClubApiError } from "./errors.js";
 
@@ -143,9 +146,79 @@ export async function listMessages(
 export async function sendMessage(
   c: ClubConn,
   content: string,
-  opts: { timeoutMs?: number } = {},
+  opts: { attachmentIds?: string[]; timeoutMs?: number } = {},
 ): Promise<Message> {
-  return request<Message>(c, "/messages", { method: "POST", body: { content }, ...opts });
+  // Backward compatible: when no attachmentIds are supplied the body is just
+  // { content } exactly as before, so existing callers (and old serialized
+  // shapes) are unaffected. With attachmentIds the body becomes
+  // { content, attachmentIds } — the server rehydrates each id into full
+  // attachment metadata, so clients can only echo back ids they got from
+  // POST /files and can never forge dimensions.
+  const body =
+    opts.attachmentIds && opts.attachmentIds.length > 0
+      ? { content, attachmentIds: opts.attachmentIds }
+      : { content };
+  return request<Message>(c, "/messages", {
+    method: "POST",
+    body,
+    timeoutMs: opts.timeoutMs,
+  });
+}
+
+// ── File upload (multipart) ────────────────────────────────────────
+// The core `request()` is JSON-only (it JSON.stringifies every body), so a
+// multipart upload can't go through it. This builds a FormData body the same
+// way the web client does (packages/web/src/lib/upload.ts), but accepts a Node
+// Buffer instead of a browser File so the CLI and MCP can use it. Auth mirrors
+// the transport: a Bearer header when a key is present. The server is the
+// authoritative mime/size checker, but callers should still pre-flight locally
+// (see packages/cli / packages/mcp) to avoid uploading bytes that are doomed
+// to be rejected.
+export interface UploadFileInput {
+  /** Raw file bytes. */
+  buffer: Buffer | Uint8Array;
+  /** Filename hint sent as the multipart part's filename. */
+  filename: string;
+  /** MIME type sent as the part's Content-Type (must be in ImageMime). */
+  mime: string;
+}
+
+export async function uploadFile(
+  c: ClubConn,
+  input: UploadFileInput,
+  opts: { timeoutMs?: number } = {},
+): Promise<UploadFileResponse> {
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const headers: Record<string, string> = {};
+    if (c.key) headers.Authorization = `Bearer ${c.key}`;
+
+    const form = new FormData();
+    // Blob is available in Node 18+ and carries the mime + a content-length;
+    // wrapping the bytes in a Blob lets fetch set the part headers without us
+    // hand-rolling a multipart body. Copy into a fresh Uint8Array backed by a
+    // plain ArrayBuffer so it satisfies the DOM BlobPart type regardless of
+    // whether the caller passed a Node Buffer (which TS 5.7 types over
+    // ArrayBufferLike, incompatible with BlobPart's ArrayBuffer-backed view).
+    const bytes = new Uint8Array(input.buffer.byteLength);
+    bytes.set(input.buffer);
+    const blob = new Blob([bytes], { type: input.mime });
+    form.append("file", blob, input.filename);
+
+    const res = await fetch(`${c.server}/files`, {
+      method: "POST",
+      headers,
+      body: form,
+      signal: controller.signal,
+    });
+    return await check<UploadFileResponse>(res);
+  } catch (err) {
+    throw wrapErr(err);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function listMembers(c: ClubConn, opts: CallOpts = {}): Promise<Participant[]> {
@@ -184,6 +257,23 @@ export async function createParticipant(
   opts: { timeoutMs?: number } = {},
 ): Promise<CreateParticipantResponse> {
   return request<CreateParticipantResponse>(c, "/participants", {
+    method: "POST",
+    body: input,
+    ...opts,
+  });
+}
+
+// Recover an existing identity by callsign + one-time recovery code. Rotates
+// both the key and the recovery code, reusing the original id + name.
+// Unauthenticated (no valid key to send); throws ClubApiError(401) on any
+// failure (unknown name, wrong code, or no recovery code armed) — the server
+// deliberately does not distinguish these to prevent callsign enumeration.
+export async function recoverParticipant(
+  c: Pick<ClubConn, "server">,
+  input: RecoverParticipantRequest,
+  opts: { timeoutMs?: number } = {},
+): Promise<RecoverParticipantResponse> {
+  return request<RecoverParticipantResponse>(c, "/participants/recover", {
     method: "POST",
     body: input,
     ...opts,

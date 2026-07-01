@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Message, MessageAttachment, Participant } from "@club/shared";
-import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
+import { fmtTime, fmtTimePrecise, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -45,7 +45,12 @@ function AttachmentGallery({
             onClick={() => setActive(i)}
             aria-label={`${openLabel} ${i + 1}`}
             className={cn(
-              "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              // A real min size so a tiny (e.g. 1×1 test) image can't collapse
+              // to an invisible dot: min-h-10 (40px) floors the height and the
+              // aspect ratio sets the width. object-cover (on the <img>) crops
+              // extreme aspect ratios (>10:1) into the fixed frame instead of a
+              // thin sliver. cursor-zoom-in signals the click-to-enlarge affordance.
+              "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in min-h-10",
               multi ? "aspect-square" : "aspect-[4/3]",
             )}
           >
@@ -90,7 +95,6 @@ type MessageListProps = {
   me: Participant | null;
   members: Participant[];
   status: Status;
-  booting?: boolean;
 };
 
 function DayRule({ ms }: { ms: number }) {
@@ -110,16 +114,28 @@ function MessageRow({
   known,
   selfName,
   showDay,
+  grouped,
 }: {
   m: Message;
   self: boolean;
   known: string[];
   selfName?: string;
   showDay: boolean;
+  // True when this message continues a run from the same author within the
+  // grouping window (see GROUP_GAP_MS). In that case the per-message header
+  // (author name + kind + time) is suppressed — Slack/iMessage style — so a
+  // burst reads as one block instead of repeating the header on every line.
+  // The exact send time is still reachable via the row's hover title.
+  grouped?: boolean;
 }) {
   const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
   const pinged = mentionsSelf(m.content, selfName);
+  // The precise (to-the-second) time, surfaced on hover via the native title
+  // tooltip AND as the row's accessible description (aria-label) so SR users get
+  // the exact time without hovering. The inline header timestamp stays HH:MM.
+  const preciseTime = fmtTimePrecise(m.createdAt, locale);
+  const sentAtLabel = t("msg.sentAt", { time: preciseTime });
   // Bubble + alignment scheme (the standard chat-app mental model):
   //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
   //   - others: left-aligned, body in a raised-surface bubble (bg-card)
@@ -132,37 +148,51 @@ function MessageRow({
     <>
       {showDay && <DayRule ms={m.createdAt} />}
       <div
+        // Native title tooltip carries the precise send time; aria-label gives
+        // SR users the same info (the inline HH:MM + author are already in the
+        // row's text content, so the label focuses on the time precision).
+        title={sentAtLabel}
+        aria-label={sentAtLabel}
         className={cn(
-          "flex gap-x-2.5 rounded-md px-4 py-1.5 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
+          // grouped rows tighten their top padding (no header to space under)
+          // and drop the hover bg so a run reads as one continuous block.
+          "flex gap-x-2.5 rounded-md px-4 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
+          grouped ? "pt-0.5 pb-1.5" : "py-1.5",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}
       >
         <div className={cn("flex justify-center pt-[7px]", self && "flex-row-reverse")}>
+          {/* Avatar dot. On grouped rows it stays for column alignment but is
+              hidden from AT (it's decorative repetition of the header above). */}
           <span
             aria-hidden
             className={cn("h-[7px] w-[7px] rounded-full", isAgent ? "bg-agent animate-agent-pulse" : "bg-human")}
           />
         </div>
         <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
+          {/* Header (author + kind + HH:MM) only on the FIRST row of a run. */}
+          {!grouped && (
+            <div
+              className={cn(
+                "flex flex-wrap items-baseline gap-x-2.5",
+                self && "flex-row-reverse",
+              )}
+            >
+              <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
+                {m.authorName}
+              </span>
+              <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
+                {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
+              </span>
+              <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
+            </div>
+          )}
           <div
             className={cn(
-              "flex flex-wrap items-baseline gap-x-2.5",
-              self && "flex-row-reverse",
-            )}
-          >
-            <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
-              {m.authorName}
-            </span>
-            <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
-              {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
-            </span>
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
-          </div>
-          <div
-            className={cn(
-              "mt-0.5 max-w-[85%] sm:max-w-[70%] md:max-w-[min(100%,60ch)] lg:max-w-[min(100%,72ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
+              "max-w-[85%] sm:max-w-[70%] md:max-w-[min(100%,60ch)] lg:max-w-[min(100%,72ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
               self ? "bg-primary/15 text-foreground" : "bg-card text-foreground",
+              grouped ? "mt-0" : "mt-0.5",
             )}
           >
             {m.content.length > 0 && renderContent(m.content, known, selfName)}
@@ -177,7 +207,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, booting },
+  { messages, me, members, status },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -213,6 +243,11 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   const known = [...members.map((m) => m.name), me?.name].filter(Boolean) as string[];
   let lastDay = "";
+  // Grouping window: consecutive messages from the same author within this gap
+  // merge into one run (header shown only on the first). 5 min is the common
+  // chat-app threshold — short enough that a resumed conversation re-shows the
+  // header, long enough that a rapid burst reads as a block.
+  const GROUP_GAP_MS = 5 * 60 * 1000;
 
   // Sticky inline banner shown when the live stream has dropped, so users know
   // sends/receives may be interrupted even if they missed the topbar dot.
@@ -227,23 +262,6 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       </div>
     ) : null;
 
-  if (booting) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {banner}
-        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/85"
-          >
-            <span className="h-2 w-2 rounded-full bg-agent animate-agent-pulse" aria-hidden />
-            {t("msg.connecting")}
-          </div>
-        </div>
-      </div>
-    );
-  }
   if (messages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
@@ -283,10 +301,18 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
           backgroundImage: "radial-gradient(900px 360px at 78% -8%, hsl(var(--agent-soft)), transparent 70%)",
         }}
       >
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const day = fmtDay(m.createdAt, locale, t("date.today"));
           const showDay = day !== lastDay;
           lastDay = day;
+          // Group with the previous message when same author, no day break, and
+          // within the gap window. A day separator always re-shows the header.
+          const prev = messages[i - 1];
+          const grouped =
+            !showDay &&
+            !!prev &&
+            prev.participantId === m.participantId &&
+            m.createdAt - prev.createdAt <= GROUP_GAP_MS;
           return (
             <MessageRow
               key={m.id}
@@ -295,6 +321,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
               known={known}
               selfName={me?.name}
               showDay={showDay}
+              grouped={grouped}
             />
           );
         })}

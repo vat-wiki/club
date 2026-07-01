@@ -113,6 +113,10 @@ export function KeyRevealDialog({
   key_,
   recoverCode,
   onSaved,
+  // When true the dialog reads as a *recovery* success — "these are your NEW
+  // rotated credentials, the old ones are dead" — instead of the first-mint
+  // wording. Same copy fields/layout; only the title/desc/ack button change.
+  recovered = false,
 }: {
   open: boolean;
   key_: string;
@@ -120,8 +124,12 @@ export function KeyRevealDialog({
   // Called once the user acknowledges they've saved both. The app then
   // persists the key and enters the room.
   onSaved: () => void;
+  recovered?: boolean;
 }) {
   const t = useT();
+  const titleKey = recovered ? "keyReveal.recovered.title" : "keyReveal.title";
+  const descKey = recovered ? "keyReveal.recovered.desc" : "keyReveal.desc";
+  const savedKey = recovered ? "keyReveal.recovered.saved" : "keyReveal.saved";
 
   return (
     <Dialog open={open}>
@@ -136,9 +144,9 @@ export function KeyRevealDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-human" aria-hidden />
-            {t("keyReveal.title")}
+            {t(titleKey)}
           </DialogTitle>
-          <DialogDescription>{t("keyReveal.desc")}</DialogDescription>
+          <DialogDescription>{t(descKey)}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -154,6 +162,11 @@ export function KeyRevealDialog({
             liveId={KEY_LIVE}
             focusOnOpen
           />
+          {/* One-line note on the key shape so users don't second-guess the
+              format (prefix + base64url random token; regenerated each mint). */}
+          <p className="-mt-1 text-xs text-muted-foreground">
+            {t("keyReveal.formatHint")}
+          </p>
 
           <CopyField
             focusMarker={{ "data-recover-copy-btn": true }}
@@ -167,13 +180,18 @@ export function KeyRevealDialog({
             liveId={RECOVER_LIVE}
           />
 
-          <p className="text-xs text-muted-foreground">
-            {t("keyReveal.recoverHint")}
-          </p>
+          {/* The first-mint flow reminds the user what the recovery code is for.
+              On recovery-success the desc already spells out rotation, so the
+              redundant hint is hidden to keep the dialog tight. */}
+          {!recovered && (
+            <p className="text-xs text-muted-foreground">
+              {t("keyReveal.recoverHint")}
+            </p>
+          )}
         </div>
 
         <Button className="w-full" onClick={onSaved}>
-          {t("keyReveal.saved")}
+          {t(savedKey)}
         </Button>
       </DialogContent>
     </Dialog>

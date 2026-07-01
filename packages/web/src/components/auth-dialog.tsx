@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { API_URL } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { RecoverDialog } from "@/components/recover-dialog";
+import { validateNickname, isBlockingIssue, NICKNAME_RULE } from "@/lib/nickname";
 
 type Mode = "create" | "paste";
 
@@ -18,14 +20,22 @@ export function AuthDialog({
   // save) the only credential that lets them back in. Carries the one-time
   // recovery code too — shown alongside the key on the reveal dialog.
   onCreated,
-  // Fired after an existing key is validated (paste path) OR after a recovery
-  // reissues a fresh key. Goes straight in — the user already had the key (or
-  // just re-took the identity), so there's nothing to reveal.
+  // Fired after an existing key is validated (paste path). Goes straight in —
+  // the user already had the key, so there's nothing to reveal.
   onAuthed,
+  // Fired after an identity is *recovered* (callsign + one-time recovery code).
+  // The server reissues a FRESH key AND a fresh recovery code; the app intercepts
+  // this — exactly like onCreated — to reveal the new pair before persisting,
+  // because the user must record the new credentials (the recovery code they
+  // just used is single-use and now dead, and the old key is rotated off).
+  // Defaults to onAuthed for backward compatibility (older callers that don't
+  // care about surfacing the rotated pair).
+  onRecovered,
 }: {
   open: boolean;
   onCreated: (key: string, recoverCode: string) => void;
   onAuthed: (key: string) => void;
+  onRecovered?: (key: string, recoverCode: string) => void;
 }) {
   const t = useT();
   const [mode, setMode] = useState<Mode>("create");
@@ -36,12 +46,48 @@ export function AuthDialog({
   // "Recover identity" is a secondary entry off the paste path (PRD §8.2: not
   // a third main route). It opens its own dialog on top of this one.
   const [recoverOpen, setRecoverOpen] = useState(false);
+  // Brief shake animation when the user tries to submit a blocked nickname
+  // (e.g. one with spaces). Reset on the next change. Respects
+  // prefers-reduced-motion via the global wildcard in index.css.
+  const [shake, setShake] = useState(false);
   const keyInputRef = useRef<HTMLInputElement>(null);
+
+  // Live nickname validation. Recomputed on every keystroke so the user gets
+  // immediate, contextual feedback instead of a single opaque error on submit.
+  // Whitespace is a hard block (it breaks @-mention tokenization); length is
+  // advisory only (the server allows up to 40 and CJK names are supported).
+  const nicknameIssue = useMemo(() => validateNickname(name), [name]);
+  const nicknameErrorId = "nickname-format-error";
+  const nicknameMessage =
+    nicknameIssue == null
+      ? null
+      : nicknameIssue.kind === "whitespace"
+        ? t("auth.field.nicknameWhitespace")
+        : nicknameIssue.kind === "tooShort"
+          ? t("auth.field.nicknameTooShort", { min: NICKNAME_RULE.min })
+          : nicknameIssue.kind === "tooLong"
+            ? t("auth.field.nicknameTooLong", { max: NICKNAME_RULE.max })
+            : null;
+  const nicknameBlocked = isBlockingIssue(nicknameIssue);
+
+  const triggerShake = () => {
+    setShake(false);
+    // Two-step so re-triggering the same name still animates (class re-add).
+    requestAnimationFrame(() => setShake(true));
+  };
 
   const create = async () => {
     setError("");
-    if (!name.trim()) {
+    const issue = validateNickname(name);
+    if (issue?.kind === "empty") {
       setError(t("auth.nameRequired"));
+      triggerShake();
+      return;
+    }
+    if (isBlockingIssue(issue)) {
+      // Whitespace genuinely breaks mentions — block and explain, don't submit.
+      setError(t("auth.field.nicknameWhitespace"));
+      triggerShake();
       return;
     }
     setBusy(true);
@@ -123,7 +169,12 @@ export function AuthDialog({
 
         {mode === "create" ? (
           <div className="space-y-4">
-            <div className="space-y-2">
+            {/* The shake wrapper jolts the whole field group (input + hint) when
+                the user tries to submit a blocked nickname, drawing the eye to
+                the explanation. motion-reduce isn't needed here: the global
+                `* { animation-duration: 0.001ms }` wildcard in index.css
+                collapses animate-shake under prefers-reduced-motion. */}
+            <div className={shake ? "animate-shake space-y-2" : "space-y-2"}>
               <Label htmlFor="name">{t("auth.field.nickname")}</Label>
               <Input
                 id="name"
@@ -132,17 +183,42 @@ export function AuthDialog({
                 placeholder={t("auth.field.nicknamePlaceholder")}
                 autoComplete="off"
                 aria-required="true"
-                aria-invalid={!!error}
-                aria-describedby={error ? "key-error" : "name-hint"}
-                onChange={(e) => setName(e.target.value)}
+                // Red border + ring as long as there's a blocking (whitespace)
+                // issue OR a stale submit error. Advisory length issues stay
+                // neutral so they read as a nudge, not a failure.
+                aria-invalid={nicknameBlocked || !!error}
+                aria-describedby={
+                  nicknameBlocked || nicknameMessage ? nicknameErrorId : "name-hint"
+                }
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError("");
+                  setShake(false);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && create()}
               />
-              {/* Helper mirrors the /join page's "昵称（也是你的 @提及名）" label so
-                  the two entry points share one mental model (PRD §3, two-entry
-                  convergence): the nickname is also the @mention handle. */}
-              <p id="name-hint" className="text-xs text-muted-foreground">
-                {t("auth.field.nicknameHint")}
-              </p>
+              {/* Live validation message takes precedence over the static hint:
+                 red for blocking issues (whitespace), amber for advisory length.
+                 The hint is the fallback so an empty/valid field still explains
+                 the @-mention connection. */}
+              {nicknameBlocked || nicknameMessage ? (
+                <p
+                  id={nicknameErrorId}
+                  role={nicknameBlocked ? "alert" : "status"}
+                  className={
+                    nicknameBlocked
+                      ? "flex items-center gap-1.5 text-xs text-destructive"
+                      : "flex items-center gap-1.5 text-xs text-human"
+                  }
+                >
+                  {nicknameBlocked && <AlertTriangle className="h-3 w-3" aria-hidden />}
+                  {nicknameMessage}
+                </p>
+              ) : (
+                <p id="name-hint" className="text-xs text-muted-foreground">
+                  {t("auth.field.nicknameHint")}
+                </p>
+              )}
             </div>
             <Button className="w-full" disabled={busy} onClick={create}>
               {busy ? t("auth.join.busy") : t("auth.join")}
@@ -160,7 +236,10 @@ export function AuthDialog({
                 autoComplete="off"
                 aria-invalid={!!error}
                 aria-describedby={error ? "key-error" : undefined}
-                onChange={(e) => setPasteKey(e.target.value)}
+                onChange={(e) => {
+                  setPasteKey(e.target.value);
+                  setError("");
+                }}
                 onKeyDown={(e) => e.key === "Enter" && paste()}
               />
             </div>
@@ -170,8 +249,16 @@ export function AuthDialog({
           </div>
         )}
 
-        {error && (
-          <p id="key-error" role="alert" className="text-sm text-destructive">
+        {/* Shared submit error (paste path: unrecognized key; create path:
+            server collision / network). Icon + red so it can't be missed,
+            unlike the previous plain muted line (P1-3). */}
+        {error && mode === "paste" && (
+          <p
+            id="key-error"
+            role="alert"
+            className="flex items-center gap-1.5 text-sm text-destructive"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
             {error}
           </p>
         )}
@@ -210,9 +297,11 @@ export function AuthDialog({
         <RecoverDialog
           open={recoverOpen}
           onOpenChange={setRecoverOpen}
-          onRecovered={(key) => {
+          onRecovered={(key, recoverCode) => {
             setRecoverOpen(false);
-            onAuthed(key);
+            // Hand the rotated pair to the app so it can reveal them before
+            // persisting (defaults to onAuthed for callers that don't opt in).
+            (onRecovered ?? ((k) => onAuthed(k)))(key, recoverCode);
           }}
         />
       </DialogContent>

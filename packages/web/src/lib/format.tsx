@@ -14,6 +14,18 @@ export function fmtTime(ms: number, locale: string = DEFAULT_LOCALE): string {
   });
 }
 
+// Full precision (HH:MM:SS) for the hover tooltip on a message — the inline
+// timestamp only shows HH:MM to keep the row quiet; the exact second is there
+// for anyone who hovers (or a SR user via the title/aria-label on the row).
+export function fmtTimePrecise(ms: number, locale: string = DEFAULT_LOCALE): string {
+  return new Date(ms).toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
 // `todayLabel` lets the caller localize the "Today" separator without this
 // module depending on the i18n dictionary. Falls back to the zh "今天".
 export function fmtDay(

@@ -36,6 +36,23 @@
 
 ---
 
+## P1
+
+### #004 agent 作为参与者的「可感知性」整个欠设计——@ 了不知道在不在、会不会回
+
+- **现象**：club 灵魂是「人与 agent 平等参与」，但 agent 一方作为参与者的**在场 / 响应能力完全不可见**。(1) roster（`club members` / web 成员栏）返回的是**全部已注册 participant**，无在线 / 离线 / 上次活跃概念——半年前注册、进程早停的「僵尸 agent」和此刻挂着的 agent **同等并列**。(2) 一个真人 `@某Agent` 之后，**完全不知道**这个 agent 此刻在不在线、有没有在监听、会不会回，只能干等到放弃。(3) 新用户在 dev 环境最常踩的坑：注册一个 agent、@ 它、然后干等——因为 agent 没配 LLM key / 进程没起，永远不回，且**零信号提示**，新人会以为是 club 坏了。
+- **在哪发现**：主理人 leon 提出「是否可能有个**探针检测 agent 是否还在正常运行**」（核心设计诉求）；王体验走查中反复踩到「@ 了不知在不在、roster 僵尸堆积」。代码核实：`packages/server/src/routes/members.ts` `getAllParticipants` 不返回任何 presence 字段；`participants` 表（`db.ts:18-32`）只有 `created_at`；SSE subscriber（`stream.ts:6-18`）未绑 participant。
+- **产品判断**：
+  - 这是**对核心承诺的兑现缺口**：「人机平等参与」隐含「agent 作为参与者可被感知」——至少让对方知道你在不在。当人 @ 一个永远沉默的僵尸 agent，得到的不是平等协作，是被静默忽略。**不可见的 agent 不是平等的 agent，是缺席的幽灵。** 让 agent 的在场 / 缺席诚实可见，是在兑现而非稀释灵魂。
+  - 探针必须分两层：**liveness**（活着吗、连着吗，server 侧从 SSE 连接可推，便宜可靠）+ **responsiveness**（@ 了会回吗，纯外部探不到——一个连着 SSE 但没配 key 的 agent「活着但永远沉默」，必须 agent 自报）。两者共存才可信。
+  - 经代码核实纠正一个误解：agent（CLI/MCP）**不是短轮询 `/me/mentions`，而是维持持久 SSE 连接**——这条长连接本身就是比轮询更强的存活证据。但 server 侧 subscriber 没绑 participant，所以「近乎免费」只差「补 participant 绑定」这一步。「主动 ping」不可行（agent 无入站端点），已排除。
+- **建议（已落 PRD）**：两层探针 + 四阶段演进（①后端 liveness 地基 → ②P1-5 thinking 已完成 → ③roster 在线区分 + mention 在线标记 → ④僵尸 / 失联诚实信号；⑤responsiveness 健康自报远期）。机制选型留口子给王后端签字。详见 `requirements/agent-presence.md`。
+- **优先级**：**P1**（核心闭环「唤醒」一环对发送方是黑箱；首阶段 liveness 地基改动量小、收益立竿见影，是 Phase 3 离线唤醒的前置）。
+- **归属**：王产品（方向，已出 PRD `agent-presence.md`）→ 王后端（liveness 地基 + presence API/SSE + health 端点）+ 王前端（web roster/mention 在线标记 + 僵尸灰显）+ CLI/MCP owner（三端对等的在线展示 + agent 侧 health 自报）+ 王测开（AP1–AP14）。
+- **关联文档**：`requirements/agent-presence.md`（本 PRD）、`issues.md` #002（消息噪音 vs 本条的「身份噪音」，同源不同面）、`docs/roadmap.md` Phase 3（离线唤醒的前置）。
+
+---
+
 ## P2
 
 ### #003 命名冲突：onboarding `join <name>` 与规划中的多房间 `join <room>` 撞动词

@@ -1,3 +1,5 @@
+import { assertImageCount } from "@club/sdk/node";
+
 // Pure input-coercion helpers used by the MCP tool dispatcher.
 //
 // Kept side-effect-free and in their own module so they can be unit-tested in
@@ -11,6 +13,17 @@ import { formatMessage } from "@club/sdk";
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
 export function str(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+
+/**
+ * Coerce an MCP tool argument into a string[], tolerating the shapes an LLM
+ * might send: a single string, or an array of strings. Anything else → [].
+ * Used for the `send` tool's `images` parameter (a list of local file paths).
+ */
+export function strArray(v: unknown): string[] {
+  if (typeof v === "string") return v.trim() ? [v] : [];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  return [];
 }
 
 /**
@@ -100,7 +113,11 @@ export function listenForMatch(
 export interface DispatchClient {
   me(): Promise<Participant>;
   messages(opts: { since?: string; limit: number }): Promise<Message[]>;
-  send(content: string): Promise<Message>;
+  send(content: string, attachmentIds?: string[]): Promise<Message>;
+  /** Upload one local image file, returning its attachment descriptor.
+   *  Index.ts wires this to @club/sdk uploadImageFile (read→sniff→validate→
+   *  POST /files); declared on the interface so dispatchTool stays fakeable. */
+  uploadImage(path: string): Promise<{ id: string }>;
   members(): Promise<Participant[]>;
   stream(onMessage: (m: Message) => void): { stop: () => void };
 }
@@ -134,8 +151,24 @@ export async function dispatchTool(
     }
     case "send": {
       const content = str(args.content);
-      if (!content) return "error: missing content";
-      const m = await client.send(content);
+      const images = strArray(args.images);
+      // Need at least one of: text or images. A bare image is a legitimate
+      // intent ("text-optional"), mirroring the CLI and web.
+      if (!content && images.length === 0) return "error: missing content";
+      // Fail fast on too many images before any upload happens.
+      assertImageCount(images);
+      let attachmentIds: string[] | undefined;
+      if (images.length > 0) {
+        // Pre-flight + upload each image; an unsupported/missing/too-large file
+        // throws and index.ts surfaces it as `error: <msg>`.
+        const ids: string[] = [];
+        for (const p of images) {
+          const att = await client.uploadImage(p);
+          ids.push(att.id);
+        }
+        attachmentIds = ids;
+      }
+      const m = await client.send(content, attachmentIds);
       return `sent: ${formatMessage(m)}`;
     }
     case "members": {

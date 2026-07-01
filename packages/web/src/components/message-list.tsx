@@ -44,6 +44,7 @@ function AttachmentGallery({
             type="button"
             onClick={() => setActive(i)}
             aria-label={`${openLabel} ${i + 1}`}
+            data-testid={`attachment-thumb-${i}`}
             className={cn(
               "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               multi ? "aspect-square" : "aspect-[4/3]",

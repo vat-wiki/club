@@ -1,5 +1,4 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
-import { Hono } from "hono";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -8,6 +7,16 @@ import { createHash } from "node:crypto";
 
 // Point the SQLite DB at a unique temp file BEFORE any module that transitively
 // imports db.ts is evaluated. db.ts reads CLUB_DB at import time.
+//
+// ⚠️ Hermeticity note: every server module (auth.js, crypto.js, db.js, …) MUST
+// be loaded via dynamic `await import()` AFTER setting process.env.CLUB_DB. A
+// static `import { requireAuth } from "../auth.js"` is hoisted by the ESM
+// loader and runs BEFORE this module body, so db.ts evaluates with CLUB_DB
+// undefined, falls back to cwd/club.db (the dev DB), and the test silently
+// runs against the dev DB. If the dev DB has FK-referenced rows and FKs are on
+// (better-sqlite3 is compiled with DEFAULT_FOREIGN_KEYS, so FKs default ON),
+// `DELETE FROM participants` throws FOREIGN KEY constraint failed → 8/8 red.
+// Dynamic imports keep the env-first ordering intact for hermetic isolation.
 const dbPath = join(tmpdir(), `club-test-${randomUUID()}.db`);
 process.env.CLUB_DB = dbPath;
 
@@ -15,8 +24,9 @@ const { participants } = await import("./participants.js");
 const { getParticipantForRecover, getParticipantByKeyHash, db } = await import(
   "../db.js"
 );
-import { hashKey } from "../crypto.js";
-import { requireAuth } from "../auth.js";
+const { hashKey } = await import("../crypto.js");
+const { requireAuth } = await import("../auth.js");
+const { Hono } = await import("hono");
 
 const app = new Hono();
 app.route("/participants", participants);

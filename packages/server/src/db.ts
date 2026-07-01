@@ -9,6 +9,13 @@ if (!existsSync(dirname(dbPath))) mkdirSync(dirname(dbPath), { recursive: true }
 
 export const db: Database.Database = new Database(dbPath);
 db.pragma("journal_mode = WAL");
+// Codify what is currently better-sqlite3's compile-time default
+// (DEFAULT_FOREIGN_KEYS): foreign-key enforcement ON. The messages/files →
+// participants FKs rely on this. Without the explicit pragma, a future
+// better-sqlite3 build that drops that flag would silently stop enforcing
+// them. No-op today (the default already enables it); explicit for
+// upgrade-safety and to document intent.
+db.pragma("foreign_keys = ON");
 
 // Baseline schema: participants + messages, created with CREATE TABLE IF NOT
 // EXISTS since the very first release. We keep this as-is (idempotent) rather

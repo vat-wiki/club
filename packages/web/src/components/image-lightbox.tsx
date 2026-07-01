@@ -37,6 +37,7 @@ export function ImageLightbox({
           <img
             src={src}
             alt={alt}
+            data-testid="lightbox-image"
             className="mx-auto max-h-[85vh] w-auto max-w-full object-contain rounded-md"
             draggable={false}
           />

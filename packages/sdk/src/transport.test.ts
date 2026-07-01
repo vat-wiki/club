@@ -6,6 +6,7 @@ import {
   getMe,
   listMessages,
   sendMessage,
+  uploadFile,
   createParticipant,
 } from "./transport.js";
 
@@ -81,6 +82,95 @@ describe("sendMessage", () => {
 
     await expect(sendMessage({ server: "http://x", key: "k" }, "hi")).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends the legacy {content} body when no attachmentIds are supplied (backward compatible)", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({ content: "hi" });
+      return jsonRes({ id: "m1", content: "hi" });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    await sendMessage({ server: "http://x", key: "k" }, "hi");
+  });
+
+  it("includes attachmentIds in the body when supplied (non-empty)", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({
+        content: "look",
+        attachmentIds: ["a1", "a2"],
+      });
+      return jsonRes({ id: "m1", content: "look" });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    await sendMessage({ server: "http://x", key: "k" }, "look", {
+      attachmentIds: ["a1", "a2"],
+    });
+  });
+
+  it("falls back to the legacy body when attachmentIds is an empty array", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({ content: "hi" });
+      return jsonRes({ id: "m1", content: "hi" });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    await sendMessage({ server: "http://x", key: "k" }, "hi", { attachmentIds: [] });
+  });
+});
+
+describe("uploadFile", () => {
+  it("POSTs a multipart body to /files with the bearer header and returns the attachment", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/files");
+      expect(init.method).toBe("POST");
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer club_k");
+      // A FormData body is a FormData instance (not a JSON string).
+      expect(init.body).toBeInstanceOf(FormData);
+      const form = init.body as FormData;
+      const file = form.get("file") as Blob;
+      expect(file.type).toBe("image/png");
+      // The bytes round-trip intact.
+      const got = Buffer.from(await file.arrayBuffer());
+      expect(Array.from(got)).toEqual([1, 2, 3]);
+      return jsonRes({ id: "fid", url: "/files/fid", mime: "image/png", size: 3 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const att = await uploadFile(
+      { server: "http://x", key: "club_k" },
+      { buffer: Buffer.from([1, 2, 3]), filename: "a.png", mime: "image/png" },
+    );
+    expect(att.id).toBe("fid");
+    expect(att.url).toBe("/files/fid");
+  });
+
+  it("works with a Uint8Array buffer too", async () => {
+    globalThis.fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      const form = init.body as FormData;
+      const got = Buffer.from(await (form.get("file") as Blob).arrayBuffer());
+      expect(Array.from(got)).toEqual([10, 20]);
+      return jsonRes({ id: "u", url: "/files/u", mime: "image/jpeg", size: 2 });
+    }) as typeof fetch;
+    const att = await uploadFile(
+      { server: "http://x" },
+      { buffer: new Uint8Array([10, 20]), filename: "b.jpg", mime: "image/jpeg" },
+    );
+    expect(att.id).toBe("u");
+  });
+
+  it("parses the server error and rethrows as ClubApiError on 4xx", async () => {
+    globalThis.fetch = vi.fn(async () => jsonRes({ error: "unsupported image type" }, 415)) as typeof fetch;
+    await expect(
+      uploadFile({ server: "http://x", key: "k" }, { buffer: Buffer.from([]), filename: "x", mime: "image/png" }),
+    ).rejects.toMatchObject({ message: "unsupported image type", status: 415 });
+  });
+
+  it("omits the Authorization header when no key is set", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+      return jsonRes({ id: "z", url: "/files/z", mime: "image/png", size: 0 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    await uploadFile({ server: "http://x" }, { buffer: Buffer.from([]), filename: "z", mime: "image/png" });
   });
 });
 

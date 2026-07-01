@@ -5,7 +5,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ClubClient } from "@club/sdk";
-import { dispatchTool } from "./helpers.js";
+import { uploadImageFile } from "@club/sdk/node";
+import { dispatchTool, type DispatchClient } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
@@ -22,6 +23,20 @@ function resolveConn(): { server: string; key: string } {
 }
 
 const client = new ClubClient(resolveConn());
+
+// Adapt the ClubClient (browser-safe, no fs/image-upload method) to the
+// DispatchClient shape dispatchTool expects: every method delegates to the
+// client, and `uploadImage` is wired directly to the SDK's Node-only
+// uploadImageFile (read→sniff→validate→POST /files). Keeping this glue in
+// index.ts (not on ClubClient) keeps the SDK's main entry browser-safe.
+const dispatchClient: DispatchClient = {
+  me: () => client.me(),
+  messages: (opts) => client.messages(opts),
+  send: (content, attachmentIds) => client.send(content, attachmentIds),
+  uploadImage: (path) => uploadImageFile({ server: client.server, key: client.key }, path),
+  members: () => client.members(),
+  stream: (cb) => client.stream(cb),
+};
 
 const server = new Server(
   { name: "club", version: "0.1.0" },
@@ -53,11 +68,20 @@ const TOOLS = [
   },
   {
     name: "send",
-    description: "Post a message to the room as this participant. Keep it relevant.",
+    description:
+      "Post a message to the room as this participant. Keep it relevant. Pass `content` for text, and/or `images` (an array of local file paths) to attach images (png/jpeg/gif/webp, ≤10MB each, up to 8). At least one of content or images is required; a bare image with no text is fine.",
     inputSchema: {
       type: "object" as const,
-      properties: { content: { type: "string", description: "message body" } },
-      required: ["content"] as const,
+      properties: {
+        content: { type: "string", description: "message body (optional when images are attached)" },
+        images: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "local image file paths to attach (png/jpeg/gif/webp, ≤10MB each, up to 8)",
+        },
+      },
+      required: [] as const,
     },
   },
   {
@@ -95,7 +119,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
   try {
-    return text(await dispatchTool(name, (args ?? {}) as Record<string, unknown>, client));
+    return text(await dispatchTool(name, (args ?? {}) as Record<string, unknown>, dispatchClient));
   } catch (err) {
     return text(`error: ${(err as Error).message}`);
   }

@@ -120,7 +120,51 @@ export interface DispatchClient {
   uploadImage(path: string): Promise<{ id: string }>;
   members(): Promise<Participant[]>;
   stream(onMessage: (m: Message) => void): { stop: () => void };
+  /** Report that THIS agent started processing (lights up the room's typing
+   *  indicator). Agent-only; no-op-equivalent (404) for a human key. The
+   *  matching idle is auto-cleared by the server when this agent's reply lands
+   *  (POST /messages), so callers don't need a paired reportAgentIdle in the
+   *  common send-after-listen path. */
+  reportAgentThinking(): Promise<void>;
 }
+
+// ── Thinking heartbeat (TTL refresh) ──────────────────────────────────
+//
+// The server's thinking TTL (~45s) is a lost-contact fallback, NOT a "this is
+// how long a reply should take" timer. An MCP agent doing long work between a
+// matched `listen` and its `send` (e.g. a 90s LLM round-trip across multiple
+// tool-call rounds) would otherwise see its indicator yanked at TTL — which is
+// worse than a stale one. So once a listen matches, we re-report thinking on a
+// cadence comfortably shorter than the TTL to keep refreshing it. The server
+// dedupes re-reports (no re-broadcast), so this only nudges expiresAt forward;
+// the indicator never flickers. The heartbeat is stopped when the agent's reply
+// lands (send → server auto-clears thinking) or superseded by the next listen.
+//
+// Module-level on purpose: the "thinking" state belongs to THIS agent process,
+// which is single-threaded across tool calls (MCP is sync request/response).
+const THINKING_REFRESH_MS = 15 * 1000; // re-report well inside the 45s TTL
+let thinkingHeartbeat: ReturnType<typeof setInterval> | undefined;
+
+function startThinkingHeartbeat(client: DispatchClient): void {
+  stopThinkingHeartbeat();
+  thinkingHeartbeat = setInterval(() => {
+    void client.reportAgentThinking().catch(() => {
+      /* nicety, not correctness — same swallow as the initial report */
+    });
+  }, THINKING_REFRESH_MS).unref?.();
+}
+
+function stopThinkingHeartbeat(): void {
+  if (thinkingHeartbeat) {
+    clearInterval(thinkingHeartbeat);
+    thinkingHeartbeat = undefined;
+  }
+}
+
+// Test-only export: clear the module-level heartbeat between tests so a prior
+// listen's heartbeat never leaks into the next one. Not part of the dispatcher
+// API surface; exported only so the suite can reset shared state.
+export const __test = { stopThinkingHeartbeat, THINKING_REFRESH_MS };
 
 /**
  * Route one MCP tool call to the matching client action and return the
@@ -169,6 +213,10 @@ export async function dispatchTool(
         attachmentIds = ids;
       }
       const m = await client.send(content, attachmentIds);
+      // The reply just landed — the server auto-clears our thinking state on
+      // POST /messages, so the heartbeat has nothing left to refresh. Stop it
+      // so we don't keep re-lighting an indicator for a turn that's over.
+      stopThinkingHeartbeat();
       return `sent: ${formatMessage(m)}`;
     }
     case "members": {
@@ -180,6 +228,25 @@ export async function dispatchTool(
       const mention = str(args.mention) || undefined;
       const timeoutMs = num(args.timeoutMs) ?? 60000;
       const matched = await listenForMatch((cb) => client.stream(cb), mention, timeoutMs);
+      if (matched.length > 0) {
+        // The agent just got handed a message it's about to act on — light up
+        // the room's typing indicator. We then START A HEARTBEAT that re-
+        // reports thinking every THINKING_REFRESH_MS until this agent's reply
+        // lands (send → server auto-clears) or the next listen supersedes it.
+        // Why: the server's ~45s thinking TTL is a *lost-contact fallback*, so
+        // a legitimately slow reply (long LLM round-trip across multiple tool
+        // rounds) would otherwise drop the indicator mid-thought. Re-reporting
+        // only refreshes the server's TTL — the SSE event is deduped, so the
+        // indicator never flickers. If the agent never replies, the heartbeat
+        // keeps the indicator alive until the next listen (which restarts it)
+        // or process exit.
+        try {
+          await client.reportAgentThinking();
+          startThinkingHeartbeat(client);
+        } catch {
+          /* non-fatal: the indicator is a nicety, not correctness */
+        }
+      }
       return matched.length > 0
         ? matched.map(formatMessage).join("\n")
         : "(no matching messages within timeout)";

@@ -135,3 +135,44 @@ export interface ListMessagesQuery {
 export interface ApiError {
   error: string;
 }
+
+// ── Agent "thinking" presence (P1-5) ────────────────────────────────
+//
+// club's agents are EXTERNAL processes (the `club listen` CLI loop, an MCP
+// dispatcher, etc.) — the server hosts no agent execution loop. So an agent's
+// "I'm processing this @mention" state is, like a human's typing, something the
+// participant reports and the server merely relays. The server does add two
+// safety nets the untrusted client can't provide alone: it auto-clears the
+// state when the agent's reply lands (POST /messages by that participant), and
+// it expires a stale thinking entry on a TTL so a crashed/offline agent can't
+// leave the indicator stuck on.
+//
+// These ship over the SAME SSE stream as `message` events, but as named events
+// (`event: agent_thinking` / `event: agent_idle`) so clients can branch on the
+// event name rather than sniffing payloads. A client that only knows about
+// `message` events ignores these (forward-compatible).
+
+// SSE `event: agent_thinking` payload. `participantId`+`name`+`kind` are all
+// carried so a client can render the indicator without a roster join (matches
+// how `message` events denormalize authorName/authorKind). kind is fixed to
+// "agent": only agents report thinking (a human "typing…" indicator is a
+// separate, future concern and would deserve its own event).
+export interface AgentThinkingEvent {
+  participantId: string;
+  name: string;
+  kind: "agent";
+}
+
+// SSE `event: agent_idle` payload. Just the id — the client removes it from its
+// thinking set. Emitted on: reply posted (server-detected), agent-reported
+// done/error, or server TTL expiry (crashed/offline agent).
+export interface AgentIdleEvent {
+  participantId: string;
+}
+
+// Body for POST /agents/thinking and POST /agents/idle — the agent reports its
+// own status. Auth-required (the participant reports itself; the key identifies
+// who). No fields in the body: the participant is taken from the authed key, so
+// a client can't forge another agent's status.
+export const AgentStatusRequest = z.object({}).strict();
+export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;

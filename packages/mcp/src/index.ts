@@ -36,6 +36,7 @@ const dispatchClient: DispatchClient = {
   uploadImage: (path) => uploadImageFile({ server: client.server, key: client.key }, path),
   members: () => client.members(),
   stream: (cb) => client.stream(cb),
+  reportAgentThinking: () => client.reportAgentThinking(),
 };
 
 const server = new Server(

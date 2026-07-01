@@ -104,12 +104,22 @@ const config: Config = {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
         },
+        // Error-feedback shake for a blocked form submit (e.g. a nickname with
+        // spaces). Three quick lateral jolts. The global prefers-reduced-motion
+        // wildcard in index.css collapses this to a single frame, so it's safe.
+        "shake": {
+          "10%, 90%": { transform: "translateX(-1px)" },
+          "20%, 80%": { transform: "translateX(2px)" },
+          "30%, 50%, 70%": { transform: "translateX(-3px)" },
+          "40%, 60%": { transform: "translateX(3px)" },
+        },
       },
       animation: {
         "agent-pulse": "agent-pulse 2s cubic-bezier(0.16,1,0.3,1) infinite",
         "slide-in": "slide-in 0.32s cubic-bezier(0.16,1,0.3,1)",
         "brand-pulse": "brand-pulse 4s ease-in-out infinite",
         "shimmer": "shimmer 1.4s cubic-bezier(0.16,1,0.3,1) infinite",
+        "shake": "shake 0.4s cubic-bezier(0.36,0.07,0.19,0.97)",
       },
     },
   },

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { loadConfig } from "./config.js";
 import { makeLoginCommand } from "./commands/login.js";
+import { makeJoinCommand } from "./commands/join.js";
 import { makeWhoamiCommand } from "./commands/whoami.js";
 import { makeSendCommand } from "./commands/send.js";
 import { makeReadCommand } from "./commands/read.js";
@@ -18,6 +19,7 @@ program
   .version("0.1.0");
 
 program.addCommand(makeLoginCommand());
+program.addCommand(makeJoinCommand());
 program.addCommand(makeWhoamiCommand());
 program.addCommand(makeSendCommand());
 program.addCommand(makeReadCommand());

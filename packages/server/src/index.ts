@@ -11,6 +11,7 @@ import { messages } from "./routes/messages.js";
 import { members } from "./routes/members.js";
 import { me } from "./routes/me.js";
 import { files } from "./routes/files.js";
+import { agents } from "./routes/agents.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const joinHtmlPath = resolve(__dirname, "public", "join.html");
@@ -33,6 +34,7 @@ app.route("/me", me);
 app.route("/messages", messages);
 app.route("/members", members);
 app.route("/files", files);
+app.route("/agents", agents);
 
 app.get("/health", (c) => c.json({ ok: true }));
 

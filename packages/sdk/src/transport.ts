@@ -279,3 +279,36 @@ export async function recoverParticipant(
     ...opts,
   });
 }
+
+// ── Agent thinking presence (P1-5) ───────────────────────────────────
+//
+// An agent reports its own "I'm processing a @mention" / "I'm done" state; the
+// server relays it to every SSE subscriber as a named event (agent_thinking /
+// agent_idle) so the room can show a typing indicator. The participant is taken
+// from the authed key, so the body is empty. Both endpoints return 204.
+//
+// Contract for callers:
+//   - report thinking ONCE when you start handling a mention;
+//   - if your work may exceed the server's thinking TTL (~45s), RE-REPORT on a
+//     cadence shorter than the TTL to refresh it — the server dedupes re-
+//     reports (no SSE re-broadcast), so the indicator won't flicker;
+//   - report idle (or just POST your reply) when done.
+// The TTL is a *lost-contact fallback* (crash/kill/silent-error), NOT a reply
+// budget — a long-but-healthy reply must re-report to avoid having its
+// indicator yanked mid-thought. The server also auto-clears thinking the moment
+// an agent's reply message lands, and reaps entries past TTL, so a missed idle
+// never sticks the indicator on forever.
+
+export async function reportAgentThinking(
+  c: ClubConn,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, "/agents/thinking", { method: "POST", body: {}, ...opts });
+}
+
+export async function reportAgentIdle(
+  c: ClubConn,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, "/agents/idle", { method: "POST", body: {}, ...opts });
+}

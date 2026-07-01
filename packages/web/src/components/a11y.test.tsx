@@ -15,6 +15,8 @@ import { KeyRevealDialog } from "./key-reveal-dialog";
 import { RecoverDialog } from "./recover-dialog";
 import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { ViewKeyDialog } from "./view-key-dialog";
+import { BootScreen } from "./boot-screen";
+import { TypingIndicator } from "./typing-indicator";
 import { withI18n } from "@/test/i18n-wrap";
 
 const TEST_KEY = "club_human_test_0123456789abcdef";
@@ -197,6 +199,51 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         onSaved={() => {}}
       />,
     );
+  });
+
+  it("KeyRevealDialog (recovery mode) has no violations", async () => {
+    // Rotated-credentials variant — same layout, different copy. The recovery
+    // flow MUST surface the new key + recovery code before entering the room
+    // (P0-1). Verify the rotated-mode dialog is still accessible.
+    await expectNoViolationsPortal(
+      <KeyRevealDialog
+        open
+        recovered
+        key_={TEST_KEY}
+        recoverCode="club_recover_rotated"
+        onSaved={() => {}}
+      />,
+    );
+  });
+
+  it("BootScreen (error state) has no violations", async () => {
+    // The /me-failure retry screen (P0-2): role=alert + retry/reload buttons.
+    await expectNoViolations(
+      <BootScreen status="error" retryNonce={0} onRetry={() => {}} />,
+    );
+  });
+
+  it("BootScreen (loading state) has no violations", async () => {
+    await expectNoViolations(
+      <BootScreen status="loading" retryNonce={0} onRetry={() => {}} />,
+    );
+  });
+
+  it("TypingIndicator has no violations (with thinking agents)", async () => {
+    // The agent "thinking" placeholder (P1-5). role=status carries the label.
+    await expectNoViolations(
+      <TypingIndicator
+        agents={[
+          { id: "1", name: "rex" },
+          { id: "2", name: "ana" },
+        ]}
+      />,
+    );
+  });
+
+  it("TypingIndicator renders nothing (no a11y footprint) when empty", async () => {
+    const { container } = render(withI18n(<TypingIndicator agents={[]} />));
+    expect(container.firstChild).toBeNull();
   });
 
   it("RecoverDialog has no violations", async () => {

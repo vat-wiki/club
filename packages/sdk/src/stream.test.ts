@@ -39,6 +39,13 @@ function sseStream() {
     push(msg: Message) {
       controller?.enqueue(encoder.encode(`data:${JSON.stringify(msg)}\n\n`));
     },
+    // Push a NAMED SSE event (with an `event:` line), used to test the
+    // agent_thinking / agent_idle dispatch.
+    pushNamed(event: string, payload: unknown) {
+      controller?.enqueue(
+        encoder.encode(`event:${event}\ndata:${JSON.stringify(payload)}\n\n`),
+      );
+    },
     end() {
       controller?.close();
     },
@@ -162,6 +169,56 @@ describe("streamMessages", () => {
     await vi.waitFor(() => expect(got).toEqual(["a", "b", "c"]), { timeout: 2000 });
 
     expect(streamCalls).toBe(2);
+    handle.stop();
+  });
+
+  it("dispatches agent_thinking / agent_idle named events to their callbacks (P1-5)", async () => {
+    const s = sseStream();
+    globalThis.fetch = streamFetch(s);
+
+    const thinking: string[] = [];
+    const idle: string[] = [];
+    const handle = streamMessages(
+      { server: "http://x", key: "k" },
+      () => {},
+      {
+        reconnect: false,
+        onAgentThinking: (e) => thinking.push(e.participantId),
+        onAgentIdle: (e) => idle.push(e.participantId),
+      },
+    );
+
+    s.pushNamed("agent_thinking", { participantId: "p1", name: "rex", kind: "agent" });
+    s.pushNamed("agent_idle", { participantId: "p1" });
+    // a normal message still flows to onMessage, not to either callback
+    s.push(makeMessage("01", "hi"));
+
+    // Let the reader pump one microtask.
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(thinking).toEqual(["p1"]);
+    expect(idle).toEqual(["p1"]);
+    handle.stop();
+  });
+
+  it("ignores unknown named events (forward-compatible)", async () => {
+    const s = sseStream();
+    globalThis.fetch = streamFetch(s);
+
+    const got: string[] = [];
+    const handle = streamMessages(
+      { server: "http://x", key: "k" },
+      (m) => got.push(m.content),
+      { reconnect: false },
+    );
+
+    // Some future event the client doesn't know about — must be dropped, not
+    // mis-delivered as a message.
+    s.pushNamed("future_event", { whatever: 1 });
+    s.push(makeMessage("01", "real"));
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(got).toEqual(["real"]);
     handle.stop();
   });
 });

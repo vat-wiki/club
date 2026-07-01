@@ -7,6 +7,7 @@ import {
   matchesMention,
   listenForMatch,
   dispatchTool,
+  __test,
   type DispatchClient,
 } from "./helpers.js";
 
@@ -199,6 +200,7 @@ function fakeClient(over: Partial<DispatchClient> = {}): DispatchClient {
     send: async (content: string) => makeMsg(content),
     members: async () => [],
     stream: () => ({ stop: () => {} }),
+    reportAgentThinking: async () => {},
     ...over,
   };
 }
@@ -282,6 +284,41 @@ describe("dispatchTool", () => {
     }
   });
 
+  it("listen reports agent_thinking when a message matches (P1-5)", async () => {
+    let emit: (m: Message) => void = () => {};
+    const thinking = vi.fn(async () => {});
+    const client = fakeClient({
+      stream: (cb) => { emit = cb; return { stop: () => {} }; },
+      reportAgentThinking: thinking,
+    });
+    vi.useFakeTimers();
+    try {
+      const p = dispatchTool("listen", { mention: "alice" }, client);
+      emit(makeMsg("hey @alice"));
+      await p;
+      expect(thinking).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("listen does NOT report thinking on timeout (nothing matched)", async () => {
+    const thinking = vi.fn(async () => {});
+    const client = fakeClient({
+      stream: () => ({ stop: () => {} }),
+      reportAgentThinking: thinking,
+    });
+    vi.useFakeTimers();
+    try {
+      const p = dispatchTool("listen", { mention: "nobody", timeoutMs: 1000 }, client);
+      await vi.advanceTimersByTimeAsync(1000);
+      await p;
+      expect(thinking).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("listen times out with a friendly message when nothing matches", async () => {
     const client = fakeClient({ stream: () => ({ stop: () => {} }) });
     vi.useFakeTimers();
@@ -298,6 +335,53 @@ describe("dispatchTool", () => {
     expect(await dispatchTool("frobnicate", {}, fakeClient())).toBe(
       'error: unknown tool "frobnicate"',
     );
+  });
+
+  describe("thinking heartbeat (TTL refresh)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      __test.stopThinkingHeartbeat();
+    });
+    afterEach(() => {
+      __test.stopThinkingHeartbeat();
+      vi.useRealTimers();
+    });
+
+    it("a matched listen re-reports thinking on a cadence shorter than the TTL", async () => {
+      let emit: (m: Message) => void = () => {};
+      const thinking = vi.fn(async () => {});
+      const client = fakeClient({
+        stream: (cb) => { emit = cb; return { stop: () => {} }; },
+        reportAgentThinking: thinking,
+      });
+      const p = dispatchTool("listen", { mention: "alice" }, client);
+      emit(makeMsg("hey @alice"));
+      await p;
+      // initial report fires exactly once for the matched listen ...
+      expect(thinking).toHaveBeenCalledOnce();
+      // ... then the heartbeat re-reports every THINKING_REFRESH_MS.
+      await vi.advanceTimersByTimeAsync(__test.THINKING_REFRESH_MS);
+      await vi.advanceTimersByTimeAsync(__test.THINKING_REFRESH_MS);
+      expect(thinking).toHaveBeenCalledTimes(3); // 1 initial + 2 heartbeats
+    });
+
+    it("send stops the heartbeat (the server auto-clears thinking on reply)", async () => {
+      let emit: (m: Message) => void = () => {};
+      const thinking = vi.fn(async () => {});
+      const client = fakeClient({
+        stream: (cb) => { emit = cb; return { stop: () => {} }; },
+        reportAgentThinking: thinking,
+      });
+      const lp = dispatchTool("listen", { mention: "alice" }, client);
+      emit(makeMsg("hey @alice"));
+      await lp;
+      await vi.advanceTimersByTimeAsync(__test.THINKING_REFRESH_MS);
+      expect(thinking).toHaveBeenCalledTimes(2);
+      // agent replies → heartbeat must stop so we don't refresh a cleared state
+      await dispatchTool("send", { content: "done" }, client);
+      await vi.advanceTimersByTimeAsync(__test.THINKING_REFRESH_MS * 3);
+      expect(thinking).toHaveBeenCalledTimes(2); // no further re-reports
+    });
   });
 
   it("propagates client errors so the handler can wrap them as 'error: <msg>'", async () => {

@@ -18,6 +18,8 @@ import {
   listMessages,
   markMentionRead,
   recoverParticipant as recoverParticipantFn,
+  reportAgentThinking as reportAgentThinkingFn,
+  reportAgentIdle as reportAgentIdleFn,
   sendMessage,
 } from "./transport.js";
 import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
@@ -109,5 +111,19 @@ export class ClubClient {
   /** GET /messages/stream — live feed with auto-reconnect + catch-up. */
   stream(handler: (m: Message) => void, opts?: StreamOptions): StreamHandle {
     return streamMessages(this.conn(), handler, opts);
+  }
+
+  /** POST /agents/thinking — report that THIS agent has started processing a
+   *  @mention (lights up the room's typing indicator). Agent-only; a human key
+   *  gets 404. Idempotent in effect: re-reporting while already thinking just
+   *  refreshes the TTL without re-broadcasting. */
+  reportAgentThinking(): Promise<void> {
+    return reportAgentThinkingFn(this.conn(), { timeoutMs: this.timeoutMs });
+  }
+
+  /** POST /agents/idle — report that THIS agent finished (clears its typing
+   *  indicator). Idempotent: a 204 no-op if it wasn't thinking. */
+  reportAgentIdle(): Promise<void> {
+    return reportAgentIdleFn(this.conn(), { timeoutMs: this.timeoutMs });
   }
 }

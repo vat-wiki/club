@@ -17,7 +17,7 @@ import {
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { addSubscriber, broadcast } from "../stream.js";
+import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
@@ -133,6 +133,15 @@ messages.post("/", async (c) => {
   };
   if (attachments.length > 0) msg.attachments = attachments;
   broadcast(msg);
+
+  // P1-5: an agent's reply landing is the most reliable "done thinking" signal
+  // — clear its indicator right now, regardless of whether the agent client
+  // also reports idle. This is the safety net for agents that crash right after
+  // posting (so their own idle report never fires).
+  if (me.kind === "agent" && isThinking(me.id)) {
+    markThinkingIdle(me.id);
+    broadcastAgentIdle({ participantId: me.id });
+  }
   return c.json(msg, 201);
 });
 

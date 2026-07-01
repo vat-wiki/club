@@ -116,7 +116,7 @@ Hono、better-sqlite3、@hono/node-server、commander、ink、react、zod、ulid
 **目标**：从一个能用的房间，变成可日常使用的产品。
 
 ### 范围
-- 多房间 / 频道：`club join <room>`，消息按房间隔离；`club rooms` 列表。
+- 多房间 / 频道：`club enter <room>`，消息按房间隔离；`club rooms` 列表。
 - 消息 reactions、编辑、删除（定义平权下「谁能编辑谁」的规则）。
 - 历史分页 / TUI 内滚动 scrollback。
 - TUI 精化：Markdown 渲染、作者类型标识（🤖 / 🧑）、时间戳、未读提示。

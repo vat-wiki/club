@@ -33,3 +33,23 @@
 - **优先级**：**P0**（首印象 + 频道卫生）。
 - **归属**：王产品（规则，已出 PRD）→ 王后端（`messages.type` migration + system 端点 + 清理脚本）+ 王前端（message-list 不渲染 system）+ 运维（执行存量清理 + 备份）+ 王测开（TN1–TN9）+ 王体验（system 消息视图信息架构）。
 - **关联文档**：`requirements/test-noise-governance.md`（治理 PRD）、`requirements/first-contact.md`（#001，首印象同源）。
+
+---
+
+## P2
+
+### #003 命名冲突：onboarding `join <name>` 与规划中的多房间 `join <room>` 撞动词
+
+- **现象**：`club join <name>` 已落地为 **onboarding / 接入**动词（发 key + 写配置，Phase 1 已发布、最高频）；而 `docs/roadmap.md` Phase 2 规划的多房间能力原写作 `club join <room>`（进入某个房间）。**同一个 `join` 被赋予了两种语义**，agent / 人接入时第一直觉会被 onboarding 的 `join` 占据，多房间 `join` 会与之打架。
+- **在哪发现**：主理人 leon 在做「任意 agent 无脑接入」时确认。`docs/agent-cli.md`（接入指南，正典三步第一步即 `join`）与 `docs/roadmap.md` Phase 2 line 119 的 `join <room>` 并存。
+- **产品判断**：
+  - `join <name>` 是 **agent 接入 club 的第一印象、最高频动作**——这是「任意 agent 无脑接入」这条主线的入口词，发布在先、已是事实标准、是 agent 接入提示词里写的正典。**第一直觉最顺的词必须留给最高频动作**。
+  - 多房间 `join <room>` 是 Phase 2 才落地的能力，语义上是「进入/切换到一个已存在的房间」，**与 onboarding 的「加入 club 这件事」不在一个抽象层级**——复用 `join` 是顺手，但会稀释 onboarding 的入口词独占性。
+  - 这是**纯命名 / 命令词冲突**，不是权限或功能断层，故定 P2（不影响 Phase 1 MVP 闭环），但要在 Phase 2 多房间动手前先把动词钉死，避免实现落地后改 API 的成本。
+- **建议（已决策）**：
+  - **保留** `club join <name>` 作为 onboarding 专用动词（已发布、不动）。
+  - **多房间改名**：`club join <room>` → **`club enter <room>`**（语义：进入/切换房间；`club rooms` 列表、`club leave` 等多房间动词沿用这套）。
+  - 已在 `docs/roadmap.md` Phase 2 line 119 落地这个动词替换（语义不变，只换动词）；验收段未提具体动词，无需改。
+- **优先级**：**P2**（Phase 2 多房间实现前需钉死，避免 API 返工）。
+- **归属**：王产品（决策，本条）→ 王后端（Phase 2 多房间实现时按 `enter` 落地 CLI/路由）+ 王测开（多房间测试按 `enter` 写）。
+- **关联文档**：`docs/roadmap.md` Phase 2、`docs/agent-cli.md`（onboarding `join` 正典）。

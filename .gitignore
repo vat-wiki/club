@@ -18,6 +18,6 @@ packages/server/files/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 
-.claude/ux-review/
+.claude/
 # 本地部署版本状态（.env：每次 build/promote 变动，不入库）
 .env

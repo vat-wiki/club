@@ -234,6 +234,9 @@ const zh: Dict = {
   "msg.reply": "回复",
   "msg.replyingTo": "回复 {name}",
   "msg.replyNotFound": "回复了一条消息",
+  "search.placeholder": "搜索消息",
+  "search.clear": "清除搜索",
+  "search.noResults": "没有匹配的消息",
 
   // Mention popup
   "mention.aria": "提及某人",
@@ -418,6 +421,9 @@ const en: Dict = {
   "msg.reply": "Reply",
   "msg.replyingTo": "Replying to {name}",
   "msg.replyNotFound": "Replied to a message",
+  "search.placeholder": "Search messages",
+  "search.clear": "Clear search",
+  "search.noResults": "No matching messages",
 
   // Mention popup
   "mention.aria": "Mention someone",

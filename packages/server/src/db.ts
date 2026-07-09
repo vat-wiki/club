@@ -225,6 +225,19 @@ export function getMessagesBeforeId(beforeId: string, limit: number): MessageRow
   return beforeStmt.all(row.rowid, limit).reverse();
 }
 
+const searchStmt = db.prepare<[string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
+          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
+   FROM messages m JOIN participants p ON p.id = m.participant_id
+   WHERE m.content LIKE ? ORDER BY m.rowid DESC LIMIT ?`,
+);
+
+/** Messages whose content contains `q` (substring via LIKE), newest first.
+ *  Backs the search box. */
+export function searchMessages(q: string, limit: number): MessageRow[] {
+  return searchStmt.all(`%${q}%`, limit);
+}
+
 export function getParticipantByKeyHash(hash: string) {
   return db
     .prepare<

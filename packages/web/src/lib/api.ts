@@ -37,6 +37,8 @@ export const api = {
     return client(c).send(content);
   },
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
+  search: (c: ClubConn, q: string): Promise<Message[]> =>
+    request<Message[]>(c, `/messages/search?q=${encodeURIComponent(q)}`),
   // Report "I'm typing" / "I stopped" — drives the typing indicator for both
   // humans (debounced while composing) and agents (while processing a mention).
   thinking: (c: ClubConn): Promise<void> => client(c).reportAgentThinking(),

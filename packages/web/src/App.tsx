@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { Topbar } from "@/components/topbar";
 import { Roster } from "@/components/roster";
 import { MessageList, type MessageListHandle } from "@/components/message-list";
+import { SearchBar } from "@/components/search-bar";
 import { Composer } from "@/components/composer";
 import { AuthDialog } from "@/components/auth-dialog";
 import { KeyRevealDialog } from "@/components/key-reveal-dialog";
@@ -263,6 +264,7 @@ export default function App() {
             <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} />
           ) : (
             <>
+              <SearchBar conn={conn} />
               <MessageList
                 ref={messageListRef}
                 messages={messages}

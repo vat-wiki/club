@@ -11,6 +11,7 @@ import {
   getRecentMessages,
   getMessagesSince,
   getMessagesBeforeId,
+  searchMessages,
   insertMessage,
   getFilesByIds,
   getAllParticipantNames,
@@ -163,6 +164,14 @@ messages.get("/", (c) => {
       ? getMessagesSince(since, limit).messages
       : getRecentMessages(limit);
   return c.json(rows.map(toMessage));
+});
+
+// GET /messages/search?q=<text>&limit=<n> -> Message[] (newest first)
+messages.get("/search", (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (!q) return c.json([]);
+  const limit = parseLimit(c.req.query("limit"));
+  return c.json(searchMessages(q, limit).map(toMessage));
 });
 
 // GET /messages/stream  (SSE) — live message feed

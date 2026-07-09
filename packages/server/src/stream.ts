@@ -1,5 +1,5 @@
 import type { SSEStreamingApi } from "hono/streaming";
-import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, ParticipantKind } from "@club/shared";
+import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, ParticipantKind } from "@club/shared";
 
 // Live SSE subscribers registered at connect time. The POST /messages route
 // pushes new messages here; subscribers are removed on abort. Each carries the
@@ -45,6 +45,12 @@ export function addSubscriber(
 // Push a named `presence` event (online/offline) to every live subscriber.
 export function broadcastPresence(e: PresenceEvent): void {
   writeAll({ event: "presence", data: JSON.stringify(e) });
+}
+
+// Push a named `message_deleted` event (recall). Clients mark the id recalled
+// rather than dropping the row, so replies/context still read coherently.
+export function broadcastDeleted(e: MessageDeletedEvent): void {
+  writeAll({ event: "message_deleted", data: JSON.stringify(e) });
 }
 
 // Push a `message` event (the default, unnamed event in SSE). Backwards

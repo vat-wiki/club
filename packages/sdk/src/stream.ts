@@ -1,4 +1,4 @@
-import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent } from "@club/shared";
+import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent } from "@club/shared";
 import { type ClubConn, listMessages } from "./transport.js";
 
 // ── SSE streaming with reconnect + catch-up ─────────────────────────
@@ -18,6 +18,8 @@ export interface StreamOptions {
   onAgentIdle?: (e: AgentIdleEvent) => void;
   /** Fired for each `presence` event (online/offline). Omit to ignore. */
   onPresence?: (e: PresenceEvent) => void;
+  /** Fired when a message is recalled (`message_deleted` event). */
+  onMessageDeleted?: (e: MessageDeletedEvent) => void;
 }
 
 export interface StreamHandle {
@@ -148,6 +150,8 @@ export function streamMessages(
             opts.onAgentIdle?.(obj as AgentIdleEvent);
           } else if (eventName === "presence") {
             opts.onPresence?.(obj as PresenceEvent);
+          } else if (eventName === "message_deleted") {
+            opts.onMessageDeleted?.(obj as MessageDeletedEvent);
           } else if (eventName === "message") {
             // The default SSE event (no `event:` line) — the original feed.
             deliver(obj as Message);

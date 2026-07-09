@@ -12,6 +12,7 @@ import {
   getMessagesSince,
   getMessagesBeforeId,
   searchMessages,
+  deleteMessage,
   insertMessage,
   getFilesByIds,
   getAllParticipantNames,
@@ -19,7 +20,7 @@ import {
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle } from "../stream.js";
+import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle, broadcastDeleted } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
@@ -54,6 +55,7 @@ function toMessage(r: MessageRow): Message {
   const attachments = parseAttachments(r.attachments);
   if (attachments) msg.attachments = attachments;
   if (r.reply_to_id) msg.replyToId = r.reply_to_id;
+  if (r.deleted) msg.deleted = true;
   return msg;
 }
 
@@ -172,6 +174,18 @@ messages.get("/search", (c) => {
   if (!q) return c.json([]);
   const limit = parseLimit(c.req.query("limit"));
   return c.json(searchMessages(q, limit).map(toMessage));
+});
+
+// DELETE /messages/:id -> 204 (recall). Only the author may (participant_id
+// check in deleteMessage). Broadcasts `message_deleted` so every client hides
+// the content and shows a "recalled" placeholder instead.
+messages.delete("/:id", async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  const ok = deleteMessage(id, me.id);
+  if (!ok) return c.json({ error: "not found" }, 404);
+  broadcastDeleted({ id });
+  return c.body(null, 204);
 });
 
 // GET /messages/stream  (SSE) — live message feed

@@ -101,6 +101,7 @@ type MessageListProps = {
   onLoadMore?: () => Promise<boolean> | void;
   loadingMore?: boolean;
   onReply?: (m: Message) => void;
+  onDelete?: (id: string) => void;
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
@@ -130,6 +131,7 @@ function MessageRow({
   grouped,
   onReply,
   replyTo,
+  onDelete,
 }: {
   m: Message;
   self: boolean;
@@ -146,6 +148,8 @@ function MessageRow({
   onReply?: (m: Message) => void;
   /** The message this one replies to (quote preview), if known locally. */
   replyTo?: Message;
+  /** Recall (delete) this message — only callable on the author's own rows. */
+  onDelete?: (id: string) => void;
 }) {
   const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
@@ -212,6 +216,15 @@ function MessageRow({
                   {t("msg.reply")}
                 </button>
               )}
+              {self && !m.deleted && !m.status && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(m.id)}
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-destructive"
+                >
+                  {t("msg.recall")}
+                </button>
+              )}
             </div>
           )}
           <div
@@ -234,9 +247,15 @@ function MessageRow({
                 )}
               </div>
             )}
-            {m.content.length > 0 && renderContent(m.content, known, selfName)}
-            {m.attachments && m.attachments.length > 0 && (
-              <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
+            {m.deleted ? (
+              <span className="italic text-muted-foreground">{t("msg.recalled")}</span>
+            ) : (
+              <>
+                {m.content.length > 0 && renderContent(m.content, known, selfName)}
+                {m.attachments && m.attachments.length > 0 && (
+                  <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
+                )}
+              </>
             )}
             {m.status === "sending" && (
               <span className="ml-1 inline-flex items-center gap-1 align-middle font-mono text-[10px] text-muted-foreground">
@@ -258,7 +277,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, onLoadMore, loadingMore, onReply },
+  { messages, me, members, status, onLoadMore, loadingMore, onReply, onDelete },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -463,6 +482,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     grouped={item.grouped}
                     onReply={onReply}
                     replyTo={item.replyTo}
+                    onDelete={onDelete}
                   />
                 )}
               </div>

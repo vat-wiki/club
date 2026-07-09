@@ -212,6 +212,18 @@ export default function App() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!conn) return;
+    // Optimistically mark recalled; the server's message_deleted broadcast
+    // confirms and syncs everyone else. Revert on failure so the row isn't stuck.
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: true } : m)));
+    try {
+      await api.deleteMessage(conn, id);
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: false } : m)));
+    }
+  };
+
   const performSignOut = () => {
     clearConn();
     setConn(null);
@@ -274,6 +286,7 @@ export default function App() {
                 onLoadMore={loadMore}
                 loadingMore={loadingMore}
                 onReply={setReplyTo}
+                onDelete={handleDelete}
               />
               {typing.agents.length > 0 && (
                 <TypingIndicator agents={typing.agents} />

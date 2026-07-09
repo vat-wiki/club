@@ -69,6 +69,9 @@ export function useMessageStream(
               return next;
             });
           },
+          onMessageDeleted: (e) => {
+            setMessages((prev) => prev.map((m) => (m.id === e.id ? { ...m, deleted: true } : m)));
+          },
         },
       );
       setStatus("connected");

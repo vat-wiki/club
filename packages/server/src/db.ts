@@ -111,6 +111,11 @@ const migrations: Migration[] = [
     description: "message reply-to (threaded quotes)",
     sql: `ALTER TABLE messages ADD COLUMN reply_to_id TEXT;`,
   },
+  {
+    version: 5,
+    description: "soft-delete (recall) flag on messages",
+    sql: `ALTER TABLE messages ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;`,
+  },
 ];
 
 db.exec(`
@@ -151,6 +156,7 @@ export interface MessageRow {
   author_kind: "human" | "agent";
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
   reply_to_id: string | null; // id of the message this one replies to, or NULL
+  deleted: number; // 1 if recalled (soft-deleted), else 0
 }
 
 export function insertMessage(
@@ -176,14 +182,14 @@ export function getAllParticipants() {
 }
 
 const afterStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid > ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    ORDER BY m.rowid DESC LIMIT ?`,
@@ -208,7 +214,7 @@ export function getMessagesSince(sinceId: string, limit: number) {
 }
 
 const beforeStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid < ? ORDER BY m.rowid DESC LIMIT ?`,
@@ -226,7 +232,7 @@ export function getMessagesBeforeId(beforeId: string, limit: number): MessageRow
 }
 
 const searchStmt = db.prepare<[string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.content LIKE ? ORDER BY m.rowid DESC LIMIT ?`,
@@ -236,6 +242,17 @@ const searchStmt = db.prepare<[string, number], MessageRow>(
  *  Backs the search box. */
 export function searchMessages(q: string, limit: number): MessageRow[] {
   return searchStmt.all(`%${q}%`, limit);
+}
+
+const deleteStmt = db.prepare<[string, string]>(
+  `UPDATE messages SET deleted = 1 WHERE id = ? AND participant_id = ? AND deleted = 0`,
+);
+
+/** Soft-delete (recall) a message. Only the author may (participant_id check).
+ *  Returns whether a row was actually updated — false means not found, not
+ *  yours, or already recalled. */
+export function deleteMessage(id: string, participantId: string): boolean {
+  return deleteStmt.run(id, participantId).changes > 0;
 }
 
 export function getParticipantByKeyHash(hash: string) {

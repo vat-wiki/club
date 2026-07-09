@@ -30,6 +30,10 @@ export interface Message {
   // server stores it; clients render a quote by looking up the referenced
   // message in their local list.
   replyToId?: string;
+  // True if the author recalled the message. The row stays for context but the
+  // content is hidden; broadcast as a `message_deleted` event so every client
+  // marks it recalled.
+  deleted?: boolean;
   // Client-only delivery status for the optimistic send UI. Absent on every
   // server-sourced message (history + SSE) — those are already confirmed.
   // "sending" = locally echoed, waiting for POST /messages to resolve and
@@ -191,6 +195,13 @@ export interface PresenceEvent {
   name: string;
   kind: ParticipantKind;
   online: boolean;
+}
+
+// SSE `event: message_deleted` payload. The author recalled a message; clients
+// mark that id recalled (hide content, show a "recalled" placeholder) rather
+// than removing the row entirely (so replies/context still make sense).
+export interface MessageDeletedEvent {
+  id: string;
 }
 
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its

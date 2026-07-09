@@ -6,6 +6,8 @@ import {
   type Message,
   type MessageAttachment,
   type ParticipantKind,
+  type Reaction,
+  type MessageReactionEvent,
 } from "@club/shared";
 import {
   getRecentMessages,
@@ -13,6 +15,8 @@ import {
   getMessagesBeforeId,
   searchMessages,
   deleteMessage,
+  getReactionsForMessage,
+  toggleReaction,
   insertMessage,
   getFilesByIds,
   getAllParticipantNames,
@@ -20,7 +24,7 @@ import {
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle, broadcastDeleted } from "../stream.js";
+import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
@@ -56,6 +60,8 @@ function toMessage(r: MessageRow): Message {
   if (attachments) msg.attachments = attachments;
   if (r.reply_to_id) msg.replyToId = r.reply_to_id;
   if (r.deleted) msg.deleted = true;
+  const reactions = getReactionsForMessage(r.id);
+  if (reactions.length) msg.reactions = reactions as Reaction[];
   return msg;
 }
 
@@ -185,6 +191,19 @@ messages.delete("/:id", async (c) => {
   const ok = deleteMessage(id, me.id);
   if (!ok) return c.json({ error: "not found" }, 404);
   broadcastDeleted({ id });
+  return c.body(null, 204);
+});
+
+// POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
+// `message_reaction` with the refreshed aggregate so all clients update.
+messages.post("/:id/reactions", async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const emoji = typeof body.emoji === "string" ? body.emoji.trim() : "";
+  if (!emoji || emoji.length > 32) return c.json({ error: "bad emoji" }, 400);
+  const reactions = toggleReaction(id, me.id, emoji);
+  broadcastReaction({ messageId: id, reactions: reactions as Reaction[] } satisfies MessageReactionEvent);
   return c.body(null, 204);
 });
 

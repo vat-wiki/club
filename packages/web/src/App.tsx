@@ -224,6 +224,17 @@ export default function App() {
     }
   };
 
+  const handleReact = async (messageId: string, emoji: string) => {
+    if (!conn) return;
+    // Best-effort: the server toggles and broadcasts the refreshed aggregate,
+    // which is what updates the UI (no optimistic guess needed).
+    try {
+      await api.react(conn, messageId, emoji);
+    } catch {
+      /* ignore — reaction is best-effort */
+    }
+  };
+
   const performSignOut = () => {
     clearConn();
     setConn(null);
@@ -287,6 +298,7 @@ export default function App() {
                 loadingMore={loadingMore}
                 onReply={setReplyTo}
                 onDelete={handleDelete}
+                onReact={handleReact}
               />
               {typing.agents.length > 0 && (
                 <TypingIndicator agents={typing.agents} />

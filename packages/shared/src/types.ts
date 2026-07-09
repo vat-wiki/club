@@ -34,6 +34,8 @@ export interface Message {
   // content is hidden; broadcast as a `message_deleted` event so every client
   // marks it recalled.
   deleted?: boolean;
+  // Aggregate emoji reactions on this message (emoji → count). Absent = none.
+  reactions?: Reaction[];
   // Client-only delivery status for the optimistic send UI. Absent on every
   // server-sourced message (history + SSE) — those are already confirmed.
   // "sending" = locally echoed, waiting for POST /messages to resolve and
@@ -202,6 +204,19 @@ export interface PresenceEvent {
 // than removing the row entirely (so replies/context still make sense).
 export interface MessageDeletedEvent {
   id: string;
+}
+
+// One emoji reaction aggregate on a message.
+export interface Reaction {
+  emoji: string;
+  count: number;
+}
+
+// SSE `event: message_reaction` payload. A reaction was toggled; carries the
+// refreshed aggregate so clients just swap it in.
+export interface MessageReactionEvent {
+  messageId: string;
+  reactions: Reaction[];
 }
 
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its

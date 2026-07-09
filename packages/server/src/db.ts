@@ -116,6 +116,18 @@ const migrations: Migration[] = [
     description: "soft-delete (recall) flag on messages",
     sql: `ALTER TABLE messages ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;`,
   },
+  {
+    version: 6,
+    description: "emoji reactions on messages",
+    sql: `
+      CREATE TABLE IF NOT EXISTS reactions (
+        message_id     TEXT NOT NULL REFERENCES messages(id),
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        emoji          TEXT NOT NULL,
+        UNIQUE(message_id, participant_id, emoji)
+      );
+    `,
+  },
 ];
 
 db.exec(`
@@ -253,6 +265,32 @@ const deleteStmt = db.prepare<[string, string]>(
  *  yours, or already recalled. */
 export function deleteMessage(id: string, participantId: string): boolean {
   return deleteStmt.run(id, participantId).changes > 0;
+}
+
+const removeReactionStmt = db.prepare<[string, string, string]>(
+  `DELETE FROM reactions WHERE message_id = ? AND participant_id = ? AND emoji = ?`,
+);
+const addReactionStmt = db.prepare<[string, string, string]>(
+  `INSERT OR IGNORE INTO reactions (message_id, participant_id, emoji) VALUES (?, ?, ?)`,
+);
+const reactionsForMsgStmt = db.prepare<[string], { emoji: string; participant_id: string }>(
+  `SELECT emoji, participant_id FROM reactions WHERE message_id = ?`,
+);
+
+/** Aggregate reactions on a message (emoji → count). */
+export function getReactionsForMessage(messageId: string): { emoji: string; count: number }[] {
+  const rows = reactionsForMsgStmt.all(messageId);
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+  return [...counts.entries()].map(([emoji, count]) => ({ emoji, count }));
+}
+
+/** Toggle a reaction (remove if present, add if absent). Returns the refreshed
+ *  aggregate so the caller can broadcast it. */
+export function toggleReaction(messageId: string, participantId: string, emoji: string): { emoji: string; count: number }[] {
+  const removed = removeReactionStmt.run(messageId, participantId, emoji).changes > 0;
+  if (!removed) addReactionStmt.run(messageId, participantId, emoji);
+  return getReactionsForMessage(messageId);
 }
 
 export function getParticipantByKeyHash(hash: string) {

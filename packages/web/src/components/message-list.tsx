@@ -102,11 +102,16 @@ type MessageListProps = {
   loadingMore?: boolean;
   onReply?: (m: Message) => void;
   onDelete?: (id: string) => void;
+  onReact?: (messageId: string, emoji: string) => void;
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
 // separators are first-class items so the virtualizer spaces them independently
 // of message rows (the row no longer renders its own DayRule).
+// The fixed emoji palette offered on each message (keeps the UI simple; the
+// contract allows any short string).
+const REACTION_EMOJIS = ["👍", "❤️", "😂"] as const;
+
 type Item =
   | { kind: "day"; ms: number; key: string }
   | { kind: "msg"; m: Message; self: boolean; grouped: boolean; replyTo?: Message; key: string };
@@ -132,6 +137,7 @@ function MessageRow({
   onReply,
   replyTo,
   onDelete,
+  onReact,
 }: {
   m: Message;
   self: boolean;
@@ -150,6 +156,8 @@ function MessageRow({
   replyTo?: Message;
   /** Recall (delete) this message — only callable on the author's own rows. */
   onDelete?: (id: string) => void;
+  /** Toggle an emoji reaction on this message. */
+  onReact?: (messageId: string, emoji: string) => void;
 }) {
   const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
@@ -270,6 +278,31 @@ function MessageRow({
               </span>
             )}
           </div>
+          {!m.deleted && (onReact || (m.reactions && m.reactions.length > 0)) && (
+            <div className={cn("mt-1 flex flex-wrap items-center gap-1", self && "justify-end")}>
+              {m.reactions?.map((r) => (
+                <span
+                  key={r.emoji}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[11px]"
+                >
+                  {r.emoji}
+                  <span className="tabular-nums text-muted-foreground">{r.count}</span>
+                </span>
+              ))}
+              {onReact &&
+                REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReact(m.id, emoji)}
+                    aria-label={t("msg.react")}
+                    className="rounded px-1 py-0.5 text-xs hover:bg-accent"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -277,7 +310,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, onLoadMore, loadingMore, onReply, onDelete },
+  { messages, me, members, status, onLoadMore, loadingMore, onReply, onDelete, onReact },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -483,6 +516,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     onReply={onReply}
                     replyTo={item.replyTo}
                     onDelete={onDelete}
+                    onReact={onReact}
                   />
                 )}
               </div>

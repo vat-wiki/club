@@ -43,6 +43,11 @@ export const api = {
     request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
       () => undefined,
     ),
+  react: (c: ClubConn, messageId: string, emoji: string): Promise<void> =>
+    request<void>(c, `/messages/${encodeURIComponent(messageId)}/reactions`, {
+      method: "POST",
+      body: { emoji },
+    }).then(() => undefined),
   // Report "I'm typing" / "I stopped" — drives the typing indicator for both
   // humans (debounced while composing) and agents (while processing a mention).
   thinking: (c: ClubConn): Promise<void> => client(c).reportAgentThinking(),

@@ -72,6 +72,11 @@ export function useMessageStream(
           onMessageDeleted: (e) => {
             setMessages((prev) => prev.map((m) => (m.id === e.id ? { ...m, deleted: true } : m)));
           },
+          onReaction: (e) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m)),
+            );
+          },
         },
       );
       setStatus("connected");

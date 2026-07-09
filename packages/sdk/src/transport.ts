@@ -147,18 +147,13 @@ export async function listMessages(
 export async function sendMessage(
   c: ClubConn,
   content: string,
-  opts: { attachmentIds?: string[]; timeoutMs?: number } = {},
+  opts: { attachmentIds?: string[]; replyToId?: string; timeoutMs?: number } = {},
 ): Promise<Message> {
-  // Backward compatible: when no attachmentIds are supplied the body is just
-  // { content } exactly as before, so existing callers (and old serialized
-  // shapes) are unaffected. With attachmentIds the body becomes
-  // { content, attachmentIds } — the server rehydrates each id into full
-  // attachment metadata, so clients can only echo back ids they got from
-  // POST /files and can never forge dimensions.
-  const body =
-    opts.attachmentIds && opts.attachmentIds.length > 0
-      ? { content, attachmentIds: opts.attachmentIds }
-      : { content };
+  // Backward compatible: when no attachmentIds/replyToId are supplied the body
+  // is just { content } exactly as before. With either, the body carries them.
+  const body: Record<string, unknown> = { content };
+  if (opts.attachmentIds && opts.attachmentIds.length > 0) body.attachmentIds = opts.attachmentIds;
+  if (opts.replyToId) body.replyToId = opts.replyToId;
   return request<Message>(c, "/messages", {
     method: "POST",
     body,

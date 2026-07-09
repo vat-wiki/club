@@ -26,6 +26,16 @@ export interface Message {
   // shape is forward-compatible so "letting an agent see it" can arrive later
   // without a contract change.
   attachments?: MessageAttachment[];
+  // Optional id of the message this one replies to (threaded quote). The
+  // server stores it; clients render a quote by looking up the referenced
+  // message in their local list.
+  replyToId?: string;
+  // True if the author recalled the message. The row stays for context but the
+  // content is hidden; broadcast as a `message_deleted` event so every client
+  // marks it recalled.
+  deleted?: boolean;
+  // Aggregate emoji reactions on this message (emoji → count). Absent = none.
+  reactions?: Reaction[];
   // Client-only delivery status for the optimistic send UI. Absent on every
   // server-sourced message (history + SSE) — those are already confirmed.
   // "sending" = locally echoed, waiting for POST /messages to resolve and
@@ -125,6 +135,7 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const CreateMessageRequest = z.object({
   content: z.string().max(MAX_MESSAGE_CONTENT).default(""),
   attachmentIds: z.array(z.string().min(1).max(64)).max(MAX_IMAGES_PER_MESSAGE).default([]),
+  replyToId: z.string().min(1).max(64).optional(),
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 
@@ -161,13 +172,13 @@ export interface ApiError {
 
 // SSE `event: agent_thinking` payload. `participantId`+`name`+`kind` are all
 // carried so a client can render the indicator without a roster join (matches
-// how `message` events denormalize authorName/authorKind). kind is fixed to
-// "agent": only agents report thinking (a human "typing…" indicator is a
-// separate, future concern and would deserve its own event).
+// how `message` events denormalize authorName/authorKind). kind is the
+// reporter's kind: agents report while processing a @mention, humans while
+// typing — a client can label them differently or uniformly as "typing".
 export interface AgentThinkingEvent {
   participantId: string;
   name: string;
-  kind: "agent";
+  kind: ParticipantKind;
 }
 
 // SSE `event: agent_idle` payload. Just the id — the client removes it from its
@@ -175,6 +186,37 @@ export interface AgentThinkingEvent {
 // done/error, or server TTL expiry (crashed/offline agent).
 export interface AgentIdleEvent {
   participantId: string;
+}
+
+// SSE `event: presence` payload. Broadcast on connect (online: true) and
+// disconnect (online: false) so the roster can tell who's actually in the room
+// right now from historical registrations. A newcomer is also seeded with the
+// current online set on connect (server-side, see stream.ts).
+export interface PresenceEvent {
+  participantId: string;
+  name: string;
+  kind: ParticipantKind;
+  online: boolean;
+}
+
+// SSE `event: message_deleted` payload. The author recalled a message; clients
+// mark that id recalled (hide content, show a "recalled" placeholder) rather
+// than removing the row entirely (so replies/context still make sense).
+export interface MessageDeletedEvent {
+  id: string;
+}
+
+// One emoji reaction aggregate on a message.
+export interface Reaction {
+  emoji: string;
+  count: number;
+}
+
+// SSE `event: message_reaction` payload. A reaction was toggled; carries the
+// refreshed aggregate so clients just swap it in.
+export interface MessageReactionEvent {
+  messageId: string;
+  reactions: Reaction[];
 }
 
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its

@@ -30,12 +30,14 @@ export function Topbar({
   // out (and the topbar is hidden then anyway). Passed down so the ViewKey
   // dialog and SignOut flow can show/copy it.
   key_,
+  onlineIds,
   onSignOutRequest,
 }: {
   meName: string | null;
   status: Status;
   members: Participant[];
   selfId?: string;
+  onlineIds?: Set<string>;
   key_: string | null;
   // Triggered by the sign-out button; opens the confirmation dialog rather
   // than signing out immediately, so the user has a chance to save the key.
@@ -87,7 +89,7 @@ export function Topbar({
       <ViewKeyDialog key_={key_} />
 
       {/* Mobile-only roster trigger + sheet (hidden on >= md where the aside shows) */}
-      <MobileRoster members={members} selfId={selfId} onlineCount={members.length} key_={key_} />
+      <MobileRoster members={members} selfId={selfId} onlineIds={onlineIds} onlineCount={onlineIds?.size ?? members.length} key_={key_} />
 
       <Button
         variant="outline"

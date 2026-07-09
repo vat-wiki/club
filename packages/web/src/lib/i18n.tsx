@@ -231,6 +231,15 @@ const zh: Dict = {
   "msg.sending": "发送中…",
   "msg.sendFailed": "发送失败",
   "msg.loadingMore": "加载更多…",
+  "msg.reply": "回复",
+  "msg.replyingTo": "回复 {name}",
+  "msg.replyNotFound": "回复了一条消息",
+  "msg.recall": "撤回",
+  "msg.recalled": "已撤回",
+  "msg.react": "回应",
+  "search.placeholder": "搜索消息",
+  "search.clear": "清除搜索",
+  "search.noResults": "没有匹配的消息",
 
   // Mention popup
   "mention.aria": "提及某人",
@@ -254,9 +263,9 @@ const zh: Dict = {
   "boot.connecting": "正在接入…",
 
   // Agent typing indicator (P1-5 placeholder; pending backend agent_thinking event)
-  "typing.labelOne": "{name} 正在思考…",
-  "typing.labelTwo": "{names} 正在思考…",
-  "typing.labelMany": "{names} 等 {count} 人正在思考…",
+  "typing.labelOne": "{name} 正在输入…",
+  "typing.labelTwo": "{names} 正在输入…",
+  "typing.labelMany": "{names} 等 {count} 人正在输入…",
 
   // Date
   "date.today": "今天",
@@ -412,6 +421,15 @@ const en: Dict = {
   "msg.sending": "Sending…",
   "msg.sendFailed": "Send failed",
   "msg.loadingMore": "Loading more…",
+  "msg.reply": "Reply",
+  "msg.replyingTo": "Replying to {name}",
+  "msg.replyNotFound": "Replied to a message",
+  "msg.recall": "Recall",
+  "msg.recalled": "Recalled",
+  "msg.react": "React",
+  "search.placeholder": "Search messages",
+  "search.clear": "Clear search",
+  "search.noResults": "No matching messages",
 
   // Mention popup
   "mention.aria": "Mention someone",
@@ -431,9 +449,9 @@ const en: Dict = {
   "boot.connecting": "Connecting…",
 
   // Agent typing indicator (P1-5 placeholder)
-  "typing.labelOne": "{name} is thinking…",
-  "typing.labelTwo": "{names} are thinking…",
-  "typing.labelMany": "{names} and {count} more are thinking…",
+  "typing.labelOne": "{name} is typing…",
+  "typing.labelTwo": "{names} are typing…",
+  "typing.labelMany": "{names} and {count} more are typing…",
 
   // Date
   "date.today": "Today",

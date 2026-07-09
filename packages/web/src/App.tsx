@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { Topbar } from "@/components/topbar";
 import { Roster } from "@/components/roster";
 import { MessageList, type MessageListHandle } from "@/components/message-list";
+import { SearchBar } from "@/components/search-bar";
 import { Composer } from "@/components/composer";
 import { AuthDialog } from "@/components/auth-dialog";
 import { KeyRevealDialog } from "@/components/key-reveal-dialog";
@@ -44,6 +45,9 @@ export default function App() {
   // used is single-use-spent and the prior key no longer works.
   const [pendingKeyRecovered, setPendingKeyRecovered] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  // The message being replied to (puts the composer in "reply" mode with a
+  // quote preview); null in normal compose mode.
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   // First-load gate state. "loading" while validating a stored key against /me
   // (and pulling the first history batch); "error" when that validation fails —
   // which used to silently clearConn() and bounce the user to onboarding with no
@@ -56,7 +60,7 @@ export default function App() {
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
   const typing = useTypingAgents();
-  const { messages, status, setMessages, loadMore, loadingMore } = useMessageStream(me ? conn : null, {
+  const { messages, status, setMessages, loadMore, loadingMore, onlineIds } = useMessageStream(me ? conn : null, {
     onAgentThinking: typing.onThinking,
     onAgentIdle: typing.onIdle,
   });
@@ -154,7 +158,7 @@ export default function App() {
     setPendingKeyRecovered(false);
   };
 
-  const handleSend = async (content: string, attachmentIds: readonly string[]) => {
+  const handleSend = async (content: string, attachmentIds: readonly string[], replyToId?: string) => {
     if (!conn || !me) return;
     // Optimistic echo: drop the message into the list immediately as "sending"
     // so the user sees their own text without waiting on the SSE round-trip —
@@ -172,6 +176,7 @@ export default function App() {
       content,
       createdAt: Date.now(),
       status: "sending",
+      ...(replyToId ? { replyToId } : {}),
       // Only the upload id is known client-side, so synthesize a displayable
       // attachment shape from /files/{id}; the confirmed copy carries the real
       // mime/size. The <img> only needs the url to render.
@@ -187,7 +192,7 @@ export default function App() {
     setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
     try {
-      const real = await api.send(conn, content, attachmentIds);
+      const real = await api.send(conn, content, attachmentIds, replyToId);
       setMessages((prev) => {
         // SSE may have already delivered the confirmed copy — the server
         // broadcasts the new message and can beat the POST response back to
@@ -204,6 +209,29 @@ export default function App() {
         prev.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)),
       );
       throw e;
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!conn) return;
+    // Optimistically mark recalled; the server's message_deleted broadcast
+    // confirms and syncs everyone else. Revert on failure so the row isn't stuck.
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: true } : m)));
+    try {
+      await api.deleteMessage(conn, id);
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: false } : m)));
+    }
+  };
+
+  const handleReact = async (messageId: string, emoji: string) => {
+    if (!conn) return;
+    // Best-effort: the server toggles and broadcasts the refreshed aggregate,
+    // which is what updates the UI (no optimistic guess needed).
+    try {
+      await api.react(conn, messageId, emoji);
+    } catch {
+      /* ignore — reaction is best-effort */
     }
   };
 
@@ -239,13 +267,14 @@ export default function App() {
           status={status}
           members={members}
           selfId={me.id}
+          onlineIds={onlineIds}
           key_={getKey()}
           onSignOutRequest={() => setSignOutOpen(true)}
         />
       )}
 
       <div className="flex min-h-0 flex-1">
-        <Roster members={members} selfId={me?.id} />
+        <Roster members={members} selfId={me?.id} onlineIds={onlineIds} />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
@@ -258,6 +287,7 @@ export default function App() {
             <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} />
           ) : (
             <>
+              <SearchBar conn={conn} />
               <MessageList
                 ref={messageListRef}
                 messages={messages}
@@ -266,6 +296,9 @@ export default function App() {
                 status={status}
                 onLoadMore={loadMore}
                 loadingMore={loadingMore}
+                onReply={setReplyTo}
+                onDelete={handleDelete}
+                onReact={handleReact}
               />
               {typing.agents.length > 0 && (
                 <TypingIndicator agents={typing.agents} />
@@ -276,6 +309,8 @@ export default function App() {
                 members={members}
                 selfId={me?.id}
                 conn={conn}
+                replyTo={replyTo}
+                onReplyClear={() => setReplyTo(null)}
               />
             </>
           )}

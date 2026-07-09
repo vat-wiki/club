@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { AlertTriangle, Paperclip, Send } from "lucide-react";
-import type { Participant } from "@club/shared";
+import type { Participant, Message } from "@club/shared";
 import { MAX_IMAGES_PER_MESSAGE } from "@club/shared";
 import type { ClubConn } from "@club/sdk";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,8 +29,10 @@ export function Composer({
   members,
   selfId,
   conn,
+  replyTo,
+  onReplyClear,
 }: {
-  onSend: (content: string, attachmentIds: readonly string[]) => Promise<void>;
+  onSend: (content: string, attachmentIds: readonly string[], replyToId?: string) => Promise<void>;
   disabled?: boolean;
   /** Roster, used to source @-mention candidates. */
   members?: readonly Participant[];
@@ -39,6 +41,10 @@ export function Composer({
   /** Active connection — needed to authorize multipart uploads (POST /files).
    *  Optional so tests/preview can mount the composer without a server. */
   conn?: ClubConn | null;
+  /** Message being replied to (composer shows a quote preview); null normally. */
+  replyTo?: Message | null;
+  /** Clear the reply target (cancel reply mode). */
+  onReplyClear?: () => void;
 }) {
   const t = useT();
   const [value, setValue] = useState("");
@@ -296,6 +302,24 @@ export function Composer({
   const doneIds = attachments.filter((d) => d.status === "done" && d.remote).map((d) => d.remote!.id);
   const canSend = (value.trim().length > 0 || doneIds.length > 0) && !hasUploading;
 
+  // ── Typing indicator ───────────────────────────────────────────────
+  // Debounce "I'm typing" reports while composing, and auto-clear a short while
+  // after the user stops. Sending a message also clears it (in submit). Fire-
+  // and-forget — typing is best-effort presence, not a critical path.
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportTyping = useCallback(() => {
+    if (!conn) return;
+    void api.thinking(conn).catch(() => {});
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      void api.idle(conn).catch(() => {});
+      typingTimer.current = null;
+    }, 2500);
+  }, [conn]);
+  useEffect(() => () => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+  }, []);
+
   const submit = async () => {
     const content = value.trim();
     const ids = [...doneIds];
@@ -306,7 +330,10 @@ export function Composer({
     closeMention();
     requestAnimationFrame(autosize);
     try {
-      await onSend(content, ids);
+      const replyId = replyTo?.id;
+      if (replyId) await onSend(content, ids, replyId);
+      else await onSend(content, ids);
+      onReplyClear?.();
       // Send succeeded: the attachments now belong to the message, drop them
       // from the draft list and free their blob URLs.
       for (const d of attachments) {
@@ -316,6 +343,9 @@ export function Composer({
       setAttachments([]);
       // First successful send dismisses the onboarding hint for good (P2-2).
       markSent();
+      // Message landed — stop the typing indicator.
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (conn) void api.idle(conn).catch(() => {});
     } catch {
       // Send failed: keep the text draft AND the image drafts so the user can
       // edit/redo without losing the (already-uploaded) images. Surface a
@@ -583,6 +613,24 @@ export function Composer({
         {/* Textarea + chip row share a single flex column so the chips sit
             directly under the text (still inside the mint-bordered bar) while
             attach/send stay pinned left/right as bar legs. */}
+        {replyTo && (
+          <div className="flex items-center gap-2 border-b border-border/60 px-3 py-1.5 text-xs">
+            <span className="min-w-0 truncate text-muted-foreground">
+              {t("msg.replyingTo", { name: replyTo.authorName })}
+              <span className="ml-1 text-foreground/80">
+                {replyTo.content.slice(0, 80) || "…"}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={onReplyClear}
+              aria-label={t("msg.reply")}
+              className="ml-auto flex-none rounded p-0.5 text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <div className="flex min-w-0 flex-1 flex-col">
         <Textarea
           ref={ref}
@@ -623,6 +671,7 @@ export function Composer({
             setValue(next);
             setError(false);
             setAttachError(null);
+            if (next.trim()) reportTyping();
             // A value change is fresh user input — clear any Escape-dismissal
             // so the popup can re-open for the new text.
             dismissedValue.current = null;

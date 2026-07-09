@@ -6,6 +6,7 @@ import { fmtTime, fmtTimePrecise, fmtDay, renderContent, mentionsSelf } from "@/
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { Avatar } from "@/components/avatar";
 
 type Status = "connecting" | "connected" | "lost";
 
@@ -99,14 +100,21 @@ type MessageListProps = {
   status: Status;
   onLoadMore?: () => Promise<boolean> | void;
   loadingMore?: boolean;
+  onReply?: (m: Message) => void;
+  onDelete?: (id: string) => void;
+  onReact?: (messageId: string, emoji: string) => void;
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
 // separators are first-class items so the virtualizer spaces them independently
 // of message rows (the row no longer renders its own DayRule).
+// The fixed emoji palette offered on each message (keeps the UI simple; the
+// contract allows any short string).
+const REACTION_EMOJIS = ["👍", "❤️", "😂"] as const;
+
 type Item =
   | { kind: "day"; ms: number; key: string }
-  | { kind: "msg"; m: Message; self: boolean; grouped: boolean; key: string };
+  | { kind: "msg"; m: Message; self: boolean; grouped: boolean; replyTo?: Message; key: string };
 
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
@@ -126,6 +134,10 @@ function MessageRow({
   selfName,
   showDay,
   grouped,
+  onReply,
+  replyTo,
+  onDelete,
+  onReact,
 }: {
   m: Message;
   self: boolean;
@@ -138,6 +150,14 @@ function MessageRow({
   // burst reads as one block instead of repeating the header on every line.
   // The exact send time is still reachable via the row's hover title.
   grouped?: boolean;
+  /** Click "reply" → enter composer reply mode quoting this message. */
+  onReply?: (m: Message) => void;
+  /** The message this one replies to (quote preview), if known locally. */
+  replyTo?: Message;
+  /** Recall (delete) this message — only callable on the author's own rows. */
+  onDelete?: (id: string) => void;
+  /** Toggle an emoji reaction on this message. */
+  onReact?: (messageId: string, emoji: string) => void;
 }) {
   const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
@@ -173,13 +193,11 @@ function MessageRow({
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}
       >
-        <div className={cn("flex justify-center pt-[7px]", self && "flex-row-reverse")}>
-          {/* Avatar dot. On grouped rows it stays for column alignment but is
-              hidden from AT (it's decorative repetition of the header above). */}
-          <span
-            aria-hidden
-            className={cn("h-[7px] w-[7px] rounded-full", isAgent ? "bg-agent animate-agent-pulse" : "bg-human")}
-          />
+        <div className={cn("flex justify-center pt-1", self && "flex-row-reverse")}>
+          {/* First-letter avatar tinted by name. On grouped rows it's invisible
+              (opacity-0) but kept for column alignment — the header above already
+              names the author, so a repeat would be noise. */}
+          <Avatar name={m.authorName} className={cn("h-6 w-6 text-[10px]", grouped && "opacity-0")} />
         </div>
         <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
           {/* Header (author + kind + HH:MM) only on the FIRST row of a run. */}
@@ -197,6 +215,24 @@ function MessageRow({
                 {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
               </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
+              {onReply && (
+                <button
+                  type="button"
+                  onClick={() => onReply(m)}
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground"
+                >
+                  {t("msg.reply")}
+                </button>
+              )}
+              {self && !m.deleted && !m.status && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(m.id)}
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-destructive"
+                >
+                  {t("msg.recall")}
+                </button>
+              )}
             </div>
           )}
           <div
@@ -208,9 +244,26 @@ function MessageRow({
               m.status === "failed" && "border border-destructive/50 bg-destructive/10",
             )}
           >
-            {m.content.length > 0 && renderContent(m.content, known, selfName)}
-            {m.attachments && m.attachments.length > 0 && (
-              <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
+            {m.replyToId && (
+              <div className="mb-1 border-l-2 border-border/60 pl-2 text-xs text-muted-foreground">
+                {replyTo ? (
+                  <span className="truncate">
+                    <span className="font-medium">{replyTo.authorName}</span>: {replyTo.content.slice(0, 80) || "…"}
+                  </span>
+                ) : (
+                  t("msg.replyNotFound")
+                )}
+              </div>
+            )}
+            {m.deleted ? (
+              <span className="italic text-muted-foreground">{t("msg.recalled")}</span>
+            ) : (
+              <>
+                {m.content.length > 0 && renderContent(m.content, known, selfName)}
+                {m.attachments && m.attachments.length > 0 && (
+                  <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
+                )}
+              </>
             )}
             {m.status === "sending" && (
               <span className="ml-1 inline-flex items-center gap-1 align-middle font-mono text-[10px] text-muted-foreground">
@@ -225,6 +278,31 @@ function MessageRow({
               </span>
             )}
           </div>
+          {!m.deleted && (onReact || (m.reactions && m.reactions.length > 0)) && (
+            <div className={cn("mt-1 flex flex-wrap items-center gap-1", self && "justify-end")}>
+              {m.reactions?.map((r) => (
+                <span
+                  key={r.emoji}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[11px]"
+                >
+                  {r.emoji}
+                  <span className="tabular-nums text-muted-foreground">{r.count}</span>
+                </span>
+              ))}
+              {onReact &&
+                REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReact(m.id, emoji)}
+                    aria-label={t("msg.react")}
+                    className="rounded px-1 py-0.5 text-xs hover:bg-accent"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -232,7 +310,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, onLoadMore, loadingMore },
+  { messages, me, members, status, onLoadMore, loadingMore, onReply, onDelete, onReact },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -259,6 +337,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   // separators are first-class items so the virtualizer spaces them
   // independently of message rows; the row no longer renders its own DayRule.
   const items = useMemo<Item[]>(() => {
+    const replyMap = new Map(messages.map((m) => [m.id, m]));
     const out: Item[] = [];
     let lastDay = "";
     for (let i = 0; i < messages.length; i++) {
@@ -280,6 +359,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         m,
         self: !!me && m.participantId === me.id,
         grouped,
+        replyTo: m.replyToId ? replyMap.get(m.replyToId) : undefined,
         key: m.id,
       });
     }
@@ -433,6 +513,10 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     selfName={selfName}
                     showDay={false}
                     grouped={item.grouped}
+                    onReply={onReply}
+                    replyTo={item.replyTo}
+                    onDelete={onDelete}
+                    onReact={onReact}
                   />
                 )}
               </div>

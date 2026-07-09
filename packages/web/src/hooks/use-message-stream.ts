@@ -21,6 +21,7 @@ export function useMessageStream(
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<Status>("connecting");
   const [loadingMore, setLoadingMore] = useState(false);
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
   // keep a live ref so the append callback is stable across renders
   const appendRef = useRef((m: Message) => {
@@ -60,12 +61,29 @@ export function useMessageStream(
           },
           onAgentThinking: (e) => thinkingRef.current?.(e),
           onAgentIdle: (e) => idleRef.current?.(e),
+          onPresence: (e) => {
+            setOnlineIds((prev) => {
+              const next = new Set(prev);
+              if (e.online) next.add(e.participantId);
+              else next.delete(e.participantId);
+              return next;
+            });
+          },
+          onMessageDeleted: (e) => {
+            setMessages((prev) => prev.map((m) => (m.id === e.id ? { ...m, deleted: true } : m)));
+          },
+          onReaction: (e) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m)),
+            );
+          },
         },
       );
       setStatus("connected");
     };
 
     hasMoreRef.current = true;
+    setOnlineIds(new Set());
     connect();
     return () => {
       stopped = true;
@@ -114,5 +132,5 @@ export function useMessageStream(
     }
   }, [conn, loadingMore]);
 
-  return { messages, status, setMessages, loadMore, loadingMore };
+  return { messages, status, setMessages, loadMore, loadingMore, onlineIds };
 }

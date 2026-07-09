@@ -13,8 +13,8 @@ describe("TypingIndicator", () => {
       <TypingIndicator agents={[{ id: "1", name: "rex" }]} />,
       { lang: "en" },
     );
-    expect(getByRole("status")).toHaveAttribute("aria-label", "rex is thinking…");
-    expect(getByText(/rex is thinking/)).toBeInTheDocument();
+    expect(getByRole("status")).toHaveAttribute("aria-label", "rex is typing…");
+    expect(getByText(/rex is typing/)).toBeInTheDocument();
   });
 
   it("lists multiple names and caps the overflow with a count", () => {
@@ -30,6 +30,6 @@ describe("TypingIndicator", () => {
     );
     // 3 agents → names capped at 2, "+1" for the rest
     const status = getByRole("status");
-    expect(status.getAttribute("aria-label")).toMatch(/rex.*ana.*1 more.*thinking/);
+    expect(status.getAttribute("aria-label")).toMatch(/rex.*ana.*1 more.*typing/);
   });
 });

@@ -6,11 +6,17 @@ import {
   type Message,
   type MessageAttachment,
   type ParticipantKind,
+  type Reaction,
+  type MessageReactionEvent,
 } from "@club/shared";
 import {
   getRecentMessages,
   getMessagesSince,
   getMessagesBeforeId,
+  searchMessages,
+  deleteMessage,
+  getReactionsForMessage,
+  toggleReaction,
   insertMessage,
   getFilesByIds,
   getAllParticipantNames,
@@ -18,7 +24,7 @@ import {
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle } from "../stream.js";
+import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
@@ -52,6 +58,10 @@ function toMessage(r: MessageRow): Message {
   };
   const attachments = parseAttachments(r.attachments);
   if (attachments) msg.attachments = attachments;
+  if (r.reply_to_id) msg.replyToId = r.reply_to_id;
+  if (r.deleted) msg.deleted = true;
+  const reactions = getReactionsForMessage(r.id);
+  if (reactions.length) msg.reactions = reactions as Reaction[];
   return msg;
 }
 
@@ -65,7 +75,7 @@ messages.post("/", async (c) => {
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
-  const { content, attachmentIds } = parsed.data;
+  const { content, attachmentIds, replyToId } = parsed.data;
 
   // Rehydrate attachments server-side from the requested ids. The server is the
   // sole source of truth for mime/width/height/size, so the client only sends
@@ -108,6 +118,7 @@ messages.post("/", async (c) => {
     content,
     createdAt,
     attachments.length > 0 ? JSON.stringify(attachments) : null,
+    replyToId ?? null,
   );
 
   // Persist a per-participant inbox row for everyone @-mentioned in the text.
@@ -133,6 +144,7 @@ messages.post("/", async (c) => {
     createdAt,
   };
   if (attachments.length > 0) msg.attachments = attachments;
+  if (replyToId) msg.replyToId = replyToId;
   broadcast(msg);
 
   // P1-5: an agent's reply landing is the most reliable "done thinking" signal
@@ -162,10 +174,43 @@ messages.get("/", (c) => {
   return c.json(rows.map(toMessage));
 });
 
+// GET /messages/search?q=<text>&limit=<n> -> Message[] (newest first)
+messages.get("/search", (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (!q) return c.json([]);
+  const limit = parseLimit(c.req.query("limit"));
+  return c.json(searchMessages(q, limit).map(toMessage));
+});
+
+// DELETE /messages/:id -> 204 (recall). Only the author may (participant_id
+// check in deleteMessage). Broadcasts `message_deleted` so every client hides
+// the content and shows a "recalled" placeholder instead.
+messages.delete("/:id", async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  const ok = deleteMessage(id, me.id);
+  if (!ok) return c.json({ error: "not found" }, 404);
+  broadcastDeleted({ id });
+  return c.body(null, 204);
+});
+
+// POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
+// `message_reaction` with the refreshed aggregate so all clients update.
+messages.post("/:id/reactions", async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const emoji = typeof body.emoji === "string" ? body.emoji.trim() : "";
+  if (!emoji || emoji.length > 32) return c.json({ error: "bad emoji" }, 400);
+  const reactions = toggleReaction(id, me.id, emoji);
+  broadcastReaction({ messageId: id, reactions: reactions as Reaction[] } satisfies MessageReactionEvent);
+  return c.body(null, 204);
+});
+
 // GET /messages/stream  (SSE) — live message feed
 messages.get("/stream", (c) => {
   return streamSSE(c, async (stream) => {
-    const unsubscribe = addSubscriber(stream);
+    const unsubscribe = addSubscriber(stream, c.get("participant"));
     stream.onAbort(() => {
       unsubscribe();
     });

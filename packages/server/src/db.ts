@@ -106,6 +106,28 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 4,
+    description: "message reply-to (threaded quotes)",
+    sql: `ALTER TABLE messages ADD COLUMN reply_to_id TEXT;`,
+  },
+  {
+    version: 5,
+    description: "soft-delete (recall) flag on messages",
+    sql: `ALTER TABLE messages ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;`,
+  },
+  {
+    version: 6,
+    description: "emoji reactions on messages",
+    sql: `
+      CREATE TABLE IF NOT EXISTS reactions (
+        message_id     TEXT NOT NULL REFERENCES messages(id),
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        emoji          TEXT NOT NULL,
+        UNIQUE(message_id, participant_id, emoji)
+      );
+    `,
+  },
 ];
 
 db.exec(`
@@ -145,6 +167,8 @@ export interface MessageRow {
   author_name: string;
   author_kind: "human" | "agent";
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
+  reply_to_id: string | null; // id of the message this one replies to, or NULL
+  deleted: number; // 1 if recalled (soft-deleted), else 0
 }
 
 export function insertMessage(
@@ -153,11 +177,12 @@ export function insertMessage(
   content: string,
   createdAt: number,
   attachments: string | null,
+  replyToId: string | null,
 ): void {
   db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at, attachments)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt, attachments);
+    `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, participantId, content, createdAt, attachments, replyToId);
 }
 
 export function getAllParticipants() {
@@ -169,14 +194,14 @@ export function getAllParticipants() {
 }
 
 const afterStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid > ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    ORDER BY m.rowid DESC LIMIT ?`,
@@ -201,7 +226,7 @@ export function getMessagesSince(sinceId: string, limit: number) {
 }
 
 const beforeStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid < ? ORDER BY m.rowid DESC LIMIT ?`,
@@ -216,6 +241,56 @@ export function getMessagesBeforeId(beforeId: string, limit: number): MessageRow
   const row = sinceStmt.get(beforeId);
   if (!row) return [];
   return beforeStmt.all(row.rowid, limit).reverse();
+}
+
+const searchStmt = db.prepare<[string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
+          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
+   FROM messages m JOIN participants p ON p.id = m.participant_id
+   WHERE m.content LIKE ? ORDER BY m.rowid DESC LIMIT ?`,
+);
+
+/** Messages whose content contains `q` (substring via LIKE), newest first.
+ *  Backs the search box. */
+export function searchMessages(q: string, limit: number): MessageRow[] {
+  return searchStmt.all(`%${q}%`, limit);
+}
+
+const deleteStmt = db.prepare<[string, string]>(
+  `UPDATE messages SET deleted = 1 WHERE id = ? AND participant_id = ? AND deleted = 0`,
+);
+
+/** Soft-delete (recall) a message. Only the author may (participant_id check).
+ *  Returns whether a row was actually updated — false means not found, not
+ *  yours, or already recalled. */
+export function deleteMessage(id: string, participantId: string): boolean {
+  return deleteStmt.run(id, participantId).changes > 0;
+}
+
+const removeReactionStmt = db.prepare<[string, string, string]>(
+  `DELETE FROM reactions WHERE message_id = ? AND participant_id = ? AND emoji = ?`,
+);
+const addReactionStmt = db.prepare<[string, string, string]>(
+  `INSERT OR IGNORE INTO reactions (message_id, participant_id, emoji) VALUES (?, ?, ?)`,
+);
+const reactionsForMsgStmt = db.prepare<[string], { emoji: string; participant_id: string }>(
+  `SELECT emoji, participant_id FROM reactions WHERE message_id = ?`,
+);
+
+/** Aggregate reactions on a message (emoji → count). */
+export function getReactionsForMessage(messageId: string): { emoji: string; count: number }[] {
+  const rows = reactionsForMsgStmt.all(messageId);
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+  return [...counts.entries()].map(([emoji, count]) => ({ emoji, count }));
+}
+
+/** Toggle a reaction (remove if present, add if absent). Returns the refreshed
+ *  aggregate so the caller can broadcast it. */
+export function toggleReaction(messageId: string, participantId: string, emoji: string): { emoji: string; count: number }[] {
+  const removed = removeReactionStmt.run(messageId, participantId, emoji).changes > 0;
+  if (!removed) addReactionStmt.run(messageId, participantId, emoji);
+  return getReactionsForMessage(messageId);
 }
 
 export function getParticipantByKeyHash(hash: string) {

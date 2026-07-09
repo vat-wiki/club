@@ -11,7 +11,7 @@ import type { ClubConn } from "@club/sdk";
 
 const uploadFileMock = vi.fn();
 vi.mock("@/lib/api", () => ({
-  api: { uploadFile: (...args: unknown[]) => uploadFileMock(...args) },
+  api: { uploadFile: (...args: unknown[]) => uploadFileMock(...args), thinking: vi.fn().mockResolvedValue(undefined), idle: vi.fn().mockResolvedValue(undefined) },
 }));
 
 import { Composer } from "./composer";

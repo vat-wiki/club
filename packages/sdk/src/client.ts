@@ -7,6 +7,7 @@ import type {
   Participant,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
+  UploadFileResponse,
 } from "@club/shared";
 import {
   type CallOpts,
@@ -18,7 +19,11 @@ import {
   listMessages,
   markMentionRead,
   recoverParticipant as recoverParticipantFn,
+  reportAgentThinking as reportAgentThinkingFn,
+  reportAgentIdle as reportAgentIdleFn,
   sendMessage,
+  uploadFile,
+  type UploadFileInput,
 } from "./transport.js";
 import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
 
@@ -80,14 +85,33 @@ export class ClubClient {
     return markMentionRead(this.conn(), id, { timeoutMs: this.timeoutMs });
   }
 
-  /** GET /messages — recent history, optionally after `since` (message id). */
+  /** GET /messages — recent history; `since` returns messages after an id,
+   *  `before` returns older messages before an id (scroll-up pagination). */
   messages(opts: ListMessagesQuery = {}): Promise<Message[]> {
     return listMessages(this.conn(), { ...opts, ...this.callOpts() });
   }
 
-  /** POST /messages — send a message as the authenticated participant. */
-  send(content: string): Promise<Message> {
-    return sendMessage(this.conn(), content, { timeoutMs: this.timeoutMs });
+  /** POST /messages — send a message as the authenticated participant.
+   *  `attachmentIds` references files previously uploaded via `uploadFile`;
+   *  when omitted the body is the legacy `{ content }` shape. Pass an empty
+   *  content with attachmentIds to send an image-only message. */
+  send(content: string, attachmentIds?: string[]): Promise<Message> {
+    return sendMessage(this.conn(), content, {
+      ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
+      timeoutMs: this.timeoutMs,
+    });
+  }
+
+  /** POST /files — upload one image (multipart), returning its attachment
+   *  descriptor. The id it returns is what you pass to `send` as an
+   *  attachmentId. Pre-flight mime/size locally before calling.
+   *
+   *  NOTE: the Node convenience `uploadImage(path)` that reads + sniffs + calls
+   *  this lives in `@club/sdk/node`, NOT on this class — this package's main
+   *  entry is browser-safe (web imports `ClubClient`), so the fs/image-size
+   *  helpers are isolated behind the Node-only subpath. */
+  uploadFile(input: UploadFileInput): Promise<UploadFileResponse> {
+    return uploadFile(this.conn(), input, { timeoutMs: this.timeoutMs });
   }
 
   /** POST /participants — mint a participant + single-use key (no auth needed). */
@@ -109,5 +133,19 @@ export class ClubClient {
   /** GET /messages/stream — live feed with auto-reconnect + catch-up. */
   stream(handler: (m: Message) => void, opts?: StreamOptions): StreamHandle {
     return streamMessages(this.conn(), handler, opts);
+  }
+
+  /** POST /agents/thinking — report that THIS agent has started processing a
+   *  @mention (lights up the room's typing indicator). Agent-only; a human key
+   *  gets 404. Idempotent in effect: re-reporting while already thinking just
+   *  refreshes the TTL without re-broadcasting. */
+  reportAgentThinking(): Promise<void> {
+    return reportAgentThinkingFn(this.conn(), { timeoutMs: this.timeoutMs });
+  }
+
+  /** POST /agents/idle — report that THIS agent finished (clears its typing
+   *  indicator). Idempotent: a 204 no-op if it wasn't thinking. */
+  reportAgentIdle(): Promise<void> {
+    return reportAgentIdleFn(this.conn(), { timeoutMs: this.timeoutMs });
   }
 }

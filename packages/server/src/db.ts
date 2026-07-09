@@ -9,6 +9,13 @@ if (!existsSync(dirname(dbPath))) mkdirSync(dirname(dbPath), { recursive: true }
 
 export const db: Database.Database = new Database(dbPath);
 db.pragma("journal_mode = WAL");
+// Codify what is currently better-sqlite3's compile-time default
+// (DEFAULT_FOREIGN_KEYS): foreign-key enforcement ON. The messages/files →
+// participants FKs rely on this. Without the explicit pragma, a future
+// better-sqlite3 build that drops that flag would silently stop enforcing
+// them. No-op today (the default already enables it); explicit for
+// upgrade-safety and to document intent.
+db.pragma("foreign_keys = ON");
 
 // Baseline schema: participants + messages, created with CREATE TABLE IF NOT
 // EXISTS since the very first release. We keep this as-is (idempotent) rather
@@ -191,6 +198,24 @@ export function getMessagesSince(sinceId: string, limit: number) {
   const row = sinceStmt.get(sinceId);
   if (!row) return { rowid: 0, messages: [] as MessageRow[] };
   return { rowid: row.rowid, messages: getMessagesAfter(row.rowid, limit) };
+}
+
+const beforeStmt = db.prepare<[number, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
+   FROM messages m JOIN participants p ON p.id = m.participant_id
+   WHERE m.rowid < ? ORDER BY m.rowid DESC LIMIT ?`,
+);
+
+/** Messages older than `beforeId`, chronologic (oldest→newest within the page).
+ *  Backs the "scroll up to load earlier history" UI — the mirror of
+ *  getMessagesSince: take the N rows with rowid < beforeId's (DESC to grab the
+ *  nearest older ones), then reverse to ascending. Returns [] if beforeId is
+ *  unknown (e.g. it was just deleted). */
+export function getMessagesBeforeId(beforeId: string, limit: number): MessageRow[] {
+  const row = sinceStmt.get(beforeId);
+  if (!row) return [];
+  return beforeStmt.all(row.rowid, limit).reverse();
 }
 
 export function getParticipantByKeyHash(hash: string) {

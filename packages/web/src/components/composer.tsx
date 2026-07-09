@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MentionPopup } from "@/components/mention-popup";
 import { ImagePreviewChip, type AttachmentDraft } from "@/components/image-preview-chip";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import {
   applyMention,
   detectMention,
@@ -313,6 +314,8 @@ export function Composer({
         objectUrlsRef.current.delete(d.objectUrl);
       }
       setAttachments([]);
+      // First successful send dismisses the onboarding hint for good (P2-2).
+      markSent();
     } catch {
       // Send failed: keep the text draft AND the image drafts so the user can
       // edit/redo without losing the (already-uploaded) images. Surface a
@@ -411,6 +414,33 @@ export function Composer({
   }, [focused, closeMention]);
 
   const popupOpen = !!mention;
+
+  // The "Enter to send · shift+enter for newline" hint is useful for first-time
+  // users but becomes permanent visual noise once they know the shortcut. We
+  // persist a "has sent" flag to sessionStorage (per-device, survives reload but
+  // not a fresh profile) and fade the hint out after the first successful send.
+  // It still reappears while focused + empty (the moment a newcomer is most
+  // likely to need a reminder), and the mention hint always shows when the
+  // popup is open (that's contextual guidance, not onboarding).
+  const [hasSent, setHasSent] = useState(false);
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("club_has_sent") === "1") setHasSent(true);
+    } catch {
+      /* sessionStorage may be unavailable */
+    }
+  }, []);
+  const markSent = useCallback(() => {
+    setHasSent(true);
+    try {
+      sessionStorage.setItem("club_has_sent", "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  // Show the static hint when: the mention popup is open (contextual), OR the
+  // user hasn't sent yet, OR the field is focused and empty (reminder moment).
+  const showStaticHint = popupOpen || !hasSent || (focused && value.trim().length === 0);
   const visibleCount = Math.min(candidates.length, MENTION_MAX_VISIBLE);
   const safeActiveIndex = visibleCount === 0 ? 0 : activeIndex % visibleCount;
   const activeOptionId = popupOpen && candidates.length > 0 ? `mention-option-${safeActiveIndex}` : undefined;
@@ -488,16 +518,44 @@ export function Composer({
             purpose: mint is reserved as Send's exclusive "ready" signal, so
             attach stays a neutral tool. Co-heighted with the textarea (the
             same min-h strategy as Send) so all three legs share one bar.
-            aria-label is required (icon-only button). */}
+            aria-label is required (icon-only button). A count badge "N/MAX"
+            surfaces how close the user is to the per-message image cap; at the
+            cap the button is disabled and the badge turns destructive (P2-3). */}
         <Button
           type="button"
           variant="ghost"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || attachments.length >= MAX_IMAGES_PER_MESSAGE}
-          aria-label={t("composer.attach.aria")}
-          className="min-h-[48px] shrink-0 px-2 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[56px]"
+          aria-label={
+            attachments.length > 0
+              ? t("composer.attach.ariaCount", { count: attachments.length, max: MAX_IMAGES_PER_MESSAGE })
+              : t("composer.attach.aria")
+          }
+          title={
+            attachments.length >= MAX_IMAGES_PER_MESSAGE
+              ? t("image.tooMany", { max: MAX_IMAGES_PER_MESSAGE })
+              : undefined
+          }
+          data-testid="composer-attach-button"
+          className="relative min-h-[48px] shrink-0 px-2 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[56px]"
         >
           <Paperclip className="h-4 w-4" aria-hidden />
+          {attachments.length > 0 && (
+            // Visually-hidden? No — a sighted user benefits from seeing N/MAX at
+            // a glance. aria-hidden because the button's aria-label already
+            // spells out the count for SRs (no double-announce).
+            <span
+              aria-hidden
+              className={cn(
+                "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[9px] leading-none",
+                attachments.length >= MAX_IMAGES_PER_MESSAGE
+                  ? "bg-destructive text-destructive-foreground"
+                  : "bg-accent text-accent-foreground",
+              )}
+            >
+              {attachments.length}/{MAX_IMAGES_PER_MESSAGE}
+            </span>
+          )}
         </Button>
         {/* Hidden file picker. `capture` hints mobile browsers to offer the
             camera, but multiple + the accept whitelist still govern desktop.
@@ -532,6 +590,7 @@ export function Composer({
           value={value}
           rows={1}
           disabled={disabled}
+          data-testid="composer-input"
           placeholder={t("composer.placeholder")}
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
@@ -600,7 +659,7 @@ export function Composer({
             chips wrap to a second line; gap-2 + px-1 pt-1 keep them aligned to
             the textarea's text column. */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-1 pt-1">
+          <div className="flex flex-wrap gap-2 px-1 pt-1" data-testid="composer-attachments">
             {attachments.map((d, i) => (
               <ImagePreviewChip
                 key={d.key}
@@ -621,6 +680,7 @@ export function Composer({
           type="submit"
           size="default"
           disabled={disabled || sending || !canSend}
+          data-testid="composer-send-button"
           // Match the textarea's min-height (48px mobile / 56px sm up) so the
           // button and the textarea are co-heighted in the common single-line
           // case. The container is `items-end`, so when both share the same
@@ -675,7 +735,18 @@ export function Composer({
       ) : (
         <p
           id="composer-hint"
-          className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90"
+          // P2-2: the static shortcut hint fades out (opacity + height collapse)
+          // once the user has sent a message and isn't in a "reminder" moment
+          // (focused + empty), so it stops competing for attention. The mention
+          // hint (popupOpen) always shows since it's contextual, not onboarding.
+          // When hidden we keep a min-h-[0.5rem] slot so the layout doesn't jump
+          // when it transitions in/out. transition-opacity respects reduced
+          // motion via the global wildcard.
+          className={cn(
+            "mt-1.5 overflow-hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground/90 transition-opacity duration-slow",
+            showStaticHint ? "max-h-6 opacity-100" : "max-h-0 opacity-0",
+          )}
+          aria-hidden={showStaticHint ? undefined : true}
         >
           {t("composer.hint")}
           {popupOpen ? <span className="hidden sm:inline">{t("composer.hintMention")}</span> : null}

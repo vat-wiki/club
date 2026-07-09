@@ -7,6 +7,7 @@ import type {
   Participant,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
+  UploadFileResponse,
 } from "@club/shared";
 import { ClubApiError } from "./errors.js";
 
@@ -136,8 +137,9 @@ export async function listMessages(
 ): Promise<Message[]> {
   const params = new URLSearchParams();
   if (opts.since) params.set("since", opts.since);
+  if (opts.before) params.set("before", opts.before);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  const { since: _s, limit: _l, ...callOpts } = opts;
+  const { since: _s, before: _b, limit: _l, ...callOpts } = opts;
   const qs = params.toString();
   return request<Message[]>(c, `/messages${qs ? "?" + qs : ""}`, callOpts);
 }
@@ -145,9 +147,79 @@ export async function listMessages(
 export async function sendMessage(
   c: ClubConn,
   content: string,
-  opts: { timeoutMs?: number } = {},
+  opts: { attachmentIds?: string[]; timeoutMs?: number } = {},
 ): Promise<Message> {
-  return request<Message>(c, "/messages", { method: "POST", body: { content }, ...opts });
+  // Backward compatible: when no attachmentIds are supplied the body is just
+  // { content } exactly as before, so existing callers (and old serialized
+  // shapes) are unaffected. With attachmentIds the body becomes
+  // { content, attachmentIds } — the server rehydrates each id into full
+  // attachment metadata, so clients can only echo back ids they got from
+  // POST /files and can never forge dimensions.
+  const body =
+    opts.attachmentIds && opts.attachmentIds.length > 0
+      ? { content, attachmentIds: opts.attachmentIds }
+      : { content };
+  return request<Message>(c, "/messages", {
+    method: "POST",
+    body,
+    timeoutMs: opts.timeoutMs,
+  });
+}
+
+// ── File upload (multipart) ────────────────────────────────────────
+// The core `request()` is JSON-only (it JSON.stringifies every body), so a
+// multipart upload can't go through it. This builds a FormData body the same
+// way the web client does (packages/web/src/lib/upload.ts), but accepts a Node
+// Buffer instead of a browser File so the CLI and MCP can use it. Auth mirrors
+// the transport: a Bearer header when a key is present. The server is the
+// authoritative mime/size checker, but callers should still pre-flight locally
+// (see packages/cli / packages/mcp) to avoid uploading bytes that are doomed
+// to be rejected.
+export interface UploadFileInput {
+  /** Raw file bytes. */
+  buffer: Buffer | Uint8Array;
+  /** Filename hint sent as the multipart part's filename. */
+  filename: string;
+  /** MIME type sent as the part's Content-Type (must be in ImageMime). */
+  mime: string;
+}
+
+export async function uploadFile(
+  c: ClubConn,
+  input: UploadFileInput,
+  opts: { timeoutMs?: number } = {},
+): Promise<UploadFileResponse> {
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const headers: Record<string, string> = {};
+    if (c.key) headers.Authorization = `Bearer ${c.key}`;
+
+    const form = new FormData();
+    // Blob is available in Node 18+ and carries the mime + a content-length;
+    // wrapping the bytes in a Blob lets fetch set the part headers without us
+    // hand-rolling a multipart body. Copy into a fresh Uint8Array backed by a
+    // plain ArrayBuffer so it satisfies the DOM BlobPart type regardless of
+    // whether the caller passed a Node Buffer (which TS 5.7 types over
+    // ArrayBufferLike, incompatible with BlobPart's ArrayBuffer-backed view).
+    const bytes = new Uint8Array(input.buffer.byteLength);
+    bytes.set(input.buffer);
+    const blob = new Blob([bytes], { type: input.mime });
+    form.append("file", blob, input.filename);
+
+    const res = await fetch(`${c.server}/files`, {
+      method: "POST",
+      headers,
+      body: form,
+      signal: controller.signal,
+    });
+    return await check<UploadFileResponse>(res);
+  } catch (err) {
+    throw wrapErr(err);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function listMembers(c: ClubConn, opts: CallOpts = {}): Promise<Participant[]> {
@@ -207,4 +279,37 @@ export async function recoverParticipant(
     body: input,
     ...opts,
   });
+}
+
+// ── Agent thinking presence (P1-5) ───────────────────────────────────
+//
+// An agent reports its own "I'm processing a @mention" / "I'm done" state; the
+// server relays it to every SSE subscriber as a named event (agent_thinking /
+// agent_idle) so the room can show a typing indicator. The participant is taken
+// from the authed key, so the body is empty. Both endpoints return 204.
+//
+// Contract for callers:
+//   - report thinking ONCE when you start handling a mention;
+//   - if your work may exceed the server's thinking TTL (~45s), RE-REPORT on a
+//     cadence shorter than the TTL to refresh it — the server dedupes re-
+//     reports (no SSE re-broadcast), so the indicator won't flicker;
+//   - report idle (or just POST your reply) when done.
+// The TTL is a *lost-contact fallback* (crash/kill/silent-error), NOT a reply
+// budget — a long-but-healthy reply must re-report to avoid having its
+// indicator yanked mid-thought. The server also auto-clears thinking the moment
+// an agent's reply message lands, and reaps entries past TTL, so a missed idle
+// never sticks the indicator on forever.
+
+export async function reportAgentThinking(
+  c: ClubConn,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, "/agents/thinking", { method: "POST", body: {}, ...opts });
+}
+
+export async function reportAgentIdle(
+  c: ClubConn,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, "/agents/idle", { method: "POST", body: {}, ...opts });
 }

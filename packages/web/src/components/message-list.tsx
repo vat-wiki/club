@@ -1,7 +1,8 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Message, MessageAttachment, Participant } from "@club/shared";
-import { fmtTime, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
+import { fmtTime, fmtTimePrecise, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -44,8 +45,14 @@ function AttachmentGallery({
             type="button"
             onClick={() => setActive(i)}
             aria-label={`${openLabel} ${i + 1}`}
+            data-testid={`attachment-thumb-${i}`}
             className={cn(
-              "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              // A real min size so a tiny (e.g. 1×1 test) image can't collapse
+              // to an invisible dot: min-h-10 (40px) floors the height and the
+              // aspect ratio sets the width. object-cover (on the <img>) crops
+              // extreme aspect ratios (>10:1) into the fixed frame instead of a
+              // thin sliver. cursor-zoom-in signals the click-to-enlarge affordance.
+              "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in min-h-10",
               multi ? "aspect-square" : "aspect-[4/3]",
             )}
           >
@@ -90,8 +97,16 @@ type MessageListProps = {
   me: Participant | null;
   members: Participant[];
   status: Status;
-  booting?: boolean;
+  onLoadMore?: () => Promise<boolean> | void;
+  loadingMore?: boolean;
 };
+
+// A flattened virtual item: either a day separator or a message row. Day
+// separators are first-class items so the virtualizer spaces them independently
+// of message rows (the row no longer renders its own DayRule).
+type Item =
+  | { kind: "day"; ms: number; key: string }
+  | { kind: "msg"; m: Message; self: boolean; grouped: boolean; key: string };
 
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
@@ -110,16 +125,28 @@ function MessageRow({
   known,
   selfName,
   showDay,
+  grouped,
 }: {
   m: Message;
   self: boolean;
   known: string[];
   selfName?: string;
   showDay: boolean;
+  // True when this message continues a run from the same author within the
+  // grouping window (see GROUP_GAP_MS). In that case the per-message header
+  // (author name + kind + time) is suppressed — Slack/iMessage style — so a
+  // burst reads as one block instead of repeating the header on every line.
+  // The exact send time is still reachable via the row's hover title.
+  grouped?: boolean;
 }) {
   const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
   const pinged = mentionsSelf(m.content, selfName);
+  // The precise (to-the-second) time, surfaced on hover via the native title
+  // tooltip AND as the row's accessible description (aria-label) so SR users get
+  // the exact time without hovering. The inline header timestamp stays HH:MM.
+  const preciseTime = fmtTimePrecise(m.createdAt, locale);
+  const sentAtLabel = t("msg.sentAt", { time: preciseTime });
   // Bubble + alignment scheme (the standard chat-app mental model):
   //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
   //   - others: left-aligned, body in a raised-surface bubble (bg-card)
@@ -132,42 +159,70 @@ function MessageRow({
     <>
       {showDay && <DayRule ms={m.createdAt} />}
       <div
+        // Native title tooltip carries the precise send time; aria-label gives
+        // SR users the same info (the inline HH:MM + author are already in the
+        // row's text content, so the label focuses on the time precision).
+        title={sentAtLabel}
+        aria-label={sentAtLabel}
         className={cn(
-          "flex gap-x-2.5 rounded-md px-4 py-1.5 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
+          // grouped rows tighten their top padding (no header to space under)
+          // and drop the hover bg so a run reads as one continuous block.
+          "flex gap-x-2.5 rounded-md px-4 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
+          grouped ? "pt-0.5 pb-1.5" : "py-1.5",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}
       >
         <div className={cn("flex justify-center pt-[7px]", self && "flex-row-reverse")}>
+          {/* Avatar dot. On grouped rows it stays for column alignment but is
+              hidden from AT (it's decorative repetition of the header above). */}
           <span
             aria-hidden
             className={cn("h-[7px] w-[7px] rounded-full", isAgent ? "bg-agent animate-agent-pulse" : "bg-human")}
           />
         </div>
         <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
+          {/* Header (author + kind + HH:MM) only on the FIRST row of a run. */}
+          {!grouped && (
+            <div
+              className={cn(
+                "flex flex-wrap items-baseline gap-x-2.5",
+                self && "flex-row-reverse",
+              )}
+            >
+              <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
+                {m.authorName}
+              </span>
+              <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
+                {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
+              </span>
+              <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
+            </div>
+          )}
           <div
             className={cn(
-              "flex flex-wrap items-baseline gap-x-2.5",
-              self && "flex-row-reverse",
-            )}
-          >
-            <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
-              {m.authorName}
-            </span>
-            <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
-              {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
-            </span>
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
-          </div>
-          <div
-            className={cn(
-              "mt-0.5 max-w-[85%] sm:max-w-[70%] md:max-w-[min(100%,60ch)] lg:max-w-[min(100%,72ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
+              "max-w-[85%] sm:max-w-[70%] md:max-w-[min(100%,60ch)] lg:max-w-[min(100%,72ch)] whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 leading-snug",
               self ? "bg-primary/15 text-foreground" : "bg-card text-foreground",
+              grouped ? "mt-0" : "mt-0.5",
+              m.status === "sending" && "opacity-60",
+              m.status === "failed" && "border border-destructive/50 bg-destructive/10",
             )}
           >
             {m.content.length > 0 && renderContent(m.content, known, selfName)}
             {m.attachments && m.attachments.length > 0 && (
               <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
+            )}
+            {m.status === "sending" && (
+              <span className="ml-1 inline-flex items-center gap-1 align-middle font-mono text-[10px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                {t("msg.sending")}
+              </span>
+            )}
+            {m.status === "failed" && (
+              <span className="mt-1 flex items-center gap-1 font-mono text-[10px] text-destructive">
+                <AlertTriangle className="h-3 w-3" aria-hidden />
+                {t("msg.sendFailed")}
+              </span>
             )}
           </div>
         </div>
@@ -177,42 +232,109 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, booting },
+  { messages, me, members, status, onLoadMore, loadingMore },
   ref,
 ) {
   const { locale, t } = useI18n();
-  const bottomRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+  // Mirror loadingMore into a ref so the scroll handler reads the latest value
+  // without re-subscribing, and never fires a second load while one's in flight.
+  const loadingMoreRef = useRef(false);
+  loadingMoreRef.current = !!loadingMore;
+  // scrollHeight captured the moment we request more history; the post-load
+  // effect adds the growth delta to scrollTop so the viewport stays on the same
+  // message instead of jumping to the newly-loaded top.
+  const prevScrollHeightRef = useRef(0);
+
+  const known = [...members.map((m) => m.name), me?.name].filter(Boolean) as string[];
+  const selfName = me?.name;
+  // Grouping window: consecutive messages from the same author within this gap
+  // merge into one run (header shown only on the first). 5 min is the common
+  // chat-app threshold — short enough that a resumed conversation re-shows the
+  // header, long enough that a rapid burst reads as a block.
+  const GROUP_GAP_MS = 5 * 60 * 1000;
+
+  // Flatten messages + day separators into one virtual-item list. Day
+  // separators are first-class items so the virtualizer spaces them
+  // independently of message rows; the row no longer renders its own DayRule.
+  const items = useMemo<Item[]>(() => {
+    const out: Item[] = [];
+    let lastDay = "";
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      const day = fmtDay(m.createdAt, locale, t("date.today"));
+      const showDay = day !== lastDay;
+      if (showDay) {
+        out.push({ kind: "day", ms: m.createdAt, key: `day-${i}` });
+        lastDay = day;
+      }
+      const prev = messages[i - 1];
+      const grouped =
+        !showDay &&
+        !!prev &&
+        prev.participantId === m.participantId &&
+        m.createdAt - prev.createdAt <= GROUP_GAP_MS;
+      out.push({
+        kind: "msg",
+        m,
+        self: !!me && m.participantId === me.id,
+        grouped,
+        key: m.id,
+      });
+    }
+    return out;
+  }, [messages, me, locale, t]);
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => wrapRef.current,
+    estimateSize: (i) => (items[i]?.kind === "day" ? 36 : 56),
+    overscan: 10,
+  });
 
   // Expose a "scroll to bottom, but only if already pinned" command so callers
   // (e.g. the visual-viewport keyboard handler) can re-pin the list after the
-  // visible area shrinks. Safe in every render branch: bottomRef.current is
-  // null in the booting/empty branches, and scrollIntoView is stubbed in tests.
+  // visible area shrinks.
   useImperativeHandle(
     ref,
     () => ({
       scrollToBottomIfPinned: () => {
-        if (!atBottomRef.current) return;
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (!atBottomRef.current || items.length === 0) return;
+        virtualizer.scrollToIndex(items.length - 1, { align: "end", behavior: "smooth" });
       },
     }),
-    [],
+    [virtualizer, items.length],
   );
 
-  // track whether the user is pinned to the bottom (don't auto-scroll if they scrolled up)
+  // Auto-stick to the bottom when a new message arrives (if the user was
+  // already pinned there). Replaces the old bottomRef scrollIntoView effect.
+  useEffect(() => {
+    if (atBottomRef.current && items.length > 0) {
+      virtualizer.scrollToIndex(items.length - 1, { align: "end" });
+    }
+  }, [items.length, virtualizer]);
+
+  // After a load-more prepend, restore the viewport: shift scrollTop down by the
+  // pixels the list grew so the message the user was reading stays put.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || prevScrollHeightRef.current === 0) return;
+    const delta = el.scrollHeight - prevScrollHeightRef.current;
+    if (delta > 0) el.scrollTop += delta;
+    prevScrollHeightRef.current = 0;
+  }, [items.length]);
+
+  // Track pinned-to-bottom AND trigger scroll-up pagination near the top.
   const onScroll = () => {
     const el = wrapRef.current;
     if (!el) return;
     atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (el.scrollTop < 80 && !loadingMoreRef.current && onLoadMore) {
+      prevScrollHeightRef.current = el.scrollHeight;
+      void onLoadMore();
+    }
   };
-
-  useEffect(() => {
-    if (atBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const known = [...members.map((m) => m.name), me?.name].filter(Boolean) as string[];
-  let lastDay = "";
 
   // Sticky inline banner shown when the live stream has dropped, so users know
   // sends/receives may be interrupted even if they missed the topbar dot.
@@ -227,23 +349,6 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       </div>
     ) : null;
 
-  if (booting) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {banner}
-        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/85"
-          >
-            <span className="h-2 w-2 rounded-full bg-agent animate-agent-pulse" aria-hidden />
-            {t("msg.connecting")}
-          </div>
-        </div>
-      </div>
-    );
-  }
   if (messages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
@@ -261,9 +366,21 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     );
   }
 
+  const virtualItems = virtualizer.getVirtualItems();
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {banner}
+      {loadingMore && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex flex-none items-center justify-center gap-1.5 border-b border-border/40 py-1.5 font-mono text-[10px] text-muted-foreground"
+        >
+          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+          {t("msg.loadingMore")}
+        </div>
+      )}
       <div
         ref={wrapRef}
         onScroll={onScroll}
@@ -283,22 +400,45 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
           backgroundImage: "radial-gradient(900px 360px at 78% -8%, hsl(var(--agent-soft)), transparent 70%)",
         }}
       >
-        {messages.map((m) => {
-          const day = fmtDay(m.createdAt, locale, t("date.today"));
-          const showDay = day !== lastDay;
-          lastDay = day;
-          return (
-            <MessageRow
-              key={m.id}
-              m={m}
-              self={!!me && m.participantId === me.id}
-              known={known}
-              selfName={me?.name}
-              showDay={showDay}
-            />
-          );
-        })}
-        <div ref={bottomRef} />
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualItems.map((vi) => {
+            const item = items[vi.index];
+            if (!item) return null;
+            return (
+              <div
+                key={item.key}
+                data-index={vi.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${vi.start}px)`,
+                }}
+              >
+                {item.kind === "day" ? (
+                  <DayRule ms={item.ms} />
+                ) : (
+                  <MessageRow
+                    m={item.m}
+                    self={item.self}
+                    known={known}
+                    selfName={selfName}
+                    showDay={false}
+                    grouped={item.grouped}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

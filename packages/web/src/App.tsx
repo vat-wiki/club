@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Participant } from "@club/shared";
+import type { ImageMime, Message, Participant } from "@club/shared";
 import type { ClubConn } from "@club/sdk";
 import { loadConn, saveConn, clearConn, API_URL, getKey } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -13,6 +13,9 @@ import { Composer } from "@/components/composer";
 import { AuthDialog } from "@/components/auth-dialog";
 import { KeyRevealDialog } from "@/components/key-reveal-dialog";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
+import { BootScreen } from "@/components/boot-screen";
+import { TypingIndicator } from "@/components/typing-indicator";
+import { useTypingAgents } from "@/hooks/use-typing-agents";
 
 export default function App() {
   const { t } = useI18n();
@@ -35,12 +38,28 @@ export default function App() {
   // The one-time recovery code minted alongside the pending key, surfaced on
   // the reveal dialog so the user records both before entering (PRD §7.1 AC1).
   const [pendingRecoverCode, setPendingRecoverCode] = useState<string>("");
+  // True when the pending key came from the *recovery* flow rather than a fresh
+  // mint. The reveal dialog then uses rotated-credential copy ("these are NEW,
+  // the old ones are dead") so the user understands the recovery code they just
+  // used is single-use-spent and the prior key no longer works.
+  const [pendingKeyRecovered, setPendingKeyRecovered] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
-  // True between having a stored key and the first batch of history landing —
-  // shows a loading state instead of flashing the empty state prematurely.
-  const [booting, setBooting] = useState(!!conn);
+  // First-load gate state. "loading" while validating a stored key against /me
+  // (and pulling the first history batch); "error" when that validation fails —
+  // which used to silently clearConn() and bounce the user to onboarding with no
+  // explanation (and, on a transient server hiccup, cost them their credential).
+  // Now we keep the key and surface a retryable error screen instead (P0-2).
+  // Null once we're past boot (entered the room OR there was no stored key).
+  const [bootStatus, setBootStatus] = useState<"loading" | "error" | null>(!!conn ? "loading" : null);
+  // Bumped on each manual retry to force the boot effect to re-run (and to reset
+  // BootScreen's auto-retry counter). The effect deps include this nonce.
+  const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
-  const { messages, status, setMessages } = useMessageStream(me ? conn : null);
+  const typing = useTypingAgents();
+  const { messages, status, setMessages, loadMore, loadingMore } = useMessageStream(me ? conn : null, {
+    onAgentThinking: typing.onThinking,
+    onAgentIdle: typing.onIdle,
+  });
 
   const refreshMembers = useCallback(async () => {
     if (!conn) return;
@@ -51,34 +70,47 @@ export default function App() {
     }
   }, [conn]);
 
-  // boot: validate stored key
-  useEffect(() => {
-    if (!conn) return;
-    setBooting(true);
-    let cancelled = false;
-    (async () => {
+  // Validate a stored key against /me and load the first history batch. Shared
+  // by the initial boot and by every retry (manual + auto-backoff + online
+  // event). On success: enter the room. On failure: flip to the error state —
+  // but NEVER clearConn(): the key stays in localStorage so a later retry can
+  // succeed once the server is reachable again.
+  const validateConn = useCallback(
+    async (c: ClubConn) => {
+      setBootStatus("loading");
       try {
-        const m = await api.me(conn);
-        if (cancelled) return;
+        const m = await api.me(c);
         setMe(m);
         setAuthOpen(false);
-        const history = await api.messages(conn);
-        if (cancelled) return;
+        const history = await api.messages(c);
         setMessages(history);
-        setBooting(false);
+        setBootStatus(null);
         void refreshMembers();
       } catch {
-        if (cancelled) return;
-        setBooting(false);
-        clearConn();
-        setConn(null);
-        setAuthOpen(true);
+        setBootStatus("error");
       }
+    },
+    [refreshMembers, setMessages],
+  );
+
+  // boot: validate stored key (initial + on every retry nonce bump)
+  useEffect(() => {
+    if (!conn) return;
+    let cancelled = false;
+    (async () => {
+      await validateConn(conn);
+      if (cancelled) return;
     })();
     return () => {
       cancelled = true;
     };
-  }, [conn, setMessages, refreshMembers]);
+    // bootRetryNonce drives manual/auto re-runs without changing `conn` identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conn, bootRetryNonce, validateConn]);
+
+  // Kick a retry: bump the nonce so the boot effect re-runs validateConn, and
+  // BootScreen resets its attempt counter.
+  const retryBoot = useCallback(() => setBootRetryNonce((n) => n + 1), []);
 
   // periodic roster refresh (members change rarely)
   useEffect(() => {
@@ -99,6 +131,19 @@ export default function App() {
     setAuthOpen(false);
     setPendingKey(key);
     setPendingRecoverCode(recoverCode);
+    setPendingKeyRecovered(false);
+  };
+
+  // An identity was *recovered* (callsign + recovery code). The server rotated
+  // BOTH the key and the recovery code; route through the reveal dialog in
+  // "recovered" mode so the user records the new pair before we persist —
+  // otherwise they'd enter the room with no way to see the new recovery code,
+  // and the code they just used is now single-use-dead (P0-1 data-loss fix).
+  const handleRecovered = (key: string, recoverCode: string) => {
+    setAuthOpen(false);
+    setPendingKey(key);
+    setPendingRecoverCode(recoverCode);
+    setPendingKeyRecovered(true);
   };
 
   const handleKeySaved = () => {
@@ -106,12 +151,60 @@ export default function App() {
     handleAuthed(pendingKey);
     setPendingKey(null);
     setPendingRecoverCode("");
+    setPendingKeyRecovered(false);
   };
 
   const handleSend = async (content: string, attachmentIds: readonly string[]) => {
-    if (!conn) return;
-    await api.send(conn, content, attachmentIds);
+    if (!conn || !me) return;
+    // Optimistic echo: drop the message into the list immediately as "sending"
+    // so the user sees their own text without waiting on the SSE round-trip —
+    // this is the fix for the "send feels laggy" feedback. POST /messages
+    // resolves with the confirmed Message (real id + accurate attachment
+    // metadata), which swaps in for the placeholder; useMessageStream then
+    // dedupes SSE's own echo by id. On failure we tint the row red and
+    // re-throw so the composer restores the draft for a retry.
+    const tempId = `optimist-${crypto.randomUUID()}`;
+    const optimistic: Message = {
+      id: tempId,
+      participantId: me.id,
+      authorName: me.name,
+      authorKind: me.kind,
+      content,
+      createdAt: Date.now(),
+      status: "sending",
+      // Only the upload id is known client-side, so synthesize a displayable
+      // attachment shape from /files/{id}; the confirmed copy carries the real
+      // mime/size. The <img> only needs the url to render.
+      attachments: attachmentIds.length
+        ? attachmentIds.map((id) => ({
+            id,
+            url: `/files/${id}`,
+            mime: "image/jpeg" as ImageMime,
+            size: 0,
+          }))
+        : undefined,
+    };
+    setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
+    try {
+      const real = await api.send(conn, content, attachmentIds);
+      setMessages((prev) => {
+        // SSE may have already delivered the confirmed copy — the server
+        // broadcasts the new message and can beat the POST response back to
+        // the client. If so, just drop the placeholder; otherwise swap it in.
+        // Either way avoid leaving the temp id next to the real one, which
+        // would render the message twice.
+        if (prev.some((m) => m.id === real.id)) {
+          return prev.filter((m) => m.id !== tempId);
+        }
+        return prev.map((m) => (m.id === tempId ? real : m));
+      });
+    } catch (e) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)),
+      );
+      throw e;
+    }
   };
 
   const performSignOut = () => {
@@ -157,21 +250,35 @@ export default function App() {
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
           <h1 className="sr-only">{t("app.h1")}</h1>
-          <MessageList
-            ref={messageListRef}
-            messages={messages}
-            me={me}
-            members={members}
-            status={status}
-            booting={booting}
-          />
-          <Composer
-            onSend={handleSend}
-            disabled={!me}
-            members={members}
-            selfId={me?.id}
-            conn={conn}
-          />
+          {/* First-load gate. While bootStatus is set we render the boot screen
+              (loading spinner OR retryable error) instead of the message list +
+              composer, so a server-down on reload never silently wipes the key
+              or strands the user in the empty state. Once null, the room shows. */}
+          {bootStatus ? (
+            <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} />
+          ) : (
+            <>
+              <MessageList
+                ref={messageListRef}
+                messages={messages}
+                me={me}
+                members={members}
+                status={status}
+                onLoadMore={loadMore}
+                loadingMore={loadingMore}
+              />
+              {typing.agents.length > 0 && (
+                <TypingIndicator agents={typing.agents} />
+              )}
+              <Composer
+                onSend={handleSend}
+                disabled={!me}
+                members={members}
+                selfId={me?.id}
+                conn={conn}
+              />
+            </>
+          )}
         </main>
       </div>
 
@@ -186,15 +293,17 @@ export default function App() {
         open={authOpen}
         onCreated={handleCreated}
         onAuthed={handleAuthed}
+        onRecovered={handleRecovered}
       />
 
-      {/* Reveal the freshly-minted key before persisting it. Mutually
-          exclusive with the AuthDialog (authOpen is false while this shows),
-          so there's no Radix focus-trap nesting to worry about. */}
+      {/* Reveal the freshly-minted (or freshly-recovered) key before persisting
+          it. Mutually exclusive with the AuthDialog (authOpen is false while
+          this shows), so there's no Radix focus-trap nesting to worry about. */}
       <KeyRevealDialog
         open={!!pendingKey}
         key_={pendingKey ?? ""}
         recoverCode={pendingRecoverCode}
+        recovered={pendingKeyRecovered}
         onSaved={handleKeySaved}
       />
 

@@ -10,6 +10,7 @@ import {
 import {
   getRecentMessages,
   getMessagesSince,
+  getMessagesBeforeId,
   insertMessage,
   getFilesByIds,
   getAllParticipantNames,
@@ -17,7 +18,7 @@ import {
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { addSubscriber, broadcast } from "../stream.js";
+import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
@@ -133,14 +134,31 @@ messages.post("/", async (c) => {
   };
   if (attachments.length > 0) msg.attachments = attachments;
   broadcast(msg);
+
+  // P1-5: an agent's reply landing is the most reliable "done thinking" signal
+  // — clear its indicator right now, regardless of whether the agent client
+  // also reports idle. This is the safety net for agents that crash right after
+  // posting (so their own idle report never fires).
+  if (me.kind === "agent" && isThinking(me.id)) {
+    markThinkingIdle(me.id);
+    broadcastAgentIdle({ participantId: me.id });
+  }
   return c.json(msg, 201);
 });
 
-// GET /messages?since=<id>&limit=<n> -> Message[]  (chronologic)
+// GET /messages?since=<id>&before=<id>&limit=<n> -> Message[]  (chronologic)
 messages.get("/", (c) => {
   const since = c.req.query("since");
+  const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
-  const rows = since ? getMessagesSince(since, limit).messages : getRecentMessages(limit);
+  // `before` (older history, scroll-up pagination) takes precedence over
+  // `since`; they aren't combined in practice, but if both appear we serve the
+  // backward page so the UI's "load earlier" never accidentally pulls newer.
+  const rows = before
+    ? getMessagesBeforeId(before, limit)
+    : since
+      ? getMessagesSince(since, limit).messages
+      : getRecentMessages(limit);
   return c.json(rows.map(toMessage));
 });
 

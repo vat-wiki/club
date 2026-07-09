@@ -1,4 +1,4 @@
-import type { Message } from "@club/shared";
+import type { Message, AgentThinkingEvent, AgentIdleEvent } from "@club/shared";
 import { type ClubConn, listMessages } from "./transport.js";
 
 // ── SSE streaming with reconnect + catch-up ─────────────────────────
@@ -12,6 +12,10 @@ export interface StreamOptions {
   backoffMs?: number;
   /** Notified on stream errors and on each reconnect attempt. */
   onError?: (err: Error) => void;
+  /** Fired for each `agent_thinking` event (P1-5). Omit to ignore. */
+  onAgentThinking?: (e: AgentThinkingEvent) => void;
+  /** Fired for each `agent_idle` event (P1-5). Omit to ignore. */
+  onAgentIdle?: (e: AgentIdleEvent) => void;
 }
 
 export interface StreamHandle {
@@ -118,15 +122,34 @@ export function streamMessages(
       while ((sep = buf.indexOf("\n\n")) !== -1) {
         const raw = buf.slice(0, sep);
         buf = buf.slice(sep + 2);
-        const dataLines = raw
-          .split("\n")
-          .filter((l) => l.startsWith("data:"))
-          .map((l) => l.slice(5).trimStart());
+        // An SSE frame may carry an `event:` line (named event) and one or more
+        // `data:` lines. Split into the event name (default "message") and the
+        // joined data payload, then dispatch by name. Unknown event names are
+        // ignored — forward-compatible with future named events.
+        let eventName = "message";
+        const dataLines: string[] = [];
+        for (const line of raw.split("\n")) {
+          if (line.startsWith("event:")) {
+            eventName = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            dataLines.push(line.slice(5).trimStart());
+          }
+        }
         if (dataLines.length === 0) continue; // heartbeat/empty
         const payload = dataLines.join("\n");
         if (payload === "") continue;
         try {
-          deliver(JSON.parse(payload) as Message);
+          const obj = JSON.parse(payload);
+          if (eventName === "agent_thinking") {
+            opts.onAgentThinking?.(obj as AgentThinkingEvent);
+          } else if (eventName === "agent_idle") {
+            opts.onAgentIdle?.(obj as AgentIdleEvent);
+          } else if (eventName === "message") {
+            // The default SSE event (no `event:` line) — the original feed.
+            deliver(obj as Message);
+          }
+          // Any other named event is ignored — forward-compatible with future
+          // events the client doesn't yet know about.
         } catch {
           /* ignore malformed */
         }

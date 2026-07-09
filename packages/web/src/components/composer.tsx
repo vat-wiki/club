@@ -296,6 +296,24 @@ export function Composer({
   const doneIds = attachments.filter((d) => d.status === "done" && d.remote).map((d) => d.remote!.id);
   const canSend = (value.trim().length > 0 || doneIds.length > 0) && !hasUploading;
 
+  // ── Typing indicator ───────────────────────────────────────────────
+  // Debounce "I'm typing" reports while composing, and auto-clear a short while
+  // after the user stops. Sending a message also clears it (in submit). Fire-
+  // and-forget — typing is best-effort presence, not a critical path.
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportTyping = useCallback(() => {
+    if (!conn) return;
+    void api.thinking(conn).catch(() => {});
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      void api.idle(conn).catch(() => {});
+      typingTimer.current = null;
+    }, 2500);
+  }, [conn]);
+  useEffect(() => () => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+  }, []);
+
   const submit = async () => {
     const content = value.trim();
     const ids = [...doneIds];
@@ -316,6 +334,9 @@ export function Composer({
       setAttachments([]);
       // First successful send dismisses the onboarding hint for good (P2-2).
       markSent();
+      // Message landed — stop the typing indicator.
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (conn) void api.idle(conn).catch(() => {});
     } catch {
       // Send failed: keep the text draft AND the image drafts so the user can
       // edit/redo without losing the (already-uploaded) images. Surface a
@@ -623,6 +644,7 @@ export function Composer({
             setValue(next);
             setError(false);
             setAttachError(null);
+            if (next.trim()) reportTyping();
             // A value change is fresh user input — clear any Escape-dismissal
             // so the popup can re-open for the new text.
             dismissedValue.current = null;

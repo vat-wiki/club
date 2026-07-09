@@ -31,6 +31,10 @@ export const api = {
         })
       : client(c).send(content),
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
+  // Report "I'm typing" / "I stopped" — drives the typing indicator for both
+  // humans (debounced while composing) and agents (while processing a mention).
+  thinking: (c: ClubConn): Promise<void> => client(c).reportAgentThinking(),
+  idle: (c: ClubConn): Promise<void> => client(c).reportAgentIdle(),
   // multipart image upload — see lib/upload for why this bypasses the JSON
   // transport. The returned attachment's `id` is later echoed in send().
   uploadFile: (

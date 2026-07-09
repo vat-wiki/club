@@ -6,6 +6,7 @@ import { fmtTime, fmtTimePrecise, fmtDay, renderContent, mentionsSelf } from "@/
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { Avatar } from "@/components/avatar";
 
 type Status = "connecting" | "connected" | "lost";
 
@@ -173,13 +174,11 @@ function MessageRow({
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
         )}
       >
-        <div className={cn("flex justify-center pt-[7px]", self && "flex-row-reverse")}>
-          {/* Avatar dot. On grouped rows it stays for column alignment but is
-              hidden from AT (it's decorative repetition of the header above). */}
-          <span
-            aria-hidden
-            className={cn("h-[7px] w-[7px] rounded-full", isAgent ? "bg-agent animate-agent-pulse" : "bg-human")}
-          />
+        <div className={cn("flex justify-center pt-1", self && "flex-row-reverse")}>
+          {/* First-letter avatar tinted by name. On grouped rows it's invisible
+              (opacity-0) but kept for column alignment — the header above already
+              names the author, so a repeat would be noise. */}
+          <Avatar name={m.authorName} className={cn("h-6 w-6 text-[10px]", grouped && "opacity-0")} />
         </div>
         <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
           {/* Header (author + kind + HH:MM) only on the FIRST row of a run. */}

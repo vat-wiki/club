@@ -161,13 +161,13 @@ export interface ApiError {
 
 // SSE `event: agent_thinking` payload. `participantId`+`name`+`kind` are all
 // carried so a client can render the indicator without a roster join (matches
-// how `message` events denormalize authorName/authorKind). kind is fixed to
-// "agent": only agents report thinking (a human "typing…" indicator is a
-// separate, future concern and would deserve its own event).
+// how `message` events denormalize authorName/authorKind). kind is the
+// reporter's kind: agents report while processing a @mention, humans while
+// typing — a client can label them differently or uniformly as "typing".
 export interface AgentThinkingEvent {
   participantId: string;
   name: string;
-  kind: "agent";
+  kind: ParticipantKind;
 }
 
 // SSE `event: agent_idle` payload. Just the id — the client removes it from its

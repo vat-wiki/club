@@ -2,17 +2,13 @@ import type { Participant } from "@club/shared";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { Avatar } from "@/components/avatar";
 
 function Row({ p, self }: { p: Participant; self: boolean }) {
   const t = useT();
   return (
     <div className="flex min-h-[44px] items-center gap-2 rounded-md px-4 py-1.5 text-sm transition-colors hover:bg-accent/70 active:bg-accent">
-      <span
-        className={cn(
-          "h-2 w-2 flex-none rounded-full",
-          p.kind === "agent" ? "bg-agent animate-agent-pulse" : "bg-human",
-        )}
-      />
+      <Avatar name={p.name} className="h-7 w-7 text-xs" />
       <span className={cn("truncate", self ? "text-foreground" : "text-muted-foreground")}>
         {p.name}
         {self && <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">{t("roster.you")}</span>}

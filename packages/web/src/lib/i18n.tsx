@@ -254,9 +254,9 @@ const zh: Dict = {
   "boot.connecting": "正在接入…",
 
   // Agent typing indicator (P1-5 placeholder; pending backend agent_thinking event)
-  "typing.labelOne": "{name} 正在思考…",
-  "typing.labelTwo": "{names} 正在思考…",
-  "typing.labelMany": "{names} 等 {count} 人正在思考…",
+  "typing.labelOne": "{name} 正在输入…",
+  "typing.labelTwo": "{names} 正在输入…",
+  "typing.labelMany": "{names} 等 {count} 人正在输入…",
 
   // Date
   "date.today": "今天",
@@ -431,9 +431,9 @@ const en: Dict = {
   "boot.connecting": "Connecting…",
 
   // Agent typing indicator (P1-5 placeholder)
-  "typing.labelOne": "{name} is thinking…",
-  "typing.labelTwo": "{names} are thinking…",
-  "typing.labelMany": "{names} and {count} more are thinking…",
+  "typing.labelOne": "{name} is typing…",
+  "typing.labelTwo": "{names} are typing…",
+  "typing.labelMany": "{names} and {count} more are typing…",
 
   // Date
   "date.today": "Today",

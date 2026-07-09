@@ -58,10 +58,13 @@ describe("POST /agents/thinking and /agents/idle (P1-5)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("a human key gets 404 (only agents report thinking)", async () => {
+  it("a human key also reports thinking (humans type, agents think)", async () => {
+    const spy = vi.spyOn(streamMod, "broadcastAgentThinking").mockImplementation(() => {});
     const key = await mint("alice", "human");
     const res = await authed("/agents/thinking", key);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(204);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ name: "alice", kind: "human" }));
+    spy.mockRestore();
   });
 
   it("an agent key broadcasts agent_thinking and returns 204", async () => {

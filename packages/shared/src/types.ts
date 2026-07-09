@@ -177,6 +177,17 @@ export interface AgentIdleEvent {
   participantId: string;
 }
 
+// SSE `event: presence` payload. Broadcast on connect (online: true) and
+// disconnect (online: false) so the roster can tell who's actually in the room
+// right now from historical registrations. A newcomer is also seeded with the
+// current online set on connect (server-side, see stream.ts).
+export interface PresenceEvent {
+  participantId: string;
+  name: string;
+  kind: ParticipantKind;
+  online: boolean;
+}
+
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its
 // own status. Auth-required (the participant reports itself; the key identifies
 // who). No fields in the body: the participant is taken from the authed key, so

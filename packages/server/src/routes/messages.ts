@@ -165,7 +165,7 @@ messages.get("/", (c) => {
 // GET /messages/stream  (SSE) — live message feed
 messages.get("/stream", (c) => {
   return streamSSE(c, async (stream) => {
-    const unsubscribe = addSubscriber(stream);
+    const unsubscribe = addSubscriber(stream, c.get("participant"));
     stream.onAbort(() => {
       unsubscribe();
     });

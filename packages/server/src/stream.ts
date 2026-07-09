@@ -1,20 +1,50 @@
 import type { SSEStreamingApi } from "hono/streaming";
-import type { Message, AgentThinkingEvent, AgentIdleEvent } from "@club/shared";
+import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, ParticipantKind } from "@club/shared";
 
 // Live SSE subscribers registered at connect time. The POST /messages route
-// pushes new messages here; subscribers are removed on abort.
+// pushes new messages here; subscribers are removed on abort. Each carries the
+// authed participant so presence (online/offline) can be broadcast on connect
+// and disconnect.
 const subscribers = new Set<{
   stream: SSEStreamingApi;
+  participant: { id: string; name: string; kind: ParticipantKind };
   dead: boolean;
 }>();
 
-export function addSubscriber(s: SSEStreamingApi): () => void {
-  const entry = { stream: s, dead: false };
+// Register an SSE subscriber and announce their presence to the room. Returns
+// the unsubscribe fn (called on abort) which removes them and broadcasts
+// offline. The newcomer is also seeded with everyone currently online so the
+// roster can mark them live immediately rather than waiting for each to
+// re-announce.
+export function addSubscriber(
+  s: SSEStreamingApi,
+  participant: { id: string; name: string; kind: ParticipantKind },
+): () => void {
+  const entry = { stream: s, participant, dead: false };
   subscribers.add(entry);
+  const presence = (p: typeof participant, online: boolean) => ({
+    participantId: p.id,
+    name: p.name,
+    kind: p.kind,
+    online,
+  });
+  broadcastPresence(presence(participant, true));
+  for (const sub of subscribers) {
+    if (sub === entry || sub.dead) continue;
+    void s
+      .writeSSE({ event: "presence", data: JSON.stringify(presence(sub.participant, true)) })
+      .catch(() => {});
+  }
   return () => {
     entry.dead = true;
     subscribers.delete(entry);
+    broadcastPresence(presence(entry.participant, false));
   };
+}
+
+// Push a named `presence` event (online/offline) to every live subscriber.
+export function broadcastPresence(e: PresenceEvent): void {
+  writeAll({ event: "presence", data: JSON.stringify(e) });
 }
 
 // Push a `message` event (the default, unnamed event in SSE). Backwards

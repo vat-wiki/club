@@ -56,7 +56,7 @@ export default function App() {
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
   const typing = useTypingAgents();
-  const { messages, status, setMessages, loadMore, loadingMore } = useMessageStream(me ? conn : null, {
+  const { messages, status, setMessages, loadMore, loadingMore, onlineIds } = useMessageStream(me ? conn : null, {
     onAgentThinking: typing.onThinking,
     onAgentIdle: typing.onIdle,
   });
@@ -239,13 +239,14 @@ export default function App() {
           status={status}
           members={members}
           selfId={me.id}
+          onlineIds={onlineIds}
           key_={getKey()}
           onSignOutRequest={() => setSignOutOpen(true)}
         />
       )}
 
       <div className="flex min-h-0 flex-1">
-        <Roster members={members} selfId={me?.id} />
+        <Roster members={members} selfId={me?.id} onlineIds={onlineIds} />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}

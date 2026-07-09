@@ -10,11 +10,13 @@ import type { Participant } from "@club/shared";
 export function MobileRoster({
   members,
   selfId,
+  onlineIds,
   onlineCount,
   key_,
 }: {
   members: Participant[];
   selfId?: string;
+  onlineIds?: Set<string>;
   onlineCount: number;
   key_: string | null;
 }) {
@@ -53,7 +55,7 @@ export function MobileRoster({
               member list. */}
           <ViewKeyDialog key_={key_} triggerLabel={t("viewKey.open")} />
 
-          <RosterSections members={members} selfId={selfId} />
+          <RosterSections members={members} selfId={selfId} onlineIds={onlineIds} />
         </div>
       </DialogContent>
     </Dialog>

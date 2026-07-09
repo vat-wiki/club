@@ -106,6 +106,11 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 4,
+    description: "message reply-to (threaded quotes)",
+    sql: `ALTER TABLE messages ADD COLUMN reply_to_id TEXT;`,
+  },
 ];
 
 db.exec(`
@@ -145,6 +150,7 @@ export interface MessageRow {
   author_name: string;
   author_kind: "human" | "agent";
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
+  reply_to_id: string | null; // id of the message this one replies to, or NULL
 }
 
 export function insertMessage(
@@ -153,11 +159,12 @@ export function insertMessage(
   content: string,
   createdAt: number,
   attachments: string | null,
+  replyToId: string | null,
 ): void {
   db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at, attachments)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt, attachments);
+    `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, participantId, content, createdAt, attachments, replyToId);
 }
 
 export function getAllParticipants() {
@@ -169,14 +176,14 @@ export function getAllParticipants() {
 }
 
 const afterStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid > ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    ORDER BY m.rowid DESC LIMIT ?`,
@@ -201,7 +208,7 @@ export function getMessagesSince(sinceId: string, limit: number) {
 }
 
 const beforeStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments,
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid < ? ORDER BY m.rowid DESC LIMIT ?`,

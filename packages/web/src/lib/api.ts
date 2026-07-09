@@ -23,13 +23,19 @@ export const api = {
   // content is optional IFF attachmentIds is non-empty (the server enforces the
   // cross-field rule; see CreateMessageRequest in @club/shared). When there are
   // no attachments we keep the original content-only body shape (unchanged path).
-  send: (c: ClubConn, content: string, attachmentIds: readonly string[] = []): Promise<Message> =>
-    attachmentIds.length > 0
-      ? request<Message>(c, "/messages", {
-          method: "POST",
-          body: { content, attachmentIds: [...attachmentIds] },
-        })
-      : client(c).send(content),
+  send: (
+    c: ClubConn,
+    content: string,
+    attachmentIds: readonly string[] = [],
+    replyToId?: string,
+  ): Promise<Message> => {
+    if (attachmentIds.length > 0 || replyToId) {
+      const body: Record<string, unknown> = { content, attachmentIds: [...attachmentIds] };
+      if (replyToId) body.replyToId = replyToId;
+      return request<Message>(c, "/messages", { method: "POST", body });
+    }
+    return client(c).send(content);
+  },
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
   // Report "I'm typing" / "I stopped" — drives the typing indicator for both
   // humans (debounced while composing) and agents (while processing a mention).

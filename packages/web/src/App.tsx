@@ -44,6 +44,9 @@ export default function App() {
   // used is single-use-spent and the prior key no longer works.
   const [pendingKeyRecovered, setPendingKeyRecovered] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  // The message being replied to (puts the composer in "reply" mode with a
+  // quote preview); null in normal compose mode.
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   // First-load gate state. "loading" while validating a stored key against /me
   // (and pulling the first history batch); "error" when that validation fails —
   // which used to silently clearConn() and bounce the user to onboarding with no
@@ -154,7 +157,7 @@ export default function App() {
     setPendingKeyRecovered(false);
   };
 
-  const handleSend = async (content: string, attachmentIds: readonly string[]) => {
+  const handleSend = async (content: string, attachmentIds: readonly string[], replyToId?: string) => {
     if (!conn || !me) return;
     // Optimistic echo: drop the message into the list immediately as "sending"
     // so the user sees their own text without waiting on the SSE round-trip —
@@ -172,6 +175,7 @@ export default function App() {
       content,
       createdAt: Date.now(),
       status: "sending",
+      ...(replyToId ? { replyToId } : {}),
       // Only the upload id is known client-side, so synthesize a displayable
       // attachment shape from /files/{id}; the confirmed copy carries the real
       // mime/size. The <img> only needs the url to render.
@@ -187,7 +191,7 @@ export default function App() {
     setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
     try {
-      const real = await api.send(conn, content, attachmentIds);
+      const real = await api.send(conn, content, attachmentIds, replyToId);
       setMessages((prev) => {
         // SSE may have already delivered the confirmed copy — the server
         // broadcasts the new message and can beat the POST response back to
@@ -267,6 +271,7 @@ export default function App() {
                 status={status}
                 onLoadMore={loadMore}
                 loadingMore={loadingMore}
+                onReply={setReplyTo}
               />
               {typing.agents.length > 0 && (
                 <TypingIndicator agents={typing.agents} />
@@ -277,6 +282,8 @@ export default function App() {
                 members={members}
                 selfId={me?.id}
                 conn={conn}
+                replyTo={replyTo}
+                onReplyClear={() => setReplyTo(null)}
               />
             </>
           )}

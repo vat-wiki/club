@@ -26,6 +26,10 @@ export interface Message {
   // shape is forward-compatible so "letting an agent see it" can arrive later
   // without a contract change.
   attachments?: MessageAttachment[];
+  // Optional id of the message this one replies to (threaded quote). The
+  // server stores it; clients render a quote by looking up the referenced
+  // message in their local list.
+  replyToId?: string;
   // Client-only delivery status for the optimistic send UI. Absent on every
   // server-sourced message (history + SSE) — those are already confirmed.
   // "sending" = locally echoed, waiting for POST /messages to resolve and
@@ -125,6 +129,7 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const CreateMessageRequest = z.object({
   content: z.string().max(MAX_MESSAGE_CONTENT).default(""),
   attachmentIds: z.array(z.string().min(1).max(64)).max(MAX_IMAGES_PER_MESSAGE).default([]),
+  replyToId: z.string().min(1).max(64).optional(),
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 

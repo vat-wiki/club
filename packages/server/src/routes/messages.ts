@@ -52,6 +52,7 @@ function toMessage(r: MessageRow): Message {
   };
   const attachments = parseAttachments(r.attachments);
   if (attachments) msg.attachments = attachments;
+  if (r.reply_to_id) msg.replyToId = r.reply_to_id;
   return msg;
 }
 
@@ -65,7 +66,7 @@ messages.post("/", async (c) => {
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
-  const { content, attachmentIds } = parsed.data;
+  const { content, attachmentIds, replyToId } = parsed.data;
 
   // Rehydrate attachments server-side from the requested ids. The server is the
   // sole source of truth for mime/width/height/size, so the client only sends
@@ -108,6 +109,7 @@ messages.post("/", async (c) => {
     content,
     createdAt,
     attachments.length > 0 ? JSON.stringify(attachments) : null,
+    replyToId ?? null,
   );
 
   // Persist a per-participant inbox row for everyone @-mentioned in the text.
@@ -133,6 +135,7 @@ messages.post("/", async (c) => {
     createdAt,
   };
   if (attachments.length > 0) msg.attachments = attachments;
+  if (replyToId) msg.replyToId = replyToId;
   broadcast(msg);
 
   // P1-5: an agent's reply landing is the most reliable "done thinking" signal

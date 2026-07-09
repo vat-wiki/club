@@ -100,6 +100,7 @@ type MessageListProps = {
   status: Status;
   onLoadMore?: () => Promise<boolean> | void;
   loadingMore?: boolean;
+  onReply?: (m: Message) => void;
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
@@ -107,7 +108,7 @@ type MessageListProps = {
 // of message rows (the row no longer renders its own DayRule).
 type Item =
   | { kind: "day"; ms: number; key: string }
-  | { kind: "msg"; m: Message; self: boolean; grouped: boolean; key: string };
+  | { kind: "msg"; m: Message; self: boolean; grouped: boolean; replyTo?: Message; key: string };
 
 function DayRule({ ms }: { ms: number }) {
   const { locale, t } = useI18n();
@@ -127,6 +128,8 @@ function MessageRow({
   selfName,
   showDay,
   grouped,
+  onReply,
+  replyTo,
 }: {
   m: Message;
   self: boolean;
@@ -139,6 +142,10 @@ function MessageRow({
   // burst reads as one block instead of repeating the header on every line.
   // The exact send time is still reachable via the row's hover title.
   grouped?: boolean;
+  /** Click "reply" → enter composer reply mode quoting this message. */
+  onReply?: (m: Message) => void;
+  /** The message this one replies to (quote preview), if known locally. */
+  replyTo?: Message;
 }) {
   const { locale, t } = useI18n();
   const isAgent = m.authorKind === "agent";
@@ -196,6 +203,15 @@ function MessageRow({
                 {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
               </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
+              {onReply && (
+                <button
+                  type="button"
+                  onClick={() => onReply(m)}
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground"
+                >
+                  {t("msg.reply")}
+                </button>
+              )}
             </div>
           )}
           <div
@@ -207,6 +223,17 @@ function MessageRow({
               m.status === "failed" && "border border-destructive/50 bg-destructive/10",
             )}
           >
+            {m.replyToId && (
+              <div className="mb-1 border-l-2 border-border/60 pl-2 text-xs text-muted-foreground">
+                {replyTo ? (
+                  <span className="truncate">
+                    <span className="font-medium">{replyTo.authorName}</span>: {replyTo.content.slice(0, 80) || "…"}
+                  </span>
+                ) : (
+                  t("msg.replyNotFound")
+                )}
+              </div>
+            )}
             {m.content.length > 0 && renderContent(m.content, known, selfName)}
             {m.attachments && m.attachments.length > 0 && (
               <AttachmentGallery attachments={m.attachments} openLabel={t("msg.image.open")} />
@@ -231,7 +258,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, onLoadMore, loadingMore },
+  { messages, me, members, status, onLoadMore, loadingMore, onReply },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -258,6 +285,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   // separators are first-class items so the virtualizer spaces them
   // independently of message rows; the row no longer renders its own DayRule.
   const items = useMemo<Item[]>(() => {
+    const replyMap = new Map(messages.map((m) => [m.id, m]));
     const out: Item[] = [];
     let lastDay = "";
     for (let i = 0; i < messages.length; i++) {
@@ -279,6 +307,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         m,
         self: !!me && m.participantId === me.id,
         grouped,
+        replyTo: m.replyToId ? replyMap.get(m.replyToId) : undefined,
         key: m.id,
       });
     }
@@ -432,6 +461,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     selfName={selfName}
                     showDay={false}
                     grouped={item.grouped}
+                    onReply={onReply}
+                    replyTo={item.replyTo}
                   />
                 )}
               </div>

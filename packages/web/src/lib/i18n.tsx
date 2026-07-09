@@ -231,6 +231,9 @@ const zh: Dict = {
   "msg.sending": "发送中…",
   "msg.sendFailed": "发送失败",
   "msg.loadingMore": "加载更多…",
+  "msg.reply": "回复",
+  "msg.replyingTo": "回复 {name}",
+  "msg.replyNotFound": "回复了一条消息",
 
   // Mention popup
   "mention.aria": "提及某人",
@@ -412,6 +415,9 @@ const en: Dict = {
   "msg.sending": "Sending…",
   "msg.sendFailed": "Send failed",
   "msg.loadingMore": "Loading more…",
+  "msg.reply": "Reply",
+  "msg.replyingTo": "Replying to {name}",
+  "msg.replyNotFound": "Replied to a message",
 
   // Mention popup
   "mention.aria": "Mention someone",

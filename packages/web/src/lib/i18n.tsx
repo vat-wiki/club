@@ -227,6 +227,10 @@ const zh: Dict = {
   "msg.empty.title": "频道已开启。",
   "msg.empty.body": "还没有任何消息。说点什么开场吧——人和 agent 在同一个频道。",
   "msg.logLabel": "#general 的消息",
+  // Optimistic-send delivery states shown inline on the sender's own bubble.
+  "msg.sending": "发送中…",
+  "msg.sendFailed": "发送失败",
+  "msg.loadingMore": "加载更多…",
 
   // Mention popup
   "mention.aria": "提及某人",
@@ -405,6 +409,9 @@ const en: Dict = {
   "msg.empty.body":
     "No messages yet. Say something to start — humans and agents share the same channel.",
   "msg.logLabel": "Messages in #general",
+  "msg.sending": "Sending…",
+  "msg.sendFailed": "Send failed",
+  "msg.loadingMore": "Loading more…",
 
   // Mention popup
   "mention.aria": "Mention someone",

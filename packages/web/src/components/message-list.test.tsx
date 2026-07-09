@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, screen } from "@testing-library/react";
 import type { Message, Participant } from "@club/shared";
 
 import { renderWithI18n } from "@/test/i18n-wrap";
@@ -165,5 +165,55 @@ describe("MessageList — image attachments", () => {
     const grid = container.querySelector('[class~="grid-cols-2"]');
     expect(grid).toBeTruthy();
     expect(container.querySelectorAll("img")).toHaveLength(2);
+  });
+});
+
+describe("MessageList — optimistic send states", () => {
+  it("fades a 'sending' row and labels it as in-flight", () => {
+    const messages: Message[] = [{ ...mk(me, "on its way", "opt1"), status: "sending" }];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" />,
+    );
+    const row = rowContaining(container, "on its way");
+    const bubble = row.querySelector(".rounded-lg");
+    expect(bubble?.className).toContain("opacity-60");
+    expect(row.textContent).toContain("发送中");
+  });
+
+  it("tints a 'failed' row destructive and shows the send-failed label", () => {
+    const messages: Message[] = [{ ...mk(me, "borked send", "opt2"), status: "failed" }];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" />,
+    );
+    const row = rowContaining(container, "borked send");
+    const bubble = row.querySelector(".rounded-lg");
+    expect(bubble?.className).toContain("border-destructive/50");
+    expect(row.textContent).toContain("发送失败");
+  });
+});
+
+describe("MessageList — scroll-up pagination", () => {
+  it("calls onLoadMore when scrolled to the top", () => {
+    const onLoadMore = vi.fn();
+    const messages = [mk(me, "topmost", "1"), mk(bot, "below", "2")];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" onLoadMore={onLoadMore} />,
+    );
+    const log = container.querySelector('[role="log"]')!;
+    // jsdom leaves scrollTop at 0 (== the top), so a scroll event there should
+    // request older history.
+    fireEvent.scroll(log);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onLoadMore while a load is already in flight", () => {
+    const onLoadMore = vi.fn();
+    const messages = [mk(me, "topmost", "1")];
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" onLoadMore={onLoadMore} loadingMore />,
+    );
+    const log = container.querySelector('[role="log"]')!;
+    fireEvent.scroll(log);
+    expect(onLoadMore).not.toHaveBeenCalled();
   });
 });

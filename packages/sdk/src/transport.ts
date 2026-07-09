@@ -137,8 +137,9 @@ export async function listMessages(
 ): Promise<Message[]> {
   const params = new URLSearchParams();
   if (opts.since) params.set("since", opts.since);
+  if (opts.before) params.set("before", opts.before);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  const { since: _s, limit: _l, ...callOpts } = opts;
+  const { since: _s, before: _b, limit: _l, ...callOpts } = opts;
   const qs = params.toString();
   return request<Message[]>(c, `/messages${qs ? "?" + qs : ""}`, callOpts);
 }

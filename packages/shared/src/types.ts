@@ -26,6 +26,12 @@ export interface Message {
   // shape is forward-compatible so "letting an agent see it" can arrive later
   // without a contract change.
   attachments?: MessageAttachment[];
+  // Client-only delivery status for the optimistic send UI. Absent on every
+  // server-sourced message (history + SSE) — those are already confirmed.
+  // "sending" = locally echoed, waiting for POST /messages to resolve and
+  // replace this row with the confirmed copy; "failed" = the POST threw, the
+  // row is tinted red, and the composer keeps the draft so the user can retry.
+  status?: "sending" | "failed";
 }
 
 // The MIME types club accepts as images. Single source of truth shared by the
@@ -129,6 +135,7 @@ export type UploadFileResponse = MessageAttachment;
 
 export interface ListMessagesQuery {
   since?: string; // message id — return messages after this one
+  before?: string; // message id — return messages BEFORE this one (older history; scroll-up pagination)
   limit?: number;
 }
 

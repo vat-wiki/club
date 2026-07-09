@@ -85,7 +85,8 @@ export class ClubClient {
     return markMentionRead(this.conn(), id, { timeoutMs: this.timeoutMs });
   }
 
-  /** GET /messages — recent history, optionally after `since` (message id). */
+  /** GET /messages — recent history; `since` returns messages after an id,
+   *  `before` returns older messages before an id (scroll-up pagination). */
   messages(opts: ListMessagesQuery = {}): Promise<Message[]> {
     return listMessages(this.conn(), { ...opts, ...this.callOpts() });
   }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Participant } from "@club/shared";
+import type { ImageMime, Message, Participant } from "@club/shared";
 import type { ClubConn } from "@club/sdk";
 import { loadConn, saveConn, clearConn, API_URL, getKey } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -56,7 +56,7 @@ export default function App() {
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
   const typing = useTypingAgents();
-  const { messages, status, setMessages } = useMessageStream(me ? conn : null, {
+  const { messages, status, setMessages, loadMore, loadingMore } = useMessageStream(me ? conn : null, {
     onAgentThinking: typing.onThinking,
     onAgentIdle: typing.onIdle,
   });
@@ -155,9 +155,56 @@ export default function App() {
   };
 
   const handleSend = async (content: string, attachmentIds: readonly string[]) => {
-    if (!conn) return;
-    await api.send(conn, content, attachmentIds);
+    if (!conn || !me) return;
+    // Optimistic echo: drop the message into the list immediately as "sending"
+    // so the user sees their own text without waiting on the SSE round-trip —
+    // this is the fix for the "send feels laggy" feedback. POST /messages
+    // resolves with the confirmed Message (real id + accurate attachment
+    // metadata), which swaps in for the placeholder; useMessageStream then
+    // dedupes SSE's own echo by id. On failure we tint the row red and
+    // re-throw so the composer restores the draft for a retry.
+    const tempId = `optimist-${crypto.randomUUID()}`;
+    const optimistic: Message = {
+      id: tempId,
+      participantId: me.id,
+      authorName: me.name,
+      authorKind: me.kind,
+      content,
+      createdAt: Date.now(),
+      status: "sending",
+      // Only the upload id is known client-side, so synthesize a displayable
+      // attachment shape from /files/{id}; the confirmed copy carries the real
+      // mime/size. The <img> only needs the url to render.
+      attachments: attachmentIds.length
+        ? attachmentIds.map((id) => ({
+            id,
+            url: `/files/${id}`,
+            mime: "image/jpeg" as ImageMime,
+            size: 0,
+          }))
+        : undefined,
+    };
+    setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
+    try {
+      const real = await api.send(conn, content, attachmentIds);
+      setMessages((prev) => {
+        // SSE may have already delivered the confirmed copy — the server
+        // broadcasts the new message and can beat the POST response back to
+        // the client. If so, just drop the placeholder; otherwise swap it in.
+        // Either way avoid leaving the temp id next to the real one, which
+        // would render the message twice.
+        if (prev.some((m) => m.id === real.id)) {
+          return prev.filter((m) => m.id !== tempId);
+        }
+        return prev.map((m) => (m.id === tempId ? real : m));
+      });
+    } catch (e) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)),
+      );
+      throw e;
+    }
   };
 
   const performSignOut = () => {
@@ -217,6 +264,8 @@ export default function App() {
                 me={me}
                 members={members}
                 status={status}
+                onLoadMore={loadMore}
+                loadingMore={loadingMore}
               />
               {typing.agents.length > 0 && (
                 <TypingIndicator agents={typing.agents} />

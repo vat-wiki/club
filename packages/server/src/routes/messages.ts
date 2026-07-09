@@ -10,6 +10,7 @@ import {
 import {
   getRecentMessages,
   getMessagesSince,
+  getMessagesBeforeId,
   insertMessage,
   getFilesByIds,
   getAllParticipantNames,
@@ -145,11 +146,19 @@ messages.post("/", async (c) => {
   return c.json(msg, 201);
 });
 
-// GET /messages?since=<id>&limit=<n> -> Message[]  (chronologic)
+// GET /messages?since=<id>&before=<id>&limit=<n> -> Message[]  (chronologic)
 messages.get("/", (c) => {
   const since = c.req.query("since");
+  const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
-  const rows = since ? getMessagesSince(since, limit).messages : getRecentMessages(limit);
+  // `before` (older history, scroll-up pagination) takes precedence over
+  // `since`; they aren't combined in practice, but if both appear we serve the
+  // backward page so the UI's "load earlier" never accidentally pulls newer.
+  const rows = before
+    ? getMessagesBeforeId(before, limit)
+    : since
+      ? getMessagesSince(since, limit).messages
+      : getRecentMessages(limit);
   return c.json(rows.map(toMessage));
 });
 

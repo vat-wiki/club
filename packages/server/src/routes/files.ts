@@ -8,6 +8,7 @@ import {
   AttachmentMime,
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
+  MAX_DOCUMENT_BYTES,
   type MessageAttachment,
 } from "@club/shared";
 import { requireAuth } from "../auth.js";
@@ -47,26 +48,43 @@ files.post("/", requireAuth, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "unsupported file type" }, 415);
   }
-  const mime = parsed.data; // ImageMime | VideoMime
+  const mime = parsed.data; // ImageMime | VideoMime | DocumentMime
+  const isImage = mime.startsWith("image/");
   const isVideo = mime.startsWith("video/");
-  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  // Anything that passed AttachmentMime but isn't image/video is a document.
+  const isDocument = !isImage && !isVideo;
+  const maxBytes = isVideo
+    ? MAX_VIDEO_BYTES
+    : isDocument
+      ? MAX_DOCUMENT_BYTES
+      : MAX_IMAGE_BYTES;
 
   if (size > maxBytes) {
-    const kind = isVideo ? "video" : "image";
+    const kind = isVideo ? "video" : isDocument ? "document" : "image";
     return c.json(
       { error: `${kind} must be at most ${maxBytes} bytes (got ${size})` },
       413,
     );
   }
 
-  // Read once into a buffer. For video this can reach MAX_VIDEO_BYTES (50MB) —
+  // Original filename (display metadata only — the blob is stored under a
+  // random id). Strip any path component defensively and cap length.
+  const filename =
+    typeof file.name === "string" && file.name.trim().length > 0
+      ? (file.name.split(/[/\\]/).pop() ?? file.name).slice(0, 200)
+      : null;
+
+  // Read once into a buffer. For video/document this can reach tens of MB —
   // acceptable for club's single-room, low-concurrency profile; a future
   // streaming write would slot in at the files-dir.ts seam if that grows.
   const buf = Buffer.from(await file.arrayBuffer());
 
+  // Only images get dimension-probed (via image-size); video + document bytes
+  // are stored verbatim (the <video> element reads its own size; documents
+  // don't carry preview-useful dimensions server-side).
   let width: number | undefined;
   let height: number | undefined;
-  if (!isVideo) {
+  if (isImage) {
     try {
       const dim = imageSize(buf);
       width = typeof dim.width === "number" ? dim.width : undefined;
@@ -94,6 +112,7 @@ files.post("/", requireAuth, async (c) => {
     height: height ?? null,
     size,
     created_at: createdAt,
+    filename,
   });
 
   const attachment: MessageAttachment = {
@@ -103,6 +122,7 @@ files.post("/", requireAuth, async (c) => {
     ...(width !== undefined ? { width } : {}),
     ...(height !== undefined ? { height } : {}),
     size,
+    ...(filename ? { filename } : {}),
   };
   return c.json(attachment, 201);
 });

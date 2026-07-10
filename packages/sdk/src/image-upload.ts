@@ -16,8 +16,10 @@ import imageSize from "image-size";
 import {
   ImageMime,
   VideoMime,
+  DocumentMime,
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
+  MAX_DOCUMENT_BYTES,
   MAX_IMAGES_PER_MESSAGE,
   type MessageAttachment,
 } from "@club/shared";
@@ -147,6 +149,56 @@ export async function uploadVideoFile(
     { buffer: buf, filename: basename(path), mime },
     { timeoutMs: opts.timeoutMs ?? 180_000 },
   );
+}
+
+// Map a document's filename extension to its MIME. Documents can't be sniffed
+// from a stable magic prefix the way images (image-size) and videos (ftyp/EBML)
+// can — PDF starts with %PDF but .docx/.xlsx are ZIP containers and .md is plain
+// text — so we trust the extension. The server re-validates the MIME anyway, so
+// a wrong guess is rejected authoritatively rather than stored mislabeled.
+const EXT_TO_DOC_MIME: Record<string, string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  md: "text/markdown",
+  markdown: "text/markdown",
+};
+
+/**
+ * Read a document from `path`, infer its MIME from the extension, validate it,
+ * then upload via POST /files. Throws ClubApiError on any pre-flight failure
+ * (missing file, unsupported type, too large). Mirrors uploadImageFile /
+ * uploadVideoFile.
+ */
+export async function uploadDocumentFile(
+  conn: ClubConn,
+  path: string,
+  opts: UploadImageOpts = {},
+): Promise<MessageAttachment> {
+  let buf: Buffer;
+  try {
+    buf = await readFile(path);
+  } catch (err) {
+    throw new ClubApiError(`could not read ${path}: ${(err as Error).message}`, 0);
+  }
+
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const mime = EXT_TO_DOC_MIME[ext];
+  if (!mime || !DocumentMime.safeParse(mime).success) {
+    throw new ClubApiError(
+      `${path} has unsupported document type .${ext || "?"} (allowed: pdf, docx, xlsx, md)`,
+      415,
+    );
+  }
+
+  if (buf.byteLength > MAX_DOCUMENT_BYTES) {
+    throw new ClubApiError(
+      `${path} is ${buf.byteLength} bytes; max is ${MAX_DOCUMENT_BYTES}`,
+      413,
+    );
+  }
+
+  return uploadFile(conn, { buffer: buf, filename: basename(path), mime }, opts);
 }
 
 /**

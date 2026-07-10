@@ -20,6 +20,10 @@ function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
       uploads.push(p);
       return { id: "att_" + p };
     },
+    uploadDocument: async (_conn, p) => {
+      uploads.push(p);
+      return { id: "att_" + p };
+    },
     send: async (content, attachmentIds) => {
       sent.push({ content, attachmentIds });
     },
@@ -87,6 +91,18 @@ describe("runSend", () => {
     const deps = makeDeps();
     await runSend({ content: "", videos: ["x.mp4"], conn: CONN }, deps);
     expect(deps.sent).toEqual([{ content: "", attachmentIds: ["att_x.mp4"] }]);
+  });
+
+  it("uploads each --file (document) then sends content + attachmentIds", async () => {
+    const deps = makeDeps();
+    await runSend(
+      { content: "see doc", images: [], documents: ["a.pdf", "b.docx"], conn: CONN },
+      deps,
+    );
+    expect(deps.uploads).toEqual(["a.pdf", "b.docx"]);
+    expect(deps.sent).toEqual([
+      { content: "see doc", attachmentIds: ["att_a.pdf", "att_b.docx"] },
+    ]);
   });
 
   it("throws when neither text nor any attachment is given", async () => {

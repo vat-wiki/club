@@ -1,16 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
+import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, MAX_DOCUMENT_BYTES } from "@club/shared";
 import {
   validateImageFile,
   validateVideoFile,
+  validateDocumentFile,
   validateMediaFile,
   isAllowedImageMime,
   isAllowedVideoMime,
+  isAllowedDocumentMime,
   humanBytes,
   extractImageFiles,
   extractMediaFiles,
+  extractAttachmentFiles,
   IMAGE_MIME_WHITELIST,
   VIDEO_MIME_WHITELIST,
+  DOCUMENT_MIME_WHITELIST,
 } from "./upload";
 
 function file(name: string, type: string, size: number): File {
@@ -150,9 +154,11 @@ describe("upload helpers — validateMediaFile (dispatch)", () => {
     });
   });
 
-  it("rejects a non-media file as an invalid video", () => {
-    expect(validateMediaFile(file("a.pdf", "application/pdf", 100))).toEqual({
-      key: "video.invalidMime",
+  it("rejects a non-attachment file as an invalid document", () => {
+    // .zip is none of image/video/document — validateMediaFile routes it to the
+    // document validator, which rejects it as an unsupported document.
+    expect(validateMediaFile(file("a.zip", "application/zip", 100))).toEqual({
+      key: "document.invalidMime",
     });
   });
 });
@@ -169,5 +175,64 @@ describe("upload helpers — extractMediaFiles", () => {
   it("returns empty for a list with no media", () => {
     expect(extractMediaFiles([file("c.pdf", "application/pdf", 10)])).toEqual([]);
     expect(extractMediaFiles([])).toEqual([]);
+  });
+});
+
+describe("upload helpers — document whitelist + validateDocumentFile", () => {
+  it("accepts pdf/docx/xlsx/md", () => {
+    expect(
+      validateDocumentFile(file("a.pdf", "application/pdf", 1024)),
+    ).toBeNull();
+    expect(
+      validateDocumentFile(
+        file("a.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 1024),
+      ),
+    ).toBeNull();
+    expect(
+      validateDocumentFile(
+        file("a.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 1024),
+      ),
+    ).toBeNull();
+    expect(validateDocumentFile(file("a.md", "text/markdown", 1024))).toBeNull();
+  });
+
+  it("whitelist matches the shared DocumentMime enum", () => {
+    expect(DOCUMENT_MIME_WHITELIST).toEqual([
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/markdown",
+    ]);
+    expect(isAllowedDocumentMime("application/pdf")).toBe(true);
+    expect(isAllowedDocumentMime("application/zip")).toBe(false);
+  });
+
+  it("rejects a non-whitelisted document", () => {
+    expect(validateDocumentFile(file("a.zip", "application/zip", 100))).toEqual({
+      key: "document.invalidMime",
+    });
+  });
+
+  it("rejects an over-size document with tooLarge", () => {
+    const oversized = MAX_DOCUMENT_BYTES + 1;
+    expect(validateDocumentFile(file("big.pdf", "application/pdf", oversized))).toEqual({
+      key: "document.tooLarge",
+      vars: { max: humanBytes(MAX_DOCUMENT_BYTES), size: humanBytes(oversized) },
+    });
+  });
+});
+
+describe("upload helpers — extractAttachmentFiles", () => {
+  it("keeps images, videos, AND documents; drops the rest", () => {
+    const img = file("a.png", "image/png", 10);
+    const vid = file("b.mp4", "video/mp4", 10);
+    const doc = file("c.pdf", "application/pdf", 10);
+    const zip = file("d.zip", "application/zip", 10);
+    expect(extractAttachmentFiles([img, vid, doc, zip])).toEqual([img, vid, doc]);
+  });
+
+  it("returns empty for a list with no attachments", () => {
+    expect(extractAttachmentFiles([file("d.zip", "application/zip", 10)])).toEqual([]);
+    expect(extractAttachmentFiles([])).toEqual([]);
   });
 });

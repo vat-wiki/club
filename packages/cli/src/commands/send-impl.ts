@@ -14,6 +14,8 @@ export interface SendDeps {
   uploadImage: (conn: ClubConn, path: string) => Promise<{ id: string }>;
   /** Upload one local video path → attachment id. Throws on any pre-flight failure. */
   uploadVideo: (conn: ClubConn, path: string) => Promise<{ id: string }>;
+  /** Upload one local document path → attachment id. Throws on any pre-flight failure. */
+  uploadDocument: (conn: ClubConn, path: string) => Promise<{ id: string }>;
   /** Send the composed message (text + attachment ids). */
   send: (content: string, attachmentIds?: string[]) => Promise<unknown>;
 }
@@ -22,6 +24,7 @@ export interface SendInput {
   content: string; // already trimmed
   images: string[]; // raw image paths
   videos?: string[]; // raw video paths (optional; image-only callers omit it)
+  documents?: string[]; // raw document paths (pdf/docx/xlsx/md)
   conn: ClubConn;
 }
 
@@ -40,18 +43,19 @@ export async function runSend(
   deps: SendDeps,
 ): Promise<SendResult> {
   const { content, conn } = input;
-  // Both lists are optional at the call site (a video-only send omits images
-  // and vice-versa); default each so the combined cap + loops below are safe.
+  // Each list is optional at the call site (a video-only send omits images,
+  // etc.); default each so the combined cap + loops below are safe.
   const images = input.images ?? [];
   const videos = input.videos ?? [];
+  const documents = input.documents ?? [];
 
-  if (!content && images.length === 0 && videos.length === 0) {
-    throw new Error("no message. pass text, use --stdin, or attach --image/--video <path>");
+  if (!content && images.length === 0 && videos.length === 0 && documents.length === 0) {
+    throw new Error("no message. pass text, use --stdin, or attach --image/--video/--file <path>");
   }
 
   // Fail fast on an over-long attachment list before any upload happens.
-  // Images + videos share one per-message cap, so check the combined count.
-  assertImageCount([...images, ...videos]);
+  // Images, videos, and documents all share one per-message cap.
+  assertImageCount([...images, ...videos, ...documents]);
 
   const attachmentIds: string[] = [];
   for (const p of images) {
@@ -60,6 +64,10 @@ export async function runSend(
   }
   for (const p of videos) {
     const att = await deps.uploadVideo(conn, p);
+    attachmentIds.push(att.id);
+  }
+  for (const p of documents) {
+    const att = await deps.uploadDocument(conn, p);
     attachmentIds.push(att.id);
   }
 

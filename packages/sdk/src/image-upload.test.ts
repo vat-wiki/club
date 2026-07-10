@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClubApiError } from "./index.js";
-import { assertImageCount, uploadImageFile, uploadVideoFile } from "./image-upload.js";
+import {
+  assertImageCount,
+  uploadImageFile,
+  uploadVideoFile,
+  uploadDocumentFile,
+} from "./image-upload.js";
 
 // A minimal 1x1 PNG — real magic bytes so image-size sniffs type:"png". This is
 // the canonical smallest valid PNG (8-byte signature + IHDR + IDAT + IEND).
@@ -194,5 +199,71 @@ describe("uploadVideoFile", () => {
     await expect(uploadVideoFile({ server: "http://x" }, "/no/such/file.mp4")).rejects.toThrow(
       /could not read/,
     );
+  });
+});
+
+describe("uploadDocumentFile", () => {
+  it("infers the MIME from the extension and uploads a pdf", async () => {
+    const d = tmpDir();
+    const p = join(d, "report.pdf");
+    writeFileSync(p, Buffer.from("%PDF-1.4 body"));
+    try {
+      const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+        expect(String(url)).toBe("http://x/files");
+        const blob = (init.body as FormData).get("file") as Blob;
+        // MIME inferred from the .pdf extension (not sniffed from bytes).
+        expect(blob.type).toBe("application/pdf");
+        return jsonRes({
+          id: "doc1",
+          url: "/files/doc1",
+          mime: "application/pdf",
+          size: 0,
+          filename: "report.pdf",
+        });
+      });
+      globalThis.fetch = fetchMock as typeof fetch;
+      const att = await uploadDocumentFile({ server: "http://x", key: "k" }, p);
+      expect(att.id).toBe("doc1");
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("infers docx/xlsx/md from their extensions", async () => {
+    const cases: Record<string, string> = {
+      "a.docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "a.xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "a.md": "text/markdown",
+      "notes.markdown": "text/markdown",
+    };
+    for (const [name, mime] of Object.entries(cases)) {
+      const d = tmpDir();
+      const p = join(d, name);
+      writeFileSync(p, Buffer.from("body"));
+      try {
+        const fetchMock = vi.fn(async (_u: string, init: RequestInit) => {
+          expect(((init.body as FormData).get("file") as Blob).type).toBe(mime);
+          return jsonRes({ id: "x", url: "/files/x", mime, size: 0 });
+        });
+        globalThis.fetch = fetchMock as typeof fetch;
+        await uploadDocumentFile({ server: "http://x" }, p);
+      } finally {
+        rmSync(d, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("rejects an unsupported document extension", async () => {
+    const d = tmpDir();
+    const p = join(d, "a.zip");
+    writeFileSync(p, Buffer.from("body"));
+    try {
+      globalThis.fetch = vi.fn(async () => jsonRes({}, 200)) as typeof fetch;
+      await expect(uploadDocumentFile({ server: "http://x" }, p)).rejects.toThrow(
+        /unsupported document type/,
+      );
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
   });
 });

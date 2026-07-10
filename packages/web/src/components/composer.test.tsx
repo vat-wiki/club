@@ -51,14 +51,14 @@ describe("Composer — image input", () => {
     expect(attach.tagName).toBe("BUTTON");
   });
 
-  it("renders a hidden file input with the image+video accept whitelist + multiple + capture", () => {
+  it("renders a hidden file input with the image+video+document accept whitelist + multiple + capture", () => {
     const { container } = renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
     const input = container.querySelector<HTMLInputElement>('input[type="file"]');
     expect(input).toBeTruthy();
     expect(input?.hidden).toBe(true);
     expect(input?.multiple).toBe(true);
     expect(input?.accept).toBe(
-      "image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm",
+      "image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,.pdf,.docx,.xlsx,.md",
     );
     expect(input?.hasAttribute("capture")).toBe(true);
   });

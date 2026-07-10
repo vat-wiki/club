@@ -62,12 +62,26 @@ export type ImageMime = z.infer<typeof ImageMime>;
 export const VideoMime = z.enum(["video/mp4", "video/webm"]);
 export type VideoMime = z.infer<typeof VideoMime>;
 
-// Every MIME club will store and serve as an attachment (image OR video). The
-// upload route branches on this union; the web client renders <img> vs <video>
-// based on which side matches.
+// The MIME types club accepts as document attachments. The browser can't render
+// these inline natively (except PDF); preview is client-side — PDF via <iframe>,
+// .docx/.xlsx via in-browser transcode libs (mammoth / sheetjs), markdown as a
+// plain download. The server stores them verbatim and records only mime +
+// filename + size (no probing).
+export const DocumentMime = z.enum([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "text/markdown", // .md
+]);
+export type DocumentMime = z.infer<typeof DocumentMime>;
+
+// Every MIME club will store and serve as an attachment (image, video, OR
+// document). The upload route branches on this union; clients render based on
+// which kind matches (<img> / <video> / file card).
 export const AttachmentMime = z.enum([
   ...ImageMime.options,
   ...VideoMime.options,
+  ...DocumentMime.options,
 ]);
 export type AttachmentMime = z.infer<typeof AttachmentMime>;
 
@@ -81,12 +95,15 @@ export type AttachmentMime = z.infer<typeof AttachmentMime>;
 export interface MessageAttachment {
   id: string;
   url: string; // root-relative, e.g. "/files/{id}"
-  mime: ImageMime | VideoMime; // image or video — clients branch on this
+  mime: ImageMime | VideoMime | DocumentMime; // clients branch on this
   width?: number; // px, lets the client reserve layout before the bytes load.
   // For images this is the server-probed dimension; for video it is typically
   // absent (the <video> element reads its own size via onLoadedMetadata).
   height?: number;
   size: number; // bytes
+  // Original filename (e.g. "report.pdf"). Documents surface it on the file
+  // card; images/videos typically omit it (they render from the id-derived url).
+  filename?: string;
 }
 
 // A @-mention of one participant by another. Persisted server-side so an agent
@@ -154,6 +171,7 @@ export const MAX_MESSAGE_CONTENT = 4000;
 export const MAX_IMAGES_PER_MESSAGE = 8;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
+export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024; // 25 MB
 
 // content is optional IFF at least one attachment is supplied ("text-optional"
 // keeps the common screenshot-then-send path frictionless — a bare image is a

@@ -128,6 +128,11 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 7,
+    description: "filename on uploaded files (document attachments show it)",
+    sql: `ALTER TABLE files ADD COLUMN filename TEXT;`,
+  },
 ];
 
 db.exec(`
@@ -486,11 +491,12 @@ export interface FileRow {
   height: number | null;
   size: number;
   created_at: number;
+  filename: string | null;
 }
 
 const insertFileStmt = db.prepare(
-  `INSERT INTO files (id, participant_id, mime, width, height, size, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  `INSERT INTO files (id, participant_id, mime, width, height, size, created_at, filename)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 
 export function insertFile(f: Omit<FileRow, never>): void {
@@ -502,11 +508,12 @@ export function insertFile(f: Omit<FileRow, never>): void {
     f.height,
     f.size,
     f.created_at,
+    f.filename,
   );
 }
 
 const fileByIdStmt = db.prepare<[string], FileRow>(
-  `SELECT id, participant_id, mime, width, height, size, created_at
+  `SELECT id, participant_id, mime, width, height, size, created_at, filename
    FROM files WHERE id = ?`,
 );
 
@@ -522,7 +529,7 @@ export function getFilesByIds(ids: string[]): FileRow[] {
   const placeholders = ids.map(() => "?").join(",");
   const rows = db
     .prepare<string[], FileRow>(
-      `SELECT id, participant_id, mime, width, height, size, created_at
+      `SELECT id, participant_id, mime, width, height, size, created_at, filename
        FROM files WHERE id IN (${placeholders})`,
     )
     .all(...ids);

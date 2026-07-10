@@ -6,6 +6,7 @@ import { fmtTime, fmtTimePrecise, fmtDay, renderContent, mentionsSelf } from "@/
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { FileCard } from "@/components/file-card";
 import { Avatar } from "@/components/avatar";
 
 type Status = "connecting" | "connected" | "lost";
@@ -65,6 +66,11 @@ function AttachmentGallery({
                 />
               </div>
             );
+          }
+          if (!a.mime.startsWith("image/")) {
+            // Document attachment (pdf/docx/xlsx/md) → compact file card with
+            // download (+ native PDF preview in a new tab).
+            return <FileCard key={a.id} attachment={a} />;
           }
           return (
             <button

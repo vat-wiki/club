@@ -101,6 +101,7 @@ messages.post("/", async (c) => {
       ...(r.width != null ? { width: r.width } : {}),
       ...(r.height != null ? { height: r.height } : {}),
       size: r.size,
+      ...(r.filename ? { filename: r.filename } : {}),
     }));
   }
 

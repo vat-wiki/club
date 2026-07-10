@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ClubClient } from "@club/sdk";
-import { uploadImageFile, uploadVideoFile } from "@club/sdk/node";
+import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
 import { dispatchTool, type DispatchClient } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
@@ -35,6 +35,7 @@ const dispatchClient: DispatchClient = {
   send: (content, attachmentIds) => client.send(content, attachmentIds),
   uploadImage: (path) => uploadImageFile({ server: client.server, key: client.key }, path),
   uploadVideo: (path) => uploadVideoFile({ server: client.server, key: client.key }, path),
+  uploadDocument: (path) => uploadDocumentFile({ server: client.server, key: client.key }, path),
   members: () => client.members(),
   stream: (cb) => client.stream(cb),
   reportAgentThinking: () => client.reportAgentThinking(),
@@ -87,6 +88,12 @@ const TOOLS = [
           items: { type: "string" },
           description:
             "local video file paths to attach (mp4/webm, ≤50MB each, up to 8 total)",
+        },
+        files: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "local document paths to attach (pdf/docx/xlsx/md, ≤25MB each, up to 8 total)",
         },
       },
       required: [] as const,

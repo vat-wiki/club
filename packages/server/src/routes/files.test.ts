@@ -236,3 +236,62 @@ describe("GET /files/:id — HTTP Range (video seek)", () => {
     );
   });
 });
+
+// ── Document branch ──────────────────────────────────────────────────
+// Arbitrary bytes + a document mime. Like video, the server doesn't probe
+// document content — it records mime + filename + size and stores the bytes
+// verbatim. The filename comes from the multipart part's name (sanitized).
+const DOC_BYTES = Buffer.from("%PDF-1.4 arbitrary document body");
+
+function docFile(mime: string, name: string): File {
+  return new File([DOC_BYTES], name, { type: mime });
+}
+
+describe("POST /files — document branch", () => {
+  it("accepts a pdf and echoes the sanitized filename", async () => {
+    const key = await mintKey("d1");
+    const { status, body } = await upload(
+      key,
+      docFile("application/pdf", "report.pdf"),
+    );
+    expect(status).toBe(201);
+    expect(body.mime).toBe("application/pdf");
+    expect(body.size).toBe(DOC_BYTES.length);
+    expect(body.filename).toBe("report.pdf");
+    expect(body.url).toBe(`/files/${body.id}`);
+    // Documents carry no width/height (only images are probed).
+    expect(body.width).toBeUndefined();
+    expect(body.height).toBeUndefined();
+  });
+
+  it("strips a directory component from the filename", async () => {
+    const key = await mintKey("d2");
+    const { body } = await upload(
+      key,
+      // A client shouldn't send a path, but if it does we keep only the basename.
+      docFile("application/pdf", "../../etc/passwd.pdf"),
+    );
+    expect(body.filename).toBe("passwd.pdf");
+  });
+
+  it("accepts docx / xlsx / md", async () => {
+    const key = await mintKey("d3");
+    const cases: Array<[string, string]> = [
+      ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "a.docx"],
+      ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "a.xlsx"],
+      ["text/markdown", "a.md"],
+    ];
+    for (const [mime, name] of cases) {
+      const { status, body } = await upload(key, docFile(mime, name));
+      expect(status).toBe(201);
+      expect(body.mime).toBe(mime);
+      expect(body.filename).toBe(name);
+    }
+  });
+
+  it("rejects a non-whitelisted document type (415)", async () => {
+    const key = await mintKey("d4");
+    const { status } = await upload(key, docFile("application/zip", "a.zip"));
+    expect(status).toBe(415);
+  });
+});

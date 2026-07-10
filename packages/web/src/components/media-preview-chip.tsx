@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, FileText, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // A draft attachment: a chosen image OR video working its way through upload.
@@ -13,7 +13,7 @@ export interface AttachmentDraft {
   key: string;
   file: File;
   objectUrl: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "document";
   status: "uploading" | "done" | "error";
   progress: number; // 0..1, only meaningful while uploading
   remote?: { id: string }; // the server id, set once status === "done"
@@ -78,6 +78,20 @@ export function MediaPreviewChip({
           tabIndex={-1}
           className="h-full w-full object-cover"
         />
+      ) : draft.kind === "document" ? (
+        // Document chips show a file icon + filename instead of a preview frame
+        // (the bytes aren't an inline-renderable image/video). role=img +
+        // aria-label carry the state for SRs, mirroring the other paths.
+        <div
+          role="img"
+          aria-label={statusAlt}
+          className="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-center"
+        >
+          <FileText className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="w-full truncate font-mono text-[9px] leading-tight text-muted-foreground">
+            {draft.file.name}
+          </span>
+        </div>
       ) : (
         <img
           src={draft.objectUrl}

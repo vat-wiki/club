@@ -221,6 +221,7 @@ function fakeClient(over: Partial<DispatchClient> = {}): DispatchClient {
     send: async (content: string) => makeMsg(content),
     uploadImage: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
     uploadVideo: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
+    uploadDocument: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
     members: async () => [],
     stream: () => ({ stop: () => {} }),
     reportAgentThinking: async () => {},
@@ -347,6 +348,23 @@ describe("dispatchTool", () => {
     });
     const out = await dispatchTool("send", { videos: ["only.webm"] }, client);
     expect(out).toContain("[视频: /files/x]");
+  });
+
+  it("send uploads each document and renders a [文件] token with its name", async () => {
+    const uploaded: string[] = [];
+    const client = fakeClient({
+      uploadDocument: async (p) => {
+        uploaded.push(p);
+        return { id: "d_" + p };
+      },
+      send: async () =>
+        makeMsg("see", [
+          { id: "d_a.pdf", url: "/files/d_a.pdf", mime: "application/pdf", size: 1, filename: "a.pdf" },
+        ]),
+    });
+    const out = await dispatchTool("send", { content: "see", files: ["a.pdf"] }, client);
+    expect(uploaded).toEqual(["a.pdf"]);
+    expect(out).toContain("[文件: a.pdf]");
   });
 
   it("send tolerates `images` passed as a single string", async () => {

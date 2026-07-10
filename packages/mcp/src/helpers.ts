@@ -123,6 +123,11 @@ export interface DispatchClient {
    *  validate→POST /files); declared on the interface so dispatchTool stays
    *  fakeable. */
   uploadVideo(path: string): Promise<{ id: string }>;
+  /** Upload one local document file, returning its attachment descriptor.
+   *  Index.ts wires this to @club/sdk uploadDocumentFile (read→infer MIME from
+   *  extension→validate→POST /files); declared on the interface so dispatchTool
+   *  stays fakeable. */
+  uploadDocument(path: string): Promise<{ id: string }>;
   members(): Promise<Participant[]>;
   stream(onMessage: (m: Message) => void): { stop: () => void };
   /** Report that THIS agent started processing (lights up the room's typing
@@ -202,18 +207,19 @@ export async function dispatchTool(
       const content = str(args.content);
       const images = strArray(args.images);
       const videos = strArray(args.videos);
-      // Need at least one of: text, images, or videos. Bare media with no text
-      // is a legitimate intent ("text-optional"), mirroring the CLI and web.
-      if (!content && images.length === 0 && videos.length === 0)
+      const documents = strArray(args.files);
+      // Need at least one of: text, images, videos, or documents. Bare media
+      // with no text is a legitimate intent ("text-optional").
+      if (!content && images.length === 0 && videos.length === 0 && documents.length === 0)
         return "error: missing content";
-      // Fail fast on too many attachments (images + videos share one cap)
-      // before any upload happens.
-      assertImageCount([...images, ...videos]);
+      // Fail fast on too many attachments before any upload happens. Images,
+      // videos, and documents all share one per-message cap.
+      assertImageCount([...images, ...videos, ...documents]);
       let attachmentIds: string[] | undefined;
-      if (images.length > 0 || videos.length > 0) {
+      if (images.length > 0 || videos.length > 0 || documents.length > 0) {
         // Pre-flight + upload each file; an unsupported/missing/too-large file
-        // throws and index.ts surfaces it as `error: <msg>`. Images first, then
-        // videos — stable, predictable attachment order.
+        // throws and index.ts surfaces it as `error: <msg>`. Order is stable:
+        // images → videos → documents.
         const ids: string[] = [];
         for (const p of images) {
           const att = await client.uploadImage(p);
@@ -221,6 +227,10 @@ export async function dispatchTool(
         }
         for (const p of videos) {
           const att = await client.uploadVideo(p);
+          ids.push(att.id);
+        }
+        for (const p of documents) {
+          const att = await client.uploadDocument(p);
           ids.push(att.id);
         }
         attachmentIds = ids;

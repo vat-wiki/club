@@ -17,7 +17,7 @@ import {
   type MentionQuery,
 } from "@/lib/mention";
 import {
-  extractMediaFiles,
+  extractAttachmentFiles,
   validateMediaFile,
   type RejectReason,
 } from "@/lib/upload";
@@ -158,7 +158,7 @@ export function Composer({
   // We never silently drop a file — a wrong-format/oversized file is announced.
   const addFiles = useCallback(
     (files: readonly File[]) => {
-      const media = extractMediaFiles(files as Iterable<File>);
+      const media = extractAttachmentFiles(files as Iterable<File>);
       if (media.length === 0) return;
 
       setAttachError(null);
@@ -189,7 +189,11 @@ export function Composer({
             key: `${file.name}-${file.size}-${objectUrl}`,
             file,
             objectUrl,
-            kind: file.type.startsWith("video/") ? "video" : "image",
+            kind: file.type.startsWith("video/")
+              ? "video"
+              : file.type.startsWith("image/")
+                ? "image"
+                : "document",
             status: "uploading",
             progress: 0,
           });
@@ -598,7 +602,7 @@ export function Composer({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
+          accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,.pdf,.docx,.xlsx,.md"
           multiple
           capture
           hidden
@@ -718,21 +722,20 @@ export function Composer({
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1 pt-1" data-testid="composer-attachments">
             {attachments.map((d, i) => {
-              const isVideo = d.kind === "video";
+              // Pick the i18n prefix by kind so each chip type gets its own copy
+              // ("图片 1" / "视频 1" / "文件 1").
+              const pfx = d.kind === "video" ? "video" : d.kind === "document" ? "document" : "image";
               return (
                 <MediaPreviewChip
                   key={d.key}
                   draft={d}
-                  labelDone={t(isVideo ? "video.chip.done" : "image.chip.done", { index: i + 1 })}
+                  labelDone={t(`${pfx}.chip.done`, { index: i + 1 })}
                   labelUploading={(p) =>
-                    t(isVideo ? "video.chip.uploading" : "image.chip.uploading", {
-                      index: i + 1,
-                      percent: p,
-                    })
+                    t(`${pfx}.chip.uploading`, { index: i + 1, percent: p })
                   }
-                  labelError={t(isVideo ? "video.chip.error" : "image.chip.error", { index: i + 1 })}
-                  removeLabel={t(isVideo ? "video.remove.aria" : "image.remove.aria", { index: i + 1 })}
-                  retryLabel={t(isVideo ? "video.retry.aria" : "image.retry.aria", { index: i + 1 })}
+                  labelError={t(`${pfx}.chip.error`, { index: i + 1 })}
+                  removeLabel={t(`${pfx}.remove.aria`, { index: i + 1 })}
+                  retryLabel={t(`${pfx}.retry.aria`, { index: i + 1 })}
                   onRemove={() => removeAttachment(d.key)}
                   onRetry={() => retryAttachment(d.key)}
                 />

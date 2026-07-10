@@ -220,6 +220,21 @@ const zh: Dict = {
   "video.chip.done": "视频 {index}",
   "video.chip.error": "视频 {index}，上传失败",
 
+  // Composer / message list — document input
+  "document.invalidMime": "只支持 PDF / DOCX / XLSX / Markdown 文档",
+  "document.tooLarge": "文档不能超过 {max}（这个 {size}）",
+  "document.retry.aria": "重新上传文档 {index}",
+  "document.remove.aria": "移除文档 {index}",
+  "document.chip.uploading": "文档 {index}，上传中 {percent}%",
+  "document.chip.done": "文档 {index}",
+  "document.chip.error": "文档 {index}，上传失败",
+
+  // Message list — document attachments
+  "file.preview": "预览",
+  "file.download": "下载",
+  "file.close": "关闭",
+  "file.previewFailed": "预览失败——请尝试下载后打开",
+
   // Message list — image attachments
   "msg.image.open": "放大查看图片",
   "image.lightbox.title": "图片预览",
@@ -420,6 +435,21 @@ const en: Dict = {
   "video.chip.uploading": "Video {index}, uploading {percent}%",
   "video.chip.done": "Video {index}",
   "video.chip.error": "Video {index}, upload failed",
+
+  // Composer / message list — document input
+  "document.invalidMime": "Only PDF / DOCX / XLSX / Markdown documents are supported",
+  "document.tooLarge": "Documents can't exceed {max} (this one is {size})",
+  "document.retry.aria": "Retry uploading document {index}",
+  "document.remove.aria": "Remove document {index}",
+  "document.chip.uploading": "Document {index}, uploading {percent}%",
+  "document.chip.done": "Document {index}",
+  "document.chip.error": "Document {index}, upload failed",
+
+  // Message list — document attachments
+  "file.preview": "Preview",
+  "file.download": "Download",
+  "file.close": "Close",
+  "file.previewFailed": "Preview failed — try downloading and opening it instead",
 
   // Message list — image attachments
   "msg.image.open": "View image larger",

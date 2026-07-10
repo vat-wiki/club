@@ -32,7 +32,7 @@
 - **建议**（已落 PRD `test-noise-governance.md`）：(b) 机器噪音走 system 消息样式、不进 #general message log（新增 `messages.type`）；(d) 清理存量噪音 + 删除纯测试 participant；(a) 独立频道规则层写入、代码层随多房间落地；(c) 自动过期延后单独立项。
 - **优先级**：**P0**（首印象 + 频道卫生）。
 - **归属**：王产品（规则，已出 PRD）→ 王后端（`messages.type` migration + system 端点 + 清理脚本）+ 王前端（message-list 不渲染 system）+ 运维（执行存量清理 + 备份）+ 王测开（TN1–TN9）+ 王体验（system 消息视图信息架构）。
-- **关联文档**：`requirements/test-noise-governance.md`（治理 PRD）、`requirements/first-contact.md`（#001，首印象同源）。
+- **关联文档**：`requirements/test-noise-governance.md`（治理 PRD）、`requirements/first-contact.md`（#001，首印象同源）、`requirements/multi-room.md`（长期解「独立频道」的能力前置——多房间落地后噪音 agent 进自己房间，主频道回归干净）。
 
 ---
 

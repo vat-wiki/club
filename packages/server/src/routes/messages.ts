@@ -21,10 +21,12 @@ import {
   getFilesByIds,
   getAllParticipantNames,
   insertMention,
+  ensureRoom,
+  getMessageRoom,
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { addSubscriber, broadcast, isThinking, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
+import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
@@ -55,6 +57,7 @@ function toMessage(r: MessageRow): Message {
     authorKind: r.author_kind as ParticipantKind,
     content: r.content,
     createdAt: r.created_at,
+    room: r.room,
   };
   const attachments = parseAttachments(r.attachments);
   if (attachments) msg.attachments = attachments;
@@ -75,7 +78,7 @@ messages.post("/", async (c) => {
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
-  const { content, attachmentIds, replyToId } = parsed.data;
+  const { content, attachmentIds, replyToId, room } = parsed.data;
 
   // Rehydrate attachments server-side from the requested ids. The server is the
   // sole source of truth for mime/width/height/size, so the client only sends
@@ -113,6 +116,11 @@ messages.post("/", async (c) => {
   const me = c.get("participant");
   const id = ulid();
   const createdAt = Date.now();
+  // Auto-create the room if it doesn't exist yet (PRD §9.4: posting into a
+  // non-existent-but-valid room builds it — "build" and "enter" are the same
+  // action in the open model). "general" always already exists from the
+  // migration seed, so the common path is a no-op.
+  ensureRoom(room, createdAt);
   insertMessage(
     id,
     me.id,
@@ -120,6 +128,7 @@ messages.post("/", async (c) => {
     createdAt,
     attachments.length > 0 ? JSON.stringify(attachments) : null,
     replyToId ?? null,
+    room,
   );
 
   // Persist a per-participant inbox row for everyone @-mentioned in the text.
@@ -128,12 +137,14 @@ messages.post("/", async (c) => {
   // an offline recipient still finds the mention on next poll. We do NOT
   // exclude the author: the client-side `listen --mention` matcher doesn't
   // either, so the inbox must agree with what a live listen would have caught.
+  // Each mention carries `room` so a cross-room @mention can deep-link the
+  // recipient to the source room + message (MR11).
   const mentioned = extractMentionedParticipants(
     content,
     getAllParticipantNames(),
   );
   for (const m of mentioned) {
-    insertMention(ulid(), id, m.id, me.id, createdAt);
+    insertMention(ulid(), id, m.id, me.id, room, createdAt);
   }
 
   const msg: Message = {
@@ -143,6 +154,7 @@ messages.post("/", async (c) => {
     authorKind: me.kind,
     content,
     createdAt,
+    room,
   };
   if (attachments.length > 0) msg.attachments = attachments;
   if (replyToId) msg.replyToId = replyToId;
@@ -151,16 +163,26 @@ messages.post("/", async (c) => {
   // P1-5: an agent's reply landing is the most reliable "done thinking" signal
   // — clear its indicator right now, regardless of whether the agent client
   // also reports idle. This is the safety net for agents that crash right after
-  // posting (so their own idle report never fires).
-  if (me.kind === "agent" && isThinking(me.id)) {
-    markThinkingIdle(me.id);
-    broadcastAgentIdle({ participantId: me.id });
+  // posting (so their own idle report never fires). The idle event carries the
+  // room the agent was thinking in (if any) so the clear reaches the same
+  // room-scoped subscribers that saw the indicator.
+  if (me.kind === "agent") {
+    const entry = markThinkingIdle(me.id);
+    if (entry) {
+      broadcastAgentIdle({
+        participantId: me.id,
+        ...(entry.room ? { room: entry.room } : {}),
+      });
+    }
   }
   return c.json(msg, 201);
 });
 
-// GET /messages?since=<id>&before=<id>&limit=<n> -> Message[]  (chronologic)
+// GET /messages?room=<slug>&since=<id>&before=<id>&limit=<n> -> Message[]
+// (chronologic). `room` defaults to "general" for backward compatibility — an
+// old client that omits it sees the general history exactly as before.
 messages.get("/", (c) => {
+  const room = c.req.query("room") ?? "general";
   const since = c.req.query("since");
   const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
@@ -168,35 +190,42 @@ messages.get("/", (c) => {
   // `since`; they aren't combined in practice, but if both appear we serve the
   // backward page so the UI's "load earlier" never accidentally pulls newer.
   const rows = before
-    ? getMessagesBeforeId(before, limit)
+    ? getMessagesBeforeId(before, room, limit)
     : since
-      ? getMessagesSince(since, limit).messages
-      : getRecentMessages(limit);
+      ? getMessagesSince(since, room, limit).messages
+      : getRecentMessages(room, limit);
   return c.json(rows.map(toMessage));
 });
 
-// GET /messages/search?q=<text>&limit=<n> -> Message[] (newest first)
+// GET /messages/search?q=<text>&room=<slug>&limit=<n> -> Message[] (newest first)
+// `room` is optional: omit to search across all rooms, pass a slug to scope it.
 messages.get("/search", (c) => {
   const q = (c.req.query("q") ?? "").trim();
   if (!q) return c.json([]);
   const limit = parseLimit(c.req.query("limit"));
-  return c.json(searchMessages(q, limit).map(toMessage));
+  const room = c.req.query("room");
+  return c.json(searchMessages(q, room || null, limit).map(toMessage));
 });
 
 // DELETE /messages/:id -> 204 (recall). Only the author may (participant_id
 // check in deleteMessage). Broadcasts `message_deleted` so every client hides
-// the content and shows a "recalled" placeholder instead.
+// the content and shows a "recalled" placeholder instead. The event carries the
+// message's room so the fan-out stays room-scoped (a client watching another
+// room never sees the recall). Soft-delete keeps the row, so the room is still
+// readable after the successful update.
 messages.delete("/:id", async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const ok = deleteMessage(id, me.id);
   if (!ok) return c.json({ error: "not found" }, 404);
-  broadcastDeleted({ id });
+  const room = getMessageRoom(id) ?? "general";
+  broadcastDeleted({ id, room });
   return c.body(null, 204);
 });
 
 // POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
-// `message_reaction` with the refreshed aggregate so all clients update.
+// `message_reaction` with the refreshed aggregate so all clients update. The
+// event carries the message's room so the fan-out stays room-scoped.
 messages.post("/:id/reactions", async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
@@ -204,14 +233,33 @@ messages.post("/:id/reactions", async (c) => {
   const emoji = typeof body.emoji === "string" ? body.emoji.trim() : "";
   if (!emoji || emoji.length > 32) return c.json({ error: "bad emoji" }, 400);
   const reactions = toggleReaction(id, me.id, emoji);
-  broadcastReaction({ messageId: id, reactions: reactions as Reaction[] } satisfies MessageReactionEvent);
+  const room = getMessageRoom(id) ?? "general";
+  broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room } satisfies MessageReactionEvent);
   return c.body(null, 204);
 });
 
-// GET /messages/stream  (SSE) — live message feed
+// GET /messages/stream  (SSE) — live message feed, optionally room-scoped.
+// `?room=<slug>` subscribes to a single room; `?rooms=a,b` to several; omitted
+// subscribes to all rooms. Room-scoped events (message / message_deleted /
+// message_reaction / agent_thinking / agent_idle) are filtered server-side so a
+// client focused on room A never pays for room B's traffic (MR10). Presence
+// stays global (PRD §8.7) — a roster is connection-level, not per-room.
 messages.get("/stream", (c) => {
+  // Parse the room filter into a Set (or null = all rooms). An explicit but
+  // empty filter (e.g. `?rooms=` with no valid slugs) is treated as "all",
+  // matching the forgiving spirit of the single-room `?room=` default.
+  const roomParam = c.req.query("room");
+  const roomsParam = c.req.query("rooms");
+  let roomSet: Set<string> | null = null;
+  if (roomParam !== undefined || roomsParam !== undefined) {
+    const names = (roomsParam ?? roomParam ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    roomSet = names.length > 0 ? new Set(names) : null;
+  }
   return streamSSE(c, async (stream) => {
-    const unsubscribe = addSubscriber(stream, c.get("participant"));
+    const unsubscribe = addSubscriber(stream, c.get("participant"), roomSet);
     stream.onAbort(() => {
       unsubscribe();
     });

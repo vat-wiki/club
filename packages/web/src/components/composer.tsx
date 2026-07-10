@@ -29,6 +29,7 @@ export function Composer({
   members,
   selfId,
   conn,
+  room,
   replyTo,
   onReplyClear,
 }: {
@@ -41,6 +42,8 @@ export function Composer({
   /** Active connection — needed to authorize multipart uploads (POST /files).
    *  Optional so tests/preview can mount the composer without a server. */
   conn?: ClubConn | null;
+  /** Room the composer posts into (drives the placeholder/label + typing scope). */
+  room?: string;
   /** Message being replied to (composer shows a quote preview); null normally. */
   replyTo?: Message | null;
   /** Clear the reply target (cancel reply mode). */
@@ -317,13 +320,13 @@ export function Composer({
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportTyping = useCallback(() => {
     if (!conn) return;
-    void api.thinking(conn).catch(() => {});
+    void api.thinking(conn, room).catch(() => {});
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => {
-      void api.idle(conn).catch(() => {});
+      void api.idle(conn, room).catch(() => {});
       typingTimer.current = null;
     }, 2500);
-  }, [conn]);
+  }, [conn, room]);
   useEffect(() => () => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
   }, []);
@@ -353,7 +356,7 @@ export function Composer({
       markSent();
       // Message landed — stop the typing indicator.
       if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (conn) void api.idle(conn).catch(() => {});
+      if (conn) void api.idle(conn, room).catch(() => {});
     } catch {
       // Send failed: keep the text draft AND the image drafts so the user can
       // edit/redo without losing the (already-uploaded) images. Surface a
@@ -616,7 +619,7 @@ export function Composer({
         {/* Visually-hidden label gives the textarea an accessible name; the
             placeholder alone is not a substitute (WCAG 1.3.1 / 3.3.2). */}
         <label htmlFor="composer-input" className="sr-only">
-          {t("composer.label")}
+          {t("composer.label", { room: room ?? "general" })}
         </label>
         {/* Textarea + chip row share a single flex column so the chips sit
             directly under the text (still inside the mint-bordered bar) while
@@ -647,7 +650,7 @@ export function Composer({
           rows={1}
           disabled={disabled}
           data-testid="composer-input"
-          placeholder={t("composer.placeholder")}
+          placeholder={t("composer.placeholder", { room: room ?? "general" })}
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
           // own, so the container edge is the single, clean input boundary

@@ -78,9 +78,9 @@ type Dict = Record<string, string>;
 
 const zh: Dict = {
   // App shell
-  "app.title": "club — #general 聊天室",
+  "app.title": "club — #{room} 聊天室",
   "app.skipToChat": "跳到聊天",
-  "app.h1": "club — #general 聊天室",
+  "app.h1": "club — #{room} 聊天室",
 
   // Topbar / connection status
   "status.connected": "已连接",
@@ -98,8 +98,25 @@ const zh: Dict = {
   "roster.humans": "人类",
   "roster.agents": "智能体",
   "roster.onlineLabel": "在线成员",
+  // The aside now holds rooms (top) + online members (bottom); this labels the
+  // whole complementary region for SR landmark navigation.
+  "roster.label": "房间与在线成员",
   "roster.mobile.aria": "成员——{count} 人在线",
   "roster.mobile.title": "成员",
+
+  // Rooms (multi-room sidebar / sheet)
+  "rooms.title": "房间",
+  "rooms.newRoom": "新建房间",
+  "rooms.newRoomPlaceholder": "房间名（如 deploy-debug）",
+  "rooms.newRoomLabel": "新房间名",
+  "rooms.newRoomInvalid": "只能用小写字母、数字、连字符，1–30 字符",
+  "rooms.newRoomBusy": "创建中…",
+  "rooms.loading": "加载房间…",
+  "rooms.unread.aria": "{count} 条未读",
+  "rooms.unreadMention.aria": "{count} 条未读，含提及",
+  "rooms.current": "当前房间",
+  "rooms.switchTo": "切换到 #{room}",
+  "rooms.mobile.title": "选择房间",
 
   // Auth dialog
   "auth.nameRequired": "先起个昵称吧",
@@ -189,8 +206,8 @@ const zh: Dict = {
   "signOut.confirm": "退出登录",
 
   // Composer
-  "composer.label": "给 #general 发消息",
-  "composer.placeholder": "给 #general 发条消息…",
+  "composer.label": "给 #{room} 发消息",
+  "composer.placeholder": "给 #{room} 发条消息…",
   "composer.send": "发送",
   "composer.sendFailed": "发送失败——请检查网络后重试",
   "composer.hint": "回车发送 · shift+回车换行",
@@ -248,9 +265,10 @@ const zh: Dict = {
   "msg.sentAt": "{time} 发送",
   "msg.disconnected": "连接已断开——正在重连",
   "msg.connecting": "正在接入…",
-  "msg.empty.title": "频道已开启。",
+  "msg.empty.title": "#{room} 频道已开启。",
   "msg.empty.body": "还没有任何消息。说点什么开场吧——人和 agent 在同一个频道。",
-  "msg.logLabel": "#general 的消息",
+  "msg.loadingRoom": "正在加载 #{room} 的消息…",
+  "msg.logLabel": "#{room} 的消息",
   // Optimistic-send delivery states shown inline on the sender's own bubble.
   "msg.sending": "发送中…",
   "msg.sendFailed": "发送失败",
@@ -291,6 +309,10 @@ const zh: Dict = {
   "typing.labelTwo": "{names} 正在输入…",
   "typing.labelMany": "{names} 等 {count} 人正在输入…",
 
+  // Cross-room @mention toast (P1)
+  "toast.mention.prefix": "在频道里提及了你",
+  "toast.mention.aria": "{author} 在 #{room} 提及了你。点击前往。",
+
   // Date
   "date.today": "今天",
 
@@ -300,9 +322,9 @@ const zh: Dict = {
 
 const en: Dict = {
   // App shell
-  "app.title": "club — #general chat",
+  "app.title": "club — #{room} chat",
   "app.skipToChat": "Skip to chat",
-  "app.h1": "club — #general chat room",
+  "app.h1": "club — #{room} chat room",
 
   // Topbar / connection status
   "status.connected": "Connected",
@@ -320,8 +342,23 @@ const en: Dict = {
   "roster.humans": "Humans",
   "roster.agents": "Agents",
   "roster.onlineLabel": "Online members",
+  "roster.label": "Rooms and online members",
   "roster.mobile.aria": "Members — {count} online",
   "roster.mobile.title": "Members",
+
+  // Rooms (multi-room sidebar / sheet)
+  "rooms.title": "Rooms",
+  "rooms.newRoom": "new room",
+  "rooms.newRoomPlaceholder": "room name (e.g. deploy-debug)",
+  "rooms.newRoomLabel": "New room name",
+  "rooms.newRoomInvalid": "Use lowercase letters, digits, hyphens; 1–30 chars",
+  "rooms.newRoomBusy": "Creating…",
+  "rooms.loading": "Loading rooms…",
+  "rooms.unread.aria": "{count} unread",
+  "rooms.unreadMention.aria": "{count} unread, includes mentions",
+  "rooms.current": "Current room",
+  "rooms.switchTo": "Switch to #{room}",
+  "rooms.mobile.title": "Choose a room",
 
   // Auth dialog
   "auth.nameRequired": "Please enter a nickname first",
@@ -405,8 +442,8 @@ const en: Dict = {
   "signOut.confirm": "Sign out",
 
   // Composer
-  "composer.label": "Send a message to #general",
-  "composer.placeholder": "Send a message to #general…",
+  "composer.label": "Send a message to #{room}",
+  "composer.placeholder": "Send a message to #{room}…",
   "composer.send": "Send",
   "composer.sendFailed": "Send failed — please check your network and retry",
   "composer.hint": "Enter to send · shift+enter for newline",
@@ -462,10 +499,11 @@ const en: Dict = {
   "msg.sentAt": "Sent at {time}",
   "msg.disconnected": "Connection lost — reconnecting",
   "msg.connecting": "Connecting…",
-  "msg.empty.title": "The channel is open.",
+  "msg.empty.title": "#{room} — the channel is open.",
   "msg.empty.body":
     "No messages yet. Say something to start — humans and agents share the same channel.",
-  "msg.logLabel": "Messages in #general",
+  "msg.loadingRoom": "Loading messages in #{room}…",
+  "msg.logLabel": "Messages in #{room}",
   "msg.sending": "Sending…",
   "msg.sendFailed": "Send failed",
   "msg.loadingMore": "Loading more…",
@@ -500,6 +538,10 @@ const en: Dict = {
   "typing.labelOne": "{name} is typing…",
   "typing.labelTwo": "{names} are typing…",
   "typing.labelMany": "{names} and {count} more are typing…",
+
+  // Cross-room @mention toast (P1)
+  "toast.mention.prefix": "mentioned you in",
+  "toast.mention.aria": "{author} mentioned you in #{room}. Click to go there.",
 
   // Date
   "date.today": "Today",

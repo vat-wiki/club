@@ -7,6 +7,7 @@ import type {
   Participant,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
+  Room,
   UploadFileResponse,
 } from "@club/shared";
 import { ClubApiError } from "./errors.js";
@@ -139,7 +140,8 @@ export async function listMessages(
   if (opts.since) params.set("since", opts.since);
   if (opts.before) params.set("before", opts.before);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  const { since: _s, before: _b, limit: _l, ...callOpts } = opts;
+  if (opts.room) params.set("room", opts.room);
+  const { since: _s, before: _b, limit: _l, room: _r, ...callOpts } = opts;
   const qs = params.toString();
   return request<Message[]>(c, `/messages${qs ? "?" + qs : ""}`, callOpts);
 }
@@ -147,18 +149,33 @@ export async function listMessages(
 export async function sendMessage(
   c: ClubConn,
   content: string,
-  opts: { attachmentIds?: string[]; replyToId?: string; timeoutMs?: number } = {},
+  opts: { attachmentIds?: string[]; replyToId?: string; room?: string; timeoutMs?: number } = {},
 ): Promise<Message> {
-  // Backward compatible: when no attachmentIds/replyToId are supplied the body
-  // is just { content } exactly as before. With either, the body carries them.
+  // Backward compatible: when no attachmentIds/replyToId/room are supplied the
+  // body is just { content } exactly as before. With any, the body carries them.
   const body: Record<string, unknown> = { content };
   if (opts.attachmentIds && opts.attachmentIds.length > 0) body.attachmentIds = opts.attachmentIds;
   if (opts.replyToId) body.replyToId = opts.replyToId;
+  if (opts.room) body.room = opts.room;
   return request<Message>(c, "/messages", {
     method: "POST",
     body,
     timeoutMs: opts.timeoutMs,
   });
+}
+
+// GET /messages/search?q=&room=&limit= — substring search, newest first. `room`
+// is optional: omit to search across all rooms, pass a slug to scope it.
+export async function searchMessages(
+  c: ClubConn,
+  opts: { q: string; room?: string; limit?: number } & CallOpts,
+): Promise<Message[]> {
+  const params = new URLSearchParams();
+  params.set("q", opts.q);
+  if (opts.room) params.set("room", opts.room);
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  const { q: _q, room: _r, limit: _l, ...callOpts } = opts;
+  return request<Message[]>(c, `/messages/search?${params.toString()}`, callOpts);
 }
 
 // ── File upload (multipart) ────────────────────────────────────────
@@ -297,14 +314,35 @@ export async function recoverParticipant(
 
 export async function reportAgentThinking(
   c: ClubConn,
-  opts: { timeoutMs?: number } = {},
+  opts: { room?: string; timeoutMs?: number } = {},
 ): Promise<void> {
-  await request<null>(c, "/agents/thinking", { method: "POST", body: {}, ...opts });
+  const body = opts.room ? { room: opts.room } : {};
+  await request<null>(c, "/agents/thinking", { method: "POST", body, ...opts });
 }
 
 export async function reportAgentIdle(
   c: ClubConn,
-  opts: { timeoutMs?: number } = {},
+  opts: { room?: string; timeoutMs?: number } = {},
 ): Promise<void> {
-  await request<null>(c, "/agents/idle", { method: "POST", body: {}, ...opts });
+  const body = opts.room ? { room: opts.room } : {};
+  await request<null>(c, "/agents/idle", { method: "POST", body, ...opts });
+}
+
+// ── Rooms (multi-room) ──────────────────────────────────────────────
+
+// GET /rooms — every room, general first then most-recently-active first. Each
+// room carries lastActivityAt (null when empty) so clients can sort unread/
+// active-first without a second round-trip.
+export async function listRooms(c: ClubConn, opts: CallOpts = {}): Promise<Room[]> {
+  return request<Room[]>(c, "/rooms", opts);
+}
+
+// POST /rooms { name } — create/ensure a room exists. Idempotent: posting an
+// existing slug returns that room without error. `name` is the canonical slug.
+export async function createRoom(
+  c: ClubConn,
+  name: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<Room> {
+  return request<Room>(c, "/rooms", { method: "POST", body: { name }, ...opts });
 }

@@ -6,14 +6,38 @@ import { z } from "zod";
 export interface ClubConfig {
   server: string;
   key: string;
+  /** Current/default room slug written by `club enter`. Absent → "general".
+   *  This is a client-side attention preference only; the server holds no
+   *  per-participant default room (PRD §4.2 / §9.8). */
+  room?: string;
 }
 
-// Validates the on-disk config shape. Both fields must be non-empty strings;
-// any unknown keys are stripped on parse.
+// The system room — always exists, the default when no room is chosen. Exported
+// so every call site that needs a fallback imports one constant (no magic
+// string drift between send/read/listen/enter).
+export const DEFAULT_ROOM = "general";
+
+// Validates the on-disk config shape. server/key must be non-empty strings
+// (they're credentials — a bad one must surface as "not logged in"). `room` is
+// a preference, so it's accepted as any string (incl. empty) and normalized by
+// defaultRoom() — a corrupt/empty room must NOT lock a logged-in user out.
 const ConfigSchema = z.object({
   server: z.string().min(1),
   key: z.string().min(1),
+  room: z.string().optional(),
 });
+
+/**
+ * Resolve the effective default room for a config: the room `club enter` wrote,
+ * falling back to "general" when unset, empty, or when there's no config at all.
+ *
+ * Pure + exported so the room-resolution rule (`--room` flag → config.room →
+ * general) has one tested fallback step shared by send/read/listen.
+ */
+export function defaultRoom(cfg: { room?: string } | null): string {
+  const r = cfg?.room?.trim();
+  return r ? r : DEFAULT_ROOM;
+}
 
 // ~/.club/config.json by default; CLUB_CONFIG points elsewhere (used to run
 // a human and an agent against the same server from one machine).

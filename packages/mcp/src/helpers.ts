@@ -7,7 +7,7 @@ import { assertImageCount } from "@club/sdk/node";
 // (resolveConn → process.exit, server.connect) that make importing it directly
 // impractical from a test.
 
-import { mentionMatches, type Message, type Participant } from "@club/shared";
+import { mentionMatches, type Message, type Participant, type Room } from "@club/shared";
 import { formatMessage } from "@club/sdk";
 
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
@@ -43,6 +43,21 @@ export function num(v: unknown): number | undefined {
 export function clampLimit(v: unknown): number {
   const n = typeof v === "number" && Number.isFinite(v) ? v : 50;
   return Math.min(Math.max(1, Math.floor(n)), 500);
+}
+
+/**
+ * Resolve the effective room for send/read: an explicit `room` arg wins, then
+ * the CLUB_ROOM env var, then "general". This mirrors the CLI's flag → config
+ * → general rule (PRD §5.4). Pure + exported so the fallback chain is tested.
+ *
+ * NOTE: this is for send/read only. `listen` defaults to ALL rooms (global) —
+ * it does NOT fall back to CLUB_ROOM — so listen uses the raw `room` arg, not
+ * this helper.
+ */
+export function resolveRoom(explicit: unknown, envRoom?: string): string {
+  if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
+  if (typeof envRoom === "string" && envRoom.trim()) return envRoom.trim();
+  return "general";
 }
 
 /**
@@ -112,8 +127,8 @@ export function listenForMatch(
 // compatible. index.ts passes its real `client` instance straight through.
 export interface DispatchClient {
   me(): Promise<Participant>;
-  messages(opts: { since?: string; limit: number }): Promise<Message[]>;
-  send(content: string, attachmentIds?: string[]): Promise<Message>;
+  messages(opts: { since?: string; limit: number; room?: string }): Promise<Message[]>;
+  send(content: string, attachmentIds?: string[], opts?: { room?: string }): Promise<Message>;
   /** Upload one local image file, returning its attachment descriptor.
    *  Index.ts wires this to @club/sdk uploadImageFile (read→sniff→validate→
    *  POST /files); declared on the interface so dispatchTool stays fakeable. */
@@ -129,13 +144,19 @@ export interface DispatchClient {
    *  stays fakeable. */
   uploadDocument(path: string): Promise<{ id: string }>;
   members(): Promise<Participant[]>;
-  stream(onMessage: (m: Message) => void): { stop: () => void };
+  /** GET /rooms — every room, general first then most-recently-active first. */
+  rooms(): Promise<Room[]>;
+  stream(
+    onMessage: (m: Message) => void,
+    opts?: { room?: string },
+  ): { stop: () => void };
   /** Report that THIS agent started processing (lights up the room's typing
-   *  indicator). Agent-only; no-op-equivalent (404) for a human key. The
-   *  matching idle is auto-cleared by the server when this agent's reply lands
-   *  (POST /messages), so callers don't need a paired reportAgentIdle in the
-   *  common send-after-listen path. */
-  reportAgentThinking(): Promise<void>;
+   *  indicator). Agent-only; no-op-equivalent (404) for a human key. Pass
+   *  `room` to scope the indicator to that room's stream. The matching idle is
+   *  auto-cleared by the server when this agent's reply lands (POST /messages),
+   *  so callers don't need a paired reportAgentIdle in the common
+   *  send-after-listen path. */
+  reportAgentThinking(room?: string): Promise<void>;
 }
 
 // ── Thinking heartbeat (TTL refresh) ──────────────────────────────────
@@ -155,10 +176,10 @@ export interface DispatchClient {
 const THINKING_REFRESH_MS = 15 * 1000; // re-report well inside the 45s TTL
 let thinkingHeartbeat: ReturnType<typeof setInterval> | undefined;
 
-function startThinkingHeartbeat(client: DispatchClient): void {
+function startThinkingHeartbeat(client: DispatchClient, room?: string): void {
   stopThinkingHeartbeat();
   thinkingHeartbeat = setInterval(() => {
-    void client.reportAgentThinking().catch(() => {
+    void client.reportAgentThinking(room).catch(() => {
       /* nicety, not correctness — same swallow as the initial report */
     });
   }, THINKING_REFRESH_MS).unref?.();
@@ -199,7 +220,10 @@ export async function dispatchTool(
     }
     case "read": {
       const limit = clampLimit(args.limit);
-      const msgs = await client.messages({ since: str(args.since), limit });
+      // send/read default to CLUB_ROOM → general (PRD §5.4). listen is the only
+      // one that defaults to all rooms — it does NOT use resolveRoom.
+      const room = resolveRoom(args.room, process.env.CLUB_ROOM);
+      const msgs = await client.messages({ since: str(args.since), limit, room });
       if (msgs.length === 0) return "(no messages)";
       return msgs.map(formatMessage).join("\n");
     }
@@ -215,6 +239,7 @@ export async function dispatchTool(
       // Fail fast on too many attachments before any upload happens. Images,
       // videos, and documents all share one per-message cap.
       assertImageCount([...images, ...videos, ...documents]);
+      const room = resolveRoom(args.room, process.env.CLUB_ROOM);
       let attachmentIds: string[] | undefined;
       if (images.length > 0 || videos.length > 0 || documents.length > 0) {
         // Pre-flight + upload each file; an unsupported/missing/too-large file
@@ -235,7 +260,7 @@ export async function dispatchTool(
         }
         attachmentIds = ids;
       }
-      const m = await client.send(content, attachmentIds);
+      const m = await client.send(content, attachmentIds, { room });
       // The reply just landed — the server auto-clears our thinking state on
       // POST /messages, so the heartbeat has nothing left to refresh. Stop it
       // so we don't keep re-lighting an indicator for a turn that's over.
@@ -247,25 +272,44 @@ export async function dispatchTool(
       if (list.length === 0) return "(no members)";
       return list.map((p) => `${p.kind === "agent" ? "🤖" : "🧑"}${p.name}`).join("\n");
     }
+    case "rooms": {
+      const list = await client.rooms();
+      if (list.length === 0) return "(no rooms)";
+      // One room per line; general flagged as the system room. Mirrors the CLI
+      // `club rooms` output shape so an agent reading either sees the same
+      // information.
+      return list
+        .map((r) => `#${r.slug}${r.slug === "general" ? " (system)" : ""}`)
+        .join("\n");
+    }
     case "listen": {
       const mention = str(args.mention) || undefined;
+      // listen's room is a pure scoping filter: omit → all rooms (global). It
+      // deliberately does NOT fall back to CLUB_ROOM (PRD §5.4 / §5.5) — a
+      // dispatcher agent must hear a @mention from any room by default.
+      const room = str(args.room) || undefined;
       const timeoutMs = num(args.timeoutMs) ?? 60000;
-      const matched = await listenForMatch((cb) => client.stream(cb), mention, timeoutMs);
+      const matched = await listenForMatch(
+        (cb) => client.stream(cb, room ? { room } : {}),
+        mention,
+        timeoutMs,
+      );
       if (matched.length > 0) {
         // The agent just got handed a message it's about to act on — light up
-        // the room's typing indicator. We then START A HEARTBEAT that re-
-        // reports thinking every THINKING_REFRESH_MS until this agent's reply
-        // lands (send → server auto-clears) or the next listen supersedes it.
-        // Why: the server's ~45s thinking TTL is a *lost-contact fallback*, so
-        // a legitimately slow reply (long LLM round-trip across multiple tool
-        // rounds) would otherwise drop the indicator mid-thought. Re-reporting
-        // only refreshes the server's TTL — the SSE event is deduped, so the
-        // indicator never flickers. If the agent never replies, the heartbeat
-        // keeps the indicator alive until the next listen (which restarts it)
-        // or process exit.
+        // the typing indicator in the room the match came from (m.room), so a
+        // focused stream sees it. Falls back to the explicit `room` arg when
+        // present; otherwise unscoped (legacy global indicator). We then START
+        // A HEARTBEAT that re-reports thinking every THINKING_REFRESH_MS until
+        // this agent's reply lands (send → server auto-clears) or the next
+        // listen supersedes it. Why: the server's ~45s thinking TTL is a
+        // *lost-contact fallback*, so a legitimately slow reply (long LLM
+        // round-trip across multiple tool rounds) would otherwise drop the
+        // indicator mid-thought. Re-reporting only refreshes the server's TTL —
+        // the SSE event is deduped, so the indicator never flickers.
+        const thinkRoom = matched[0]?.room ?? room;
         try {
-          await client.reportAgentThinking();
-          startThinkingHeartbeat(client);
+          await client.reportAgentThinking(thinkRoom);
+          startThinkingHeartbeat(client, thinkRoom);
         } catch {
           /* non-fatal: the indicator is a nicety, not correctness */
         }

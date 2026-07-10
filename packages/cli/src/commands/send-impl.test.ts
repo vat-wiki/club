@@ -5,10 +5,10 @@ import { runSend, type SendDeps } from "./send-impl.js";
 // interaction (image AND video) so we can assert order + arguments.
 function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
   uploads: string[];
-  sent: { content: string; attachmentIds?: string[] }[];
+  sent: { content: string; attachmentIds?: string[]; room?: string }[];
 } {
   const uploads: string[] = [];
-  const sent: { content: string; attachmentIds?: string[] }[] = [];
+  const sent: { content: string; attachmentIds?: string[]; room?: string }[] = [];
   const base: SendDeps & { uploads: string[]; sent: typeof sent } = {
     uploads,
     sent,
@@ -24,8 +24,8 @@ function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
       uploads.push(p);
       return { id: "att_" + p };
     },
-    send: async (content, attachmentIds) => {
-      sent.push({ content, attachmentIds });
+    send: async (content, attachmentIds, room) => {
+      sent.push({ content, attachmentIds, room });
     },
   };
   // Let a test override any function; the tracker arrays stay live so the
@@ -168,5 +168,20 @@ describe("runSend", () => {
       runSend({ content: "x", images: ["a.png", "second.png", "c.png"], conn: CONN }, deps),
     ).rejects.toThrow(/could not read second.png/);
     expect(deps.sent).toEqual([]); // no partial send
+  });
+
+  it("threads the room through to send (posts to the resolved room)", async () => {
+    const deps = makeDeps();
+    await runSend(
+      { content: "hi", images: [], conn: CONN, room: "deploy-debug" },
+      deps,
+    );
+    expect(deps.sent).toEqual([{ content: "hi", attachmentIds: undefined, room: "deploy-debug" }]);
+  });
+
+  it("passes room: undefined when no room is set (server then defaults to general)", async () => {
+    const deps = makeDeps();
+    await runSend({ content: "hi", images: [], conn: CONN }, deps);
+    expect(deps.sent[0]?.room).toBeUndefined();
   });
 });

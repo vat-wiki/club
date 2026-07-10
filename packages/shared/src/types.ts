@@ -19,6 +19,10 @@ export interface Message {
   authorKind: ParticipantKind;
   content: string;
   createdAt: number;
+  // Canonical room slug this message belongs to. Every message lives in exactly
+  // one room; the default/system room is "general". Old clients/requests that
+  // omit room land here, so the field is always present on server-sourced rows.
+  room: string;
   // Images attached to the message; absent/empty = a plain text message
   // (backward compatible — old clients/rows simply have none). MVP scope: an
   // image is a *shareable/displayable* carrier, symmetric for humans and agents
@@ -122,6 +126,9 @@ export interface Mention {
   content: string;
   messageCreatedAt: number;
   readAt: number | null;
+  // The room the mentioning message was posted in, so a cross-room @mention can
+  // deep-link the recipient straight to that room + message. Always present.
+  room: string;
 }
 
 // ── API request/response shapes ─────────────────────────────────────
@@ -131,6 +138,45 @@ export const CreateParticipantRequest = z.object({
   kind: ParticipantKind,
 });
 export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
+
+// ── Rooms (multi-room) ──────────────────────────────────────────────
+//
+// A room is an open topic channel — NOT an access-control boundary. Every
+// authed participant reads/writes every room equally (PRD §4.1). Rooms are
+// addressed by a stable canonical slug. `general` is the seeded system room;
+// it always exists and is the default when a request omits room.
+
+// Room slug: 1–30 chars of lowercase alphanumerics and hyphens, starting with
+// an alphanumeric. Single source of truth shared by the server (POST /rooms,
+// POST /messages room param) and any client doing pre-flight validation. The
+// {0,29} after the leading char yields 1–30 total.
+export const ROOM_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,29}$/;
+export const RoomSlug = z
+  .string()
+  .regex(
+    ROOM_SLUG_REGEX,
+    "room name must be 1-30 chars of [a-z0-9-], starting alphanumeric",
+  );
+
+// One room in the list returned by GET /rooms. `lastActivityAt` is the
+// created_at of the most recent message in the room (null for an empty room)
+// so clients can sort "unread-first, most-recently-active-first" without an
+// extra round-trip. There is no server-side read state — unread is tracked
+// client-side (PRD §5.2).
+export interface Room {
+  id: string;
+  slug: string;
+  createdAt: number;
+  lastActivityAt: number | null;
+}
+
+// POST /rooms { name } — create/ensure a room exists. Idempotent: posting an
+// existing slug returns that room without error. `name` is the canonical slug;
+// there is no separate display name this phase (PRD §8.6).
+export const CreateRoomRequest = z.object({
+  name: RoomSlug,
+});
+export type CreateRoomRequest = z.infer<typeof CreateRoomRequest>;
 
 // Returned exactly once by POST /participants; the plaintext key and recovery
 // code are never persisted server-side (only their sha256 hashes are stored).
@@ -183,6 +229,10 @@ export const CreateMessageRequest = z.object({
   content: z.string().max(MAX_MESSAGE_CONTENT).default(""),
   attachmentIds: z.array(z.string().min(1).max(64)).max(MAX_IMAGES_PER_MESSAGE).default([]),
   replyToId: z.string().min(1).max(64).optional(),
+  // Room to post into; defaults to "general" for backward compatibility. Must
+  // be a valid slug; posting to a non-existent (but valid) room auto-creates it
+  // (PRD §9.4) — "build" and "enter" are the same action in the open model.
+  room: RoomSlug.default("general"),
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 
@@ -195,6 +245,8 @@ export interface ListMessagesQuery {
   since?: string; // message id — return messages after this one
   before?: string; // message id — return messages BEFORE this one (older history; scroll-up pagination)
   limit?: number;
+  // Room to scope to; omitted → "general" on the server (backward compatible).
+  room?: string;
 }
 
 export interface ApiError {
@@ -222,17 +274,22 @@ export interface ApiError {
 // how `message` events denormalize authorName/authorKind). kind is the
 // reporter's kind: agents report while processing a @mention, humans while
 // typing — a client can label them differently or uniformly as "typing".
+// `room`, when present, scopes the indicator to that room's stream; absent
+// means an unscoped (legacy/global) report that reaches all subscribers.
 export interface AgentThinkingEvent {
   participantId: string;
   name: string;
   kind: ParticipantKind;
+  room?: string;
 }
 
 // SSE `event: agent_idle` payload. Just the id — the client removes it from its
 // thinking set. Emitted on: reply posted (server-detected), agent-reported
-// done/error, or server TTL expiry (crashed/offline agent).
+// done/error, or server TTL expiry (crashed/offline agent). `room` mirrors the
+// room the agent was thinking in so the clear event reaches the same stream.
 export interface AgentIdleEvent {
   participantId: string;
+  room?: string;
 }
 
 // SSE `event: presence` payload. Broadcast on connect (online: true) and
@@ -248,9 +305,12 @@ export interface PresenceEvent {
 
 // SSE `event: message_deleted` payload. The author recalled a message; clients
 // mark that id recalled (hide content, show a "recalled" placeholder) rather
-// than removing the row entirely (so replies/context still make sense).
+// than removing the row entirely (so replies/context still make sense). `room`
+// lets the stream fan-out stay room-scoped (a client watching room B does not
+// receive a recall from room A).
 export interface MessageDeletedEvent {
   id: string;
+  room: string;
 }
 
 // One emoji reaction aggregate on a message.
@@ -260,15 +320,23 @@ export interface Reaction {
 }
 
 // SSE `event: message_reaction` payload. A reaction was toggled; carries the
-// refreshed aggregate so clients just swap it in.
+// refreshed aggregate so clients just swap it in. `room` keeps the fan-out
+// room-scoped (a client watching room B does not receive a reaction from A).
 export interface MessageReactionEvent {
   messageId: string;
   reactions: Reaction[];
+  room: string;
 }
 
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its
 // own status. Auth-required (the participant reports itself; the key identifies
-// who). No fields in the body: the participant is taken from the authed key, so
-// a client can't forge another agent's status.
-export const AgentStatusRequest = z.object({}).strict();
+// who). Only the optional `room` is accepted: when present the thinking/idle
+// event is scoped to that room's stream; absent means unscoped (legacy/global).
+// The participant is taken from the authed key, so a client can't forge another
+// agent's status.
+export const AgentStatusRequest = z
+  .object({
+    room: RoomSlug.optional(),
+  })
+  .strict();
 export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;

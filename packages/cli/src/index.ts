@@ -9,6 +9,8 @@ import { makeMembersCommand } from "./commands/members.js";
 import { makeListenCommand } from "./commands/listen.js";
 import { makeMentionsCommand } from "./commands/mentions.js";
 import { makeRecoverCommand } from "./commands/recover.js";
+import { makeRoomsCommand } from "./commands/rooms.js";
+import { makeEnterCommand } from "./commands/enter.js";
 import { runTui } from "./tui.js";
 
 const program = new Command();
@@ -21,6 +23,8 @@ program
 program.addCommand(makeLoginCommand());
 program.addCommand(makeJoinCommand());
 program.addCommand(makeWhoamiCommand());
+program.addCommand(makeRoomsCommand());
+program.addCommand(makeEnterCommand());
 program.addCommand(makeSendCommand());
 program.addCommand(makeReadCommand());
 program.addCommand(makeMembersCommand());

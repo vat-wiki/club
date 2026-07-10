@@ -2,6 +2,7 @@ import { ClubClient, request, type ClubConn } from "@club/sdk";
 import type {
   Participant,
   Message,
+  Room,
   UploadFileResponse,
   CreateParticipantResponse,
   RecoverParticipantRequest,
@@ -18,27 +19,38 @@ function client(c: ClubConn): ClubClient {
 
 export const api = {
   me: (c: ClubConn): Promise<Participant> => client(c).me(),
-  messages: (c: ClubConn, since?: string): Promise<Message[]> =>
-    client(c).messages({ since, limit: 50 }),
+  // `room` scopes history to a room (default "general" server-side when omitted).
+  // `since` returns messages after an id; omitted here returns the recent batch.
+  messages: (c: ClubConn, since?: string, room?: string): Promise<Message[]> =>
+    client(c).messages({ since, room, limit: 50 }),
   // content is optional IFF attachmentIds is non-empty (the server enforces the
   // cross-field rule; see CreateMessageRequest in @club/shared). When there are
   // no attachments we keep the original content-only body shape (unchanged path).
+  // `room` posts into a specific room (default "general"); posting into a valid
+  // but non-existent room auto-creates it (PRD §9.4 — build = enter).
   send: (
     c: ClubConn,
     content: string,
     attachmentIds: readonly string[] = [],
     replyToId?: string,
+    room?: string,
   ): Promise<Message> => {
-    if (attachmentIds.length > 0 || replyToId) {
+    if (attachmentIds.length > 0 || replyToId || room) {
       const body: Record<string, unknown> = { content, attachmentIds: [...attachmentIds] };
       if (replyToId) body.replyToId = replyToId;
+      if (room) body.room = room;
       return request<Message>(c, "/messages", { method: "POST", body });
     }
     return client(c).send(content);
   },
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
-  search: (c: ClubConn, q: string): Promise<Message[]> =>
-    request<Message[]>(c, `/messages/search?q=${encodeURIComponent(q)}`),
+  // GET /rooms — every room, general first then most-recently-active first.
+  rooms: (c: ClubConn): Promise<Room[]> => client(c).rooms(),
+  // POST /rooms { name } — create/ensure a room exists (idempotent).
+  createRoom: (c: ClubConn, name: string): Promise<Room> => client(c).createRoom(name),
+  // `room` scopes the search to one room; omit to search across all rooms.
+  search: (c: ClubConn, q: string, room?: string): Promise<Message[]> =>
+    client(c).search(q, room ? { room } : undefined),
   deleteMessage: (c: ClubConn, id: string): Promise<void> =>
     request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
       () => undefined,
@@ -50,8 +62,10 @@ export const api = {
     }).then(() => undefined),
   // Report "I'm typing" / "I stopped" — drives the typing indicator for both
   // humans (debounced while composing) and agents (while processing a mention).
-  thinking: (c: ClubConn): Promise<void> => client(c).reportAgentThinking(),
-  idle: (c: ClubConn): Promise<void> => client(c).reportAgentIdle(),
+  // `room` scopes the indicator to that room's stream (PRD §5.1).
+  thinking: (c: ClubConn, room?: string): Promise<void> =>
+    client(c).reportAgentThinking(room),
+  idle: (c: ClubConn, room?: string): Promise<void> => client(c).reportAgentIdle(room),
   // multipart image upload — see lib/upload for why this bypasses the JSON
   // transport. The returned attachment's `id` is later echoed in send().
   uploadFile: (

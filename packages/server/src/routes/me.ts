@@ -30,6 +30,7 @@ function toMention(r: MentionRow): Mention {
     content: r.content,
     messageCreatedAt: r.message_created_at,
     readAt: r.read_at,
+    room: r.room,
   };
 }
 

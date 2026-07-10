@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
-import { requireConfig } from "../config.js";
+import { defaultRoom, requireConfig } from "../config.js";
 import { readStream, type ReadableLike } from "../stdin.js";
 import { runSend, type SendDeps } from "./send-impl.js";
 
@@ -11,7 +11,7 @@ const collect = (v: string, acc: string[]): string[] => [...acc, v];
 export function makeSendCommand(): Command {
   return new Command("send")
     .description(
-      'send a message — `club send "hi"`, `echo hi | club send --stdin`, or attach files with `--image` / `--video` / `--file <path>` (repeatable, ≤8 total)',
+      'send a message — `club send "hi"`, `echo hi | club send --stdin`, attach files with `--image` / `--video` / `--file <path>` (repeatable, ≤8 total), or target a room with `--room <slug>`',
     )
     .argument("[text...]", "message text (omit if piping via --stdin or sending files only)")
     .option("--stdin", "read message body from stdin")
@@ -33,10 +33,20 @@ export function makeSendCommand(): Command {
       collect,
       [] as string[],
     )
+    .option(
+      "--room <slug>",
+      "post to this room (default: the room from `club enter`, or general)",
+    )
     .action(
       async (
         text: string[],
-        opts: { stdin?: boolean; image?: string[]; video?: string[]; file?: string[] },
+        opts: {
+          stdin?: boolean;
+          image?: string[];
+          video?: string[];
+          file?: string[];
+          room?: string;
+        },
       ) => {
         let content: string;
         if (opts.stdin) {
@@ -50,12 +60,15 @@ export function makeSendCommand(): Command {
 
         const cfg = requireConfig();
         const client = new ClubClient(cfg);
+        // Room resolution: --room flag → config default (from `club enter`) →
+        // general. Explicit always wins; otherwise the current room wins.
+        const room = opts.room ?? defaultRoom(cfg);
         // Wire the real SDK functions; runSend holds the testable orchestration.
         const deps: SendDeps = {
           uploadImage: (conn, p) => uploadImageFile(conn, p),
           uploadVideo: (conn, p) => uploadVideoFile(conn, p),
           uploadDocument: (conn, p) => uploadDocumentFile(conn, p),
-          send: (c, ids) => client.send(c, ids),
+          send: (c, ids, r) => client.send(c, ids, r ? { room: r } : undefined),
         };
         try {
           await runSend(
@@ -65,6 +78,7 @@ export function makeSendCommand(): Command {
               videos: opts.video ?? [],
               documents: opts.file ?? [],
               conn: cfg,
+              room,
             },
             deps,
           );

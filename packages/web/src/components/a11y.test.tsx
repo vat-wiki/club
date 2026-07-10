@@ -17,7 +17,10 @@ import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { ViewKeyDialog } from "./view-key-dialog";
 import { BootScreen } from "./boot-screen";
 import { TypingIndicator } from "./typing-indicator";
+import { RoomList } from "./room-list";
+import { MentionToasts } from "./mention-toast";
 import { withI18n } from "@/test/i18n-wrap";
+import type { MentionToast } from "@/hooks/use-rooms";
 
 const TEST_KEY = "club_human_test_0123456789abcdef";
 
@@ -84,6 +87,7 @@ const messages: Message[] = [
     authorKind: "human",
     content: "hello world",
     createdAt: Date.now(),
+    room: "general",
   },
   {
     id: "m2",
@@ -92,8 +96,24 @@ const messages: Message[] = [
     authorKind: "agent",
     content: "hi @alice",
     createdAt: Date.now(),
+    room: "general",
   },
 ];
+
+// A couple of rooms + a no-op switch/create so the room-aware components render
+// fully under axe without dragging in real data fetching.
+const rooms = [
+  { id: "r1", slug: "general", createdAt: 0, lastActivityAt: Date.now() },
+  { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: Date.now() },
+];
+const noop = async () => {};
+const roomNav = {
+  rooms,
+  currentRoom: "general",
+  unread: {},
+  onSelectRoom: () => {},
+  onCreateRoom: noop,
+};
 
 describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   it("Composer has no violations", async () => {
@@ -105,7 +125,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   });
 
   it("Roster has no violations", async () => {
-    await expectNoViolations(<Roster members={members} selfId={me.id} />);
+    await expectNoViolations(<Roster members={members} selfId={me.id} {...roomNav} />);
   });
 
   it("Topbar has no violations", async () => {
@@ -116,6 +136,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         members={members}
         selfId={me.id}
         key_={TEST_KEY}
+        {...roomNav}
         onSignOutRequest={() => {}}
       />,
     );
@@ -123,7 +144,28 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MessageList has no violations (with messages)", async () => {
     await expectNoViolations(
-      <MessageList messages={messages} me={me} members={members} status="connected" />,
+      <MessageList messages={messages} me={me} members={members} status="connected" room="general" />,
+    );
+  });
+
+  it("RoomList has no violations", async () => {
+    await expectNoViolations(
+      <RoomList
+        rooms={rooms}
+        currentRoom="general"
+        unread={{ "deploy-debug": { count: 2, mention: true } }}
+        onSelect={() => {}}
+        onCreate={async () => {}}
+      />,
+    );
+  });
+
+  it("MentionToasts have no violations", async () => {
+    const toasts: MentionToast[] = [
+      { id: "t1", messageId: "m1", room: "deploy-debug", authorName: "claude", authorKind: "agent", content: "hey @alice" },
+    ];
+    await expectNoViolations(
+      <MentionToasts toasts={toasts} onActivate={() => {}} onDismiss={() => {}} />,
     );
   });
 
@@ -302,6 +344,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
           members={members}
           selfId={me.id}
           key_={TEST_KEY}
+          {...roomNav}
           onSignOutRequest={() => {}}
         />,
       ),
@@ -324,6 +367,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
           members={members}
           selfId={me.id}
           key_={TEST_KEY}
+          {...roomNav}
           onSignOutRequest={() => {}}
         />,
       ),

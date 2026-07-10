@@ -16,6 +16,9 @@ function formatMention(m: Mention): string {
     authorKind: m.authorKind,
     content: m.content,
     createdAt: m.messageCreatedAt,
+    // Mention now carries its source room (multi-room); include it so the
+    // synthesized Message satisfies the required `room` field.
+    room: m.room,
   });
 }
 

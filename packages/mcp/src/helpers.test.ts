@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { Message, Participant, ParticipantKind } from "@club/shared";
+import type { Message, Participant, ParticipantKind, Room } from "@club/shared";
 import {
   str,
   num,
   clampLimit,
+  resolveRoom,
   matchesMention,
   listenForMatch,
   dispatchTool,
@@ -108,6 +109,35 @@ describe("clampLimit", () => {
   });
 });
 
+describe("resolveRoom", () => {
+  it("returns the explicit room when it is a non-empty string", () => {
+    expect(resolveRoom("deploy-debug")).toBe("deploy-debug");
+    expect(resolveRoom("deploy-debug", "internal")).toBe("deploy-debug");
+  });
+
+  it("trims whitespace from an explicit room", () => {
+    expect(resolveRoom("  deploy-debug  ")).toBe("deploy-debug");
+  });
+
+  it("falls back to the env room when the explicit arg is absent/empty", () => {
+    expect(resolveRoom(undefined, "internal")).toBe("internal");
+    expect(resolveRoom("", "internal")).toBe("internal");
+    expect(resolveRoom("   ", "internal")).toBe("internal");
+  });
+
+  it("falls back to general when both explicit and env are absent/empty", () => {
+    expect(resolveRoom(undefined)).toBe("general");
+    expect(resolveRoom(undefined, "")).toBe("general");
+    expect(resolveRoom(undefined, "   ")).toBe("general");
+    expect(resolveRoom(null, undefined)).toBe("general");
+  });
+
+  it("ignores a non-string explicit arg (e.g. an LLM sending a number)", () => {
+    expect(resolveRoom(42, "internal")).toBe("internal");
+    expect(resolveRoom({}, undefined)).toBe("general");
+  });
+});
+
 describe("matchesMention", () => {
   it("matches every message when mention is absent/empty (no-filter path)", () => {
     expect(matchesMention("anything", undefined)).toBe(true);
@@ -148,7 +178,7 @@ describe("matchesMention", () => {
   });
 });
 
-function makeMsg(content: string, attachments?: Message["attachments"]): Message {
+function makeMsg(content: string, attachments?: Message["attachments"], room = "general"): Message {
   return {
     id: "m_" + content,
     participantId: "p1",
@@ -156,6 +186,7 @@ function makeMsg(content: string, attachments?: Message["attachments"]): Message
     authorKind: "human",
     content,
     createdAt: 0,
+    room,
     ...(attachments ? { attachments } : {}),
   };
 }
@@ -223,6 +254,7 @@ function fakeClient(over: Partial<DispatchClient> = {}): DispatchClient {
     uploadVideo: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
     uploadDocument: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
     members: async () => [],
+    rooms: async () => [],
     stream: () => ({ stop: () => {} }),
     reportAgentThinking: async () => {},
     ...over,
@@ -230,6 +262,16 @@ function fakeClient(over: Partial<DispatchClient> = {}): DispatchClient {
 }
 
 describe("dispatchTool", () => {
+  // Make every dispatch test deterministic w.r.t. the CLUB_ROOM default: save
+  // and clear it, restore after. Tests that need a CLUB_ROOM set it explicitly.
+  const prevClubRoom = process.env.CLUB_ROOM;
+  beforeEach(() => {
+    delete process.env.CLUB_ROOM;
+  });
+  afterEach(() => {
+    process.env.CLUB_ROOM = prevClubRoom;
+  });
+
   it("whoami formats the current participant", async () => {
     expect(await dispatchTool("whoami", {}, fakeClient())).toBe("You are alice (human). id=p_alice");
   });
@@ -250,24 +292,45 @@ describe("dispatchTool", () => {
     expect(out).toContain("world");
   });
 
-  it("read clamps `limit` into [1,500] and defaults `since` to '' (SDK treats '' as absent)", async () => {
-    let received: { since?: string; limit: number } | null = null;
+  it("read clamps `limit` into [1,500] and defaults `since` to '' and room to general", async () => {
+    let received: { since?: string; limit: number; room?: string } | null = null;
     await dispatchTool(
       "read",
       { limit: 99999 },
       fakeClient({ messages: async (opts) => { received = opts; return []; } }),
     );
-    expect(received).toEqual({ since: "", limit: 500 });
+    expect(received).toEqual({ since: "", limit: 500, room: "general" });
   });
 
   it("read forwards a `since` cursor verbatim", async () => {
-    let received: { since?: string; limit: number } | null = null;
+    let received: { since?: string; limit: number; room?: string } | null = null;
     await dispatchTool(
       "read",
       { since: "m_abc" },
       fakeClient({ messages: async (opts) => { received = opts; return []; } }),
     );
-    expect(received).toEqual({ since: "m_abc", limit: 50 });
+    expect(received).toEqual({ since: "m_abc", limit: 50, room: "general" });
+  });
+
+  it("read scopes to the explicit room arg", async () => {
+    let received: { since?: string; limit: number; room?: string } | null = null;
+    await dispatchTool(
+      "read",
+      { room: "deploy-debug" },
+      fakeClient({ messages: async (opts) => { received = opts; return []; } }),
+    );
+    expect(received?.room).toBe("deploy-debug");
+  });
+
+  it("read falls back to CLUB_ROOM when no room arg is given", async () => {
+    process.env.CLUB_ROOM = "internal";
+    let received: { since?: string; limit: number; room?: string } | null = null;
+    await dispatchTool(
+      "read",
+      {},
+      fakeClient({ messages: async (opts) => { received = opts; return []; } }),
+    );
+    expect(received?.room).toBe("internal");
   });
 
   it("send rejects empty / missing content without calling the client", async () => {
@@ -282,6 +345,43 @@ describe("dispatchTool", () => {
     const out = await dispatchTool("send", { content: "hi there" }, fakeClient());
     expect(out).toMatch(/^sent: /);
     expect(out).toContain("hi there");
+  });
+
+  it("send defaults the room to general when neither arg nor CLUB_ROOM is set", async () => {
+    let sentRoom: string | undefined;
+    const client = fakeClient({
+      send: async (_c, _ids, opts) => {
+        sentRoom = opts?.room;
+        return makeMsg("hi");
+      },
+    });
+    await dispatchTool("send", { content: "hi" }, client);
+    expect(sentRoom).toBe("general");
+  });
+
+  it("send posts to the explicit room arg", async () => {
+    let sentRoom: string | undefined;
+    const client = fakeClient({
+      send: async (_c, _ids, opts) => {
+        sentRoom = opts?.room;
+        return makeMsg("hi", undefined, "deploy-debug");
+      },
+    });
+    await dispatchTool("send", { content: "hi", room: "deploy-debug" }, client);
+    expect(sentRoom).toBe("deploy-debug");
+  });
+
+  it("send falls back to CLUB_ROOM when no room arg is given", async () => {
+    process.env.CLUB_ROOM = "internal";
+    let sentRoom: string | undefined;
+    const client = fakeClient({
+      send: async (_c, _ids, opts) => {
+        sentRoom = opts?.room;
+        return makeMsg("hi");
+      },
+    });
+    await dispatchTool("send", { content: "hi" }, client);
+    expect(sentRoom).toBe("internal");
   });
 
   it("send with images uploads each path then sends with attachmentIds", async () => {
@@ -407,6 +507,21 @@ describe("dispatchTool", () => {
     expect(await dispatchTool("members", {}, fakeClient())).toBe("(no members)");
   });
 
+  it("rooms lists every room, general tagged as system", async () => {
+    const rooms: Room[] = [
+      { id: "r1", slug: "general", createdAt: 0, lastActivityAt: 100 },
+      { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: 200 },
+      { id: "r3", slug: "internal", createdAt: 0, lastActivityAt: null },
+    ];
+    const out = await dispatchTool("rooms", {}, fakeClient({ rooms: async () => rooms }));
+    const lines = out.split("\n");
+    expect(lines).toEqual(["#general (system)", "#deploy-debug", "#internal"]);
+  });
+
+  it("rooms returns '(no rooms)' when the list is empty", async () => {
+    expect(await dispatchTool("rooms", {}, fakeClient())).toBe("(no rooms)");
+  });
+
   it("listen returns the first matching message, formatted", async () => {
     let emit: (m: Message) => void = () => {};
     const client = fakeClient({ stream: (cb) => { emit = cb; return { stop: () => {} }; } });
@@ -462,6 +577,65 @@ describe("dispatchTool", () => {
       const p = dispatchTool("listen", { mention: "nobody", timeoutMs: 1000 }, client);
       await vi.advanceTimersByTimeAsync(1000);
       expect(await p).toBe("(no matching messages within timeout)");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("listen scopes the stream to the room when room is given", async () => {
+    let streamOpts: { room?: string } | undefined;
+    const client = fakeClient({
+      stream: (_cb, opts) => {
+        streamOpts = opts;
+        return { stop: () => {} };
+      },
+    });
+    vi.useFakeTimers();
+    try {
+      const p = dispatchTool("listen", { mention: "nobody", room: "deploy-debug", timeoutMs: 100 }, client);
+      await vi.advanceTimersByTimeAsync(100);
+      await p;
+      expect(streamOpts).toEqual({ room: "deploy-debug" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("listen subscribes to ALL rooms (no room filter) when room is omitted", async () => {
+    let streamOpts: { room?: string } | undefined;
+    const client = fakeClient({
+      stream: (_cb, opts) => {
+        streamOpts = opts;
+        return { stop: () => {} };
+      },
+    });
+    vi.useFakeTimers();
+    try {
+      const p = dispatchTool("listen", { mention: "nobody", timeoutMs: 100 }, client);
+      await vi.advanceTimersByTimeAsync(100);
+      await p;
+      // No room filter — listen defaults to global, NOT to CLUB_ROOM.
+      expect(streamOpts).toEqual({});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("listen does NOT fall back to CLUB_ROOM (global default is intentional)", async () => {
+    process.env.CLUB_ROOM = "internal";
+    let streamOpts: { room?: string } | undefined;
+    const client = fakeClient({
+      stream: (_cb, opts) => {
+        streamOpts = opts;
+        return { stop: () => {} };
+      },
+    });
+    vi.useFakeTimers();
+    try {
+      const p = dispatchTool("listen", { mention: "nobody", timeoutMs: 100 }, client);
+      await vi.advanceTimersByTimeAsync(100);
+      await p;
+      expect(streamOpts).toEqual({}); // still global despite CLUB_ROOM
     } finally {
       vi.useRealTimers();
     }

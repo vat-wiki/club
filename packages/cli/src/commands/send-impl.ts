@@ -12,14 +12,16 @@ import { assertImageCount, type ClubConn } from "@club/sdk/node";
 export interface SendDeps {
   /** Upload one local image path → attachment id. Throws on any pre-flight failure. */
   uploadImage: (conn: ClubConn, path: string) => Promise<{ id: string }>;
-  /** Send the composed message (text + attachment ids). */
-  send: (content: string, attachmentIds?: string[]) => Promise<unknown>;
+  /** Send the composed message (text + attachment ids) into `room`. */
+  send: (content: string, attachmentIds?: string[], room?: string) => Promise<unknown>;
 }
 
 export interface SendInput {
   content: string; // already trimmed
   images: string[]; // raw paths
   conn: ClubConn;
+  /** Room to post into; resolved by the caller (flag → config default → general). */
+  room?: string;
 }
 
 export interface SendResult {
@@ -51,6 +53,10 @@ export async function runSend(
     attachmentIds.push(att.id);
   }
 
-  await deps.send(content, attachmentIds.length > 0 ? attachmentIds : undefined);
+  await deps.send(
+    content,
+    attachmentIds.length > 0 ? attachmentIds : undefined,
+    input.room,
+  );
   return { attachmentIds };
 }

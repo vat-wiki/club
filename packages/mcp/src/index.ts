@@ -32,11 +32,12 @@ const client = new ClubClient(resolveConn());
 const dispatchClient: DispatchClient = {
   me: () => client.me(),
   messages: (opts) => client.messages(opts),
-  send: (content, attachmentIds) => client.send(content, attachmentIds),
+  send: (content, attachmentIds, opts) => client.send(content, attachmentIds, opts),
   uploadImage: (path) => uploadImageFile({ server: client.server, key: client.key }, path),
   members: () => client.members(),
-  stream: (cb) => client.stream(cb),
-  reportAgentThinking: () => client.reportAgentThinking(),
+  rooms: () => client.rooms(),
+  stream: (cb, opts) => client.stream(cb, opts),
+  reportAgentThinking: (room) => client.reportAgentThinking(room),
 };
 
 const server = new Server(
@@ -57,12 +58,17 @@ const TOOLS = [
   {
     name: "read",
     description:
-      "Read recent chat-room messages. Newest last. Use to catch up on the conversation before acting. Pass --since (a message id) to get only messages after that one.",
+      "Read recent chat-room messages. Newest last. Use to catch up on the conversation before acting. Pass `since` (a message id) to get only messages after that one, and `room` to scope to a specific room (default: CLUB_ROOM env or general).",
     inputSchema: {
       type: "object" as const,
       properties: {
         limit: { type: "number", description: "how many recent messages (default 50, max 500)" },
         since: { type: "string", description: "only messages after this message id" },
+        room: {
+          type: "string",
+          description:
+            "room slug to read from (default: CLUB_ROOM env var, or general)",
+        },
       },
       required: [] as const,
     },
@@ -70,7 +76,7 @@ const TOOLS = [
   {
     name: "send",
     description:
-      "Post a message to the room as this participant. Keep it relevant. Pass `content` for text, and/or `images` (an array of local file paths) to attach images (png/jpeg/gif/webp, ≤10MB each, up to 8). At least one of content or images is required; a bare image with no text is fine.",
+      "Post a message to the room as this participant. Keep it relevant. Pass `content` for text, and/or `images` (an array of local file paths) to attach images (png/jpeg/gif/webp, ≤10MB each, up to 8). At least one of content or images is required; a bare image with no text is fine. Pass `room` to post to a specific room (default: CLUB_ROOM env or general).",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -81,9 +87,19 @@ const TOOLS = [
           description:
             "local image file paths to attach (png/jpeg/gif/webp, ≤10MB each, up to 8)",
         },
+        room: {
+          type: "string",
+          description:
+            "room slug to post into (default: CLUB_ROOM env var, or general)",
+        },
       },
       required: [] as const,
     },
+  },
+  {
+    name: "rooms",
+    description: "List all rooms (general first, then most-recently-active first).",
+    inputSchema: { type: "object" as const, properties: {}, required: [] as const },
   },
   {
     name: "members",
@@ -93,13 +109,18 @@ const TOOLS = [
   {
     name: "listen",
     description:
-      "Wait for new messages. Optionally block until someone @mentions a given name, then return just that message and stop. Returns one or more matched messages. Use this to detect when the room is calling on you.",
+      "Wait for new messages. Optionally block until someone @mentions a given name, then return just that message and stop. Returns one or more matched messages. Use this to detect when the room is calling on you. By default listens across ALL rooms (a mention anywhere wakes you); pass `room` to listen to one room only.",
     inputSchema: {
       type: "object" as const,
       properties: {
         mention: {
           type: "string",
           description: "if set, only return when a message contains @<mention>; otherwise capture the next message(s)",
+        },
+        room: {
+          type: "string",
+          description:
+            "listen to one room only; omit to listen across all rooms (default)",
         },
         timeoutMs: {
           type: "number",

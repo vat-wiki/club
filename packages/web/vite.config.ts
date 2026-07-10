@@ -29,6 +29,10 @@ export default defineConfig({
       "/me": "http://localhost:6200",
       "/messages": "http://localhost:6200",
       "/members": "http://localhost:6200",
+      // Multi-room: room list + create (GET/POST /rooms).
+      "/rooms": "http://localhost:6200",
+      // Agent thinking/idle presence (POST /agents/thinking, /agents/idle).
+      "/agents": "http://localhost:6200",
       // Image upload + serving (POST /files, GET /files/:id). Same-origin in
       // dev so the multipart upload and the <img src> resolve through Vite.
       "/files": "http://localhost:6200",

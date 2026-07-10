@@ -26,6 +26,7 @@ function msg(p: Participant, content: string, id: string, attachments: MessageAt
     authorKind: p.kind,
     content,
     createdAt: Date.now(),
+    room: "general",
     attachments,
   };
 }

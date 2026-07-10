@@ -6,9 +6,10 @@ import type { ClubConn } from "@club/sdk";
 import { useT } from "@/lib/i18n";
 
 // Inline message search: debounced query against GET /messages/search, results
-// in a dropdown below the input. Fire-and-forget on error (search is best-effort
-// discovery, not critical). Closes on clear; stays open while typing.
-export function SearchBar({ conn }: { conn: ClubConn | null }) {
+// in a dropdown below the input. Scoped to the current room (the focused
+// channel is what you're reading). Fire-and-forget on error (search is
+// best-effort discovery, not critical). Closes on clear; stays open while typing.
+export function SearchBar({ conn, room }: { conn: ClubConn | null; room?: string }) {
   const t = useT();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Message[]>([]);
@@ -21,13 +22,13 @@ export function SearchBar({ conn }: { conn: ClubConn | null }) {
     }
     const h = setTimeout(async () => {
       try {
-        setResults(await api.search(conn, q));
+        setResults(await api.search(conn, q, room));
       } catch {
         setResults([]);
       }
     }, 300);
     return () => clearTimeout(h);
-  }, [conn, q]);
+  }, [conn, q, room]);
 
   return (
     <div className="relative flex-none border-b border-border/60 px-4 py-1.5 sm:px-6">

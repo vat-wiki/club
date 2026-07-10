@@ -4,6 +4,7 @@ import type { ClubConn } from "@club/sdk";
 import { loadConn, saveConn, clearConn, API_URL, getKey } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useMessageStream } from "@/hooks/use-message-stream";
+import { useRooms, type MentionToast } from "@/hooks/use-rooms";
 import { useVisualViewportHeight } from "@/hooks/use-visual-viewport-height";
 import { useI18n } from "@/lib/i18n";
 import { Topbar } from "@/components/topbar";
@@ -16,6 +17,7 @@ import { KeyRevealDialog } from "@/components/key-reveal-dialog";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 import { BootScreen } from "@/components/boot-screen";
 import { TypingIndicator } from "@/components/typing-indicator";
+import { MentionToasts } from "@/components/mention-toast";
 import { useTypingAgents } from "@/hooks/use-typing-agents";
 
 export default function App() {
@@ -60,10 +62,28 @@ export default function App() {
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
   const typing = useTypingAgents();
+  // Multi-room: room list, the focused room (persisted), per-room unread, and
+  // cross-room @mention toasts. The stream below subscribes to ALL rooms and
+  // routes each message: focused-room → visible tail, others → unread/toast.
+  const rooms = useRooms(conn, me?.name);
+  // Mirror the focused room into a ref so validateConn (a boot-time callback
+  // whose deps must NOT include the room, or it'd re-trigger boot on every
+  // switch) reads the latest value.
+  const currentRoomRef = useRef(rooms.currentRoom);
+  currentRoomRef.current = rooms.currentRoom;
+
   const { messages, status, setMessages, loadMore, loadingMore, onlineIds } = useMessageStream(me ? conn : null, {
+    currentRoom: rooms.currentRoom,
+    onIncoming: rooms.recordIncoming,
     onAgentThinking: typing.onThinking,
     onAgentIdle: typing.onIdle,
   });
+  // True while a room's initial history is being fetched (switch = "换台"); the
+  // MessageList shows a shimmer skeleton instead of flashing empty-then-pop.
+  const [loadingRoom, setLoadingRoom] = useState(false);
+  // A message id to deep-link to (from a cross-room mention toast); cleared once
+  // the MessageList has scrolled to + highlighted it.
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
 
   const refreshMembers = useCallback(async () => {
     if (!conn) return;
@@ -86,7 +106,9 @@ export default function App() {
         const m = await api.me(c);
         setMe(m);
         setAuthOpen(false);
-        const history = await api.messages(c);
+        // Load the focused room's history (defaults to general for a fresh
+        // client; a returning client resumes its last room from localStorage).
+        const history = await api.messages(c, undefined, currentRoomRef.current);
         setMessages(history);
         setBootStatus(null);
         void refreshMembers();
@@ -95,6 +117,58 @@ export default function App() {
       }
     },
     [refreshMembers, setMessages],
+  );
+
+  // Load one room's initial history. Shared by the boot path and every room
+  // switch: clear the old tail, fetch, swap in. The MessageList is keyed by the
+  // room so it remounts and plays the 180ms cross-fade; loadingRoom routes the
+  // empty moment to a shimmer skeleton instead of the empty state.
+  const loadRoomHistory = useCallback(
+    async (c: ClubConn, room: string) => {
+      setLoadingRoom(true);
+      try {
+        setMessages([]);
+        const history = await api.messages(c, undefined, room);
+        setMessages(history);
+      } catch {
+        /* transient — the live stream keeps delivering new messages */
+      } finally {
+        setLoadingRoom(false);
+      }
+    },
+    [setMessages],
+  );
+
+  const handleSwitchRoom = useCallback(
+    (room: string) => {
+      if (!conn || room === rooms.currentRoom) return;
+      rooms.switchRoom(room);
+      void loadRoomHistory(conn, room);
+    },
+    [conn, rooms, loadRoomHistory],
+  );
+
+  const handleCreateRoom = useCallback(
+    async (name: string) => {
+      if (!conn) return;
+      // createRoom is idempotent and switches focus to the new room; load its
+      // (empty) history so the empty state renders cleanly.
+      await rooms.createRoom(name);
+      void loadRoomHistory(conn, name);
+    },
+    [conn, rooms, loadRoomHistory],
+  );
+
+  // Cross-room mention toast → jump to the source room + scroll/highlight the
+  // message. The MessageList retries the highlight as history loads, so setting
+  // the target before the fetch resolves is safe.
+  const handleToastActivate = useCallback(
+    (toast: MentionToast) => {
+      handleSwitchRoom(toast.room);
+      setHighlightMessageId(toast.messageId);
+      rooms.dismissToastsForRoom(toast.room);
+    },
+    [handleSwitchRoom, rooms],
   );
 
   // boot: validate stored key (initial + on every retry nonce bump)
@@ -175,6 +249,7 @@ export default function App() {
       authorKind: me.kind,
       content,
       createdAt: Date.now(),
+      room: rooms.currentRoom,
       status: "sending",
       ...(replyToId ? { replyToId } : {}),
       // Only the upload id is known client-side, so synthesize a displayable
@@ -192,7 +267,7 @@ export default function App() {
     setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
     try {
-      const real = await api.send(conn, content, attachmentIds, replyToId);
+      const real = await api.send(conn, content, attachmentIds, replyToId, rooms.currentRoom);
       setMessages((prev) => {
         // SSE may have already delivered the confirmed copy — the server
         // broadcasts the new message and can beat the POST response back to
@@ -245,10 +320,10 @@ export default function App() {
     setAuthOpen(true);
   };
 
-  // Keep the document title in sync with the active language.
+  // Keep the document title in sync with the active language + focused room.
   useEffect(() => {
-    document.title = t("app.title");
-  }, [t]);
+    document.title = t("app.title", { room: rooms.currentRoom });
+  }, [t, rooms.currentRoom]);
 
   return (
     <div className="flex h-full flex-col">
@@ -269,16 +344,30 @@ export default function App() {
           selfId={me.id}
           onlineIds={onlineIds}
           key_={getKey()}
+          currentRoom={rooms.currentRoom}
+          rooms={rooms.sortedRooms}
+          unread={rooms.unread}
+          onSelectRoom={handleSwitchRoom}
+          onCreateRoom={handleCreateRoom}
           onSignOutRequest={() => setSignOutOpen(true)}
         />
       )}
 
       <div className="flex min-h-0 flex-1">
-        <Roster members={members} selfId={me?.id} onlineIds={onlineIds} />
+        <Roster
+          members={members}
+          selfId={me?.id}
+          onlineIds={onlineIds}
+          rooms={rooms.sortedRooms}
+          currentRoom={rooms.currentRoom}
+          unread={rooms.unread}
+          onSelectRoom={handleSwitchRoom}
+          onCreateRoom={handleCreateRoom}
+        />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
-          <h1 className="sr-only">{t("app.h1")}</h1>
+          <h1 className="sr-only">{t("app.h1", { room: rooms.currentRoom })}</h1>
           {/* First-load gate. While bootStatus is set we render the boot screen
               (loading spinner OR retryable error) instead of the message list +
               composer, so a server-down on reload never silently wipes the key
@@ -287,13 +376,19 @@ export default function App() {
             <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} />
           ) : (
             <>
-              <SearchBar conn={conn} />
+              <SearchBar conn={conn} room={rooms.currentRoom} />
+              {/* key={room} forces a remount on switch → 180ms cross-fade. */}
               <MessageList
+                key={rooms.currentRoom}
                 ref={messageListRef}
                 messages={messages}
                 me={me}
                 members={members}
                 status={status}
+                room={rooms.currentRoom}
+                loadingRoom={loadingRoom}
+                highlightMessageId={highlightMessageId}
+                onHighlightConsumed={() => setHighlightMessageId(null)}
                 onLoadMore={loadMore}
                 loadingMore={loadingMore}
                 onReply={setReplyTo}
@@ -309,6 +404,7 @@ export default function App() {
                 members={members}
                 selfId={me?.id}
                 conn={conn}
+                room={rooms.currentRoom}
                 replyTo={replyTo}
                 onReplyClear={() => setReplyTo(null)}
               />
@@ -316,6 +412,14 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Cross-room @mention toasts (P1). Live regardless of which panel is open;
+          clicking jumps to the source room + message. */}
+      <MentionToasts
+        toasts={rooms.toasts}
+        onActivate={handleToastActivate}
+        onDismiss={rooms.dismissToast}
+      />
 
       {/*
         AuthDialog is keyed by authOpen so it fully remounts whenever it (re)opens.

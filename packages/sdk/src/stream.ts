@@ -1,5 +1,5 @@
 import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
-import { type ClubConn, listMessages } from "./transport.js";
+import { type ClubConn, listMessages, listRooms } from "./transport.js";
 
 // ── SSE streaming with reconnect + catch-up ─────────────────────────
 
@@ -22,6 +22,10 @@ export interface StreamOptions {
   onMessageDeleted?: (e: MessageDeletedEvent) => void;
   /** Fired when a reaction is toggled (`message_reaction` event). */
   onReaction?: (e: MessageReactionEvent) => void;
+  /** Subscribe to a single room only (room-scoped stream). */
+  room?: string;
+  /** Subscribe to multiple rooms. Ignored if `room` is set. */
+  rooms?: string[];
 }
 
 export interface StreamHandle {
@@ -65,6 +69,21 @@ export function streamMessages(
   const maxReconnects = opts.maxReconnects ?? Infinity;
   const base = opts.backoffMs ?? 500;
 
+  // Room filter for the stream: a single room, a set of rooms, or null = all.
+  // Drives both the /messages/stream?room=|?rooms= query and the catch-up
+  // fetches (which must mirror the subscription scope, else a multi-room client
+  // would only catch up general on reconnect).
+  const roomFilter: string[] | null = opts.room
+    ? [opts.room]
+    : opts.rooms && opts.rooms.length > 0
+      ? opts.rooms
+      : null;
+  const roomQuery = opts.room
+    ? `room=${encodeURIComponent(opts.room)}`
+    : opts.rooms && opts.rooms.length > 0
+      ? `rooms=${opts.rooms.map(encodeURIComponent).join(",")}`
+      : "";
+
   // One abort signal for the whole subscription lifetime; stop() aborts it,
   // which cuts the reconnect backoff short and tears down the live fetch.
   const stopSignal = new AbortController();
@@ -106,10 +125,13 @@ export function streamMessages(
     );
     const headers: Record<string, string> = { Accept: "text/event-stream" };
     if (c.key) headers.Authorization = `Bearer ${c.key}`;
-    const res = await fetch(`${c.server}/messages/stream`, {
-      headers,
-      signal: fetchController.signal,
-    });
+    const res = await fetch(
+      `${c.server}/messages/stream${roomQuery ? "?" + roomQuery : ""}`,
+      {
+        headers,
+        signal: fetchController.signal,
+      },
+    );
     if (!res.ok || !res.body) throw new Error(`stream failed: HTTP ${res.status}`);
 
     // Subscribe-first: the SSE connection is now live, so anything broadcast
@@ -179,11 +201,29 @@ export function streamMessages(
 
   async function catchUp(): Promise<void> {
     if (lastId === undefined) return; // nothing to resume from
-    try {
-      const missed = await listMessages(c, { since: lastId });
-      for (const m of missed) deliver(m);
-    } catch {
-      /* best-effort; the reopened stream keeps delivering live messages */
+    // Catch up the gap per subscribed room: GET /messages is single-room, so a
+    // multi-room subscription fetches each room's new-since-cursor messages.
+    // ulid ids are globally monotonic, so the id-based de-dup in deliver()
+    // collapses any overlap to exactly-once and lastId advances correctly
+    // across rooms. For an all-rooms subscription we first enumerate rooms
+    // (best-effort — a failure just skips catch-up, the live stream covers it).
+    let rooms: string[];
+    if (roomFilter !== null) {
+      rooms = roomFilter;
+    } else {
+      try {
+        rooms = (await listRooms(c)).map((r) => r.slug);
+      } catch {
+        return;
+      }
+    }
+    for (const room of rooms) {
+      try {
+        const missed = await listMessages(c, { since: lastId, room });
+        for (const m of missed) deliver(m);
+      } catch {
+        /* best-effort; the reopened stream keeps delivering live messages */
+      }
     }
   }
 

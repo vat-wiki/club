@@ -1,0 +1,53 @@
+import { Hono } from "hono";
+import { CreateRoomRequest, type Room } from "@club/shared";
+import { requireAuth } from "../auth.js";
+import { listRooms, ensureRoom, type RoomRow } from "../db.js";
+
+// ── Rooms (multi-room) ───────────────────────────────────────────────
+//
+// Open-topic rooms: every authed participant (human or agent, equally) can list
+// and create rooms. A room is a topic channel, NOT an access boundary — there
+// is no membership/visibility concept this phase (PRD §4.1). POST is idempotent:
+// posting an existing slug returns that room without error ("ensure exists"),
+// matching the open model where build and enter are the same action.
+
+export const rooms = new Hono();
+rooms.use("*", requireAuth);
+
+// snake_case db row → camelCase contract. last_activity_at is nullable for
+// empty rooms (no messages yet).
+function toRoom(r: RoomRow): Room {
+  return {
+    id: r.id,
+    slug: r.slug,
+    createdAt: r.created_at,
+    lastActivityAt: r.last_activity_at,
+  };
+}
+
+// GET /rooms — every room, general first then most-recently-active first (the
+// ordering is also computed in SQL; clients may re-sort). Each room carries
+// lastActivityAt (null when empty) so clients can do "unread-first,
+// active-first" ordering without a second round-trip.
+rooms.get("/", (c) => {
+  const rows = listRooms();
+  return c.json(rows.map(toRoom));
+});
+
+// POST /rooms { name } -> Room (201 if newly created, 200 if it already existed)
+// Idempotent: posting an existing slug returns the existing room. `name` is the
+// canonical slug, validated by CreateRoomRequest (regex ^[a-z0-9][a-z0-9-]{0,29}$).
+// "general" is seeded by the migration, so posting it just returns that row.
+rooms.post("/", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = CreateRoomRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+  }
+  const slug = parsed.data.name;
+  const created = ensureRoom(slug, Date.now()).created;
+  // Re-read via listRooms so the response carries the authoritative
+  // lastActivityAt (non-null when the room already had messages).
+  const full = listRooms().find((r) => r.slug === slug)!;
+  return c.json(toRoom(full), created ? 201 : 200);
+});

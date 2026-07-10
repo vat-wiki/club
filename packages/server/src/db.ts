@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { ulid } from "ulid";
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), "club.db");
 
@@ -20,8 +21,10 @@ db.pragma("foreign_keys = ON");
 // Baseline schema: participants + messages, created with CREATE TABLE IF NOT
 // EXISTS since the very first release. We keep this as-is (idempotent) rather
 // than retrofitting it into the migration list — existing deployments already
-// have these tables, and re-running the statements is a no-op for them.
-db.exec(`
+// have these tables, and re-running the statements is a no-op for them. Exported
+// so the migration test can stand up a "v0" db on an arbitrary connection and
+// then drive the upgrade chain.
+export const BASELINE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS participants (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at     INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
-`);
+`;
+db.exec(BASELINE_SCHEMA);
 
 // ── Schema migrations ─────────────────────────────────────────────────
 // A tiny, dependency-free migration runner. Each migration is an ordered DDL
@@ -128,6 +132,29 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 7,
+    description: "multi-room: rooms table, messages.room, mentions.room, general seed",
+    // Open-topic rooms. `rooms` holds the canonical slug registry; `messages`
+    // and `mentions` get a `room` column defaulting to "general" so existing
+    // rows backfill in place (zero data loss, no backfill script — NF1). An
+    // index on (room) backs the room-scoped history pagination; the cursor
+    // stays the monotonic implicit rowid (selectable but not itself indexable
+    // as a named column), with the room index narrowing each page's scan. The
+    // "general" system row is seeded so it always exists; it is never deleted.
+    sql: `
+      CREATE TABLE IF NOT EXISTS rooms (
+        id          TEXT PRIMARY KEY,
+        slug        TEXT NOT NULL UNIQUE,
+        created_at  INTEGER NOT NULL
+      );
+      ALTER TABLE messages ADD COLUMN room TEXT NOT NULL DEFAULT 'general';
+      CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room);
+      ALTER TABLE mentions ADD COLUMN room TEXT NOT NULL DEFAULT 'general';
+      INSERT OR IGNORE INTO rooms (id, slug, created_at)
+        VALUES ('general', 'general', CAST(strftime('%s','now') AS INTEGER) * 1000);
+    `,
+  },
 ];
 
 db.exec(`
@@ -135,25 +162,44 @@ CREATE TABLE IF NOT EXISTS schema_version (
   version INTEGER NOT NULL
 );
 `);
-// Seed the version row at 0 the first time (baseline schema above is "v0").
-db.prepare(
-  `INSERT OR IGNORE INTO schema_version (version) VALUES (0)`,
-).run();
 
-const currentVersion = (
-  db
-    .prepare<[], { version: number }>(`SELECT version FROM schema_version`)
-    .get() ?? { version: 0 }
-).version;
+// Apply pending migrations to a connection, tracking the high-water mark in the
+// single-row schema_version table. Each migration runs inside a transaction
+// (atomic DDL+version bump). `maxVersion` is a test seam letting a caller build
+// a db at an older schema (e.g. v6) and then drive the upgrade; production
+// leaves it at the default (Infinity → apply everything pending).
+export function runMigrations(
+  database: Database.Database,
+  maxVersion = Infinity,
+): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER NOT NULL
+    );
+  `);
+  // Seed the version row at 0 the first time (baseline schema above is "v0").
+  database
+    .prepare(`INSERT OR IGNORE INTO schema_version (version) VALUES (0)`)
+    .run();
 
-for (const m of migrations) {
-  if (m.version <= currentVersion) continue;
-  const tx = db.transaction(() => {
-    db.exec(m.sql);
-    db.prepare(`UPDATE schema_version SET version = ?`).run(m.version);
-  });
-  tx();
+  const currentVersion = (
+    database
+      .prepare<[], { version: number }>(`SELECT version FROM schema_version`)
+      .get() ?? { version: 0 }
+  ).version;
+
+  for (const m of migrations) {
+    if (m.version > maxVersion) break;
+    if (m.version <= currentVersion) continue;
+    const tx = database.transaction(() => {
+      database.exec(m.sql);
+      database.prepare(`UPDATE schema_version SET version = ?`).run(m.version);
+    });
+    tx();
+  }
 }
+
+runMigrations(db);
 
 // Order messages by insertion time. We keep a rowid so 'since' cursor can use
 // a monotonic sequence rather than the (sortable but ulid) id comparison,
@@ -169,6 +215,7 @@ export interface MessageRow {
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
   reply_to_id: string | null; // id of the message this one replies to, or NULL
   deleted: number; // 1 if recalled (soft-deleted), else 0
+  room: string; // canonical room slug; "general" for backfilled rows
 }
 
 export function insertMessage(
@@ -178,11 +225,12 @@ export function insertMessage(
   createdAt: number,
   attachments: string | null,
   replyToId: string | null,
+  room: string,
 ): void {
   db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt, attachments, replyToId);
+    `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
 
 export function getAllParticipants() {
@@ -193,67 +241,87 @@ export function getAllParticipants() {
     .all();
 }
 
-const afterStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
+const afterStmt = db.prepare<[number, string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.rowid > ? ORDER BY m.rowid ASC LIMIT ?`,
+   WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
-const recentStmt = db.prepare<[number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
+const recentStmt = db.prepare<[string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
-   ORDER BY m.rowid DESC LIMIT ?`,
+   WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 const sinceStmt = db.prepare<[string], { rowid: number }>(
   `SELECT rowid FROM messages WHERE id = ?`,
 );
 
-export function getMessagesAfter(rowid: number, limit: number): MessageRow[] {
-  return afterStmt.all(rowid, limit);
+export function getMessagesAfter(rowid: number, room: string, limit: number): MessageRow[] {
+  return afterStmt.all(rowid, room, limit);
 }
 
-export function getRecentMessages(limit: number): MessageRow[] {
-  return recentStmt.all(limit).reverse();
+export function getRecentMessages(room: string, limit: number): MessageRow[] {
+  return recentStmt.all(room, limit).reverse();
 }
 
-export function getMessagesSince(sinceId: string, limit: number) {
+export function getMessagesSince(sinceId: string, room: string, limit: number) {
   const row = sinceStmt.get(sinceId);
   if (!row) return { rowid: 0, messages: [] as MessageRow[] };
-  return { rowid: row.rowid, messages: getMessagesAfter(row.rowid, limit) };
+  return { rowid: row.rowid, messages: getMessagesAfter(row.rowid, room, limit) };
 }
 
-const beforeStmt = db.prepare<[number, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
+const beforeStmt = db.prepare<[number, string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.rowid < ? ORDER BY m.rowid DESC LIMIT ?`,
+   WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 /** Messages older than `beforeId`, chronologic (oldest→newest within the page).
  *  Backs the "scroll up to load earlier history" UI — the mirror of
  *  getMessagesSince: take the N rows with rowid < beforeId's (DESC to grab the
  *  nearest older ones), then reverse to ascending. Returns [] if beforeId is
- *  unknown (e.g. it was just deleted). */
-export function getMessagesBeforeId(beforeId: string, limit: number): MessageRow[] {
+ *  unknown (e.g. it was just deleted). Scoped to `room`. */
+export function getMessagesBeforeId(beforeId: string, room: string, limit: number): MessageRow[] {
   const row = sinceStmt.get(beforeId);
   if (!row) return [];
-  return beforeStmt.all(row.rowid, limit).reverse();
+  return beforeStmt.all(row.rowid, room, limit).reverse();
 }
 
-const searchStmt = db.prepare<[string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted,
+const searchAllStmt = db.prepare<[string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
           p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
    FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.content LIKE ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
+const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
+          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
+   FROM messages m JOIN participants p ON p.id = m.participant_id
+   WHERE m.content LIKE ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+);
+
 /** Messages whose content contains `q` (substring via LIKE), newest first.
- *  Backs the search box. */
-export function searchMessages(q: string, limit: number): MessageRow[] {
-  return searchStmt.all(`%${q}%`, limit);
+ *  Backs the search box. When `room` is null/empty the search spans all rooms;
+ *  otherwise it is scoped to that room. */
+export function searchMessages(q: string, room: string | null, limit: number): MessageRow[] {
+  return room
+    ? searchRoomStmt.all(`%${q}%`, room, limit)
+    : searchAllStmt.all(`%${q}%`, limit);
+}
+
+// The room a message lives in. Used to room-scope `message_deleted` /
+// `message_reaction` SSE fan-out (the delete/reaction routes know only the id,
+// and a message's room never changes). Returns undefined if the id is unknown.
+const messageRoomStmt = db.prepare<[string], { room: string }>(
+  `SELECT room FROM messages WHERE id = ?`,
+);
+export function getMessageRoom(id: string): string | undefined {
+  return messageRoomStmt.get(id)?.room;
 }
 
 const deleteStmt = db.prepare<[string, string]>(
@@ -383,6 +451,7 @@ export interface MentionRow {
   content: string;
   message_created_at: number;
   read_at: number | null;
+  room: string; // room the mentioning message was posted in (deep-link source)
 }
 
 const allParticipantsStmt = db.prepare<
@@ -397,23 +466,25 @@ export function getAllParticipantNames(): { id: string; name: string }[] {
 
 const insertMentionStmt = db.prepare(
   `INSERT OR IGNORE INTO mentions
-     (id, message_id, participant_id, author_id, read_at, created_at)
-   VALUES (?, ?, ?, ?, NULL, ?)`,
+     (id, message_id, participant_id, author_id, room, read_at, created_at)
+   VALUES (?, ?, ?, ?, ?, NULL, ?)`,
 );
 
 /**
  * Insert one inbox row. `INSERT OR IGNORE` so a duplicate (same message +
  * recipient) is silently dropped rather than throwing — matches the UNIQUE
- * constraint intent. Returns whether a row was actually inserted.
+ * constraint intent. Returns whether a row was actually inserted. `room` is the
+ * room the mentioning message was posted in, so the recipient can deep-link.
  */
 export function insertMention(
   id: string,
   messageId: string,
   participantId: string,
   authorId: string,
+  room: string,
   createdAt: number,
 ): boolean {
-  return insertMentionStmt.run(id, messageId, participantId, authorId, createdAt)
+  return insertMentionStmt.run(id, messageId, participantId, authorId, room, createdAt)
     .changes > 0;
 }
 
@@ -421,7 +492,7 @@ const unreadMentionsStmt = db.prepare<[string], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
           p.name AS author_name, p.kind AS author_kind,
           m.content AS content, m.created_at AS message_created_at,
-          mn.read_at
+          mn.read_at, mn.room
    FROM mentions mn
    JOIN messages m ON m.id = mn.message_id
    JOIN participants p ON p.id = mn.author_id
@@ -448,7 +519,7 @@ const mentionFullStmt = db.prepare<[string], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
           p.name AS author_name, p.kind AS author_kind,
           m.content AS content, m.created_at AS message_created_at,
-          mn.read_at
+          mn.read_at, mn.room
    FROM mentions mn
    JOIN messages m ON m.id = mn.message_id
    JOIN participants p ON p.id = mn.author_id
@@ -529,4 +600,63 @@ export function getFilesByIds(ids: string[]): FileRow[] {
   const byId = new Map(rows.map((r) => [r.id, r]));
   // Filter undefined (id not found) but keep order; caller validates ownership.
   return ids.map((id) => byId.get(id)).filter((r): r is FileRow => !!r);
+}
+
+// ── Rooms (multi-room) ───────────────────────────────────────────────
+//
+// Rooms are open topic channels (PRD §4.1). The `rooms` table is the canonical
+// slug registry; messages/mentions carry the slug directly (no FK by design —
+// a room's slug is immutable and stable, and messages may reference a room
+// before its registry row is observably present in a race, though in practice
+// POST /messages ensures the room exists first). `general` is the seeded system
+// row and is always present.
+
+export interface RoomRow {
+  id: string;
+  slug: string;
+  created_at: number;
+  // created_at of the most recent message in this room; NULL for an empty room.
+  last_activity_at: number | null;
+}
+
+// All rooms with their last-activity timestamp in one scan. `general` sorts
+// first, then most-recently-active first, then empty rooms (NULL activity) last
+// by created_at. The LEFT JOIN + MAX yields NULL activity for rooms with no
+// messages — exactly what clients need for "active-first" ordering without a
+// second round-trip. Room counts are small (<100 expected), so the grouped scan
+// is plenty fast.
+const listRoomsStmt = db.prepare<[], RoomRow>(
+  `SELECT r.id, r.slug, r.created_at,
+          MAX(m.created_at) AS last_activity_at
+   FROM rooms r
+   LEFT JOIN messages m ON m.room = r.slug
+   GROUP BY r.id, r.slug, r.created_at
+   ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`,
+);
+export function listRooms(): RoomRow[] {
+  return listRoomsStmt.all();
+}
+
+const roomBySlugStmt = db.prepare<
+  string,
+  { id: string; slug: string; created_at: number }
+>(`SELECT id, slug, created_at FROM rooms WHERE slug = ?`);
+
+const insertRoomStmt = db.prepare(
+  `INSERT OR IGNORE INTO rooms (id, slug, created_at) VALUES (?, ?, ?)`,
+);
+
+/** Ensure a room with `slug` exists, creating it if missing. Idempotent: a
+ *  pre-check returns the existing row; INSERT OR IGNORE guards the rare race of
+ *  two concurrent creates. Returns the room plus `created` (true iff this call
+ *  actually inserted the row) so the route can pick 201 vs 200. */
+export function ensureRoom(
+  slug: string,
+  createdAt: number,
+): { id: string; slug: string; created_at: number; created: boolean } {
+  const existing = roomBySlugStmt.get(slug);
+  if (existing) return { ...existing, created: false };
+  const id = ulid();
+  insertRoomStmt.run(id, slug, createdAt);
+  return { id, slug, created_at: createdAt, created: true };
 }

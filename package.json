@@ -1,6 +1,6 @@
 {
   "name": "club",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "A chat room where humans and agents are equal citizens — same client, same key, same history.",
   "type": "module",

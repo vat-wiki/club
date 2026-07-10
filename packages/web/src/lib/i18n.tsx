@@ -196,20 +196,29 @@ const zh: Dict = {
   "composer.hint": "回车发送 · shift+回车换行",
   "composer.hintMention": " · ↑↓ 选择 · 回车@提及 · esc 取消",
 
-  // Composer — image input
-  "composer.attach.aria": "添加图片",
-  "composer.attach.ariaCount": "添加图片（已 {count}/{max} 张）",
-  "composer.uploading": "图片上传中…",
-  "composer.attach.hint": "粘贴 / 拖拽图片，或点📎添加",
+  // Composer — attachment input (image + video)
+  "composer.attach.aria": "添加图片或视频",
+  "composer.attach.ariaCount": "添加附件（已 {count}/{max} 个）",
+  "composer.uploading": "附件上传中…",
+  "composer.attach.hint": "粘贴 / 拖拽图片或视频，或点📎添加",
   "image.invalidMime": "只支持 PNG / JPEG / GIF / WebP 图片",
   "image.tooLarge": "图片不能超过 {max}（这张 {size}）",
-  "image.tooMany": "一条消息最多 {max} 张图片",
+  "image.tooMany": "一条消息最多 {max} 个附件",
   "image.uploadFailed": "上传失败——点图片重试",
   "image.retry.aria": "重新上传图片 {index}",
   "image.remove.aria": "移除图片 {index}",
   "image.chip.uploading": "图片 {index}，上传中 {percent}%",
   "image.chip.done": "图片 {index}",
   "image.chip.error": "图片 {index}，上传失败",
+
+  // Composer / message list — video input
+  "video.invalidMime": "只支持 MP4 / WebM 视频",
+  "video.tooLarge": "视频不能超过 {max}（这个 {size}）",
+  "video.retry.aria": "重新上传视频 {index}",
+  "video.remove.aria": "移除视频 {index}",
+  "video.chip.uploading": "视频 {index}，上传中 {percent}%",
+  "video.chip.done": "视频 {index}",
+  "video.chip.error": "视频 {index}，上传失败",
 
   // Message list — image attachments
   "msg.image.open": "放大查看图片",
@@ -388,20 +397,29 @@ const en: Dict = {
   "composer.hint": "Enter to send · shift+enter for newline",
   "composer.hintMention": " · ↑↓ to select · Enter to @mention · esc to cancel",
 
-  // Composer — image input
-  "composer.attach.aria": "Add image",
-  "composer.attach.ariaCount": "Add image ({count}/{max} attached)",
-  "composer.uploading": "Uploading images…",
-  "composer.attach.hint": "Paste / drop an image, or click 📎 to add",
+  // Composer — attachment input (image + video)
+  "composer.attach.aria": "Add image or video",
+  "composer.attach.ariaCount": "Add attachment ({count}/{max} attached)",
+  "composer.uploading": "Uploading…",
+  "composer.attach.hint": "Paste / drop an image or video, or click 📎 to add",
   "image.invalidMime": "Only PNG / JPEG / GIF / WebP images are supported",
   "image.tooLarge": "Images can't exceed {max} (this one is {size})",
-  "image.tooMany": "A message can have at most {max} images",
+  "image.tooMany": "A message can have at most {max} attachments",
   "image.uploadFailed": "Upload failed — click the image to retry",
   "image.retry.aria": "Retry uploading image {index}",
   "image.remove.aria": "Remove image {index}",
   "image.chip.uploading": "Image {index}, uploading {percent}%",
   "image.chip.done": "Image {index}",
   "image.chip.error": "Image {index}, upload failed",
+
+  // Composer / message list — video input
+  "video.invalidMime": "Only MP4 / WebM videos are supported",
+  "video.tooLarge": "Videos can't exceed {max} (this one is {size})",
+  "video.retry.aria": "Retry uploading video {index}",
+  "video.remove.aria": "Remove video {index}",
+  "video.chip.uploading": "Video {index}, uploading {percent}%",
+  "video.chip.done": "Video {index}",
+  "video.chip.error": "Video {index}, upload failed",
 
   // Message list — image attachments
   "msg.image.open": "View image larger",

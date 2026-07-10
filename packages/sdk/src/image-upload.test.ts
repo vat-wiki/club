@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClubApiError } from "./index.js";
-import { assertImageCount, uploadImageFile } from "./image-upload.js";
+import { assertImageCount, uploadImageFile, uploadVideoFile } from "./image-upload.js";
 
 // A minimal 1x1 PNG — real magic bytes so image-size sniffs type:"png". This is
 // the canonical smallest valid PNG (8-byte signature + IHDR + IDAT + IEND).
@@ -36,8 +36,8 @@ describe("assertImageCount", () => {
     expect(() => assertImageCount(Array(8).fill("a.png"))).not.toThrow();
   });
 
-  it("throws ClubApiError when too many images are requested", () => {
-    expect(() => assertImageCount(Array(9).fill("a.png"))).toThrow(/too many images/);
+  it("throws ClubApiError when too many attachments are requested", () => {
+    expect(() => assertImageCount(Array(9).fill("a.png"))).toThrow(/too many attachments/);
     expect(() => assertImageCount(Array(9).fill("a.png"))).toThrow(ClubApiError);
   });
 
@@ -110,5 +110,89 @@ describe("uploadImageFile", () => {
     } finally {
       rmSync(d, { recursive: true, force: true });
     }
+  });
+});
+
+// Minimal container headers — only the bytes sniffVideoMime inspects matter;
+// the rest is padding. mp4: a "ftyp" box at offset 4 with major brand "mp42".
+// webm: the EBML magic 0x1A45DFA3. mov: ftyp with brand "qt  " (QuickTime —
+// not browser-playable, so the sniffer must reject it).
+const MIN_MP4 = Buffer.from("00000018667479706d703432000000000000000000000000", "hex");
+const MIN_WEBM = Buffer.from("1a45dfa30000000000000000000000000000000000000000", "hex");
+const MIN_MOV = Buffer.from("0000001866747970717420200000000000000000", "hex");
+
+describe("uploadVideoFile", () => {
+  it("reads, sniffs, and uploads a valid mp4, returning the attachment id", async () => {
+    const d = tmpDir();
+    const p = join(d, "clip.dat"); // wrong extension on purpose — sniffing ignores it
+    writeFileSync(p, MIN_MP4);
+    try {
+      const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+        expect(String(url)).toBe("http://x/files");
+        const blob = (init.body as FormData).get("file") as Blob;
+        // Sniffed from the ftyp magic bytes, not the filename.
+        expect(blob.type).toBe("video/mp4");
+        return jsonRes({ id: "v1", url: "/files/v1", mime: "video/mp4", size: MIN_MP4.byteLength });
+      });
+      globalThis.fetch = fetchMock as typeof fetch;
+
+      const att = await uploadVideoFile({ server: "http://x", key: "k" }, p);
+      expect(att.id).toBe("v1");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("sniffs a webm as video/webm", async () => {
+    const d = tmpDir();
+    const p = join(d, "clip.webm");
+    writeFileSync(p, MIN_WEBM);
+    try {
+      const fetchMock = vi.fn(async (_u: string, init: RequestInit) => {
+        const blob = (init.body as FormData).get("file") as Blob;
+        expect(blob.type).toBe("video/webm");
+        return jsonRes({ id: "v2", url: "/files/v2", mime: "video/webm", size: MIN_WEBM.byteLength });
+      });
+      globalThis.fetch = fetchMock as typeof fetch;
+      const att = await uploadVideoFile({ server: "http://x" }, p);
+      expect(att.id).toBe("v2");
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a .mov (QuickTime ftyp) as not browser-playable", async () => {
+    const d = tmpDir();
+    const p = join(d, "clip.mov");
+    writeFileSync(p, MIN_MOV);
+    try {
+      globalThis.fetch = vi.fn(async () => jsonRes({}, 200)) as typeof fetch;
+      await expect(uploadVideoFile({ server: "http://x" }, p)).rejects.toThrow(
+        /not a recognized video/,
+      );
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a non-video file (image magic bytes)", async () => {
+    const d = tmpDir();
+    const p = join(d, "fake.mp4");
+    writeFileSync(p, MIN_PNG); // PNG magic — not a video container
+    try {
+      globalThis.fetch = vi.fn(async () => jsonRes({}, 200)) as typeof fetch;
+      await expect(uploadVideoFile({ server: "http://x" }, p)).rejects.toThrow(
+        /not a recognized video/,
+      );
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a non-existent file with a readable error", async () => {
+    await expect(uploadVideoFile({ server: "http://x" }, "/no/such/file.mp4")).rejects.toThrow(
+      /could not read/,
+    );
   });
 });

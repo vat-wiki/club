@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ClubClient } from "@club/sdk";
-import { uploadImageFile } from "@club/sdk/node";
+import { uploadImageFile, uploadVideoFile } from "@club/sdk/node";
 import { dispatchTool, type DispatchClient } from "./helpers.js";
 
 // ── Connection config ────────────────────────────────────────────────
@@ -34,6 +34,7 @@ const dispatchClient: DispatchClient = {
   messages: (opts) => client.messages(opts),
   send: (content, attachmentIds) => client.send(content, attachmentIds),
   uploadImage: (path) => uploadImageFile({ server: client.server, key: client.key }, path),
+  uploadVideo: (path) => uploadVideoFile({ server: client.server, key: client.key }, path),
   members: () => client.members(),
   stream: (cb) => client.stream(cb),
   reportAgentThinking: () => client.reportAgentThinking(),
@@ -70,16 +71,22 @@ const TOOLS = [
   {
     name: "send",
     description:
-      "Post a message to the room as this participant. Keep it relevant. Pass `content` for text, and/or `images` (an array of local file paths) to attach images (png/jpeg/gif/webp, ≤10MB each, up to 8). At least one of content or images is required; a bare image with no text is fine.",
+      "Post a message to the room as this participant. Keep it relevant. Pass `content` for text, and/or `images` / `videos` (arrays of local file paths) to attach media (images: png/jpeg/gif/webp ≤10MB; videos: mp4/webm ≤50MB; up to 8 attachments total). At least one of content/images/videos is required; bare media with no text is fine.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        content: { type: "string", description: "message body (optional when images are attached)" },
+        content: { type: "string", description: "message body (optional when media is attached)" },
         images: {
           type: "array",
           items: { type: "string" },
           description:
-            "local image file paths to attach (png/jpeg/gif/webp, ≤10MB each, up to 8)",
+            "local image file paths to attach (png/jpeg/gif/webp, ≤10MB each, up to 8 total)",
+        },
+        videos: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "local video file paths to attach (mp4/webm, ≤50MB each, up to 8 total)",
         },
       },
       required: [] as const,

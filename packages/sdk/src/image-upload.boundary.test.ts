@@ -197,7 +197,7 @@ describe("assertImageCount boundary", () => {
     } catch (e) {
       expect(e).toBeInstanceOf(ClubApiError);
       expect((e as ClubApiError).status).toBe(400);
-      expect((e as Error).message).toMatch(/too many images: 9/);
+      expect((e as Error).message).toMatch(/too many attachments: 9/);
       expect((e as Error).message).toMatch(/max 8/);
     }
   });

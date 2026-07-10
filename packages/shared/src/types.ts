@@ -50,6 +50,27 @@ export interface Message {
 export const ImageMime = z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 export type ImageMime = z.infer<typeof ImageMime>;
 
+// The MIME types club accepts as videos. Same single-source-of-truth pattern as
+// ImageMime. Scope is deliberately the formats every modern browser decodes
+// natively via <video> — mp4 (H.264/AAC, the dominant phone/camera recording
+// format) and webm (VP8/VP9). Other containers (mov/avi/mkv…) are rejected
+// rather than transcoded: native playback avoids any ffmpeg dependency (server
+// or wasm) while covering virtually all real recordings. Unlike images, the
+// server does NOT probe width/height for video — the <video> element reads them
+// client-side via `onLoadedMetadata`, so no duration/dimension column is needed
+// on `files` and the existing schema serves video unchanged.
+export const VideoMime = z.enum(["video/mp4", "video/webm"]);
+export type VideoMime = z.infer<typeof VideoMime>;
+
+// Every MIME club will store and serve as an attachment (image OR video). The
+// upload route branches on this union; the web client renders <img> vs <video>
+// based on which side matches.
+export const AttachmentMime = z.enum([
+  ...ImageMime.options,
+  ...VideoMime.options,
+]);
+export type AttachmentMime = z.infer<typeof AttachmentMime>;
+
 // One image attached to a message. `id` is a server-generated unguessable random
 // slug that doubles as the public `/files/{id}` path (serving is intentionally
 // unauthenticated — `<img src>` cannot carry the bearer header, and club is a
@@ -60,8 +81,10 @@ export type ImageMime = z.infer<typeof ImageMime>;
 export interface MessageAttachment {
   id: string;
   url: string; // root-relative, e.g. "/files/{id}"
-  mime: ImageMime;
-  width?: number; // px, lets the client reserve layout before the image loads
+  mime: ImageMime | VideoMime; // image or video — clients branch on this
+  width?: number; // px, lets the client reserve layout before the bytes load.
+  // For images this is the server-probed dimension; for video it is typically
+  // absent (the <video> element reads its own size via onLoadedMetadata).
   height?: number;
   size: number; // bytes
 }
@@ -123,8 +146,14 @@ export interface RecoverParticipantResponse {
 // Image-input limits — shared so the web client's pre-flight checks and the
 // upload route's authoritative checks can never drift apart.
 export const MAX_MESSAGE_CONTENT = 4000;
+// Per-message cap on attachments. Historically image-only ("MAX_IMAGES"), now a
+// shared budget covering BOTH images and videos (a message may mix them) — kept
+// under the original name so the SDK/CLI/web references don't churn. Videos are
+// far heavier than images, so in practice a message rarely holds many, but the
+// ceiling is uniform rather than tracking two separate counters.
 export const MAX_IMAGES_PER_MESSAGE = 8;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
 
 // content is optional IFF at least one attachment is supplied ("text-optional"
 // keeps the common screenshot-then-send path frictionless — a bare image is a

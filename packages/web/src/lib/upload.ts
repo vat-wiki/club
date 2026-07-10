@@ -1,13 +1,25 @@
-import { ImageMime, MAX_IMAGE_BYTES, type MessageAttachment, type UploadFileResponse } from "@club/shared";
+import {
+  ImageMime,
+  VideoMime,
+  MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES,
+  type MessageAttachment,
+  type UploadFileResponse,
+} from "@club/shared";
 import { ClubApiError, type ClubConn } from "@club/sdk";
 
 // The MIME whitelist is the single source of truth in @club/shared (ImageMime).
 // Pre-flight locally so a wrong-format pick is rejected before any bytes hit
 // the network — the server re-checks authoritatively anyway.
 export const IMAGE_MIME_WHITELIST: readonly string[] = ImageMime.options;
+export const VIDEO_MIME_WHITELIST: readonly string[] = VideoMime.options;
 
 export function isAllowedImageMime(mime: string): boolean {
   return (IMAGE_MIME_WHITELIST as readonly string[]).includes(mime);
+}
+
+export function isAllowedVideoMime(mime: string): boolean {
+  return (VIDEO_MIME_WHITELIST as readonly string[]).includes(mime);
 }
 
 export function humanBytes(bytes: number): string {
@@ -40,12 +52,48 @@ export function validateImageFile(file: File): RejectReason | null {
   return null;
 }
 
+// Same shape as validateImageFile but against the video limits (mp4/webm,
+// 50MB). Mirrors the image path so the composer can validate any picked file
+// through one entry point (validateMediaFile) without branching on type itself.
+export function validateVideoFile(file: File): RejectReason | null {
+  if (!(VIDEO_MIME_WHITELIST as readonly string[]).includes(file.type)) {
+    return { key: "video.invalidMime" };
+  }
+  if (file.size > MAX_VIDEO_BYTES) {
+    return {
+      key: "video.tooLarge",
+      vars: { max: humanBytes(MAX_VIDEO_BYTES), size: humanBytes(file.size) },
+    };
+  }
+  return null;
+}
+
+// Validate any media file (image OR video) by dispatching on its MIME prefix.
+// Returns null when accepted, or a localized reject reason the caller turns
+// into text via t(). Non-media files fall through to a generic reject.
+export function validateMediaFile(file: File): RejectReason | null {
+  if (file.type.startsWith("video/")) return validateVideoFile(file);
+  if (file.type.startsWith("image/")) return validateImageFile(file);
+  return { key: "video.invalidMime" };
+}
+
 // Pull image files out of a DataTransferItemList / FileList, ignoring
-// non-image items. Used by paste + drop handlers.
+// non-image items. Kept for callers/tests that only want images.
 export function extractImageFiles(items: Iterable<File>): File[] {
   const out: File[] = [];
   for (const f of items) {
     if (f.type.startsWith("image/")) out.push(f);
+  }
+  return out;
+}
+
+// Pull image OR video files out of a DataTransferItemList / FileList, ignoring
+// everything else (e.g. a dragged folder or text). The composer's picker /
+// paste / drop all route through here so one path handles both attachment kinds.
+export function extractMediaFiles(items: Iterable<File>): File[] {
+  const out: File[] = [];
+  for (const f of items) {
+    if (f.type.startsWith("image/") || f.type.startsWith("video/")) out.push(f);
   }
   return out;
 }

@@ -40,39 +40,66 @@ function AttachmentGallery({
   return (
     <>
       <div className={cn("mt-1.5 w-full max-w-[320px]", multi ? "grid grid-cols-2 gap-1" : "")}>
-        {attachments.map((a, i) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => setActive(i)}
-            aria-label={`${openLabel} ${i + 1}`}
-            data-testid={`attachment-thumb-${i}`}
-            className={cn(
-              // A real min size so a tiny (e.g. 1×1 test) image can't collapse
-              // to an invisible dot: min-h-10 (40px) floors the height and the
-              // aspect ratio sets the width. object-cover (on the <img>) crops
-              // extreme aspect ratios (>10:1) into the fixed frame instead of a
-              // thin sliver. cursor-zoom-in signals the click-to-enlarge affordance.
-              "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in min-h-10",
-              multi ? "aspect-square" : "aspect-[4/3]",
-            )}
-          >
-            <img
-              src={resolveUrl(a.url)}
-              alt=""
-              // Loading shimmer until the bytes arrive; on load the image fades
-              // in over the shimmering placeholder. The infinite shimmer is
-              // collapsed to a single frame under prefers-reduced-motion
-              // (global wildcard in index.css).
-              loading="lazy"
-              draggable={false}
-              onLoad={(e) => {
-                e.currentTarget.classList.remove("opacity-0");
-              }}
-              className="h-full w-full bg-gradient-to-r from-muted via-accent/40 to-muted bg-[length:200%_100%] object-cover opacity-0 animate-shimmer transition-opacity duration-200"
-            />
-          </button>
-        ))}
+        {attachments.map((a, i) => {
+          // Video attachments render as an inline <video controls> — the native
+          // player handles play/seek/fullscreen, so they don't enter the image
+          // lightbox. preload="metadata" fetches just enough to show the
+          // duration and first frame without buffering the whole file up front,
+          // and exercises the server's Range support as soon as the user scrubs.
+          if (a.mime.startsWith("video/")) {
+            return (
+              <div
+                key={a.id}
+                data-testid={`attachment-video-${i}`}
+                className={cn(
+                  "mt-1.5 w-full max-w-[360px] overflow-hidden rounded-md border border-border/60 bg-black",
+                  multi && "col-span-2",
+                )}
+              >
+                <video
+                  src={resolveUrl(a.url)}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  className="aspect-video w-full bg-black"
+                />
+              </div>
+            );
+          }
+          return (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setActive(i)}
+              aria-label={`${openLabel} ${i + 1}`}
+              data-testid={`attachment-thumb-${i}`}
+              className={cn(
+                // A real min size so a tiny (e.g. 1×1 test) image can't collapse
+                // to an invisible dot: min-h-10 (40px) floors the height and the
+                // aspect ratio sets the width. object-cover (on the <img>) crops
+                // extreme aspect ratios (>10:1) into the fixed frame instead of a
+                // thin sliver. cursor-zoom-in signals the click-to-enlarge affordance.
+                "group/img relative overflow-hidden rounded-md border border-border/60 bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in min-h-10",
+                multi ? "aspect-square" : "aspect-[4/3]",
+              )}
+            >
+              <img
+                src={resolveUrl(a.url)}
+                alt=""
+                // Loading shimmer until the bytes arrive; on load the image fades
+                // in over the shimmering placeholder. The infinite shimmer is
+                // collapsed to a single frame under prefers-reduced-motion
+                // (global wildcard in index.css).
+                loading="lazy"
+                draggable={false}
+                onLoad={(e) => {
+                  e.currentTarget.classList.remove("opacity-0");
+                }}
+                className="h-full w-full bg-gradient-to-r from-muted via-accent/40 to-muted bg-[length:200%_100%] object-cover opacity-0 animate-shimmer transition-opacity duration-200"
+              />
+            </button>
+          );
+        })}
       </div>
       <ImageLightbox
         src={activeSrc}

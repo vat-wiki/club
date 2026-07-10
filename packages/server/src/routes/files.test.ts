@@ -1,4 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
+import { MAX_VIDEO_BYTES } from "@club/shared";
 import { Hono } from "hono";
 import { rmSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -116,5 +117,122 @@ describe("GET /files/:id", () => {
   it("404s for an unknown id", async () => {
     const res = await app.request("/files/does-not-exist");
     expect(res.status).toBe(404);
+  });
+});
+
+// ── Video branch ──────────────────────────────────────────────────────
+// An arbitrary buffer standing in for a video. The server's video branch does
+// NOT probe container metadata (unlike images, which parse dimensions via
+// image-size), so the bytes' content is irrelevant — only mime + size are
+// checked. This lets us exercise the whole video pipeline without a real (and
+// large) mp4/webm fixture.
+const VIDEO_BYTES = Buffer.from(Array.from({ length: 1000 }, (_, i) => i % 256));
+
+function videoFile(
+  mime = "video/mp4",
+  name = "v.mp4",
+  bytes: Buffer = VIDEO_BYTES,
+): File {
+  return new File([bytes], name, { type: mime });
+}
+
+describe("POST /files — video branch", () => {
+  it("accepts an mp4 and returns metadata WITHOUT probed dimensions", async () => {
+    const key = await mintKey("v1");
+    const { status, body } = await upload(key, videoFile("video/mp4"));
+    expect(status).toBe(201);
+    expect(body.mime).toBe("video/mp4");
+    // Unlike images, video attachments carry no width/height — the <video>
+    // element reads its own dimensions client-side.
+    expect(body.width).toBeUndefined();
+    expect(body.height).toBeUndefined();
+    expect(body.size).toBe(VIDEO_BYTES.length);
+    expect(body.url).toBe(`/files/${body.id}`);
+  });
+
+  it("accepts a webm", async () => {
+    const key = await mintKey("v2");
+    const { status, body } = await upload(key, videoFile("video/webm"));
+    expect(status).toBe(201);
+    expect(body.mime).toBe("video/webm");
+  });
+
+  it("rejects a non-whitelisted video container (415)", async () => {
+    const key = await mintKey("v3");
+    const { status } = await upload(key, videoFile("video/quicktime"));
+    expect(status).toBe(415);
+  });
+
+  it("rejects a video over MAX_VIDEO_BYTES (413)", async () => {
+    const key = await mintKey("v4");
+    const tooBig = Buffer.alloc(MAX_VIDEO_BYTES + 1, 0);
+    const { status } = await upload(key, videoFile("video/mp4", "big.mp4", tooBig));
+    expect(status).toBe(413);
+  });
+});
+
+describe("GET /files/:id — HTTP Range (video seek)", () => {
+  it("advertises Accept-Ranges and serves the full body on a plain GET", async () => {
+    const key = await mintKey("r1");
+    const { body } = await upload(key, videoFile());
+    const res = await app.request(`/files/${body.id}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("accept-ranges")).toBe("bytes");
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.equals(VIDEO_BYTES)).toBe(true);
+  });
+
+  it("returns 206 + the requested byte slice on a Range request", async () => {
+    const key = await mintKey("r2");
+    const { body } = await upload(key, videoFile());
+    const res = await app.request(`/files/${body.id}`, {
+      headers: { Range: "bytes=10-19" },
+    });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe(
+      `bytes 10-19/${VIDEO_BYTES.length}`,
+    );
+    expect(res.headers.get("content-length")).toBe("10");
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.equals(VIDEO_BYTES.subarray(10, 20))).toBe(true);
+  });
+
+  it("returns 206 to the end on an open-ended Range (bytes=990-)", async () => {
+    const key = await mintKey("r3");
+    const { body } = await upload(key, videoFile());
+    const res = await app.request(`/files/${body.id}`, {
+      headers: { Range: "bytes=990-" },
+    });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe(
+      `bytes 990-999/${VIDEO_BYTES.length}`,
+    );
+    expect(res.headers.get("content-length")).toBe("10");
+  });
+
+  it("serves the last N bytes on a suffix Range (bytes=-10)", async () => {
+    const key = await mintKey("r5");
+    const { body } = await upload(key, videoFile());
+    const res = await app.request(`/files/${body.id}`, {
+      headers: { Range: "bytes=-10" },
+    });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe(
+      `bytes 990-999/${VIDEO_BYTES.length}`,
+    );
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.equals(VIDEO_BYTES.subarray(990))).toBe(true);
+  });
+
+  it("returns 416 for an unsatisfiable Range", async () => {
+    const key = await mintKey("r4");
+    const { body } = await upload(key, videoFile());
+    const res = await app.request(`/files/${body.id}`, {
+      headers: { Range: `bytes=${VIDEO_BYTES.length + 10}-` },
+    });
+    expect(res.status).toBe(416);
+    expect(res.headers.get("content-range")).toBe(
+      `bytes */${VIDEO_BYTES.length}`,
+    );
   });
 });

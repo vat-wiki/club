@@ -46,18 +46,20 @@ beforeEach(() => {
 describe("Composer — image input", () => {
   it("renders the attach button with an accessible name", () => {
     renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
-    const attach = screen.getByLabelText("添加图片");
+    const attach = screen.getByLabelText("添加图片或视频");
     expect(attach).toBeTruthy();
     expect(attach.tagName).toBe("BUTTON");
   });
 
-  it("renders a hidden file input with the image accept whitelist + multiple + capture", () => {
+  it("renders a hidden file input with the image+video accept whitelist + multiple + capture", () => {
     const { container } = renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
     const input = container.querySelector<HTMLInputElement>('input[type="file"]');
     expect(input).toBeTruthy();
     expect(input?.hidden).toBe(true);
     expect(input?.multiple).toBe(true);
-    expect(input?.accept).toBe("image/png,image/jpeg,image/gif,image/webp");
+    expect(input?.accept).toBe(
+      "image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm",
+    );
     expect(input?.hasAttribute("capture")).toBe(true);
   });
 
@@ -111,7 +113,7 @@ describe("Composer — image input", () => {
     const send = screen.getByRole("button", { name: "发送" });
     expect(send).toBeDisabled();
     // And the hint explains why (uploading status, live region).
-    expect(screen.getByText("图片上传中…")).toBeTruthy();
+    expect(screen.getByText("附件上传中…")).toBeTruthy();
   });
 
   it("rejects an over-size file with a message naming the limit and the actual size", async () => {

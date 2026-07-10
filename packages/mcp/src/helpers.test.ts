@@ -220,6 +220,7 @@ function fakeClient(over: Partial<DispatchClient> = {}): DispatchClient {
     messages: async () => [],
     send: async (content: string) => makeMsg(content),
     uploadImage: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
+    uploadVideo: async () => ({ id: "att_" + Math.random().toString(36).slice(2) }),
     members: async () => [],
     stream: () => ({ stop: () => {} }),
     reportAgentThinking: async () => {},
@@ -317,6 +318,37 @@ describe("dispatchTool", () => {
     expect(out).toContain("[图片: /files/x]");
   });
 
+  it("send uploads each video and renders a [视频] token", async () => {
+    const uploaded: string[] = [];
+    const sentIds: string[] = [];
+    const client = fakeClient({
+      uploadVideo: async (p) => {
+        uploaded.push(p);
+        return { id: "v_" + p };
+      },
+      send: async (_c, attachmentIds) => {
+        sentIds.push(...(attachmentIds ?? []));
+        return makeMsg("watch", [
+          { id: "v_a.mp4", url: "/files/v_a.mp4", mime: "video/mp4", size: 1 },
+        ]);
+      },
+    });
+    const out = await dispatchTool("send", { content: "watch", videos: ["a.mp4"] }, client);
+    expect(uploaded).toEqual(["a.mp4"]);
+    expect(sentIds).toEqual(["v_a.mp4"]);
+    expect(out).toContain("[视频: /files/v_a.mp4]");
+  });
+
+  it("send accepts a bare video (no content) — text-optional path", async () => {
+    const client = fakeClient({
+      uploadVideo: async () => ({ id: "x" }),
+      send: async () =>
+        makeMsg("", [{ id: "x", url: "/files/x", mime: "video/webm", size: 1 }]),
+    });
+    const out = await dispatchTool("send", { videos: ["only.webm"] }, client);
+    expect(out).toContain("[视频: /files/x]");
+  });
+
   it("send tolerates `images` passed as a single string", async () => {
     const client = fakeClient({
       uploadImage: async (p) => ({ id: "u_" + p }),
@@ -331,7 +363,7 @@ describe("dispatchTool", () => {
     const client = fakeClient({ uploadImage });
     await expect(
       dispatchTool("send", { images: Array(9).fill("a.png") }, client),
-    ).rejects.toThrow(/too many images/);
+    ).rejects.toThrow(/too many attachments/);
     expect(uploadImage).not.toHaveBeenCalled();
   });
 

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { runSend, type SendDeps } from "./send-impl.js";
 
-// Fakes for the SDK functions runSend depends on. `calls` records every
-// interaction so we can assert order + arguments.
+// Fakes for the SDK functions runSend depends on. `uploads` records every
+// interaction (image AND video) so we can assert order + arguments.
 function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
   uploads: string[];
   sent: { content: string; attachmentIds?: string[] }[];
@@ -16,11 +16,15 @@ function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
       uploads.push(p);
       return { id: "att_" + p };
     },
+    uploadVideo: async (_conn, p) => {
+      uploads.push(p);
+      return { id: "att_" + p };
+    },
     send: async (content, attachmentIds) => {
       sent.push({ content, attachmentIds });
     },
   };
-  // Let a test override either function; the tracker arrays stay live so the
+  // Let a test override any function; the tracker arrays stay live so the
   // test still sees uploads/sent from the base (an override is expected to push
   // or not, depending on what the test asserts).
   return { ...base, ...over };
@@ -55,7 +59,37 @@ describe("runSend", () => {
     expect(deps.sent).toEqual([{ content: "", attachmentIds: ["att_x.png"] }]);
   });
 
-  it("throws when neither text nor images are given", async () => {
+  it("uploads each --video then sends content + attachmentIds", async () => {
+    const deps = makeDeps();
+    await runSend(
+      { content: "watch", images: [], videos: ["a.mp4", "b.webm"], conn: CONN },
+      deps,
+    );
+    expect(deps.uploads).toEqual(["a.mp4", "b.webm"]);
+    expect(deps.sent).toEqual([
+      { content: "watch", attachmentIds: ["att_a.mp4", "att_b.webm"] },
+    ]);
+  });
+
+  it("uploads a mix of --image and --video, images first (stable order)", async () => {
+    const deps = makeDeps();
+    await runSend(
+      { content: "mix", images: ["a.png"], videos: ["b.mp4"], conn: CONN },
+      deps,
+    );
+    expect(deps.uploads).toEqual(["a.png", "b.mp4"]);
+    expect(deps.sent).toEqual([
+      { content: "mix", attachmentIds: ["att_a.png", "att_b.mp4"] },
+    ]);
+  });
+
+  it("sends a video-only message (empty text + videos)", async () => {
+    const deps = makeDeps();
+    await runSend({ content: "", videos: ["x.mp4"], conn: CONN }, deps);
+    expect(deps.sent).toEqual([{ content: "", attachmentIds: ["att_x.mp4"] }]);
+  });
+
+  it("throws when neither text nor any attachment is given", async () => {
     const deps = makeDeps();
     await expect(runSend({ content: "", images: [], conn: CONN }, deps)).rejects.toThrow(
       /no message/,
@@ -64,11 +98,19 @@ describe("runSend", () => {
     expect(deps.sent).toEqual([]);
   });
 
-  it("fails fast on too many images without uploading any", async () => {
+  it("fails fast on too many attachments (images + videos share the cap) without uploading any", async () => {
     const deps = makeDeps();
     await expect(
-      runSend({ content: "", images: Array(9).fill("a.png"), conn: CONN }, deps),
-    ).rejects.toThrow(/too many images/);
+      runSend(
+        {
+          content: "",
+          images: Array(5).fill("a.png"),
+          videos: Array(4).fill("b.mp4"),
+          conn: CONN,
+        },
+        deps,
+      ),
+    ).rejects.toThrow(/too many attachments/);
     expect(deps.uploads).toEqual([]);
   });
 
@@ -82,6 +124,18 @@ describe("runSend", () => {
       runSend({ content: "", images: ["bad.png"], conn: CONN }, deps),
     ).rejects.toThrow(/not a recognized image/);
     // send must never have been called.
+    expect(deps.sent).toEqual([]);
+  });
+
+  it("surfaces a per-file video upload error without sending", async () => {
+    const deps = makeDeps({
+      uploadVideo: async () => {
+        throw new Error("not a recognized video");
+      },
+    });
+    await expect(
+      runSend({ content: "", videos: ["bad.mov"], conn: CONN }, deps),
+    ).rejects.toThrow(/not a recognized video/);
     expect(deps.sent).toEqual([]);
   });
 

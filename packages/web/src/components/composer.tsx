@@ -6,7 +6,7 @@ import type { ClubConn } from "@club/sdk";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MentionPopup } from "@/components/mention-popup";
-import { ImagePreviewChip, type AttachmentDraft } from "@/components/image-preview-chip";
+import { MediaPreviewChip, type AttachmentDraft } from "@/components/media-preview-chip";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -17,8 +17,8 @@ import {
   type MentionQuery,
 } from "@/lib/mention";
 import {
-  extractImageFiles,
-  validateImageFile,
+  extractMediaFiles,
+  validateMediaFile,
   type RejectReason,
 } from "@/lib/upload";
 import { api } from "@/lib/api";
@@ -128,6 +128,9 @@ export function Composer({
     (key: string, file: File) => {
       if (!conn) return;
       api.uploadFile(conn, file, {
+        // Videos can be large (up to 50MB); give them a generous upload window
+        // so a slow connection isn't cut off at the image default (30s).
+        timeoutMs: file.type.startsWith("video/") ? 180_000 : 30_000,
         onProgress: (loaded, total) => {
           const progress = total > 0 ? loaded / total : 0;
           setAttachments((prev) => prev.map((d) => (d.key === key ? { ...d, progress } : d)));
@@ -155,8 +158,8 @@ export function Composer({
   // We never silently drop a file — a wrong-format/oversized file is announced.
   const addFiles = useCallback(
     (files: readonly File[]) => {
-      const images = extractImageFiles(files as Iterable<File>);
-      if (images.length === 0) return;
+      const media = extractMediaFiles(files as Iterable<File>);
+      if (media.length === 0) return;
 
       setAttachError(null);
       setAttachments((prev) => {
@@ -170,12 +173,12 @@ export function Composer({
         // take the valid ones and surface the first reason for the dropped one.
         const accepted: AttachmentDraft[] = [];
         let firstReject: RejectReason | null = null;
-        for (const file of images) {
+        for (const file of media) {
           if (accepted.length >= remaining) {
             firstReject = firstReject ?? { key: "image.tooMany", vars: { max: MAX_IMAGES_PER_MESSAGE } };
             break;
           }
-          const reason = validateImageFile(file);
+          const reason = validateMediaFile(file);
           if (reason) {
             firstReject = firstReject ?? reason;
             continue;
@@ -186,6 +189,7 @@ export function Composer({
             key: `${file.name}-${file.size}-${objectUrl}`,
             file,
             objectUrl,
+            kind: file.type.startsWith("video/") ? "video" : "image",
             status: "uploading",
             progress: 0,
           });
@@ -594,7 +598,7 @@ export function Composer({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
           multiple
           capture
           hidden
@@ -692,7 +696,11 @@ export function Composer({
           // default behavior (no preventDefault).
           onPaste={(e) => {
             const files = Array.from(e.clipboardData.items)
-              .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+              .filter(
+                (it) =>
+                  it.kind === "file" &&
+                  (it.type.startsWith("image/") || it.type.startsWith("video/")),
+              )
               .map((it) => it.getAsFile())
               .filter((f): f is File => !!f);
             if (files.length > 0) {
@@ -709,19 +717,27 @@ export function Composer({
             the textarea's text column. */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1 pt-1" data-testid="composer-attachments">
-            {attachments.map((d, i) => (
-              <ImagePreviewChip
-                key={d.key}
-                draft={d}
-                labelDone={t("image.chip.done", { index: i + 1 })}
-                labelUploading={(p) => t("image.chip.uploading", { index: i + 1, percent: p })}
-                labelError={t("image.chip.error", { index: i + 1 })}
-                removeLabel={t("image.remove.aria", { index: i + 1 })}
-                retryLabel={t("image.retry.aria", { index: i + 1 })}
-                onRemove={() => removeAttachment(d.key)}
-                onRetry={() => retryAttachment(d.key)}
-              />
-            ))}
+            {attachments.map((d, i) => {
+              const isVideo = d.kind === "video";
+              return (
+                <MediaPreviewChip
+                  key={d.key}
+                  draft={d}
+                  labelDone={t(isVideo ? "video.chip.done" : "image.chip.done", { index: i + 1 })}
+                  labelUploading={(p) =>
+                    t(isVideo ? "video.chip.uploading" : "image.chip.uploading", {
+                      index: i + 1,
+                      percent: p,
+                    })
+                  }
+                  labelError={t(isVideo ? "video.chip.error" : "image.chip.error", { index: i + 1 })}
+                  removeLabel={t(isVideo ? "video.remove.aria" : "image.remove.aria", { index: i + 1 })}
+                  retryLabel={t(isVideo ? "video.retry.aria" : "image.retry.aria", { index: i + 1 })}
+                  onRemove={() => removeAttachment(d.key)}
+                  onRetry={() => retryAttachment(d.key)}
+                />
+              );
+            })}
           </div>
         )}
         </div>

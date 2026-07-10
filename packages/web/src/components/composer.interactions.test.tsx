@@ -169,7 +169,7 @@ describe("Composer — client-side image count cap (MAX_IMAGES_PER_MESSAGE = 8)"
     uploadFileMock.mockClear();
     fireEvent.change(input, { target: { files: [png("ninth.png")] } });
     await waitFor(() => {
-      expect(screen.getByText(/最多 8 张/)).toBeTruthy();
+      expect(screen.getByText(/最多 8 个附件/)).toBeTruthy();
     });
     expect(uploadFileMock).not.toHaveBeenCalled();
   });

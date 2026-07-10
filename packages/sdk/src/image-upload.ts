@@ -15,7 +15,9 @@ import { basename } from "node:path";
 import imageSize from "image-size";
 import {
   ImageMime,
+  VideoMime,
   MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES,
   MAX_IMAGES_PER_MESSAGE,
   type MessageAttachment,
 } from "@club/shared";
@@ -31,6 +33,30 @@ const TYPE_TO_MIME: Record<string, string> = {
   gif: "image/gif",
   webp: "image/webp",
 };
+
+// Sniff a video's real container from its header bytes — image-size doesn't
+// recognize video, so we read the magic bytes directly. Returns the VideoMime
+// value, or undefined if the bytes aren't a browser-playable mp4/webm:
+//   - MP4: an "ftyp" box at offset 4 (major brand mp42/isom/iso5/avc1/…). The
+//     "qt" brand is QuickTime .mov, which browsers don't play natively → reject.
+//   - WebM: the EBML/Matroska magic 0x1A 0x45 0xDF 0xA3.
+function sniffVideoMime(buf: Buffer): string | undefined {
+  if (buf.length >= 12 && buf.subarray(4, 8).toString("latin1") === "ftyp") {
+    const brand = buf.subarray(8, 12).toString("latin1");
+    if (brand.startsWith("qt")) return undefined; // .mov — not web-playable
+    return "video/mp4";
+  }
+  if (
+    buf.length >= 4 &&
+    buf[0] === 0x1a &&
+    buf[1] === 0x45 &&
+    buf[2] === 0xdf &&
+    buf[3] === 0xa3
+  ) {
+    return "video/webm";
+  }
+  return undefined;
+}
 
 export interface UploadImageOpts {
   timeoutMs?: number;
@@ -83,14 +109,57 @@ export async function uploadImageFile(
 }
 
 /**
- * Validate that a list of image paths is within the per-message quota before
- * any upload starts, so the user fails fast on "too many" instead of after
- * uploading several. Returns void; throws ClubApiError(400) on overflow.
+ * Read a video from `path`, sniff & validate it, then upload it via POST /files.
+ * Mirrors uploadImageFile but for the video formats (mp4/webm, 50MB): image-size
+ * can't sniff video, so the container is read from the header magic bytes
+ * (sniffVideoMime). Throws ClubApiError on any pre-flight failure. Videos get a
+ * longer default upload window (180s) since they can be large.
+ */
+export async function uploadVideoFile(
+  conn: ClubConn,
+  path: string,
+  opts: UploadImageOpts = {},
+): Promise<MessageAttachment> {
+  let buf: Buffer;
+  try {
+    buf = await readFile(path);
+  } catch (err) {
+    throw new ClubApiError(`could not read ${path}: ${(err as Error).message}`, 0);
+  }
+
+  if (buf.byteLength > MAX_VIDEO_BYTES) {
+    throw new ClubApiError(
+      `${path} is ${buf.byteLength} bytes; max is ${MAX_VIDEO_BYTES}`,
+      413,
+    );
+  }
+
+  const mime = sniffVideoMime(buf);
+  if (!mime || !VideoMime.safeParse(mime).success) {
+    throw new ClubApiError(
+      `${path} is not a recognized video (allowed: mp4, webm)`,
+      415,
+    );
+  }
+
+  return uploadFile(
+    conn,
+    { buffer: buf, filename: basename(path), mime },
+    { timeoutMs: opts.timeoutMs ?? 180_000 },
+  );
+}
+
+/**
+ * Validate that a list of attachment paths is within the per-message quota
+ * before any upload starts, so the user fails fast on "too many" instead of
+ * after uploading several. The cap (MAX_IMAGES_PER_MESSAGE) is a shared budget
+ * for images AND videos combined — pass the total count. Returns void; throws
+ * ClubApiError(400) on overflow.
  */
 export function assertImageCount(paths: readonly string[]): void {
   if (paths.length > MAX_IMAGES_PER_MESSAGE) {
     throw new ClubApiError(
-      `too many images: ${paths.length} (max ${MAX_IMAGES_PER_MESSAGE} per message)`,
+      `too many attachments: ${paths.length} (max ${MAX_IMAGES_PER_MESSAGE} per message)`,
       400,
     );
   }

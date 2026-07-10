@@ -175,7 +175,7 @@ export interface UploadFileInput {
   buffer: Buffer | Uint8Array;
   /** Filename hint sent as the multipart part's filename. */
   filename: string;
-  /** MIME type sent as the part's Content-Type (must be in ImageMime). */
+  /** MIME type sent as the part's Content-Type (must be in AttachmentMime). */
   mime: string;
 }
 

@@ -57,7 +57,7 @@ export const api = {
   uploadFile: (
     c: ClubConn,
     file: File,
-    opts?: { onProgress?: (loaded: number, total: number) => void },
+    opts?: { timeoutMs?: number; onProgress?: (loaded: number, total: number) => void },
   ): Promise<UploadFileResponse> => uploadImage(c, file, opts),
 };
 

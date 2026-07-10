@@ -1,11 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { MAX_IMAGE_BYTES } from "@club/shared";
+import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
 import {
   validateImageFile,
+  validateVideoFile,
+  validateMediaFile,
   isAllowedImageMime,
+  isAllowedVideoMime,
   humanBytes,
   extractImageFiles,
+  extractMediaFiles,
   IMAGE_MIME_WHITELIST,
+  VIDEO_MIME_WHITELIST,
 } from "./upload";
 
 function file(name: string, type: string, size: number): File {
@@ -88,5 +93,81 @@ describe("upload helpers — extractImageFiles", () => {
   it("returns empty for a list with no images", () => {
     expect(extractImageFiles([file("b.pdf", "application/pdf", 10)])).toEqual([]);
     expect(extractImageFiles([])).toEqual([]);
+  });
+});
+
+describe("upload helpers — video whitelist + validateVideoFile", () => {
+  it("accepts mp4 and webm", () => {
+    expect(isAllowedVideoMime("video/mp4")).toBe(true);
+    expect(isAllowedVideoMime("video/webm")).toBe(true);
+  });
+
+  it("rejects unsupported video containers and non-video", () => {
+    expect(isAllowedVideoMime("video/quicktime")).toBe(false);
+    expect(isAllowedVideoMime("video/x-matroska")).toBe(false);
+    expect(isAllowedVideoMime("image/png")).toBe(false);
+  });
+
+  it("whitelist matches the shared VideoMime enum", () => {
+    expect(VIDEO_MIME_WHITELIST).toEqual(["video/mp4", "video/webm"]);
+  });
+
+  it("accepts a valid video under the size cap", () => {
+    expect(validateVideoFile(file("a.mp4", "video/mp4", 1024))).toBeNull();
+  });
+
+  it("accepts a video exactly at the size cap", () => {
+    expect(validateVideoFile(file("a.webm", "video/webm", MAX_VIDEO_BYTES))).toBeNull();
+  });
+
+  it("rejects a wrong-type video with invalidMime", () => {
+    expect(validateVideoFile(file("a.mov", "video/quicktime", 100))).toEqual({
+      key: "video.invalidMime",
+    });
+  });
+
+  it("rejects an over-size video with tooLarge", () => {
+    const oversized = MAX_VIDEO_BYTES + 1;
+    expect(validateVideoFile(file("big.mp4", "video/mp4", oversized))).toEqual({
+      key: "video.tooLarge",
+      vars: { max: humanBytes(MAX_VIDEO_BYTES), size: humanBytes(oversized) },
+    });
+  });
+});
+
+describe("upload helpers — validateMediaFile (dispatch)", () => {
+  it("validates images via the image path", () => {
+    expect(validateMediaFile(file("a.png", "image/png", 100))).toBeNull();
+    expect(validateMediaFile(file("a.svg", "image/svg+xml", 100))).toEqual({
+      key: "image.invalidMime",
+    });
+  });
+
+  it("validates videos via the video path", () => {
+    expect(validateMediaFile(file("a.mp4", "video/mp4", 100))).toBeNull();
+    expect(validateMediaFile(file("a.mov", "video/quicktime", 100))).toEqual({
+      key: "video.invalidMime",
+    });
+  });
+
+  it("rejects a non-media file as an invalid video", () => {
+    expect(validateMediaFile(file("a.pdf", "application/pdf", 100))).toEqual({
+      key: "video.invalidMime",
+    });
+  });
+});
+
+describe("upload helpers — extractMediaFiles", () => {
+  it("keeps both image and video files, drops the rest", () => {
+    const img = file("a.png", "image/png", 10);
+    const vid = file("b.mp4", "video/mp4", 10);
+    const pdf = file("c.pdf", "application/pdf", 10);
+    const out = extractMediaFiles([img, vid, pdf]);
+    expect(out).toEqual([img, vid]);
+  });
+
+  it("returns empty for a list with no media", () => {
+    expect(extractMediaFiles([file("c.pdf", "application/pdf", 10)])).toEqual([]);
+    expect(extractMediaFiles([])).toEqual([]);
   });
 });

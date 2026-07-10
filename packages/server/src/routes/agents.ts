@@ -23,11 +23,12 @@ import {
 export const agents = new Hono();
 agents.use("*", requireAuth);
 
-// POST /agents/thinking   {} -> 204 (and an `agent_thinking` SSE broadcast)
+// POST /agents/thinking   { room? } -> 204 (and an `agent_thinking` SSE broadcast)
 //
-// Body is intentionally empty: the participant is identified by the authed key,
-// so a client cannot forge another agent's status. Strict schema rejects any
-// stray fields with 400 rather than silently accepting a malformed contract.
+// The participant is identified by the authed key, so a client cannot forge
+// another agent's status. The optional `room` scopes the indicator to that
+// room's stream (absent = unscoped/global, the backward-compatible behavior).
+// Strict schema rejects any other stray fields with 400.
 agents.post("/thinking", async (c) => {
   const me = c.get("participant");
 
@@ -37,14 +38,23 @@ agents.post("/thinking", async (c) => {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
 
-  const fresh = markThinking(me.id, me.name);
-  if (fresh) broadcastAgentThinking({ participantId: me.id, name: me.name, kind: me.kind });
+  const room = parsed.data.room ?? null;
+  const fresh = markThinking(me.id, me.name, room);
+  if (fresh) {
+    broadcastAgentThinking({
+      participantId: me.id,
+      name: me.name,
+      kind: me.kind,
+      ...(room ? { room } : {}),
+    });
+  }
   return c.body(null, 204);
 });
 
-// POST /agents/idle   {} -> 204 (and an `agent_idle` SSE broadcast if the agent
-// was thinking). Idempotent: reporting idle when not thinking is a 204 no-op,
-// so an agent that double-reports (e.g. on both reply and exit) doesn't error.
+// POST /agents/idle   { room? } -> 204 (and an `agent_idle` SSE broadcast if the
+// agent was thinking). Idempotent: reporting idle when not thinking is a 204
+// no-op. The clear event carries the room the agent was thinking in (if any) so
+// it reaches the same room-scoped subscribers that saw the indicator.
 agents.post("/idle", async (c) => {
   const me = c.get("participant");
 
@@ -54,7 +64,12 @@ agents.post("/idle", async (c) => {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
 
-  const wasThinking = markThinkingIdle(me.id);
-  if (wasThinking) broadcastAgentIdle({ participantId: me.id });
+  const entry = markThinkingIdle(me.id);
+  if (entry) {
+    broadcastAgentIdle({
+      participantId: me.id,
+      ...(entry.room ? { room: entry.room } : {}),
+    });
+  }
   return c.body(null, 204);
 });

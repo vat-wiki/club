@@ -1,11 +1,13 @@
-import { LogOut, Radio } from "lucide-react";
+import { ChevronDown, LogOut, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MobileRoster } from "@/components/mobile-roster";
+import { MobileRoomSheet } from "@/components/mobile-room-sheet";
 import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { Participant } from "@club/shared";
+import type { Participant, Room } from "@club/shared";
+import type { RoomUnread } from "@/hooks/use-rooms";
 
 type Status = "connecting" | "connected" | "lost";
 
@@ -21,6 +23,25 @@ const statusKey: Record<Status, string> = {
   lost: "status.reconnecting",
 };
 
+// The current-room badge shown in the topbar (one of the "triple identifiers"
+// of the focused room — sidebar row + topbar badge + composer placeholder).
+// On mobile it doubles as the room-sheet trigger; on desktop it's a static
+// label (the sidebar carries the full switchable list).
+function RoomBadge({ room, clickable }: { room: string; clickable?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 font-mono text-xs",
+        clickable ? "text-foreground" : "text-muted-foreground",
+      )}
+    >
+      <span className="text-muted-foreground/60">#</span>
+      <span className="max-w-[10ch] truncate">{room}</span>
+      {clickable && <ChevronDown aria-hidden className="h-3 w-3 text-muted-foreground/70" />}
+    </span>
+  );
+}
+
 export function Topbar({
   meName,
   status,
@@ -31,6 +52,11 @@ export function Topbar({
   // dialog and SignOut flow can show/copy it.
   key_,
   onlineIds,
+  currentRoom,
+  rooms,
+  unread,
+  onSelectRoom,
+  onCreateRoom,
   onSignOutRequest,
 }: {
   meName: string | null;
@@ -39,6 +65,11 @@ export function Topbar({
   selfId?: string;
   onlineIds?: Set<string>;
   key_: string | null;
+  currentRoom: string;
+  rooms: Room[];
+  unread: Record<string, RoomUnread>;
+  onSelectRoom: (slug: string) => void;
+  onCreateRoom: (name: string) => Promise<void>;
   // Triggered by the sign-out button; opens the confirmation dialog rather
   // than signing out immediately, so the user has a chance to save the key.
   onSignOutRequest: () => void;
@@ -50,12 +81,34 @@ export function Topbar({
         <span className="font-display text-xl font-semibold tracking-tight">
           club<span className="text-agent animate-brand-pulse">.</span>
         </span>
-        {/* sm-reveal morphs the badge in/out at the sm breakpoint instead of the
-            display:none snap of `hidden sm:inline-block`, so rotating the device
-            feels like a collapse/expand rather than a jump. ml-0 sm:ml-2 keeps
-            the gap from lingering when the badge is collapsed. */}
-        <span className="sm-reveal ml-0 rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground sm:ml-2">
-          #general
+      </div>
+
+      {/* Current-room badge — ALWAYS visible across breakpoints (design §7.4),
+          since it's a primary nav entry on mobile. On mobile it opens the room
+          sheet; on desktop it's a static label (the sidebar lists rooms). */}
+      <div className="flex flex-none items-center">
+        {/* Mobile: the badge is the sheet trigger (md:hidden). */}
+        <div className="md:hidden">
+          <MobileRoomSheet
+            trigger={
+              <button
+                type="button"
+                aria-label={t("rooms.switchTo", { room: currentRoom })}
+                className="tap-target rounded-full outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <RoomBadge room={currentRoom} clickable />
+              </button>
+            }
+            rooms={rooms}
+            currentRoom={currentRoom}
+            unread={unread}
+            onSelect={onSelectRoom}
+            onCreate={onCreateRoom}
+          />
+        </div>
+        {/* Desktop: static badge (sidebar owns the switchable list). */}
+        <span className="hidden md:inline-flex">
+          <RoomBadge room={currentRoom} />
         </span>
       </div>
 

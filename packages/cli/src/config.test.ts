@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseConfig, configPath, saveConfig, loadConfig } from "./config.js";
+import { parseConfig, configPath, saveConfig, loadConfig, defaultRoom, DEFAULT_ROOM } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {
@@ -43,6 +43,46 @@ describe("parseConfig", () => {
     expect(parseConfig("null")).toBeNull();
     expect(parseConfig('"hello"')).toBeNull();
     expect(parseConfig("[]")).toBeNull();
+  });
+
+  it("preserves an optional room field when present", () => {
+    const raw = JSON.stringify({
+      server: "http://localhost:6200",
+      key: "club_human_abc",
+      room: "deploy-debug",
+    });
+    expect(parseConfig(raw)).toEqual({
+      server: "http://localhost:6200",
+      key: "club_human_abc",
+      room: "deploy-debug",
+    });
+  });
+
+  it("accepts an empty room string without invalidating the config (room is a preference)", () => {
+    const raw = JSON.stringify({ server: "http://x", key: "club_x", room: "" });
+    // An empty room must NOT lock a logged-in user out; defaultRoom() handles
+    // the fallback to general downstream.
+    expect(parseConfig(raw)).toEqual({ server: "http://x", key: "club_x", room: "" });
+  });
+});
+
+describe("defaultRoom", () => {
+  it("returns the config's room when set", () => {
+    expect(defaultRoom({ server: "http://x", key: "k", room: "internal" })).toBe("internal");
+  });
+
+  it("falls back to general when the config has no room", () => {
+    expect(defaultRoom({ server: "http://x", key: "k" })).toBe(DEFAULT_ROOM);
+    expect(DEFAULT_ROOM).toBe("general");
+  });
+
+  it("falls back to general when the room is empty/whitespace (robust to corrupt config)", () => {
+    expect(defaultRoom({ server: "http://x", key: "k", room: "" })).toBe("general");
+    expect(defaultRoom({ server: "http://x", key: "k", room: "   " })).toBe("general");
+  });
+
+  it("falls back to general when there is no config at all (not logged in)", () => {
+    expect(defaultRoom(null)).toBe("general");
   });
 });
 

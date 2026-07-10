@@ -9,11 +9,22 @@ export interface UseMessageStreamOptions {
   // from the same SSE subscription as the message feed. Stable via refs below.
   onAgentThinking?: (e: AgentThinkingEvent) => void;
   onAgentIdle?: (e: AgentIdleEvent) => void;
+  /** The room currently in focus. Only its messages are appended to the visible
+   *  `messages` tail; other rooms' messages are routed to `onIncoming` for
+   *  unread tracking. The stream itself subscribes to ALL rooms (no room filter)
+   *  so cross-room unread + @mention toasts stay live. Read via a ref so the
+   *  handler is stable across room switches without re-subscribing. */
+  currentRoom?: string;
+  /** Fired for EVERY incoming message regardless of room — drives per-room
+   *  unread counts and cross-room mention toasts (see use-rooms). */
+  onIncoming?: (m: Message) => void;
 }
 
 // Live SSE subscription over the shared client. Reconnects with backoff when
 // the stream ends on its own; tears down on unmount/key change. Returns the
-// growing message tail (deduped by id) plus a connection status for the bar.
+// growing message tail (deduped by id) for the FOCUSED room plus a connection
+// status for the bar. The stream subscribes to all rooms so the client can track
+// unread across rooms; messages are filtered to the focused room for display.
 export function useMessageStream(
   conn: ClubConn | null,
   opts: UseMessageStreamOptions = {},
@@ -23,16 +34,12 @@ export function useMessageStream(
   const [loadingMore, setLoadingMore] = useState(false);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
-  // keep a live ref so the append callback is stable across renders
-  const appendRef = useRef((m: Message) => {
-    setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]));
-  });
-  appendRef.current = (m: Message) => {
-    setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]));
-  };
-
-  // Latest thinking/idle handlers via refs so the effect deps stay on `conn`
-  // (we drive our own reconnect) while still calling the freshest callbacks.
+  // Latest room + callbacks via refs so the SSE effect deps stay on `conn`
+  // (we drive our own reconnect) while still reading the freshest values.
+  const currentRoomRef = useRef(opts.currentRoom ?? "general");
+  currentRoomRef.current = opts.currentRoom ?? "general";
+  const incomingRef = useRef(opts.onIncoming);
+  incomingRef.current = opts.onIncoming;
   const thinkingRef = useRef(opts.onAgentThinking);
   thinkingRef.current = opts.onAgentThinking;
   const idleRef = useRef(opts.onAgentIdle);
@@ -48,19 +55,37 @@ export function useMessageStream(
       if (stopped) return;
       setStatus("connecting");
       sub = new ClubClient(conn).stream(
-        (m) => appendRef.current(m),
+        (m) => {
+          // Every message refreshes unread/activity tracking (all rooms).
+          incomingRef.current?.(m);
+          // Only the focused room is appended to the visible tail; other rooms
+          // are accounted for via onIncoming and stay off the screen.
+          if (m.room !== currentRoomRef.current) return;
+          setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]));
+        },
         {
-          // The hook drives its own reconnect so it can track status; route the
-          // drop notification through onError and disable the SDK's built-in
-          // reconnect to keep this hook in control.
+          // Subscribe to ALL rooms (no room/rooms filter): the web client tracks
+          // per-room unread + cross-room @mentions, so it needs every room's
+          // events. The server still does the fan-out; the focused-room display
+          // is filtered client-side above. Room-scoped subscription is the
+          // capability the SDK exposes (used by CLI/MCP); the web client opts
+          // into all-rooms because it tracks unread (PRD §5.2).
           reconnect: false,
           onError: () => {
             if (stopped) return;
             setStatus("lost");
             reconnect = setTimeout(connect, 3000);
           },
-          onAgentThinking: (e) => thinkingRef.current?.(e),
-          onAgentIdle: (e) => idleRef.current?.(e),
+          onAgentThinking: (e) => {
+            // Typing indicators are room-scoped events; only show the ones for
+            // the focused room (others would noise the indicator).
+            if (e.room && e.room !== currentRoomRef.current) return;
+            thinkingRef.current?.(e);
+          },
+          onAgentIdle: (e) => {
+            if (e.room && e.room !== currentRoomRef.current) return;
+            idleRef.current?.(e);
+          },
           onPresence: (e) => {
             setOnlineIds((prev) => {
               const next = new Set(prev);
@@ -70,9 +95,12 @@ export function useMessageStream(
             });
           },
           onMessageDeleted: (e) => {
+            // Only the focused room's messages are in the visible list.
+            if (e.room !== currentRoomRef.current) return;
             setMessages((prev) => prev.map((m) => (m.id === e.id ? { ...m, deleted: true } : m)));
           },
           onReaction: (e) => {
+            if (e.room !== currentRoomRef.current) return;
             setMessages((prev) =>
               prev.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m)),
             );
@@ -83,6 +111,11 @@ export function useMessageStream(
     };
 
     hasMoreRef.current = true;
+    // Clear presence on (re)connect so stale "online" entries from a dropped
+    // connection don't linger — the server re-seeds the current online set as
+    // presence events on connect. This runs only on conn change / reconnect, NOT
+    // on room switch (the stream stays connected across room focus changes), so
+    // the roster never flashes when switching rooms.
     setOnlineIds(new Set());
     connect();
     return () => {
@@ -91,6 +124,9 @@ export function useMessageStream(
       sub?.stop();
     };
   }, [conn?.server, conn?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // NOTE: `currentRoom` is intentionally NOT a dep — switching rooms must NOT
+  // tear down the all-rooms stream (that would flash the roster's presence and
+  // interrupt unread tracking). Room focus only re-routes display, via the ref.
 
   // Live ref of the current tail so loadMore can read the oldest id without
   // becoming a dep of the callback (which would re-create it on every message).
@@ -100,9 +136,8 @@ export function useMessageStream(
   // the UI from hammering the server once we've scrolled to the top of the room.
   const hasMoreRef = useRef(true);
 
-  // Load one page of older history (scroll-up pagination). Prepends anything
-  // new, de-duped by id. Returns whether it actually loaded anything, so the
-  // caller can preserve scroll position only when the list grew.
+  // Load one page of older history (scroll-up pagination) for the focused room.
+  // Prepends anything new, de-duped by id. Returns whether it loaded anything.
   const loadMore = useCallback(async (): Promise<boolean> => {
     if (!conn || loadingMore) return false;
     const prev = messagesRef.current;
@@ -114,7 +149,11 @@ export function useMessageStream(
     if (!hasMoreRef.current) return false;
     setLoadingMore(true);
     try {
-      const older = await new ClubClient(conn).messages({ before: oldest.id, limit: 50 });
+      const older = await new ClubClient(conn).messages({
+        before: oldest.id,
+        limit: 50,
+        room: currentRoomRef.current,
+      });
       if (older.length === 0) {
         hasMoreRef.current = false;
         return false;

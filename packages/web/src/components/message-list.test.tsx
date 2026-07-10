@@ -23,6 +23,7 @@ function mk(p: Participant, content: string, id: string): Message {
     authorKind: p.kind,
     content,
     createdAt: Date.now(),
+    room: "general",
   };
 }
 

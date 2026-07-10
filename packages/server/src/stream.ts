@@ -4,14 +4,26 @@ import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, Messag
 // Live SSE subscribers registered at connect time. The POST /messages route
 // pushes new messages here; subscribers are removed on abort. Each carries the
 // authed participant so presence (online/offline) can be broadcast on connect
-// and disconnect.
+// and disconnect, and a `rooms` filter so the stream can be scoped to one or
+// more rooms (null = subscribed to all rooms).
 const subscribers = new Set<{
   stream: SSEStreamingApi;
   participant: { id: string; name: string; kind: ParticipantKind };
+  rooms: Set<string> | null; // null = all rooms
   dead: boolean;
 }>();
 
-// Register an SSE subscriber and announce their presence to the room. Returns
+// Does a subscriber want events for `room`? `room === null` marks an unscoped
+// event (presence) that reaches every subscriber regardless of their filter —
+// presence stays global by design (PRD §8.7: no per-room presence).
+function wantsRoom(sub: { rooms: Set<string> | null }, room: string | null): boolean {
+  if (room === null) return true;
+  if (sub.rooms === null) return true;
+  return sub.rooms.has(room);
+}
+
+// Register an SSE subscriber and announce their presence to the room. `rooms`
+// scopes which room-scoped events this connection receives (null = all). Returns
 // the unsubscribe fn (called on abort) which removes them and broadcasts
 // offline. The newcomer is also seeded with everyone currently online so the
 // roster can mark them live immediately rather than waiting for each to
@@ -19,8 +31,9 @@ const subscribers = new Set<{
 export function addSubscriber(
   s: SSEStreamingApi,
   participant: { id: string; name: string; kind: ParticipantKind },
+  rooms: Set<string> | null,
 ): () => void {
-  const entry = { stream: s, participant, dead: false };
+  const entry = { stream: s, participant, rooms, dead: false };
   subscribers.add(entry);
   const presence = (p: typeof participant, online: boolean) => ({
     participantId: p.id,
@@ -43,47 +56,56 @@ export function addSubscriber(
 }
 
 // Push a named `presence` event (online/offline) to every live subscriber.
+// Presence is intentionally NOT room-scoped (room === null → all subscribers).
 export function broadcastPresence(e: PresenceEvent): void {
-  writeAll({ event: "presence", data: JSON.stringify(e) });
+  writeAll({ event: "presence", data: JSON.stringify(e) }, null);
 }
 
 // Push a named `message_deleted` event (recall). Clients mark the id recalled
 // rather than dropping the row, so replies/context still read coherently.
 export function broadcastDeleted(e: MessageDeletedEvent): void {
-  writeAll({ event: "message_deleted", data: JSON.stringify(e) });
+  writeAll({ event: "message_deleted", data: JSON.stringify(e) }, e.room);
 }
 
 // Push a named `message_reaction` event (refreshed aggregate after a toggle).
 export function broadcastReaction(e: MessageReactionEvent): void {
-  writeAll({ event: "message_reaction", data: JSON.stringify(e) });
+  writeAll({ event: "message_reaction", data: JSON.stringify(e) }, e.room);
 }
 
 // Push a `message` event (the default, unnamed event in SSE). Backwards
 // compatible: existing clients that parse only `data:` lines keep working.
 export function broadcast(msg: Message): void {
   const payload = JSON.stringify(msg);
-  writeAll({ data: payload });
+  writeAll({ data: payload }, msg.room);
 }
 
 // Push a named `agent_thinking` event. Uses the SSE `event:` field so a client
 // branches on the event name; clients that don't know this event ignore it.
+// When `e.room` is present the event is scoped to that room's subscribers;
+// absent means an unscoped (legacy/global) report reaching everyone.
 export function broadcastAgentThinking(e: AgentThinkingEvent): void {
-  writeAll({ event: "agent_thinking", data: JSON.stringify(e) });
+  writeAll({ event: "agent_thinking", data: JSON.stringify(e) }, e.room ?? null);
 }
 
-// Push a named `agent_idle` event.
+// Push a named `agent_idle` event. `e.room` scopes the clear to the same room
+// the agent was thinking in; absent → unscoped (reaches everyone).
 export function broadcastAgentIdle(e: AgentIdleEvent): void {
-  writeAll({ event: "agent_idle", data: JSON.stringify(e) });
+  writeAll({ event: "agent_idle", data: JSON.stringify(e) }, e.room ?? null);
 }
 
-// Underlying fan-out: write one SSE frame to every live subscriber. Failures
-// mark the subscriber dead and drop it. Fire-and-forget per sub.
-function writeAll(frame: {
-  event?: string;
-  data: string;
-}): void {
+// Underlying fan-out: write one SSE frame to every live subscriber whose room
+// filter matches `room` (null = unscoped event → everyone). Failures mark the
+// subscriber dead and drop it. Fire-and-forget per sub.
+function writeAll(
+  frame: {
+    event?: string;
+    data: string;
+  },
+  room: string | null,
+): void {
   for (const sub of subscribers) {
     if (sub.dead) continue;
+    if (!wantsRoom(sub, room)) continue;
     // writeSSE returns a promise; fire-and-forget, drop on failure.
     void sub.stream
       .writeSSE(frame)
@@ -120,6 +142,10 @@ const THINKING_TTL_MS = 45 * 1000; // ~45s — lost-contact fallback (not reply 
 interface ThinkingEntry {
   participantId: string;
   name: string;
+  // Room the agent reported thinking in, or null for an unscoped (legacy)
+  // report. Carried onto the eventual `agent_idle` so the clear reaches the same
+  // room-scoped subscribers that saw the indicator light up.
+  room: string | null;
   expiresAt: number;
 }
 
@@ -131,39 +157,51 @@ const thinking = new Map<string, ThinkingEntry>();
 /** Record (or refresh) that `participantId` is thinking. Returns whether this
  *  is a NEW entry (true) vs a TTL refresh of an existing one (false). Callers
  *  only broadcast `agent_thinking` on a fresh entry to avoid noisy re-broadcasts
- *  when an already-thinking agent is re-mentioned. */
-export function markThinking(participantId: string, name: string): boolean {
+ *  when an already-thinking agent is re-mentioned. `room` scopes the indicator
+ *  to that room's stream when provided; null/omitted = unscoped (global). */
+export function markThinking(
+  participantId: string,
+  name: string,
+  room: string | null = null,
+): boolean {
   const fresh = !thinking.has(participantId);
   thinking.set(participantId, {
     participantId,
     name,
+    room,
     expiresAt: Date.now() + THINKING_TTL_MS,
   });
   return fresh;
 }
 
-/** Clear the thinking state for `participantId` and return whether it was
- *  present. Callers broadcast `agent_idle` only when something was actually
- *  cleared, so a redundant idle report is a no-op on the wire. */
-export function markThinkingIdle(participantId: string): boolean {
-  return thinking.delete(participantId);
+/** Clear the thinking state for `participantId`, returning the entry (so the
+ *  caller can broadcast `agent_idle` into the right room) or null if it wasn't
+ *  thinking. A redundant idle report is thus a no-op on the wire. */
+export function markThinkingIdle(participantId: string): ThinkingEntry | null {
+  const entry = thinking.get(participantId);
+  if (!entry) return null;
+  thinking.delete(participantId);
+  return entry;
 }
 
-/** Is `participantId` currently in the thinking set? Used by POST /messages to
- *  auto-clear an agent's indicator the moment its reply lands. */
+/** Is `participantId` currently in the thinking set? */
 export function isThinking(participantId: string): boolean {
   return thinking.has(participantId);
 }
 
 // Reap expired thinking entries, broadcasting agent_idle for each so a dead
 // agent's indicator can't get stuck on. Runs on the same heartbeat that pings
-// idle SSE connections.
+// idle SSE connections. The idle event carries the entry's room so the clear
+// reaches the same room-scoped subscribers.
 function reapExpiredThinking(): void {
   const now = Date.now();
   for (const [id, entry] of thinking) {
     if (entry.expiresAt <= now) {
       thinking.delete(id);
-      broadcastAgentIdle({ participantId: id });
+      broadcastAgentIdle({
+        participantId: id,
+        ...(entry.room ? { room: entry.room } : {}),
+      });
     }
   }
 }

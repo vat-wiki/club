@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ClubConn } from "@club/sdk";
-import type { Message, ParticipantKind, Room } from "@club/shared";
+import type { Message, Room } from "@club/shared";
 import { mentionsSelf } from "@/lib/format";
 import { api } from "@/lib/api";
 
@@ -40,7 +40,6 @@ export interface MentionToast {
   messageId: string;
   room: string;
   authorName: string;
-  authorKind: ParticipantKind;
   content: string;
 }
 
@@ -173,7 +172,6 @@ export function useRooms(conn: ClubConn | null, selfName?: string): UseRoomsResu
           messageId: m.id,
           room: m.room,
           authorName: m.authorName,
-          authorKind: m.authorKind,
           content: m.content,
         };
         setToasts((prev) => {

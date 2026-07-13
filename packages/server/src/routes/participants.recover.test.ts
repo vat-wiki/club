@@ -45,11 +45,11 @@ beforeEach(() => {
   db.prepare(`DELETE FROM participants`).run();
 });
 
-async function mint(name: string, kind: "human" | "agent" = "human") {
+async function mint(name: string) {
   const res = await app.request("/participants", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind }),
+    body: JSON.stringify({ name }),
   });
   return { res, body: (await res.json()) as any };
 }
@@ -61,14 +61,13 @@ describe("POST /participants (recovery code)", () => {
     expect(res.status).toBe(201);
 
     expect(typeof body.key).toBe("string");
-    expect(body.key).toMatch(/^club_human_/);
+    expect(body.key).toMatch(/^club_/);
     expect(typeof body.recoverCode).toBe("string");
     expect(body.recoverCode).toMatch(/^club_recover_/);
     expect(body.key).not.toBe(body.recoverCode);
     expect(body.participant).toEqual({
       id: expect.any(String),
       name: "alice",
-      kind: "human",
       createdAt: expect.any(Number),
     });
 
@@ -105,7 +104,7 @@ describe("POST /participants/recover", () => {
     const body = (await res.json()) as any;
     expect(body.participant.id).toBe(originalId);
     expect(body.participant.name).toBe("bob");
-    expect(body.key).toMatch(/^club_human_/);
+    expect(body.key).toMatch(/^club_/);
     expect(body.key).not.toBe(originalKey);
     expect(body.recoverCode).toMatch(/^club_recover_/);
     expect(body.recoverCode).not.toBe(originalCode);
@@ -207,9 +206,9 @@ describe("compat: recover_hash = NULL (pre-existing participants)", () => {
     const legacyKey = "club_human_legacy_legacylegacylegacylegacy";
     const now = Date.now();
     db.prepare(
-      `INSERT INTO participants (id, name, kind, key_hash, recover_hash, created_at)
-       VALUES (?, ?, ?, ?, NULL, ?)`,
-    ).run("01LEGACY", "legacy", "human", hashKey(legacyKey), now);
+      `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
+       VALUES (?, ?, ?, NULL, ?)`,
+    ).run("01LEGACY", "legacy", hashKey(legacyKey), now);
 
     // /me still works with the legacy key
     const me = await app.request("/me", {

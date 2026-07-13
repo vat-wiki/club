@@ -92,7 +92,7 @@ export function AuthDialog({
     }
     setBusy(true);
     try {
-      const { key, recoverCode } = await createParticipant(API_URL, name.trim(), "human");
+      const { key, recoverCode } = await createParticipant(API_URL, name.trim());
       // Hand the freshly-minted key + recovery code to the app WITHOUT
       // persisting; the app shows the reveal and only saves once the user
       // acknowledges they've saved both.

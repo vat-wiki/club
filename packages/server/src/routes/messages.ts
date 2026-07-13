@@ -5,7 +5,6 @@ import {
   CreateMessageRequest,
   type Message,
   type MessageAttachment,
-  type ParticipantKind,
   type Reaction,
   type MessageReactionEvent,
 } from "@club/shared";
@@ -54,7 +53,6 @@ function toMessage(r: MessageRow): Message {
     id: r.id,
     participantId: r.participant_id,
     authorName: r.author_name,
-    authorKind: r.author_kind as ParticipantKind,
     content: r.content,
     createdAt: r.created_at,
     room: r.room,
@@ -151,7 +149,6 @@ messages.post("/", async (c) => {
     id,
     participantId: me.id,
     authorName: me.name,
-    authorKind: me.kind,
     content,
     createdAt,
     room,
@@ -160,20 +157,19 @@ messages.post("/", async (c) => {
   if (replyToId) msg.replyToId = replyToId;
   broadcast(msg);
 
-  // P1-5: an agent's reply landing is the most reliable "done thinking" signal
-  // — clear its indicator right now, regardless of whether the agent client
-  // also reports idle. This is the safety net for agents that crash right after
-  // posting (so their own idle report never fires). The idle event carries the
-  // room the agent was thinking in (if any) so the clear reaches the same
-  // room-scoped subscribers that saw the indicator.
-  if (me.kind === "agent") {
-    const entry = markThinkingIdle(me.id);
-    if (entry) {
-      broadcastAgentIdle({
-        participantId: me.id,
-        ...(entry.room ? { room: entry.room } : {}),
-      });
-    }
+  // A reply landing is the most reliable "done thinking" signal — clear this
+  // author's indicator right now, regardless of whether their client also
+  // reports idle. Category-blind: any participant who reported thinking (an
+  // agent processing a @mention OR a human typing) is cleared on post — the
+  // safety net for a client that crashes right after posting, so its own idle
+  // report never fires. The idle event carries the room they were thinking in
+  // (if any) so the clear reaches the same room-scoped subscribers that saw it.
+  const entry = markThinkingIdle(me.id);
+  if (entry) {
+    broadcastAgentIdle({
+      participantId: me.id,
+      ...(entry.room ? { room: entry.room } : {}),
+    });
   }
   return c.json(msg, 201);
 });

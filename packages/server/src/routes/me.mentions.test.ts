@@ -25,11 +25,11 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-async function mintKey(name: string, kind: "human" | "agent"): Promise<string> {
+async function mintKey(name: string): Promise<string> {
   const res = await app.request("/participants", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind }),
+    body: JSON.stringify({ name }),
   });
   const body = await res.json();
   return body.key;
@@ -56,7 +56,7 @@ describe("GET /me/mentions (mention inbox)", () => {
   });
 
   it("returns [] when nobody has @-mentioned the caller", async () => {
-    const alice = await mintKey("inbox-alice-1", "human");
+    const alice = await mintKey("inbox-alice-1");
     const res = await app.request("/me/mentions", auth(alice));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
@@ -66,8 +66,8 @@ describe("GET /me/mentions (mention inbox)", () => {
     // alice mints a key but never connects a stream — she is "offline". bob
     // sends a message @-mentioning her. The mention must be persisted so she
     // can find it on next poll.
-    const alice = await mintKey("inbox-alice-2", "human");
-    const bob = await mintKey("inbox-bob-2", "agent");
+    const alice = await mintKey("inbox-alice-2");
+    const bob = await mintKey("inbox-bob-2");
     await send(bob, "hey @inbox-alice-2 please review");
 
     const res = await app.request("/me/mentions", auth(alice));
@@ -76,7 +76,6 @@ describe("GET /me/mentions (mention inbox)", () => {
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({
       authorName: "inbox-bob-2",
-      authorKind: "agent",
       content: "hey @inbox-alice-2 please review",
       readAt: null,
     });
@@ -88,7 +87,6 @@ describe("GET /me/mentions (mention inbox)", () => {
         "participantId",
         "authorId",
         "authorName",
-        "authorKind",
         "content",
         "messageCreatedAt",
         "readAt",
@@ -98,8 +96,8 @@ describe("GET /me/mentions (mention inbox)", () => {
   });
 
   it("matches @<name> case-insensitively", async () => {
-    const alice = await mintKey("inbox-alice-3", "human");
-    const bob = await mintKey("inbox-bob-3", "human");
+    const alice = await mintKey("inbox-alice-3");
+    const bob = await mintKey("inbox-bob-3");
     await send(bob, "PING @INBOX-ALICE-3");
 
     const list = await (await app.request("/me/mentions", auth(alice))).json();
@@ -107,8 +105,8 @@ describe("GET /me/mentions (mention inbox)", () => {
   });
 
   it("does NOT match a bare name without the @ prefix", async () => {
-    const alice = await mintKey("inbox-alice-4", "human");
-    const bob = await mintKey("inbox-bob-4", "human");
+    const alice = await mintKey("inbox-alice-4");
+    const bob = await mintKey("inbox-bob-4");
     await send(bob, "inbox-alice-4 will handle it");
 
     const list = await (await app.request("/me/mentions", auth(alice))).json();
@@ -116,9 +114,9 @@ describe("GET /me/mentions (mention inbox)", () => {
   });
 
   it("records multiple distinct mentions from a single message", async () => {
-    const alice = await mintKey("inbox-alice-5", "human");
-    const bob = await mintKey("inbox-bob-5", "human");
-    const carol = await mintKey("inbox-carol-5", "human");
+    const alice = await mintKey("inbox-alice-5");
+    const bob = await mintKey("inbox-bob-5");
+    const carol = await mintKey("inbox-carol-5");
     await send(bob, "@inbox-alice-5 and @inbox-carol-5, ping");
 
     const a = await (await app.request("/me/mentions", auth(alice))).json();
@@ -131,8 +129,8 @@ describe("GET /me/mentions (mention inbox)", () => {
   });
 
   it("mentions a participant at most once per message even if @-repeated", async () => {
-    const alice = await mintKey("inbox-alice-6", "human");
-    const bob = await mintKey("inbox-bob-6", "human");
+    const alice = await mintKey("inbox-alice-6");
+    const bob = await mintKey("inbox-bob-6");
     await send(bob, "@inbox-alice-6 @inbox-alice-6 @inbox-alice-6");
 
     const list = await (await app.request("/me/mentions", auth(alice))).json();
@@ -140,8 +138,8 @@ describe("GET /me/mentions (mention inbox)", () => {
   });
 
   it("lists unread mentions oldest-first", async () => {
-    const alice = await mintKey("inbox-alice-7", "human");
-    const bob = await mintKey("inbox-bob-7", "human");
+    const alice = await mintKey("inbox-alice-7");
+    const bob = await mintKey("inbox-bob-7");
     await send(bob, "first @inbox-alice-7");
     await send(bob, "second @inbox-alice-7");
 
@@ -160,8 +158,8 @@ describe("POST /me/mentions/:id/read", () => {
   });
 
   it("marks a mention read and drops it from the unread list", async () => {
-    const alice = await mintKey("inbox-alice-8", "human");
-    const bob = await mintKey("inbox-bob-8", "human");
+    const alice = await mintKey("inbox-alice-8");
+    const bob = await mintKey("inbox-bob-8");
     await send(bob, "@inbox-alice-8 read me");
 
     const before = await (
@@ -185,7 +183,7 @@ describe("POST /me/mentions/:id/read", () => {
   });
 
   it("returns 404 for a non-existent mention id", async () => {
-    const alice = await mintKey("inbox-alice-9", "human");
+    const alice = await mintKey("inbox-alice-9");
     const res = await app.request("/me/mentions/does-not-exist/read", {
       method: "POST",
       ...auth(alice),
@@ -197,9 +195,9 @@ describe("POST /me/mentions/:id/read", () => {
     // A participant must not be able to mark — or even probe — another's inbox
     // row. Both "not mine" and "truly absent" yield 404 to avoid leaking
     // existence.
-    const alice = await mintKey("inbox-alice-10", "human");
-    const bob = await mintKey("inbox-bob-10", "human");
-    const carol = await mintKey("inbox-carol-10", "human");
+    const alice = await mintKey("inbox-alice-10");
+    const bob = await mintKey("inbox-bob-10");
+    const carol = await mintKey("inbox-carol-10");
     await send(bob, "@inbox-carol-10 hi"); // carol is mentioned, alice is not
 
     const carolInbox = await (
@@ -216,8 +214,8 @@ describe("POST /me/mentions/:id/read", () => {
   });
 
   it("returns 409 when marking an already-read mention", async () => {
-    const alice = await mintKey("inbox-alice-11", "human");
-    const bob = await mintKey("inbox-bob-11", "human");
+    const alice = await mintKey("inbox-alice-11");
+    const bob = await mintKey("inbox-bob-11");
     await send(bob, "@inbox-alice-11 twice");
 
     const list = await (

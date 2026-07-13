@@ -13,7 +13,7 @@ describe("useTypingAgents", () => {
     expect(result.current.agents).toEqual([]);
 
     act(() => {
-      result.current.onThinking({ participantId: "p1", name: "rex", kind: "agent" });
+      result.current.onThinking({ participantId: "p1", name: "rex" });
     });
     expect(result.current.agents).toEqual([{ id: "p1", name: "rex" }]);
 
@@ -27,10 +27,10 @@ describe("useTypingAgents", () => {
     const { result } = renderHook(() => useTypingAgents());
 
     act(() => {
-      result.current.onThinking({ participantId: "p1", name: "rex", kind: "agent" });
+      result.current.onThinking({ participantId: "p1", name: "rex" });
     });
     act(() => {
-      result.current.onThinking({ participantId: "p1", name: "Rex", kind: "agent" });
+      result.current.onThinking({ participantId: "p1", name: "Rex" });
     });
     expect(result.current.agents).toEqual([{ id: "p1", name: "Rex" }]);
 
@@ -44,10 +44,10 @@ describe("useTypingAgents", () => {
     const { result } = renderHook(() => useTypingAgents());
 
     act(() => {
-      result.current.onThinking({ participantId: "p1", name: "rex", kind: "agent" });
+      result.current.onThinking({ participantId: "p1", name: "rex" });
     });
     act(() => {
-      result.current.onThinking({ participantId: "p2", name: "ana", kind: "agent" });
+      result.current.onThinking({ participantId: "p2", name: "ana" });
     });
     expect(result.current.agents.map((a) => a.id)).toEqual(["p1", "p2"]);
 
@@ -64,5 +64,17 @@ describe("useTypingAgents", () => {
       result.current.onIdle({ participantId: "ghost" });
     });
     expect(result.current.agents).toEqual([]);
+  });
+
+  it("never shows the viewer their own typing state (self-filter)", () => {
+    // A human typing receives their own agent_thinking broadcast back (the
+    // server fans out to all subscribers including the sender). The hook must
+    // filter self out so you never see your own name in the indicator.
+    const { result } = renderHook(() => useTypingAgents("me"));
+    act(() => {
+      result.current.onThinking({ participantId: "me", name: "myself" });
+      result.current.onThinking({ participantId: "p1", name: "rex" });
+    });
+    expect(result.current.agents).toEqual([{ id: "p1", name: "rex" }]);
   });
 });

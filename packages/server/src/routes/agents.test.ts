@@ -28,11 +28,11 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-async function mint(name: string, kind: "human" | "agent"): Promise<string> {
+async function mint(name: string): Promise<string> {
   const res = await app.request("/participants", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind }),
+    body: JSON.stringify({ name }),
   });
   return (await res.json()).key;
 }
@@ -60,21 +60,21 @@ describe("POST /agents/thinking and /agents/idle (P1-5)", () => {
 
   it("a human key also reports thinking (humans type, agents think)", async () => {
     const spy = vi.spyOn(streamMod, "broadcastAgentThinking").mockImplementation(() => {});
-    const key = await mint("alice", "human");
+    const key = await mint("alice");
     const res = await authed("/agents/thinking", key);
     expect(res.status).toBe(204);
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ name: "alice", kind: "human" }));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ name: "alice" }));
     spy.mockRestore();
   });
 
   it("an agent key broadcasts agent_thinking and returns 204", async () => {
     const spy = vi.spyOn(streamMod, "broadcastAgentThinking").mockImplementation(() => {});
-    const key = await mint("rex", "agent");
+    const key = await mint("rex");
     const res = await authed("/agents/thinking", key);
     expect(res.status).toBe(204);
     expect(spy).toHaveBeenCalledOnce();
     expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "rex", kind: "agent" }),
+      expect.objectContaining({ name: "rex" }),
     );
     // participantId is the agent's id — verify via the me route shape is overkill;
     // just assert it's a non-empty string carried through.
@@ -84,7 +84,7 @@ describe("POST /agents/thinking and /agents/idle (P1-5)", () => {
 
   it("re-reporting while already thinking does NOT re-broadcast (TTL refresh)", async () => {
     const spy = vi.spyOn(streamMod, "broadcastAgentThinking").mockImplementation(() => {});
-    const key = await mint("rex2", "agent");
+    const key = await mint("rex2");
     await authed("/agents/thinking", key);
     await authed("/agents/thinking", key); // second report while thinking
     expect(spy).toHaveBeenCalledOnce();
@@ -94,7 +94,7 @@ describe("POST /agents/thinking and /agents/idle (P1-5)", () => {
   it("idle clears thinking and broadcasts agent_idle", async () => {
     const thinkSpy = vi.spyOn(streamMod, "broadcastAgentThinking").mockImplementation(() => {});
     const idleSpy = vi.spyOn(streamMod, "broadcastAgentIdle").mockImplementation(() => {});
-    const key = await mint("rex3", "agent");
+    const key = await mint("rex3");
     await authed("/agents/thinking", key);
     await authed("/agents/idle", key);
     expect(idleSpy).toHaveBeenCalledOnce();
@@ -105,7 +105,7 @@ describe("POST /agents/thinking and /agents/idle (P1-5)", () => {
 
   it("idle when not thinking is a no-op (no broadcast, still 204)", async () => {
     const idleSpy = vi.spyOn(streamMod, "broadcastAgentIdle").mockImplementation(() => {});
-    const key = await mint("rex4", "agent");
+    const key = await mint("rex4");
     const res = await authed("/agents/idle", key);
     expect(res.status).toBe(204);
     expect(idleSpy).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe("POST /agents/thinking and /agents/idle (P1-5)", () => {
   });
 
   it("rejects a body with unexpected fields (strict schema -> 400)", async () => {
-    const key = await mint("rex5", "agent");
+    const key = await mint("rex5");
     const res = await authed("/agents/thinking", key, "POST", { bogus: 1 });
     expect(res.status).toBe(400);
   });
@@ -123,7 +123,7 @@ describe("POST /messages auto-clears a thinking agent (P1-5 safety net)", () => 
   it("broadcasts agent_idle when a thinking agent posts its reply", async () => {
     const thinkSpy = vi.spyOn(streamMod, "broadcastAgentThinking").mockImplementation(() => {});
     const idleSpy = vi.spyOn(streamMod, "broadcastAgentIdle").mockImplementation(() => {});
-    const key = await mint("rex6", "agent");
+    const key = await mint("rex6");
     // agent starts thinking, then posts a reply
     await authed("/agents/thinking", key);
     const reply = await authed("/messages", key, "POST", { content: "here is my answer" });

@@ -7,10 +7,9 @@ import {
   MENTION_MAX_VISIBLE,
 } from "./mention";
 
-const P = (id: string, name: string, kind: "human" | "agent" = "human"): Participant => ({
+const P = (id: string, name: string): Participant => ({
   id,
   name,
-  kind,
   createdAt: 0,
 });
 
@@ -76,7 +75,7 @@ describe("detectMention", () => {
 describe("filterMembers", () => {
   const roster = [
     P("1", "alice"),
-    P("2", "王前端", "agent"),
+    P("2", "王前端"),
     P("3", "Bob"),
     P("4", "alex"),
     P("5", "robert"),

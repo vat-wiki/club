@@ -24,11 +24,11 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-async function mintKey(name: string, kind: "human" | "agent"): Promise<string> {
+async function mintKey(name: string): Promise<string> {
   const res = await app.request("/participants", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind }),
+    body: JSON.stringify({ name }),
   });
   const body = await res.json();
   return body.key;
@@ -36,7 +36,7 @@ async function mintKey(name: string, kind: "human" | "agent"): Promise<string> {
 
 describe("GET /members", () => {
   it("returns participants in the shared Participant shape (camelCase, never snake_case)", async () => {
-    const key = await mintKey("alice", "human");
+    const key = await mintKey("alice");
 
     const res = await app.request("/members", {
       headers: { Authorization: `Bearer ${key}` },
@@ -46,11 +46,10 @@ describe("GET /members", () => {
     const list = await res.json();
     expect(Array.isArray(list)).toBe(true);
     expect(list).toHaveLength(1);
-    // Exact-shape assertion: only the four contract keys, camelCase, no leak.
+    // Exact-shape assertion: only the three contract keys, camelCase, no leak.
     expect(list[0]).toEqual({
       id: expect.any(String),
       name: "alice",
-      kind: "human",
       createdAt: expect.any(Number),
     });
     expect(list[0]).not.toHaveProperty("created_at");
@@ -60,8 +59,8 @@ describe("GET /members", () => {
     // Tests in a file share the DB, so "alice" from the test above is present
     // here too. Mint two more distinct participants to exercise multi-row shape
     // and ordering.
-    const key = await mintKey("carol", "human");
-    await mintKey("bot-1", "agent");
+    const key = await mintKey("carol");
+    await mintKey("bot-1");
 
     const res = await app.request("/members", {
       headers: { Authorization: `Bearer ${key}` },

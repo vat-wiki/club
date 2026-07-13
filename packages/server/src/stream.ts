@@ -1,5 +1,5 @@
 import type { SSEStreamingApi } from "hono/streaming";
-import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent, ParticipantKind } from "@club/shared";
+import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
 
 // Live SSE subscribers registered at connect time. The POST /messages route
 // pushes new messages here; subscribers are removed on abort. Each carries the
@@ -8,7 +8,7 @@ import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, Messag
 // more rooms (null = subscribed to all rooms).
 const subscribers = new Set<{
   stream: SSEStreamingApi;
-  participant: { id: string; name: string; kind: ParticipantKind };
+  participant: { id: string; name: string };
   rooms: Set<string> | null; // null = all rooms
   dead: boolean;
 }>();
@@ -30,7 +30,7 @@ function wantsRoom(sub: { rooms: Set<string> | null }, room: string | null): boo
 // re-announce.
 export function addSubscriber(
   s: SSEStreamingApi,
-  participant: { id: string; name: string; kind: ParticipantKind },
+  participant: { id: string; name: string },
   rooms: Set<string> | null,
 ): () => void {
   const entry = { stream: s, participant, rooms, dead: false };
@@ -38,7 +38,6 @@ export function addSubscriber(
   const presence = (p: typeof participant, online: boolean) => ({
     participantId: p.id,
     name: p.name,
-    kind: p.kind,
     online,
   });
   broadcastPresence(presence(participant, true));

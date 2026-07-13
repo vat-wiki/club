@@ -28,11 +28,11 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-async function mint(name: string, kind: "human" | "agent"): Promise<string> {
+async function mint(name: string): Promise<string> {
   const res = await app.request("/participants", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind }),
+    body: JSON.stringify({ name }),
   });
   return (await res.json()).key;
 }
@@ -62,14 +62,14 @@ async function getMsgs(key: string, room?: string): Promise<any[]> {
 // ── MR2: backward compatibility ─────────────────────────────────────
 describe("MR2 — omitting room defaults to general (old clients unbroken)", () => {
   it("POST /messages without room lands in general and echoes room='general'", async () => {
-    const key = await mint("mr2-human", "human");
+    const key = await mint("mr2-human");
     const { status, body } = await postMsg(key, "legacy send");
     expect(status).toBe(201);
     expect(body.room).toBe("general");
   });
 
   it("GET /messages without room returns general history", async () => {
-    const key = await mint("mr2-b", "human");
+    const key = await mint("mr2-b");
     await postMsg(key, "in general 1");
     const list = await getMsgs(key); // no room param
     expect(list.length).toBeGreaterThan(0);
@@ -81,8 +81,8 @@ describe("MR2 — omitting room defaults to general (old clients unbroken)", () 
 // ── MR3: parity / open access (room is NOT an auth axis) ─────────────
 describe("MR3 — human and agent keys read/write every room (no 403)", () => {
   it("both key kinds succeed posting + reading across multiple rooms", async () => {
-    const human = await mint("mr3-human", "human");
-    const agent = await mint("mr3-agent", "agent");
+    const human = await mint("mr3-human");
+    const agent = await mint("mr3-agent");
     // Ensure two non-general rooms exist.
     for (const slug of ["mr3-alpha", "mr3-beta"]) {
       await app.request("/rooms", { method: "POST", headers: auth(human), body: JSON.stringify({ name: slug }) });
@@ -105,7 +105,7 @@ describe("MR3 — human and agent keys read/write every room (no 403)", () => {
 // ── MR4: topic isolation ────────────────────────────────────────────
 describe("MR4 — a room's messages do not leak into another room", () => {
   it("GET /messages?room=A does not return room B messages", async () => {
-    const key = await mint("mr4", "human");
+    const key = await mint("mr4");
     await postMsg(key, "only in alpha", "mr4-alpha");
     await postMsg(key, "only in beta", "mr4-beta");
 
@@ -118,7 +118,7 @@ describe("MR4 — a room's messages do not leak into another room", () => {
   });
 
   it("POST to a non-existent (but valid) room auto-creates it", async () => {
-    const key = await mint("mr4-auto", "human");
+    const key = await mint("mr4-auto");
     const { status } = await postMsg(key, "creates the room", "mr4-implicit");
     expect(status).toBe(201);
     const res = await app.request("/rooms", { headers: auth(key) });
@@ -130,7 +130,7 @@ describe("MR4 — a room's messages do not leak into another room", () => {
 // ── MR5: room lifecycle ─────────────────────────────────────────────
 describe("MR5 — POST /rooms lifecycle (validation + idempotency)", () => {
   it("rejects an invalid slug with 400", async () => {
-    const key = await mint("mr5", "human");
+    const key = await mint("mr5");
     for (const bad of ["UPPER", "has space", "no_underscore-bad?x", "-leading", "", "a".repeat(31)]) {
       const res = await app.request("/rooms", {
         method: "POST",
@@ -142,7 +142,7 @@ describe("MR5 — POST /rooms lifecycle (validation + idempotency)", () => {
   });
 
   it("accepts a valid slug and returns the room (201)", async () => {
-    const key = await mint("mr5-ok", "human");
+    const key = await mint("mr5-ok");
     const res = await app.request("/rooms", {
       method: "POST",
       headers: auth(key),
@@ -156,7 +156,7 @@ describe("MR5 — POST /rooms lifecycle (validation + idempotency)", () => {
   });
 
   it("is idempotent — re-creating returns the existing room (200, same id)", async () => {
-    const key = await mint("mr5-idem", "human");
+    const key = await mint("mr5-idem");
     const first = await app.request("/rooms", {
       method: "POST",
       headers: auth(key),
@@ -173,7 +173,7 @@ describe("MR5 — POST /rooms lifecycle (validation + idempotency)", () => {
   });
 
   it("POST /rooms {name:'general'} returns the seeded general room (not an error)", async () => {
-    const key = await mint("mr5-gen", "human");
+    const key = await mint("mr5-gen");
     const res = await app.request("/rooms", {
       method: "POST",
       headers: auth(key),
@@ -196,7 +196,7 @@ describe("MR5 — POST /rooms lifecycle (validation + idempotency)", () => {
 // ── MR6 (server face): GET /rooms shape + lastActivityAt ─────────────
 describe("MR6 — GET /rooms returns every room with lastActivityAt", () => {
   it("lists general + created rooms, general first, with correct lastActivityAt", async () => {
-    const key = await mint("mr6", "human");
+    const key = await mint("mr6");
     // Post into general and a fresh room so lastActivityAt diverges.
     await postMsg(key, "activity in general");
     await app.request("/rooms", { method: "POST", headers: auth(key), body: JSON.stringify({ name: "mr6-quiet" }) });
@@ -248,7 +248,7 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
     const sub = fakeStream();
     const unsub = streamMod.addSubscriber(
       sub.sse as any,
-      { id: "p1", name: "p1", kind: "human" },
+      { id: "p1", name: "p1" },
       new Set(["mr10-a"]),
     );
     try {
@@ -256,7 +256,6 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
         id: "from-a",
         participantId: "x",
         authorName: "x",
-        authorKind: "human",
         content: "a",
         createdAt: 1,
         room: "mr10-a",
@@ -265,7 +264,6 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
         id: "from-b",
         participantId: "x",
         authorName: "x",
-        authorKind: "human",
         content: "b",
         createdAt: 2,
         room: "mr10-b",
@@ -283,7 +281,7 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
     const sub = fakeStream();
     const unsub = streamMod.addSubscriber(
       sub.sse as any,
-      { id: "p2", name: "p2", kind: "human" },
+      { id: "p2", name: "p2" },
       new Set(["mr10-a"]),
     );
     try {
@@ -320,19 +318,18 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
     const subB = fakeStream();
     const unsubA = streamMod.addSubscriber(
       subA.sse as any,
-      { id: "pa", name: "pa", kind: "agent" },
+      { id: "pa", name: "pa" },
       new Set(["mr10-think-a"]),
     );
     const unsubB = streamMod.addSubscriber(
       subB.sse as any,
-      { id: "pb", name: "pb", kind: "agent" },
+      { id: "pb", name: "pb" },
       new Set(["mr10-think-b"]),
     );
     try {
       streamMod.broadcastAgentThinking({
         participantId: "agent1",
         name: "agent1",
-        kind: "agent",
         room: "mr10-think-a",
       });
       await new Promise((r) => setTimeout(r, 0));
@@ -350,7 +347,7 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
     const subAll = fakeStream();
     const unsub = streamMod.addSubscriber(
       subAll.sse as any,
-      { id: "pall", name: "pall", kind: "human" },
+      { id: "pall", name: "pall" },
       null,
     );
     try {
@@ -358,7 +355,6 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
         id: "any-a",
         participantId: "x",
         authorName: "x",
-        authorKind: "human",
         content: "a",
         createdAt: 1,
         room: "mr10-all-a",
@@ -367,7 +363,6 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
         id: "any-b",
         participantId: "x",
         authorName: "x",
-        authorKind: "human",
         content: "b",
         createdAt: 2,
         room: "mr10-all-b",
@@ -386,8 +381,8 @@ describe("MR10 — a room-A subscriber does not receive room-B events", () => {
 // ── MR11: cross-room @mention carries the source room ───────────────
 describe("MR11 — a mention records the room it happened in", () => {
   it("a @mention in room R lands in the recipient inbox with room=R", async () => {
-    const recipient = await mint("mr11-target", "agent");
-    const sender = await mint("mr11-sender", "human");
+    const recipient = await mint("mr11-target");
+    const sender = await mint("mr11-sender");
     // Mention happens in a non-general room.
     const { status } = await postMsg(sender, "hey @mr11-target look here", "mr11-room");
     expect(status).toBe(201);
@@ -403,8 +398,8 @@ describe("MR11 — a mention records the room it happened in", () => {
   });
 
   it("a mention in general carries room='general'", async () => {
-    const recipient = await mint("mr11-gen-target", "agent");
-    const sender = await mint("mr11-gen-sender", "human");
+    const recipient = await mint("mr11-gen-target");
+    const sender = await mint("mr11-gen-sender");
     await postMsg(sender, "ping @mr11-gen-target");
 
     const list = await (
@@ -418,7 +413,7 @@ describe("MR11 — a mention records the room it happened in", () => {
 describe("stream filter is driven by the message payload's room, not ambient state", () => {
   it("a delete in room B does not broadcast into a room-A-only subscriber", async () => {
     const spy = vi.spyOn(streamMod, "broadcastDeleted");
-    const key = await mint("mr10-del", "human");
+    const key = await mint("mr10-del");
     // create a message in room B, then recall it; assert the event payload's room.
     const { body } = await postMsg(key, "to be recalled", "mr10-del-b");
     const del = await app.request(`/messages/${body.id}`, {

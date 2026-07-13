@@ -13,7 +13,6 @@ function formatMention(m: Mention): string {
     id: m.messageId,
     participantId: m.authorId,
     authorName: m.authorName,
-    authorKind: m.authorKind,
     content: m.content,
     createdAt: m.messageCreatedAt,
     // Mention now carries its source room (multi-room); include it so the

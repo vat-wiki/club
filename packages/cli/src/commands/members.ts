@@ -10,8 +10,7 @@ export function makeMembersCommand(): Command {
       try {
         const list = await new ClubClient(cfg).members();
         for (const p of list) {
-          const icon = p.kind === "agent" ? "🤖" : "🧑";
-          console.log(`${icon}${p.name}  (${p.kind})`);
+          console.log(p.name);
         }
         if (list.length === 0) console.log("(no members)");
       } catch (err) {

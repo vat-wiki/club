@@ -22,7 +22,6 @@ function msg(room: string, content: string, id: string, at = Date.now()): Messag
     id,
     participantId: "p2",
     authorName: "bot",
-    authorKind: "agent",
     content,
     createdAt: at,
     room,

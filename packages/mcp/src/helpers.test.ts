@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { Message, Participant, ParticipantKind, Room } from "@club/shared";
+import type { Message, Participant, Room } from "@club/shared";
 import {
   str,
   num,
@@ -183,7 +183,6 @@ function makeMsg(content: string, attachments?: Message["attachments"], room = "
     id: "m_" + content,
     participantId: "p1",
     authorName: "alice",
-    authorKind: "human",
     content,
     createdAt: 0,
     room,
@@ -240,8 +239,8 @@ describe("listenForMatch", () => {
 });
 
 // ── dispatchTool ──────────────────────────────────────────────────────
-function makeP(name: string, kind: ParticipantKind = "human"): Participant {
-  return { id: "p_" + name, name, kind, createdAt: 0 };
+function makeP(name: string): Participant {
+  return { id: "p_" + name, name, createdAt: 0 };
 }
 
 /** A DispatchClient whose every method is overridable; defaults are inert. */
@@ -273,7 +272,7 @@ describe("dispatchTool", () => {
   });
 
   it("whoami formats the current participant", async () => {
-    expect(await dispatchTool("whoami", {}, fakeClient())).toBe("You are alice (human). id=p_alice");
+    expect(await dispatchTool("whoami", {}, fakeClient())).toBe("You are alice. id=p_alice");
   });
 
   it("read returns '(no messages)' for an empty room", async () => {
@@ -496,11 +495,11 @@ describe("dispatchTool", () => {
     );
   });
 
-  it("members renders humans and agents with the right icon, one per line", async () => {
+  it("members renders one name per line", async () => {
     const client = fakeClient({
-      members: async () => [makeP("alice", "human"), makeP("robby", "agent")],
+      members: async () => [makeP("alice"), makeP("robby")],
     });
-    expect(await dispatchTool("members", {}, client)).toBe("🧑alice\n🤖robby");
+    expect(await dispatchTool("members", {}, client)).toBe("alice\nrobby");
   });
 
   it("members returns '(no members)' for an empty roster", async () => {

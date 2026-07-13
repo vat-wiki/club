@@ -25,7 +25,7 @@ async function mintKey(name: string): Promise<string> {
   const res = await app.request("/participants", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, kind: "human" }),
+    body: JSON.stringify({ name }),
   });
   return (await res.json()).key;
 }

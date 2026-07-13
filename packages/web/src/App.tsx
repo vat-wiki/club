@@ -61,7 +61,7 @@ export default function App() {
   // BootScreen's auto-retry counter). The effect deps include this nonce.
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
-  const typing = useTypingAgents();
+  const typing = useTypingAgents(me?.id);
   // Multi-room: room list, the focused room (persisted), per-room unread, and
   // cross-room @mention toasts. The stream below subscribes to ALL rooms and
   // routes each message: focused-room → visible tail, others → unread/toast.
@@ -246,7 +246,6 @@ export default function App() {
       id: tempId,
       participantId: me.id,
       authorName: me.name,
-      authorKind: me.kind,
       content,
       createdAt: Date.now(),
       room: rooms.currentRoom,

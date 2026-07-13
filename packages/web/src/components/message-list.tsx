@@ -205,7 +205,6 @@ function MessageRow({
   onReact?: (messageId: string, emoji: string) => void;
 }) {
   const { locale, t } = useI18n();
-  const isAgent = m.authorKind === "agent";
   const pinged = mentionsSelf(m.content, selfName);
   // The precise (to-the-second) time, surfaced on hover via the native title
   // tooltip AND as the row's accessible description (aria-label) so SR users get
@@ -215,7 +214,7 @@ function MessageRow({
   // Bubble + alignment scheme (the standard chat-app mental model):
   //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
   //   - others: left-aligned, body in a raised-surface bubble (bg-card)
-  // The author kind dot moves to the leading edge of the bubble in both cases
+  // The avatar moves to the leading edge of the bubble in both cases
   // (i.e. on the right for self, on the left for others) via flex-row-reverse,
   // so it never sits awkwardly on the wrong side after alignment flips.
   // When a row pings the current user, the whole row gets a faint primary wash
@@ -248,7 +247,7 @@ function MessageRow({
           <Avatar name={m.authorName} className={cn("h-6 w-6 text-[10px]", grouped && "opacity-0")} />
         </div>
         <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
-          {/* Header (author + kind + HH:MM) only on the FIRST row of a run. */}
+          {/* Header (author + HH:MM) only on the FIRST row of a run. */}
           {!grouped && (
             <div
               className={cn(
@@ -256,11 +255,8 @@ function MessageRow({
                 self && "flex-row-reverse",
               )}
             >
-              <span className={cn("font-mono text-[13px] font-medium", isAgent ? "text-agent" : "text-human")}>
+              <span className="font-mono text-[13px] font-medium text-foreground">
                 {m.authorName}
-              </span>
-              <span className="font-mono text-[10px] lowercase text-muted-foreground/90">
-                {m.authorKind === "agent" ? t("msg.kindAgent") : t("msg.kindHuman")}
               </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
               {onReply && (

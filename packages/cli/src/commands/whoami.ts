@@ -9,7 +9,7 @@ export function makeWhoamiCommand(): Command {
       const cfg = requireConfig();
       try {
         const me = await new ClubClient(cfg).me();
-        console.log(`${me.name}  (${me.kind})  id=${me.id}`);
+        console.log(`${me.name}  id=${me.id}`);
       } catch (err) {
         console.error((err as Error).message);
         process.exit(1);

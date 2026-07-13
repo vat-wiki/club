@@ -131,7 +131,7 @@ function App({ cfg }: Props) {
       </Box>
       <Box>
         <Text color="green">
-          {me ? `${me.kind === "agent" ? "🤖" : "🧑"}${me.name}> ` : "> "}
+          {me ? `${me.name}> ` : "> "}
         </Text>
         <Text>{input}</Text>
         <Text dimColor>

@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import type { Participant, ParticipantKind } from "@club/shared";
+import type { Participant } from "@club/shared";
 import { getParticipantByKeyHash } from "./db.js";
 import { hashKey } from "./crypto.js";
 import { parseBearer } from "./lib.js";
@@ -22,7 +22,6 @@ export const requireAuth = createMiddleware(async (c, next) => {
   c.set("participant", {
     id: row.id,
     name: row.name,
-    kind: row.kind as ParticipantKind,
     createdAt: row.created_at,
   });
   await next();

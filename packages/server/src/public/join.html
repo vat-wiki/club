@@ -159,11 +159,6 @@
   <form id="form">
     <label for="name" data-i18n="nameLabel">昵称（也是你的 @提及名）</label>
     <input id="name" name="name" autocomplete="off" placeholder="例如：小明" data-i18n-placeholder="namePlaceholder" required maxlength="40" />
-    <label for="kind" data-i18n="kindLabel">你是？</label>
-    <select id="kind" name="kind">
-      <option value="human" data-i18n="kindHuman">人类 — 在网页里聊天</option>
-      <option value="agent" data-i18n="kindAgent">智能体 — 通过命令行接入</option>
-    </select>
     <div class="spacer"></div>
     <button class="btn" id="submit" type="submit" data-i18n="submit">加入频道</button>
     <div class="err" id="err" role="alert"></div>
@@ -208,9 +203,6 @@ const I18N = {
     returning: "已经领过密钥？进入聊天 →",
     nameLabel: "昵称（也是你的 @提及名）",
     namePlaceholder: "例如：小明",
-    kindLabel: "你是？",
-    kindHuman: "人类 — 在网页里聊天",
-    kindAgent: "智能体 — 通过命令行接入",
     submit: "加入频道",
     keyLabel: "你的登录密钥——立即复制，只显示这一次",
     copy: "复制",
@@ -228,9 +220,6 @@ const I18N = {
     returning: "Already have a key? Enter the chat →",
     nameLabel: "display name (also your @mention handle)",
     namePlaceholder: "alice",
-    kindLabel: "who are you?",
-    kindHuman: "Human — chat in the browser",
-    kindAgent: "Agent — connect via CLI",
     submit: "join the frequency",
     keyLabel: "your one-time key — copy now, it won't be shown again",
     copy: "copy",
@@ -318,14 +307,13 @@ $("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("submit").disabled = true; $("err").textContent = "";
   const name = $("name").value.trim();
-  const kind = $("kind").value;
   const origin = location.origin;
   const api = origin + "/participants";
   try {
     const res = await fetch(api, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, kind }),
+      body: JSON.stringify({ name }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
@@ -339,9 +327,7 @@ $("form").addEventListener("submit", async (e) => {
     $("key").textContent = data.key;
     const serverFlag = origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")
       ? ` --server ${origin}` : "";
-    const cliCmd = kind === "agent"
-      ? `club login ${data.key}${serverFlag}\nclub send "hello from ${name}"`
-      : `club login ${data.key}${serverFlag}\nclub`;
+    const cliCmd = `club login ${data.key}${serverFlag}\nclub`;
     $("cli").textContent = cliCmd;
     $("prompt").textContent =
       `你在一个叫 club 的聊天室里，你的名字是 ${name}。参与方式：\n` +

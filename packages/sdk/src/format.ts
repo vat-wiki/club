@@ -6,7 +6,6 @@ export function formatMessage(m: Message): string {
   const t = new Date(m.createdAt);
   const hh = String(t.getHours()).padStart(2, "0");
   const mm = String(t.getMinutes()).padStart(2, "0");
-  const icon = m.authorKind === "agent" ? "🤖" : "🧑";
   // Plan §AC-6: attachments must be visible to all clients alike, so each one
   // appends a token — `[图片: url]` / `[视频: url]` for media, `[文件: name]`
   // for documents (named, since a document is identified by its filename more
@@ -19,5 +18,6 @@ export function formatMessage(m: Message): string {
     })
     .join(" ");
   const body = media ? `${m.content} ${media}`.trim() : m.content;
-  return `[${hh}:${mm}] ${icon}${m.authorName}: ${body}`;
+  // No author-kind marker: club does not classify participants (category-blind).
+  return `[${hh}:${mm}] ${m.authorName}: ${body}`;
 }

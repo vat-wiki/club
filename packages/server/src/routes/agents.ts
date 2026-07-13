@@ -10,15 +10,15 @@ import {
 
 // ── Agent thinking presence (P1-5) ───────────────────────────────────
 //
-// club's participants self-report "I'm busy with this conversation" — agents
-// when processing a @mention, humans while typing — so the room can show a
-// typing indicator. The server relays each report to every SSE subscriber as a
-// named event and tracks the live set with a TTL + reply-posted auto-clear
-// (see stream.ts). Both kinds may report; the event carries the participant's
-// kind so clients can label agent "thinking" vs human "typing" if they choose.
-// A second thinking report while already thinking refreshes the TTL and is a
-// no-op on the wire (no re-broadcast), so re-mentioning a busy agent (or a
-// human still typing) doesn't strobe the indicator.
+// club's participants self-report "I'm busy with this conversation" — an agent
+// processing a @mention, a human typing — so the room can show a typing
+// indicator. The server relays each report to every SSE subscriber as a named
+// event and tracks the live set with a TTL + reply-posted auto-clear (see
+// stream.ts). The mechanism is category-blind: any participant may report, and
+// the event carries no kind (club does not classify participants — see
+// .pd-docs/requirements/category-blind.md). A second report while already
+// thinking refreshes the TTL and is a no-op on the wire (no re-broadcast), so
+// re-mentioning a busy participant doesn't strobe the indicator.
 
 export const agents = new Hono();
 agents.use("*", requireAuth);
@@ -44,7 +44,6 @@ agents.post("/thinking", async (c) => {
     broadcastAgentThinking({
       participantId: me.id,
       name: me.name,
-      kind: me.kind,
       ...(room ? { room } : {}),
     });
   }

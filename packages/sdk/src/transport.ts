@@ -17,7 +17,7 @@ import { ClubApiError } from "./errors.js";
 // built with just { server } to mint a key, then rebuilt with that key.
 export interface ClubConn {
   server: string; // base URL, e.g. http://localhost:6200
-  key?: string; // club_<kind>_<...> bearer token
+  key?: string; // club_<...> bearer token (legacy keys may carry a club_human_/club_agent_ prefix)
 }
 
 export interface CallOpts {

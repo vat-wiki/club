@@ -5,7 +5,6 @@ import {
   CreateParticipantRequest,
   RecoverParticipantRequest,
   type Participant,
-  type ParticipantKind,
 } from "@club/shared";
 import {
   getParticipantForRecover,
@@ -18,11 +17,14 @@ import { hashKey } from "../crypto.js";
 
 export const participants = new Hono();
 
-// Generate a single-use key. Plaintext returned exactly once. The kind is
-// embedded in the prefix (club_human_…/club_agent_…) as a display hint only.
-function newKey(kind: ParticipantKind): string {
+// Generate a single-use key. Plaintext returned exactly once. The key carries
+// only the `club_` namespace prefix — no participant kind, since club no longer
+// classifies participants (category-blind). Legacy keys with a club_human_…/
+// club_agent_… prefix still validate: auth hashes the full presented string and
+// looks up by key_hash, so the prefix was never authoritative.
+function newKey(): string {
   const token = randomBytes(24).toString("base64url");
-  return `club_${kind}_${token}`;
+  return `club_${token}`;
 }
 
 // A one-time recovery code: same entropy source as the key, but a distinct
@@ -43,24 +45,23 @@ function safeEqualHex(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
-// POST /participants  { name, kind } -> { key, recoverCode, participant }
+// POST /participants  { name } -> { key, recoverCode, participant }
 participants.post("/", async (c) => {
   const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
-  const { name, kind } = parsed.data;
+  const { name } = parsed.data;
   if (getParticipantByName(name)) {
     return c.json({ error: `name "${name}" is taken` }, 409);
   }
   const id = ulid();
-  const plaintext = newKey(kind);
+  const plaintext = newKey();
   const recoverCode = newRecoverCode();
-  insertParticipant(id, name, kind, hashKey(plaintext), hashKey(recoverCode), Date.now());
+  insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
   const participant: Participant = {
     id,
     name,
-    kind,
     createdAt: Date.now(),
   };
   return c.json({ key: plaintext, recoverCode, participant }, 201);
@@ -99,7 +100,7 @@ participants.post("/recover", async (c) => {
   }
 
   // Reissue both credentials, reusing the original id + name.
-  const newPlainKey = newKey(row.kind);
+  const newPlainKey = newKey();
   const newCode = newRecoverCode();
   updateParticipantKey(row.id, hashKey(newPlainKey));
   updateParticipantRecover(row.id, hashKey(newCode));
@@ -107,7 +108,6 @@ participants.post("/recover", async (c) => {
   const participant: Participant = {
     id: row.id,
     name: row.name,
-    kind: row.kind,
     createdAt: row.created_at,
   };
   return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);

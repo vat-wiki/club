@@ -11,8 +11,8 @@ import { MessageList } from "./message-list";
 // contract the styles hang off, and these guard against regressions where
 // `self` stops influencing the row layout (the original bug: `self && ""`).
 
-const me: Participant = { id: "p1", name: "alice", kind: "human", createdAt: 0 };
-const bot: Participant = { id: "p2", name: "bot", kind: "agent", createdAt: 0 };
+const me: Participant = { id: "p1", name: "alice", createdAt: 0 };
+const bot: Participant = { id: "p2", name: "bot", createdAt: 0 };
 const members: Participant[] = [me, bot];
 
 function mk(p: Participant, content: string, id: string): Message {
@@ -20,7 +20,6 @@ function mk(p: Participant, content: string, id: string): Message {
     id,
     participantId: p.id,
     authorName: p.name,
-    authorKind: p.kind,
     content,
     createdAt: Date.now(),
     room: "general",

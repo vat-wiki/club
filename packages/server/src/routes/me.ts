@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { ulid } from "ulid";
-import type { Mention, ParticipantKind } from "@club/shared";
+import type { Mention } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import {
   getUnreadMentions,
@@ -26,7 +26,6 @@ function toMention(r: MentionRow): Mention {
     participantId: r.participant_id,
     authorId: r.author_id,
     authorName: r.author_name,
-    authorKind: r.author_kind as ParticipantKind,
     content: r.content,
     messageCreatedAt: r.message_created_at,
     readAt: r.read_at,

@@ -10,8 +10,8 @@ import { MessageList } from "./message-list";
 // complement the existing gallery-render tests, which only assert the static
 // thumbnail markup (grid classes, alt/aria-label) — not the open/close dialog.
 
-const me: Participant = { id: "p1", name: "alice", kind: "human", createdAt: 0 };
-const bot: Participant = { id: "p2", name: "bot", kind: "agent", createdAt: 0 };
+const me: Participant = { id: "p1", name: "alice", createdAt: 0 };
+const bot: Participant = { id: "p2", name: "bot", createdAt: 0 };
 const members: Participant[] = [me, bot];
 
 function att(id: string): MessageAttachment {
@@ -23,7 +23,6 @@ function msg(p: Participant, content: string, id: string, attachments: MessageAt
     id,
     participantId: p.id,
     authorName: p.name,
-    authorKind: p.kind,
     content,
     createdAt: Date.now(),
     room: "general",

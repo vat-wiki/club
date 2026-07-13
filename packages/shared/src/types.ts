@@ -2,13 +2,13 @@ import { z } from "zod";
 
 // ── Domain ──────────────────────────────────────────────────────────
 
-export const ParticipantKind = z.enum(["human", "agent"]);
-export type ParticipantKind = z.infer<typeof ParticipantKind>;
-
+// A participant is a participant — club deliberately does NOT classify people
+// into "human" vs "agent". Whether someone is an agent is something they convey
+// themselves (name, self-introduction, behavior), never a system-assigned label.
+// See .pd-docs/requirements/category-blind.md.
 export interface Participant {
   id: string;
   name: string;
-  kind: ParticipantKind;
   createdAt: number;
 }
 
@@ -16,7 +16,6 @@ export interface Message {
   id: string;
   participantId: string;
   authorName: string;
-  authorKind: ParticipantKind;
   content: string;
   createdAt: number;
   // Canonical room slug this message belongs to. Every message lives in exactly
@@ -122,7 +121,6 @@ export interface Mention {
   // Who sent the mentioning message (denormalized for display without a join).
   authorId: string;
   authorName: string;
-  authorKind: ParticipantKind;
   content: string;
   messageCreatedAt: number;
   readAt: number | null;
@@ -133,9 +131,11 @@ export interface Mention {
 
 // ── API request/response shapes ─────────────────────────────────────
 
+// NOTE: no `kind` — club does not classify participants (category-blind). The
+// schema is non-strict, so a legacy client still sending `{ name, kind }` is
+// silently stripped of `kind` rather than rejected (graceful deprecation).
 export const CreateParticipantRequest = z.object({
   name: z.string().min(1).max(40),
-  kind: ParticipantKind,
 });
 export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
 
@@ -269,17 +269,16 @@ export interface ApiError {
 // event name rather than sniffing payloads. A client that only knows about
 // `message` events ignores these (forward-compatible).
 
-// SSE `event: agent_thinking` payload. `participantId`+`name`+`kind` are all
-// carried so a client can render the indicator without a roster join (matches
-// how `message` events denormalize authorName/authorKind). kind is the
-// reporter's kind: agents report while processing a @mention, humans while
-// typing — a client can label them differently or uniformly as "typing".
-// `room`, when present, scopes the indicator to that room's stream; absent
-// means an unscoped (legacy/global) report that reaches all subscribers.
+// SSE `event: agent_thinking` payload. `participantId`+`name` are carried so a
+// client can render the indicator without a roster join (matches how `message`
+// events denormalize authorName). The event name retains an "agent" legacy but
+// the mechanism is kind-agnostic: any participant (an agent processing a
+// @mention OR a human typing) reports and is shown as "typing". `room`, when
+// present, scopes the indicator to that room's stream; absent means an unscoped
+// (legacy/global) report that reaches all subscribers.
 export interface AgentThinkingEvent {
   participantId: string;
   name: string;
-  kind: ParticipantKind;
   room?: string;
 }
 
@@ -299,7 +298,6 @@ export interface AgentIdleEvent {
 export interface PresenceEvent {
   participantId: string;
   name: string;
-  kind: ParticipantKind;
   online: boolean;
 }
 

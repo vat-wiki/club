@@ -14,10 +14,9 @@ members.use("*", requireAuth);
 function toParticipant(r: {
   id: string;
   name: string;
-  kind: "human" | "agent";
   created_at: number;
 }): Participant {
-  return { id: r.id, name: r.name, kind: r.kind, createdAt: r.created_at };
+  return { id: r.id, name: r.name, createdAt: r.created_at };
 }
 
 // GET /members -> Participant[] (ordered by createdAt asc)

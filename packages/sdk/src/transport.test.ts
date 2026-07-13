@@ -52,7 +52,7 @@ describe("getMe", () => {
       expect((init.headers as Record<string, string>).Authorization).toBe(
         "Bearer club_agent_xyz",
       );
-      return jsonRes({ id: "1", name: "a", kind: "agent", createdAt: 1 });
+      return jsonRes({ id: "1", name: "a", createdAt: 1 });
     });
     globalThis.fetch = fetchMock as typeof fetch;
 
@@ -181,9 +181,9 @@ describe("createParticipant", () => {
       expect(init.method).toBe("POST");
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBeUndefined();
-      expect(JSON.parse(init.body as string)).toEqual({ name: "bot", kind: "agent" });
+      expect(JSON.parse(init.body as string)).toEqual({ name: "bot" });
       return jsonRes(
-        { key: "club_agent_t", participant: { id: "1", name: "bot", kind: "agent", createdAt: 1 } },
+        { key: "club_agent_t", participant: { id: "1", name: "bot", createdAt: 1 } },
         201,
       );
     });
@@ -191,7 +191,7 @@ describe("createParticipant", () => {
 
     const res = await createParticipant(
       { server: "http://x" },
-      { name: "bot", kind: "agent" },
+      { name: "bot" },
     );
     expect(res.key).toBe("club_agent_t");
     expect(res.participant.name).toBe("bot");

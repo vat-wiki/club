@@ -160,6 +160,18 @@ const migrations: Migration[] = [
     description: "filename on uploaded files (document attachments show it)",
     sql: `ALTER TABLE files ADD COLUMN filename TEXT;`,
   },
+  {
+    version: 9,
+    description: "drop participant.kind (category-blind: human/agent distinction removed)",
+    // club no longer classifies participants into human/agent — see
+    // .pd-docs/requirements/category-blind.md. The column is dropped; every
+    // prepared statement has stopped selecting it. BASELINE_SCHEMA still creates
+    // the column so a fresh db walks the same v1→v9 path as an upgraded one
+    // (create-then-drop is idempotent under the versioned runner, and re-running
+    // v9 on a db that already dropped it is skipped by the version check).
+    // SQLite ≥3.35 supports DROP COLUMN; better-sqlite3 bundles it.
+    sql: `ALTER TABLE participants DROP COLUMN kind;`,
+  },
 ];
 
 db.exec(`
@@ -216,7 +228,6 @@ export interface MessageRow {
   rowid: number;
   participant_id: string;
   author_name: string;
-  author_kind: "human" | "agent";
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
   reply_to_id: string | null; // id of the message this one replies to, or NULL
   deleted: number; // 1 if recalled (soft-deleted), else 0
@@ -240,23 +251,21 @@ export function insertMessage(
 
 export function getAllParticipants() {
   return db
-    .prepare<[], { id: string; name: string; kind: "human" | "agent"; created_at: number }>(
-      `SELECT id, name, kind, created_at FROM participants ORDER BY created_at ASC`,
+    .prepare<[], { id: string; name: string; created_at: number }>(
+      `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
     )
     .all();
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
-   FROM messages m JOIN participants p ON p.id = m.participant_id
+          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
-   FROM messages m JOIN participants p ON p.id = m.participant_id
+          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
@@ -280,8 +289,7 @@ export function getMessagesSince(sinceId: string, room: string, limit: number) {
 
 const beforeStmt = db.prepare<[number, string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
-   FROM messages m JOIN participants p ON p.id = m.participant_id
+          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
@@ -298,15 +306,13 @@ export function getMessagesBeforeId(beforeId: string, room: string, limit: numbe
 
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
-   FROM messages m JOIN participants p ON p.id = m.participant_id
+          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.content LIKE ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name, p.kind AS author_kind
-   FROM messages m JOIN participants p ON p.id = m.participant_id
+          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
    WHERE m.content LIKE ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
@@ -368,34 +374,31 @@ export function toggleReaction(messageId: string, participantId: string, emoji: 
 
 export function getParticipantByKeyHash(hash: string) {
   return db
-    .prepare<
-      [string],
-      { id: string; name: string; kind: "human" | "agent"; created_at: number }
-    >(`SELECT id, name, kind, created_at FROM participants WHERE key_hash = ?`)
+    .prepare<[string], { id: string; name: string; created_at: number }>(
+      `SELECT id, name, created_at FROM participants WHERE key_hash = ?`,
+    )
     .get(hash);
 }
 
 export function getParticipantByName(name: string) {
   return db
-    .prepare<
-      [string],
-      { id: string; name: string; kind: "human" | "agent"; created_at: number }
-    >(`SELECT id, name, kind, created_at FROM participants WHERE name = ?`)
+    .prepare<[string], { id: string; name: string; created_at: number }>(
+      `SELECT id, name, created_at FROM participants WHERE name = ?`,
+    )
     .get(name);
 }
 
 export function insertParticipant(
   id: string,
   name: string,
-  kind: "human" | "agent",
   keyHash: string,
   recoverHash: string,
   createdAt: number,
 ): void {
   db.prepare(
-    `INSERT INTO participants (id, name, kind, key_hash, recover_hash, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, name, kind, keyHash, recoverHash, createdAt);
+    `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, name, keyHash, recoverHash, createdAt);
 }
 
 // ── Identity recovery ───────────────────────────────────────────────
@@ -409,7 +412,6 @@ export function insertParticipant(
 export interface ParticipantRecoverRow {
   id: string;
   name: string;
-  kind: "human" | "agent";
   created_at: number;
   recover_hash: string | null;
 }
@@ -417,7 +419,7 @@ export interface ParticipantRecoverRow {
 const getParticipantForRecoverStmt = db.prepare<
   [string],
   ParticipantRecoverRow
->(`SELECT id, name, kind, created_at, recover_hash FROM participants WHERE name = ?`);
+>(`SELECT id, name, created_at, recover_hash FROM participants WHERE name = ?`);
 
 /** A participant row including recover_hash, looked up by callsign (for the
  *  recovery endpoint). Returns undefined if the name doesn't exist. */
@@ -452,7 +454,6 @@ export interface MentionRow {
   participant_id: string;
   author_id: string;
   author_name: string;
-  author_kind: "human" | "agent";
   content: string;
   message_created_at: number;
   read_at: number | null;
@@ -461,8 +462,8 @@ export interface MentionRow {
 
 const allParticipantsStmt = db.prepare<
   [],
-  { id: string; name: string; kind: "human" | "agent" }
->(`SELECT id, name, kind FROM participants`);
+  { id: string; name: string }
+>(`SELECT id, name FROM participants`);
 
 /** Lightweight roster for mention parsing: every (id, name). */
 export function getAllParticipantNames(): { id: string; name: string }[] {
@@ -495,7 +496,7 @@ export function insertMention(
 
 const unreadMentionsStmt = db.prepare<[string], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
-          p.name AS author_name, p.kind AS author_kind,
+          p.name AS author_name,
           m.content AS content, m.created_at AS message_created_at,
           mn.read_at, mn.room
    FROM mentions mn
@@ -522,7 +523,7 @@ export function getMentionById(id: string) {
 
 const mentionFullStmt = db.prepare<[string], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
-          p.name AS author_name, p.kind AS author_kind,
+          p.name AS author_name,
           m.content AS content, m.created_at AS message_created_at,
           mn.read_at, mn.room
    FROM mentions mn

@@ -95,8 +95,6 @@ const zh: Dict = {
 
   // Roster
   "roster.you": "（你）",
-  "roster.humans": "人类",
-  "roster.agents": "智能体",
   "roster.onlineLabel": "在线成员",
   // The aside now holds rooms (top) + online members (bottom); this labels the
   // whole complementary region for SR landmark navigation.
@@ -258,8 +256,6 @@ const zh: Dict = {
   "image.lightbox.desc": "点击外侧或按 Esc 关闭",
 
   // Message list
-  "msg.kindAgent": "智能体",
-  "msg.kindHuman": "人类",
   // Hover/tooltip: the inline timestamp only shows HH:MM; this labels the
   // precise-to-the-second time revealed on hover (and read by SRs).
   "msg.sentAt": "{time} 发送",
@@ -286,8 +282,6 @@ const zh: Dict = {
   // Mention popup
   "mention.aria": "提及某人",
   "mention.noMatch": "没有匹配“{query}”的成员",
-  "mention.kindAgent": "智能体",
-  "mention.kindHuman": "人类",
   "mention.more": "+{count} 个更多——继续输入以缩小范围",
 
   // Boot failure screen — shown when validating a stored key against /me fails
@@ -339,8 +333,6 @@ const en: Dict = {
 
   // Roster
   "roster.you": "(you)",
-  "roster.humans": "Humans",
-  "roster.agents": "Agents",
   "roster.onlineLabel": "Online members",
   "roster.label": "Rooms and online members",
   "roster.mobile.aria": "Members — {count} online",
@@ -494,8 +486,6 @@ const en: Dict = {
   "image.lightbox.desc": "Click outside or press Esc to close",
 
   // Message list
-  "msg.kindAgent": "agent",
-  "msg.kindHuman": "human",
   "msg.sentAt": "Sent at {time}",
   "msg.disconnected": "Connection lost — reconnecting",
   "msg.connecting": "Connecting…",
@@ -520,8 +510,6 @@ const en: Dict = {
   // Mention popup
   "mention.aria": "Mention someone",
   "mention.noMatch": "No members matching “{query}”",
-  "mention.kindAgent": "agent",
-  "mention.kindHuman": "human",
   "mention.more": "+{count} more — keep typing to narrow down",
 
   // Boot failure screen

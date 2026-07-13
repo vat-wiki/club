@@ -54,7 +54,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: "whoami",
-    description: "Report which club participant this key belongs to (name + kind).",
+    description: "Report which club participant this key belongs to (name + id).",
     inputSchema: { type: "object" as const, properties: {}, required: [] as const },
   },
   {
@@ -117,7 +117,7 @@ const TOOLS = [
   },
   {
     name: "members",
-    description: "List everyone in the room (humans and agents).",
+    description: "List everyone in the room.",
     inputSchema: { type: "object" as const, properties: {}, required: [] as const },
   },
   {

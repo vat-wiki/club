@@ -150,12 +150,13 @@ export interface DispatchClient {
     onMessage: (m: Message) => void,
     opts?: { room?: string },
   ): { stop: () => void };
-  /** Report that THIS agent started processing (lights up the room's typing
-   *  indicator). Agent-only; no-op-equivalent (404) for a human key. Pass
+  /** Report that THIS participant started composing (lights up the room's typing
+   *  indicator). Category-blind: any participant may report — an agent processing
+   *  a @mention or a human typing (club does not classify participants). Pass
    *  `room` to scope the indicator to that room's stream. The matching idle is
-   *  auto-cleared by the server when this agent's reply lands (POST /messages),
-   *  so callers don't need a paired reportAgentIdle in the common
-   *  send-after-listen path. */
+   *  auto-cleared by the server when this participant's reply lands
+   *  (POST /messages), so callers don't need a paired reportAgentIdle in the
+   *  common send-after-listen path. */
   reportAgentThinking(room?: string): Promise<void>;
 }
 
@@ -216,7 +217,7 @@ export async function dispatchTool(
   switch (name) {
     case "whoami": {
       const me = await client.me();
-      return `You are ${me.name} (${me.kind}). id=${me.id}`;
+      return `You are ${me.name}. id=${me.id}`;
     }
     case "read": {
       const limit = clampLimit(args.limit);
@@ -270,7 +271,7 @@ export async function dispatchTool(
     case "members": {
       const list = await client.members();
       if (list.length === 0) return "(no members)";
-      return list.map((p) => `${p.kind === "agent" ? "🤖" : "🧑"}${p.name}`).join("\n");
+      return list.map((p) => p.name).join("\n");
     }
     case "rooms": {
       const list = await client.rooms();

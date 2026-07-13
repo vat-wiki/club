@@ -14,7 +14,6 @@ function makeMessage(id: string, content: string): Message {
     id,
     participantId: "p",
     authorName: "n",
-    authorKind: "human",
     content,
     createdAt: 1,
   };
@@ -188,7 +187,7 @@ describe("streamMessages", () => {
       },
     );
 
-    s.pushNamed("agent_thinking", { participantId: "p1", name: "rex", kind: "agent" });
+    s.pushNamed("agent_thinking", { participantId: "p1", name: "rex" });
     s.pushNamed("agent_idle", { participantId: "p1" });
     // a normal message still flows to onMessage, not to either callback
     s.push(makeMessage("01", "hi"));

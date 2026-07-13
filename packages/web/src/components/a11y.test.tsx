@@ -71,12 +71,11 @@ async function expectNoViolationsPortal(ui: ReactNode) {
 const me: Participant = {
   id: "p1",
   name: "alice",
-  kind: "human",
   createdAt: Date.now(),
 };
 const members: Participant[] = [
   me,
-  { id: "p2", name: "bot", kind: "agent", createdAt: Date.now() },
+  { id: "p2", name: "bot", createdAt: Date.now() },
 ];
 
 const messages: Message[] = [
@@ -84,7 +83,6 @@ const messages: Message[] = [
     id: "m1",
     participantId: "p1",
     authorName: "alice",
-    authorKind: "human",
     content: "hello world",
     createdAt: Date.now(),
     room: "general",
@@ -93,7 +91,6 @@ const messages: Message[] = [
     id: "m2",
     participantId: "p2",
     authorName: "bot",
-    authorKind: "agent",
     content: "hi @alice",
     createdAt: Date.now(),
     room: "general",
@@ -162,7 +159,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MentionToasts have no violations", async () => {
     const toasts: MentionToast[] = [
-      { id: "t1", messageId: "m1", room: "deploy-debug", authorName: "claude", authorKind: "agent", content: "hey @alice" },
+      { id: "t1", messageId: "m1", room: "deploy-debug", authorName: "claude", content: "hey @alice" },
     ];
     await expectNoViolations(
       <MentionToasts toasts={toasts} onActivate={() => {}} onDismiss={() => {}} />,

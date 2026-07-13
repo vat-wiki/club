@@ -78,11 +78,9 @@ export const api = {
 export async function createParticipant(
   server: string,
   name: string,
-  kind: "human" | "agent",
 ): Promise<{ key: string; recoverCode: string }> {
   const { key, recoverCode } = await new ClubClient({ server }).createParticipant({
     name,
-    kind,
   });
   return { key, recoverCode };
 }

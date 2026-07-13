@@ -79,7 +79,7 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(8);
+    expect(version?.version).toBe(9);
 
     raw.close();
   });
@@ -95,7 +95,7 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(8);
+    expect(version?.version).toBe(9);
     // general still exactly one row (INSERT OR IGNORE is idempotent too).
     const count = raw
       .prepare<[], { n: number }>(
@@ -113,8 +113,8 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     raw.exec(BASELINE_SCHEMA);
     runMigrations(raw);
     raw.exec(
-      `INSERT INTO participants (id, name, kind, key_hash, created_at)
-         VALUES ('p2', 'trinity', 'human', 'h', 1);`,
+      `INSERT INTO participants (id, name, key_hash, created_at)
+         VALUES ('p2', 'trinity', 'h', 1);`,
     );
     // Insert WITHOUT specifying room — the column default must kick in.
     raw.exec(
@@ -125,6 +125,40 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
       .prepare<[], { room: string }>("SELECT room FROM messages WHERE id = 'm2'")
       .get();
     expect(msg?.room).toBe("general");
+    raw.close();
+  });
+});
+
+describe("MR1b — category-blind migration (v9): drops participant.kind", () => {
+  // club no longer classifies participants (category-blind — see
+  // .pd-docs/requirements/category-blind.md). v9 drops the kind column.
+  it("removes the kind column and reaches schema_version 9", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw); // full chain incl. v9
+
+    const cols = raw
+      .prepare<[], { name: string }>("PRAGMA table_info(participants)")
+      .all()
+      .map((c) => c.name);
+    expect(cols).not.toContain("kind");
+
+    const version = raw
+      .prepare<[], { version: number }>("SELECT version FROM schema_version")
+      .get();
+    expect(version?.version).toBe(9);
+    raw.close();
+  });
+
+  it("is idempotent — re-running on an already-dropped db is a no-op", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw);
+    expect(() => runMigrations(raw)).not.toThrow();
     raw.close();
   });
 });

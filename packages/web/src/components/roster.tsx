@@ -23,33 +23,10 @@ function Row({ p, self, online }: { p: Participant; self: boolean; online: boole
   );
 }
 
-function Section({
-  title,
-  list,
-  selfId,
-  onlineIds,
-}: {
-  title: string;
-  list: Participant[];
-  selfId?: string;
-  onlineIds?: Set<string>;
-}) {
-  if (list.length === 0) return null;
-  return (
-    <div className="space-y-1">
-      <h2 className="px-4 pb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85">
-        {title}
-      </h2>
-      {list.map((p) => (
-        // Unknown onlineIds (e.g. before the stream seeds presence) defaults to
-        // online so the roster never looks empty/ghosted on first paint.
-        <Row key={p.id} p={p} self={p.id === selfId} online={onlineIds?.has(p.id) ?? true} />
-      ))}
-    </div>
-  );
-}
-
 // Shared roster body — rendered inside the desktop aside and the mobile sheet.
+// Category-blind: a single flat list in server (registration) order. club does
+// NOT split humans from agents — there is no such distinction in the data model
+// (see .pd-docs/requirements/category-blind.md).
 export function RosterSections({
   members,
   selfId,
@@ -59,15 +36,14 @@ export function RosterSections({
   selfId?: string;
   onlineIds?: Set<string>;
 }) {
-  const t = useT();
-  const humans = members.filter((m) => m.kind === "human");
-  const agents = members.filter((m) => m.kind === "agent");
   return (
-    <>
-      <Section title={t("roster.humans")} list={humans} selfId={selfId} onlineIds={onlineIds} />
-      {humans.length > 0 && agents.length > 0 && <Separator />}
-      <Section title={t("roster.agents")} list={agents} selfId={selfId} onlineIds={onlineIds} />
-    </>
+    <div className="space-y-1">
+      {members.map((p) => (
+        // Unknown onlineIds (e.g. before the stream seeds presence) defaults to
+        // online so the roster never looks empty/ghosted on first paint.
+        <Row key={p.id} p={p} self={p.id === selfId} online={onlineIds?.has(p.id) ?? true} />
+      ))}
+    </div>
   );
 }
 

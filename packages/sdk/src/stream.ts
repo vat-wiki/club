@@ -142,10 +142,17 @@ export function streamMessages(
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
+    // Defensive: protect against malformed servers sending unbounded frame data.
+    // A frame larger than this likely indicates a broken implementation or abuse.
+    const MAX_FRAME_SIZE = 1_000_000; // 1MB per SSE frame
     while (!stopSignal.signal.aborted) {
       const { done, value } = await reader.read();
       if (done) break;
       buf += decoder.decode(value, { stream: true });
+      // Guard against buffer overflow from a malicious or broken server.
+      if (buf.length > MAX_FRAME_SIZE) {
+        throw new Error("SSE frame exceeded maximum size (1MB); disconnecting");
+      }
       let sep: number;
       while ((sep = buf.indexOf("\n\n")) !== -1) {
         const raw = buf.slice(0, sep);

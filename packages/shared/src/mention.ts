@@ -18,8 +18,34 @@
  * empty roster names, the CLI/MCP treat an empty filter as "match everything").
  * Pure + unit-tested.
  */
+/** Regex matching a single name character (any letter, digit, underscore, or hyphen) */
 const NAME_CHAR = /[\p{L}\p{N}_-]/u;
 
+/**
+ * Check if a message content @-mentions a participant by name.
+ *
+ * Single source of truth for "does `content` @-mention `name`?" Shared by
+ * the server (per-participant mention inbox), the CLI (`listen --mention`),
+ * and the MCP server (`matchesMention`).
+ *
+ * **Rule**: A case-insensitive match of `@<name>` that is NOT immediately
+ * followed by another name character (letter/digit/underscore/hyphen, any
+ * script). The trailing boundary stops a short name from matching a longer
+ * @-tag — e.g. name "wang" is NOT mentioned by "@wangwen". The leading `@`
+ * is itself the left boundary.
+ *
+ * @param content - The message content to search in
+ * @param name - The participant name to check for (must be non-empty)
+ * @returns true if the content contains a valid @-mention of the name
+ *
+ * @example
+ * ```ts
+ * mentionMatches("hey @alice", "alice");      // true
+ * mentionMatches("hey @alice", "ALICE");       // true (case-insensitive)
+ * mentionMatches("ping @alicia", "al");        // false (word boundary)
+ * mentionMatches("alice will handle it", "alice"); // false (no @ prefix)
+ * ```
+ */
 export function mentionMatches(content: string, name: string): boolean {
   if (!name) return false;
   const needle = "@" + name.toLowerCase();

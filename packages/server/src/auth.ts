@@ -16,7 +16,15 @@ declare module "hono" {
 
 export const requireAuth = createMiddleware(async (c, next) => {
   const key = parseBearer(c.req.header("Authorization"));
-  if (!key) return c.json({ error: "missing bearer token" }, 401);
+  if (!key) {
+    // Distinguish missing header from malformed header for better debugging.
+    // Both are 401 (authentication required), but the message guides the client.
+    const authHeader = c.req.header("Authorization");
+    if (!authHeader || authHeader.trim() === "") {
+      return c.json({ error: "missing Authorization header" }, 401);
+    }
+    return c.json({ error: "invalid Authorization format (expected 'Bearer <token>')" }, 401);
+  }
   const row = getParticipantByKeyHash(hashKey(key));
   if (!row) return c.json({ error: "invalid key" }, 401);
   c.set("participant", {

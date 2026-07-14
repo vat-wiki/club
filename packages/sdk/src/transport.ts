@@ -7,6 +7,7 @@ import type {
   Participant,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
+  Reaction,
   Room,
   UploadFileResponse,
 } from "@club/shared";
@@ -196,6 +197,65 @@ export interface UploadFileInput {
   mime: string;
 }
 
+// Client-side upload limits. These should match or be slightly more conservative
+// than the server limits to avoid uploading bytes that will be rejected.
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50MB
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB
+
+// Extract the base size limit from the MIME type.
+function getMaxLengthForMime(mime: string): number {
+  if (mime.startsWith("video/")) return MAX_VIDEO_BYTES;
+  if (mime.startsWith("image/")) return MAX_IMAGE_BYTES;
+  // Documents and unknown types default to document limit.
+  return MAX_DOCUMENT_BYTES;
+}
+
+// GET /files/:id — fetch file content as ArrayBuffer. Useful for agents
+// to read files uploaded by others. Returns raw bytes; caller decodes by mime.
+export async function getFile(
+  c: ClubConn,
+  id: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<{ buffer: ArrayBuffer; mime: string; filename?: string }> {
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const headers: Record<string, string> = {};
+    if (c.key) headers.Authorization = `Bearer ${c.key}`;
+
+    const res = await fetch(`${c.server}/files/${encodeURIComponent(id)}`, {
+      headers,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body?.error) msg = body.error;
+      } catch {
+        /* ignore non-JSON error bodies */
+      }
+      throw new ClubApiError(msg, res.status);
+    }
+    const buffer = await res.arrayBuffer();
+    const mime = res.headers.get("content-type") || "application/octet-stream";
+    // Content-Disposition may contain original filename: "attachment; filename=\"foo.pdf\""
+    const contentDisposition = res.headers.get("content-disposition");
+    let filename: string | undefined;
+    if (contentDisposition) {
+      const m = /filename=(?:"([^"]*)"|([^;]*))/.exec(contentDisposition);
+      if (m) filename = m[1] || m[2];
+    }
+    return { buffer, mime, filename };
+  } catch (err) {
+    throw wrapErr(err);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function uploadFile(
   c: ClubConn,
   input: UploadFileInput,
@@ -205,6 +265,16 @@ export async function uploadFile(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // Pre-flight size check: fail fast if the buffer exceeds the limit for its MIME type.
+    // This prevents wasting bandwidth on uploads the server will reject.
+    const maxLength = getMaxLengthForMime(input.mime);
+    if (input.buffer.byteLength > maxLength) {
+      throw new ClubApiError(
+        `file size (${input.buffer.byteLength} bytes) exceeds limit for ${input.mime} (${maxLength} bytes)`,
+        413,
+      );
+    }
+
     const headers: Record<string, string> = {};
     if (c.key) headers.Authorization = `Bearer ${c.key}`;
 
@@ -345,4 +415,37 @@ export async function createRoom(
   opts: { timeoutMs?: number } = {},
 ): Promise<Room> {
   return request<Room>(c, "/rooms", { method: "POST", body: { name }, ...opts });
+}
+
+// ── Message actions (delete, react) ────────────────────────────────────
+
+// DELETE /messages/:id — soft-delete (recall) a message. Only the author may.
+// Returns 204 on success, 404 if not found or not yours.
+export async function deleteMessage(
+  c: ClubConn,
+  id: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, `/messages/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    ...opts,
+  });
+}
+
+// POST /messages/:id/reactions { emoji } — toggle a reaction. Adds if absent,
+// removes if present. Broadcasts the refreshed aggregate to all subscribers.
+// Returns the updated reaction list [{ emoji, count }].
+// NOTE: Reaction type is imported from @club/shared.
+
+export async function toggleMessageReaction(
+  c: ClubConn,
+  id: string,
+  emoji: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<Reaction[]> {
+  return request<Reaction[]>(c, `/messages/${encodeURIComponent(id)}/reactions`, {
+    method: "POST",
+    body: { emoji },
+    ...opts,
+  });
 }

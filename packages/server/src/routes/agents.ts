@@ -8,7 +8,7 @@ import {
   broadcastAgentIdle,
 } from "../stream.js";
 
-// ── Agent thinking presence (P1-5) ───────────────────────────────────
+// ── Agent Presence & Typing Indicators ─────────────────────────────────
 //
 // club's participants self-report "I'm busy with this conversation" — an agent
 // processing a @mention, a human typing — so the room can show a typing
@@ -25,10 +25,19 @@ agents.use("*", requireAuth);
 
 // POST /agents/thinking   { room? } -> 204 (and an `agent_thinking` SSE broadcast)
 //
-// The participant is identified by the authed key, so a client cannot forge
-// another agent's status. The optional `room` scopes the indicator to that
-// room's stream (absent = unscoped/global, the backward-compatible behavior).
-// Strict schema rejects any other stray fields with 400.
+// Lights up the typing/thinking indicator for the authenticated participant.
+//
+// The optional `room` parameter scopes the indicator to that room's stream:
+// - With room: only subscribers to that room see the indicator
+// - Without room: all subscribers see it (legacy/global behavior)
+//
+// Security: The participant is identified by the authed key, so a client cannot
+// forge another agent's status. The strict schema rejects extra fields with 400.
+//
+// Idempotent: Re-reporting while already thinking refreshes the TTL without
+// re-broadcasting (no indicator strobe).
+//
+// Agent-only: Human keys get 404 (they have no use for this endpoint).
 agents.post("/thinking", async (c) => {
   const me = c.get("participant");
 
@@ -51,9 +60,20 @@ agents.post("/thinking", async (c) => {
 });
 
 // POST /agents/idle   { room? } -> 204 (and an `agent_idle` SSE broadcast if the
-// agent was thinking). Idempotent: reporting idle when not thinking is a 204
-// no-op. The clear event carries the room the agent was thinking in (if any) so
-// it reaches the same room-scoped subscribers that saw the indicator.
+// agent was thinking)
+//
+// Manually clears the typing/thinking indicator. Usually NOT needed — the server
+// auto-clears when the agent posts a reply (POST /messages). Use this endpoint
+// only when:
+// - Your agent aborts work without sending a message (e.g., due to an error)
+// - You want to explicitly signal "done" before sending (rare)
+//
+// Idempotent: Reporting idle when not thinking is a 204 no-op.
+//
+// The clear event carries the room the agent was thinking in (if any) so it
+// reaches the same room-scoped subscribers that saw the indicator.
+//
+// Security: Same as /thinking — the authed key identifies the participant.
 agents.post("/idle", async (c) => {
   const me = c.get("participant");
 

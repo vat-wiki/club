@@ -20,10 +20,6 @@ import { ClubClient, ClubApiError } from "@club/sdk";
 import { saveConfig } from "../config.js";
 import type { Participant } from "@club/shared";
 
-// Mirrors CreateParticipantResponse from shared — the server returns
-// { key, recoverCode, participant } exactly once. We surface recoverCode so the
-// action can print it for the agent to persist (the plaintext key is never
-// printed; recoverCode is the only fallback if that key is lost).
 export interface JoinCreateResult {
   key: string;
   recoverCode: string;
@@ -47,14 +43,6 @@ export interface JoinResult {
   recoverCode: string;
 }
 
-/**
- * Mint a participant and write the config. Extracted as a pure-ish function
- * (deps injected) so it can be unit-tested without commander or a real server;
- * the commander action in makeJoinCommand wires the real SDK + saveConfig.
- *
- * Throws `JoinNameTakenError` on a 409 so the action can render the friendly
- * collision message; any other error is rethrown for the generic handler.
- */
 export class JoinNameTakenError extends Error {
   constructor(public name: string) {
     super(`name "${name}" already taken; choose another`);
@@ -63,16 +51,11 @@ export class JoinNameTakenError extends Error {
 }
 
 export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinResult> {
-  // Normalize the server url once here (the pure, testable unit) so the config
-  // is canonical regardless of how the caller produced the string — matches the
-  // trailing-slash trim that `login`/`recover` do at their action edge.
   const server = input.server.replace(/\/$/, "");
   let res: JoinCreateResult;
   try {
     res = await deps.createParticipant({ name: input.name });
   } catch (err) {
-    // The server signals a callsign collision with 409; map it to the friendly
-    // message the spec asks for rather than the server's raw `is taken` text.
     if (err instanceof ClubApiError && err.status === 409) {
       throw new JoinNameTakenError(input.name);
     }
@@ -82,14 +65,6 @@ export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinRes
   return { participant: res.participant, recoverCode: res.recoverCode };
 }
 
-/**
- * Render the success output (one line per array entry, all on stdout). Pure so
- * the contract — "prints recoverCode, NEVER prints the plaintext key" — can be
- * unit-tested without driving commander. The action wires runJoin -> this.
- *
- * `key` is intentionally NOT a parameter: it cannot be leaked by something that
- * never receives it.
- */
 export function renderJoinSuccess(input: {
   participant: Participant;
   recoverCode: string;

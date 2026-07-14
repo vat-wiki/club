@@ -75,8 +75,13 @@ files.post("/", requireAuth, async (c) => {
       : null;
 
   // Read once into a buffer. For video/document this can reach tens of MB —
-  // acceptable for club's single-room, low-concurrency profile; a future
-  // streaming write would slot in at the files-dir.ts seam if that grows.
+  // acceptable for club's single-room, low-concurrency profile. The write below
+  // is synchronous by design: it provides atomicity (file either fully lands or
+  // not at all) without complex rollback logic. At the enforced size caps
+  // (MAX_VIDEO_BYTES = 50MB, MAX_IMAGE_BYTES = 10MB, MAX_DOCUMENT_BYTES = 10MB),
+  // the blocking window is bounded and acceptable for the target deployment.
+  // A future high-concurrency deployment can swap this for a streaming write at
+  // the files-dir.ts seam without changing the API contract.
   const buf = Buffer.from(await file.arrayBuffer());
 
   // Only images get dimension-probed (via image-size); video + document bytes

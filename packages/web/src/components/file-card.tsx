@@ -4,6 +4,8 @@ import type { MessageAttachment } from "@club/shared";
 import { humanBytes } from "@/lib/upload";
 import { useT } from "@/lib/i18n";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 // The preview libraries' styles. Small (~24KB combined, mostly excel) and
 // loaded eagerly so they're ready when a user opens a preview; the heavier JS
@@ -17,11 +19,20 @@ function resolveUrl(url: string): string {
   return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
-type PreviewKind = "docx" | "excel" | "pdf";
+type PreviewKind = "docx" | "excel" | "pdf" | "markdown";
 
-// Which @js-preview lib renders this MIME, if any. Markdown (and anything else
-// not listed) is download-only — it's plain text the user opens locally.
-function previewKind(mime: string): PreviewKind | null {
+// Which previewer renders this attachment, if any. PDF/DOCX/XLSX go through
+// @js-preview; Markdown (by MIME or .md/.markdown extension) renders as HTML.
+// Anything else is download-only.
+function previewKind(mime: string, filename?: string): PreviewKind | null {
+  const name = filename?.toLowerCase() ?? "";
+  if (
+    mime === "text/markdown" ||
+    mime === "text/x-markdown" ||
+    /\.md$|\.markdown$/.test(name)
+  ) {
+    return "markdown";
+  }
   switch (mime) {
     case "application/pdf":
       return "pdf";
@@ -46,7 +57,7 @@ function previewKind(mime: string): PreviewKind | null {
 export function FileCard({ attachment }: { attachment: MessageAttachment }) {
   const t = useT();
   const [previewing, setPreviewing] = useState(false);
-  const kind = previewKind(attachment.mime);
+  const kind = previewKind(attachment.mime, attachment.filename);
   const url = resolveUrl(attachment.url);
   const name = attachment.filename ?? attachment.id;
 
@@ -71,6 +82,7 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
               type="button"
               onClick={() => setPreviewing(true)}
               aria-label={t("file.preview")}
+              data-testid="file-preview-btn"
               className="grid h-8 w-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Eye className="h-4 w-4" aria-hidden />
@@ -131,7 +143,19 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
 // effect can rely on `ref.current` being present: dynamically import the right
 // @js-preview lib, init it against the container, feed the URL, and destroy on
 // unmount to avoid leaks.
+// Dispatches to the right renderer. PDF/DOCX/XLSX share the @js-preview path
+// (OfficePreview); Markdown is fetched, parsed, sanitized, and rendered as HTML
+// (MarkdownPreview).
 function PreviewBody({ kind, url }: { kind: PreviewKind; url: string }) {
+  if (kind === "markdown") return <MarkdownPreview url={url} />;
+  return <OfficePreview kind={kind} url={url} />;
+}
+
+// @js-preview renderer for PDF/DOCX/XLSX. Mounted only while the Dialog is
+// open, so its effect can rely on `ref.current` being present: dynamically
+// import the right lib, init it against the container, feed the URL, and
+// destroy on unmount to avoid leaks.
+function OfficePreview({ kind, url }: { kind: Exclude<PreviewKind, "markdown">; url: string }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -183,6 +207,57 @@ function PreviewBody({ kind, url }: { kind: PreviewKind; url: string }) {
         </div>
       )}
       <div ref={ref} className="min-h-full" />
+    </div>
+  );
+}
+
+// Markdown renderer. Fetches the raw text, parses with marked (GFM on), then
+// runs the HTML through DOMPurify before injecting — attachment content is
+// untrusted, so never render raw marked output (script injection, event
+// handlers, javascript: URLs). The scroll surface hugs the dialog edge; the
+// .md-body column constrains line length for readability (text reflow, not
+// "preview padding" — the preview frame itself has none).
+function MarkdownPreview({ url }: { url: string }) {
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const text = await res.text();
+        const raw = marked.parse(text, { async: false, gfm: true, breaks: false }) as string;
+        const clean = DOMPurify.sanitize(raw, {
+          FORBID_TAGS: ["style", "iframe", "object", "embed", "form", "link"],
+          FORBID_ATTR: ["style"],
+        });
+        if (!active) return;
+        if (ref.current) ref.current.innerHTML = clean;
+        setStatus("ready");
+      } catch {
+        if (active) setStatus("error");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  return (
+    <div className="relative min-h-0 flex-1 overflow-auto bg-background">
+      {status !== "ready" && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center p-6 text-center text-sm text-muted-foreground">
+          {status === "loading" ? (
+            <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
+          ) : (
+            t("file.previewFailed")
+          )}
+        </div>
+      )}
+      <div ref={ref} className="md-body mx-auto max-w-3xl px-6 py-6" data-testid="markdown-body" />
     </div>
   );
 }

@@ -34,9 +34,23 @@ function AttachmentGallery({
   attachments: MessageAttachment[];
   openLabel: string;
 }) {
+  // Only image attachments enter the lightbox (videos use the native player,
+  // documents use FileCard). Precompute the image subset + a per-attachment
+  // index map so each thumbnail — keyed by its position in the full attachment
+  // list (which the tests assert via data-testid) — can tell the lightbox which
+  // image to open, and the lightbox can prev/next across just the images.
+  const images: MessageAttachment[] = [];
+  const imageIndexOf: number[] = [];
+  for (const a of attachments) {
+    if (a.mime.startsWith("image/")) {
+      imageIndexOf.push(images.length);
+      images.push(a);
+    } else {
+      imageIndexOf.push(-1);
+    }
+  }
   const [active, setActive] = useState<number | null>(null);
   const multi = attachments.length > 1;
-  const activeSrc = active != null ? resolveUrl(attachments[active].url) : "";
 
   return (
     <>
@@ -76,7 +90,7 @@ function AttachmentGallery({
             <button
               key={a.id}
               type="button"
-              onClick={() => setActive(i)}
+              onClick={() => setActive(imageIndexOf[i])}
               aria-label={`${openLabel} ${i + 1}`}
               data-testid={`attachment-thumb-${i}`}
               className={cn(
@@ -108,12 +122,9 @@ function AttachmentGallery({
         })}
       </div>
       <ImageLightbox
-        src={activeSrc}
-        alt={openLabel}
-        open={active != null}
-        onOpenChange={(o) => {
-          if (!o) setActive(null);
-        }}
+        images={images.map((a) => ({ src: resolveUrl(a.url), alt: openLabel }))}
+        index={active}
+        onIndexChange={setActive}
       />
     </>
   );
@@ -231,7 +242,7 @@ function MessageRow({
         className={cn(
           // grouped rows tighten their top padding (no header to space under)
           // and drop the hover bg so a run reads as one continuous block.
-          "flex gap-x-2.5 rounded-md px-4 animate-slide-in transition-colors hover:bg-accent/70 sm:px-6",
+          "flex gap-x-2.5 rounded-md px-4 animate-slide-in transition-colors sm:px-6",
           grouped ? "pt-0.5 pb-1.5" : "py-1.5",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",

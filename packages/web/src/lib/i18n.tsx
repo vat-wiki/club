@@ -254,6 +254,8 @@ const zh: Dict = {
   "msg.image.open": "放大查看图片",
   "image.lightbox.title": "图片预览",
   "image.lightbox.desc": "点击外侧或按 Esc 关闭",
+  "image.lightbox.prev": "上一张",
+  "image.lightbox.next": "下一张",
 
   // Message list
   // Hover/tooltip: the inline timestamp only shows HH:MM; this labels the
@@ -484,6 +486,8 @@ const en: Dict = {
   "msg.image.open": "View image larger",
   "image.lightbox.title": "Image preview",
   "image.lightbox.desc": "Click outside or press Esc to close",
+  "image.lightbox.prev": "Previous image",
+  "image.lightbox.next": "Next image",
 
   // Message list
   "msg.sentAt": "Sent at {time}",

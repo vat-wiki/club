@@ -125,3 +125,69 @@ describe("AttachmentGallery — multi-image grid layout", () => {
     expect(gallery?.children.length).toBe(3);
   });
 });
+
+describe("AttachmentGallery lightbox — prev/next across images", () => {
+  it("next/prev buttons switch the displayed image", async () => {
+    const messages = [msg(bot, "two pics", "m1", [att("first"), att("second")])];
+    renderWithI18n(<MessageList messages={messages} me={me} members={members} status="connected" />);
+
+    fireEvent.click(screen.getByTestId("attachment-thumb-0"));
+    await screen.findByTestId("lightbox-image");
+    expect(screen.getByTestId("lightbox-image").getAttribute("src")).toContain("/files/first");
+
+    fireEvent.click(screen.getByTestId("lightbox-next"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-image").getAttribute("src")).toContain("/files/second");
+    });
+
+    fireEvent.click(screen.getByTestId("lightbox-prev"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-image").getAttribute("src")).toContain("/files/first");
+    });
+  });
+
+  it("disables prev at the first image and next at the last", async () => {
+    const messages = [msg(bot, "two pics", "m1", [att("first"), att("second")])];
+    renderWithI18n(<MessageList messages={messages} me={me} members={members} status="connected" />);
+
+    fireEvent.click(screen.getByTestId("attachment-thumb-0"));
+    await screen.findByTestId("lightbox-image");
+    expect(screen.getByTestId("lightbox-prev")).toBeDisabled();
+    expect(screen.getByTestId("lightbox-next")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("lightbox-next"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-next")).toBeDisabled();
+    });
+    expect(screen.getByTestId("lightbox-prev")).not.toBeDisabled();
+  });
+
+  it("ArrowRight / ArrowLeft keys switch images", async () => {
+    const messages = [msg(bot, "two pics", "m1", [att("first"), att("second")])];
+    renderWithI18n(<MessageList messages={messages} me={me} members={members} status="connected" />);
+
+    fireEvent.click(screen.getByTestId("attachment-thumb-0"));
+    await screen.findByTestId("lightbox-image");
+    const dialog = screen.getByRole("dialog");
+
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-image").getAttribute("src")).toContain("/files/second");
+    });
+
+    fireEvent.keyDown(dialog, { key: "ArrowLeft" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-image").getAttribute("src")).toContain("/files/first");
+    });
+  });
+
+  it("hides prev/next controls for a single-image gallery", async () => {
+    const messages = [msg(bot, "one", "m1", [att("only")])];
+    renderWithI18n(<MessageList messages={messages} me={me} members={members} status="connected" />);
+
+    fireEvent.click(screen.getByTestId("attachment-thumb-0"));
+    await screen.findByTestId("lightbox-image");
+    expect(screen.queryByTestId("lightbox-prev")).toBeNull();
+    expect(screen.queryByTestId("lightbox-next")).toBeNull();
+  });
+});

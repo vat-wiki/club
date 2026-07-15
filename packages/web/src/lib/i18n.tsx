@@ -203,6 +203,13 @@ const zh: Dict = {
   "signOut.cancel": "取消",
   "signOut.confirm": "退出登录",
 
+  // Account created toast (non-blocking, shown after successful registration)
+  "accountCreated.title": "已保存登录凭证",
+  "accountCreated.message": "你的备份码已保存，可在侧栏随时查看。",
+  "accountCreated.copy": "复制",
+  "accountCreated.copied": "已复制",
+  "accountCreated.download": "下载",
+
   // Composer
   "composer.label": "给 #{room} 发消息",
   "composer.placeholder": "给 #{room} 发条消息…",
@@ -432,6 +439,13 @@ const en: Dict = {
   "signOut.copyAnnounced": "Login key copied to clipboard",
   "signOut.cancel": "Cancel",
   "signOut.confirm": "Sign out",
+
+  // Account created toast (non-blocking, shown after successful registration)
+  "accountCreated.title": "Account saved",
+  "accountCreated.message": "Your backup code has been saved. View it anytime from the sidebar.",
+  "accountCreated.copy": "Copy",
+  "accountCreated.copied": "Copied",
+  "accountCreated.download": "Download",
 
   // Composer
   "composer.label": "Send a message to #{room}",

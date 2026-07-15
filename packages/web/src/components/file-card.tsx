@@ -3,6 +3,7 @@ import { Download, Eye, FileText, Loader2, X } from "lucide-react";
 import type { MessageAttachment } from "@club/shared";
 import { humanBytes } from "@/lib/upload";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 // The preview libraries' styles. Small (~24KB combined, mostly excel) and
@@ -52,12 +53,21 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
 
   return (
     <>
-      <div
+      <button
+        type="button"
+        onClick={() => kind && setPreviewing(true)}
+        disabled={!kind}
         data-testid="attachment-file"
-        className="mt-1.5 flex w-full max-w-[320px] items-center gap-2.5 rounded-md border border-border/60 bg-card px-2.5 py-2"
+        className={cn(
+          "mt-1.5 flex w-full max-w-[320px] items-center gap-2.5 rounded-md border px-2.5 py-2 transition-colors",
+          kind
+            ? "border-border/60 bg-card hover:bg-accent hover:border-border cursor-pointer"
+            : "border-border/40 bg-muted/40 cursor-default",
+        )}
+        aria-label={kind ? t("file.preview") : name}
       >
         <FileText className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 text-left">
           <div className="truncate text-xs font-medium" title={name}>
             {name}
           </div>
@@ -65,27 +75,10 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
             {humanBytes(attachment.size)}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          {kind && (
-            <button
-              type="button"
-              onClick={() => setPreviewing(true)}
-              aria-label={t("file.preview")}
-              className="grid h-8 w-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Eye className="h-4 w-4" aria-hidden />
-            </button>
-          )}
-          <a
-            href={url}
-            download={name}
-            aria-label={t("file.download")}
-            className="grid h-8 w-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-          </a>
-        </div>
-      </div>
+        {kind && (
+          <Eye className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
+        )}
+      </button>
 
       {kind && (
         <Dialog open={previewing} onOpenChange={setPreviewing}>

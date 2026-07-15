@@ -338,6 +338,8 @@ export function Composer({
     setSending(true);
     setError(false);
     setValue("");
+    // Hard reset the DOM value to ensure it's fully cleared (fixes P0-1)
+    if (ref.current) ref.current.value = "";
     closeMention();
     requestAnimationFrame(autosize);
     try {

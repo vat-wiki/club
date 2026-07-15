@@ -2,6 +2,7 @@ import type { ClubConn } from "@club/sdk";
 
 const KEY = "club_key";
 const SERVER = "club_server";
+const RECOVER_CODE = "club_recover_code";
 
 // Base URL of the club backend. Empty = same-origin (Vite proxies in dev;
 // in prod the backend can serve the built assets). Override with VITE_API_URL.
@@ -18,9 +19,18 @@ export function saveConn(key: string) {
   localStorage.setItem(SERVER, API_URL);
 }
 
+export function saveRecoverCode(recoverCode: string) {
+  localStorage.setItem(RECOVER_CODE, recoverCode);
+}
+
+export function getRecoverCode(): string | null {
+  return localStorage.getItem(RECOVER_CODE);
+}
+
 export function clearConn() {
   localStorage.removeItem(KEY);
   localStorage.removeItem(SERVER);
+  localStorage.removeItem(RECOVER_CODE);
 }
 
 // Read the current key from storage without constructing a full ClubConn.

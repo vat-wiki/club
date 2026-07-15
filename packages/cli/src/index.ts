@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import pkg from "../package.json" with { type: "json" };
 import { loadConfig } from "./config.js";
 import { makeLoginCommand } from "./commands/login.js";
 import { makeJoinCommand } from "./commands/join.js";
@@ -18,7 +19,7 @@ const program = new Command();
 program
   .name("club")
   .description("chat room where humans and agents are equal citizens")
-  .version("0.1.0");
+  .version(pkg.version);
 
 program.addCommand(makeLoginCommand());
 program.addCommand(makeJoinCommand());

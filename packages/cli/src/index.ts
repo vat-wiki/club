@@ -17,7 +17,9 @@ import { makeDeleteCommand } from "./commands/delete.js";
 import { makeReactCommand } from "./commands/react.js";
 import { makeSearchCommand } from "./commands/search.js";
 import { makeCatCommand } from "./commands/cat.js";
+import { makeUpdateCommand } from "./commands/update.js";
 import { runTui } from "./tui.js";
+import { autoUpdateAndRelaunch, checkForUpdate, isDevRun } from "./update.js";
 
 // Top-level error handler — uniform "error: <msg>" output for all commands.
 // Each command's action throws; this wrapper catches and formats consistently.
@@ -51,8 +53,29 @@ const cmds = [
   makeDeleteCommand(),
   makeReactCommand(),
   makeCatCommand(),
+  makeUpdateCommand(),
 ];
 cmds.forEach((c) => program.addCommand(c));
+
+// Before any command runs: opportunistically self-update club-cli.
+// A 24h TTL cache keeps this off the hot path; on a hit we reinstall globally and
+// relaunch, so the user's original command continues on the new version. Anything that
+// can go wrong (offline, no write permission, dev run, the update command itself,
+// a relaunched child) bails out and the original command runs unchanged.
+program.hook("preAction", async (_thisCmd, actionCmd) => {
+  try {
+    if (process.env.CLUB_NO_UPDATE_CHECK === "1") return; // relaunched child / user opt-out
+    if (actionCmd.name() === "update") return; // `club update` manages itself
+    if (isDevRun()) return; // running from source via tsx
+    // (note: --version/--help short-circuit before the action and never reach this hook)
+
+    const { update, latest } = await checkForUpdate();
+    if (!update || !latest) return;
+    await autoUpdateAndRelaunch(latest); // success → exits running the new version
+  } catch {
+    // Last-resort safety net: never block the user's command.
+  }
+});
 
 // No subcommand -> interactive TUI for a human.
 program.action(() => {

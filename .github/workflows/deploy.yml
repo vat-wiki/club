@@ -1,0 +1,65 @@
+name: Deploy & Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ~/projects/club
+    steps:
+      - name: Pull latest
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Build & deploy (test)
+        run: ./scripts/deploy.sh build
+
+  publish-cli:
+    runs-on: self-hosted
+    needs: deploy
+    defaults:
+      run:
+        working-directory: ~/projects/club
+    steps:
+      - name: Pull latest
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check npm version
+        id: version
+        run: |
+          LOCAL_VERSION=$(node -p "require('./packages/cli/package.json').version")
+          REMOTE_VERSION=$(npm view club-cli version 2>/dev/null || echo "0.0.0")
+          echo "local=$LOCAL_VERSION"
+          echo "remote=$REMOTE_VERSION"
+          if [ "$LOCAL_VERSION" = "$REMOTE_VERSION" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠ Version $LOCAL_VERSION already published, skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "✓ New version $LOCAL_VERSION, will publish"
+          fi
+
+      - name: Install & build
+        run: |
+          npm ci
+          cd packages/cli && npm run build
+
+      - name: Publish to npm
+        if: steps.version.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd packages/cli
+          npm publish --access public

@@ -19,7 +19,7 @@ export function makeInfoCommand(): Command {
           client.members(),
         ]);
         const room = defaultRoom(cfg);
-        console.log(`You: ${me.name} (${me.kind})`);
+        console.log(`You: ${me.name} (id=${me.id})`);
         console.log(`Server: ${cfg.server}`);
         console.log(`Current room: #${room}`);
         console.log(`Total rooms: ${rooms.length}`);
@@ -34,7 +34,7 @@ export function makeInfoCommand(): Command {
         }
         console.log(`\nMembers:`);
         for (const m of members) {
-          console.log(`  ${m.kind === "agent" ? "🤖" : "🧑"}${m.name}`);
+          console.log(`  ${m.name}`);
         }
       } catch (err) {
         console.error((err as Error).message);

@@ -136,7 +136,7 @@ async function parseXlsx(buffer: Uint8Array): Promise<FileContent> {
     const sheets: string[] = [];
     let output = "";
 
-    workbook.SheetNames.forEach((sheetName) => {
+    workbook.SheetNames.forEach((sheetName: string) => {
       sheets.push(sheetName);
       const sheet = workbook.Sheets[sheetName];
       output += `\n## Sheet: ${sheetName}\n`;

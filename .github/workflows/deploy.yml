@@ -11,6 +11,10 @@ jobs:
       run:
         working-directory: /home/leon/projects/club
     steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Pull latest
         run: |
           git fetch origin main
@@ -26,15 +30,15 @@ jobs:
       run:
         working-directory: /home/leon/projects/club
     steps:
-      - name: Pull latest
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Pull latest
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
 
       - name: Install & build
         run: |

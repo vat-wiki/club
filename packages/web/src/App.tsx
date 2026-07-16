@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImageMime, Message, Participant } from "@club/shared";
 import type { ClubConn } from "@club/sdk";
-import { loadConn, saveConn, clearConn, API_URL, getKey } from "@/lib/auth";
+import { loadConn, saveConn, saveRecoverCode, clearConn, API_URL, getKey } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useMessageStream } from "@/hooks/use-message-stream";
 import { useRooms, type MentionToast } from "@/hooks/use-rooms";
@@ -13,11 +13,11 @@ import { MessageList, type MessageListHandle } from "@/components/message-list";
 import { SearchBar } from "@/components/search-bar";
 import { Composer } from "@/components/composer";
 import { AuthDialog } from "@/components/auth-dialog";
-import { KeyRevealDialog } from "@/components/key-reveal-dialog";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 import { BootScreen } from "@/components/boot-screen";
 import { TypingIndicator } from "@/components/typing-indicator";
 import { MentionToasts } from "@/components/mention-toast";
+import { AccountCreatedToast } from "@/components/account-created-toast";
 import { useTypingAgents } from "@/hooks/use-typing-agents";
 
 export default function App() {
@@ -34,19 +34,11 @@ export default function App() {
   const [me, setMe] = useState<Participant | null>(null);
   const [members, setMembers] = useState<Participant[]>([]);
   const [authOpen, setAuthOpen] = useState(!conn);
-  // A freshly minted key that the app has NOT yet persisted. While set, we
-  // show the KeyRevealDialog instead of entering the room — the user must
-  // acknowledge they've saved the key before it lands in localStorage.
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  // The one-time recovery code minted alongside the pending key, surfaced on
-  // the reveal dialog so the user records both before entering (PRD §7.1 AC1).
-  const [pendingRecoverCode, setPendingRecoverCode] = useState<string>("");
-  // True when the pending key came from the *recovery* flow rather than a fresh
-  // mint. The reveal dialog then uses rotated-credential copy ("these are NEW,
-  // the old ones are dead") so the user understands the recovery code they just
-  // used is single-use-spent and the prior key no longer works.
-  const [pendingKeyRecovered, setPendingKeyRecovered] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  // Account created toast state (P0-7: non-blocking toast instead of blocking reveal)
+  const [accountCreatedToast, setAccountCreatedToast] = useState<{
+    recoverCode: string;
+  } | null>(null);
   // The message being replied to (puts the composer in "reply" mode with a
   // quote preview); null in normal compose mode.
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -202,34 +194,26 @@ export default function App() {
     setConn({ server: API_URL, key });
   };
 
-  // A brand-new identity was minted. Don't persist yet — hand the key +
-  // recovery code to the reveal dialog so the user can see/copy them first.
-  // saveConn + enter only happens when they acknowledge.
+  // A brand-new identity was minted. Save key + recover code immediately (P0-7:
+  // non-blocking flow). Show a toast with the recover code so the user can copy it.
   const handleCreated = (key: string, recoverCode: string) => {
+    saveConn(key);
+    saveRecoverCode(recoverCode);
+    setConn({ server: API_URL, key });
     setAuthOpen(false);
-    setPendingKey(key);
-    setPendingRecoverCode(recoverCode);
-    setPendingKeyRecovered(false);
+    // Show non-blocking toast with recover code
+    setAccountCreatedToast({ recoverCode });
   };
 
   // An identity was *recovered* (callsign + recovery code). The server rotated
-  // BOTH the key and the recovery code; route through the reveal dialog in
-  // "recovered" mode so the user records the new pair before we persist —
-  // otherwise they'd enter the room with no way to see the new recovery code,
-  // and the code they just used is now single-use-dead (P0-1 data-loss fix).
+  // BOTH the key and the recovery code. Save both immediately and show a toast.
   const handleRecovered = (key: string, recoverCode: string) => {
+    saveConn(key);
+    saveRecoverCode(recoverCode);
+    setConn({ server: API_URL, key });
     setAuthOpen(false);
-    setPendingKey(key);
-    setPendingRecoverCode(recoverCode);
-    setPendingKeyRecovered(true);
-  };
-
-  const handleKeySaved = () => {
-    if (!pendingKey) return;
-    handleAuthed(pendingKey);
-    setPendingKey(null);
-    setPendingRecoverCode("");
-    setPendingKeyRecovered(false);
+    // Show non-blocking toast with recover code
+    setAccountCreatedToast({ recoverCode });
   };
 
   const handleSend = async (content: string, attachmentIds: readonly string[], replyToId?: string) => {
@@ -420,6 +404,14 @@ export default function App() {
         onDismiss={rooms.dismissToast}
       />
 
+      {/* Account created toast (P0-7: non-blocking, shows recover code after registration) */}
+      {accountCreatedToast && (
+        <AccountCreatedToast
+          recoverCode={accountCreatedToast.recoverCode}
+          onDismiss={() => setAccountCreatedToast(null)}
+        />
+      )}
+
       {/*
         AuthDialog is keyed by authOpen so it fully remounts whenever it (re)opens.
         This clears all internal form state (mode, name, pasteKey, error) on every
@@ -432,17 +424,6 @@ export default function App() {
         onCreated={handleCreated}
         onAuthed={handleAuthed}
         onRecovered={handleRecovered}
-      />
-
-      {/* Reveal the freshly-minted (or freshly-recovered) key before persisting
-          it. Mutually exclusive with the AuthDialog (authOpen is false while
-          this shows), so there's no Radix focus-trap nesting to worry about. */}
-      <KeyRevealDialog
-        open={!!pendingKey}
-        key_={pendingKey ?? ""}
-        recoverCode={pendingRecoverCode}
-        recovered={pendingKeyRecovered}
-        onSaved={handleKeySaved}
       />
 
       {/* Confirm before wiping the key from this machine. */}

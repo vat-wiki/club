@@ -27,6 +27,8 @@ function Row({ p, self, online }: { p: Participant; self: boolean; online: boole
 // Category-blind: a single flat list in server (registration) order. club does
 // NOT split humans from agents — there is no such distinction in the data model
 // (see .pd-docs/requirements/category-blind.md).
+//
+// Online members are sorted to the top so it's easy to see who's available.
 export function RosterSections({
   members,
   selfId,
@@ -36,12 +38,46 @@ export function RosterSections({
   selfId?: string;
   onlineIds?: Set<string>;
 }) {
+  // Split into online and offline, then sort each group.
+  // Online members go first, sorted by name (case-insensitive).
+  // Offline members follow, also sorted by name.
+  const onlineSet = onlineIds ?? new Set(members.map((m) => m.id)); // default all online
+  const online: Participant[] = [];
+  const offline: Participant[] = [];
+
+  for (const m of members) {
+    if (onlineSet.has(m.id)) {
+      online.push(m);
+    } else {
+      offline.push(m);
+    }
+  }
+
+  // Sort by name (case-insensitive) within each group
+  const sortByName = (a: Participant, b: Participant) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  online.sort(sortByName);
+  offline.sort(sortByName);
+
+  // Move self to the front of whichever group they're in
+  const moveSelfToFront = (list: Participant[], selfId?: string) => {
+    if (!selfId) return;
+    const idx = list.findIndex((m) => m.id === selfId);
+    if (idx > 0) {
+      const [self] = list.splice(idx, 1);
+      list.unshift(self);
+    }
+  };
+  moveSelfToFront(online, selfId);
+  moveSelfToFront(offline, selfId);
+
   return (
     <div className="space-y-1">
-      {members.map((p) => (
-        // Unknown onlineIds (e.g. before the stream seeds presence) defaults to
-        // online so the roster never looks empty/ghosted on first paint.
-        <Row key={p.id} p={p} self={p.id === selfId} online={onlineIds?.has(p.id) ?? true} />
+      {online.map((p) => (
+        <Row key={p.id} p={p} self={p.id === selfId} online={true} />
+      ))}
+      {offline.map((p) => (
+        <Row key={p.id} p={p} self={p.id === selfId} online={false} />
       ))}
     </div>
   );

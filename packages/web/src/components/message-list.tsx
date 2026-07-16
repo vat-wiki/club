@@ -234,6 +234,8 @@ function MessageRow({
     <>
       {showDay && <DayRule ms={m.createdAt} />}
       <div
+        data-message-id={m.id}
+        data-author={m.authorName}
         // Native title tooltip carries the precise send time; aria-label gives
         // SR users the same info (the inline HH:MM + author are already in the
         // row's text content, so the label focuses on the time precision).
@@ -273,6 +275,7 @@ function MessageRow({
               {onReply && (
                 <button
                   type="button"
+                  data-testid={`reply-${m.id}`}
                   onClick={() => onReply(m)}
                   className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground"
                 >
@@ -282,6 +285,7 @@ function MessageRow({
               {self && !m.deleted && !m.status && onDelete && (
                 <button
                   type="button"
+                  data-testid={`recall-${m.id}`}
                   onClick={() => onDelete(m.id)}
                   className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-destructive"
                 >
@@ -349,6 +353,7 @@ function MessageRow({
                   <button
                     key={emoji}
                     type="button"
+                    data-testid={`react-${m.id}-${emoji}`}
                     onClick={() => onReact(m.id, emoji)}
                     aria-label={t("msg.react")}
                     className="rounded px-1 py-0.5 text-xs hover:bg-accent"

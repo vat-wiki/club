@@ -78,6 +78,21 @@ messages.post("/", async (c) => {
   }
   const { content, attachmentIds, replyToId, room } = parsed.data;
 
+  // Defensive: content length is validated at the zod layer, but we enforce
+  // a hard server-side cap to protect against oversized payloads that could
+  // impact storage or delivery performance.
+  const MAX_CONTENT_LENGTH = 100_000; // 100k characters
+  if (content.length > MAX_CONTENT_LENGTH) {
+    return c.json({ error: `content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters` }, 400);
+  }
+
+  // Validate attachment count to prevent abuse. The client-side SDK enforces
+  // this too; this is the authoritative server-side check.
+  const MAX_ATTACHMENTS = 10;
+  if (attachmentIds.length > MAX_ATTACHMENTS) {
+    return c.json({ error: `too many attachments (max ${MAX_ATTACHMENTS})` }, 400);
+  }
+
   // Rehydrate attachments server-side from the requested ids. The server is the
   // sole source of truth for mime/width/height/size, so the client only sends
   // ids — dimensions can't be forged. We also enforce that every requested id

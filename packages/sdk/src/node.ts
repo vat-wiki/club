@@ -9,3 +9,4 @@
 
 export * from "./index.js";
 export * from "./image-upload.js";
+export * from "./file-parser.js";

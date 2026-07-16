@@ -15,7 +15,9 @@ import {
   type ClubConn,
   createParticipant as createParticipantFn,
   createRoom as createRoomFn,
+  deleteMessage as deleteMessageFn,
   getMe,
+  getFile,
   listMembers,
   listMentions,
   listMessages,
@@ -26,6 +28,7 @@ import {
   reportAgentIdle as reportAgentIdleFn,
   searchMessages as searchMessagesFn,
   sendMessage,
+  toggleMessageReaction as toggleMessageReactionFn,
   uploadFile,
   type UploadFileInput,
 } from "./transport.js";
@@ -154,6 +157,36 @@ export class ClubClient {
     return uploadFile(this.conn(), input, { timeoutMs: this.timeoutMs });
   }
 
+  /** GET /files/:id — fetch a file attachment by id. Returns raw bytes + metadata.
+   *  Useful for agents to read files uploaded by others. Caller decodes by mime. */
+  getFile(id: string): Promise<{ buffer: ArrayBuffer; mime: string; filename?: string }> {
+    return getFile(this.conn(), id, { timeoutMs: this.timeoutMs });
+  }
+
+  /** GET /files/:id — fetch and parse a file attachment into readable text.
+   *  Supports: text/*, JSON, PDF, Word (.docx), Excel (.xlsx).
+   *  Returns parsed text content suitable for agent consumption.
+   *  NOTE: Only available in @club/sdk/node (Node.js environment). */
+  async readFileContent(id: string): Promise<{
+    text: string;
+    format: string;
+    mime: string;
+    filename?: string;
+    metadata?: { title?: string; author?: string; subject?: string; pages?: number; sheets?: string[] };
+  }> {
+    const { buffer, mime, filename } = await this.getFile(id);
+    // Dynamic import of parser (only available in Node)
+    const { parseFileContent } = await import("./file-parser.js");
+    const parsed = await parseFileContent(buffer, mime, filename);
+    return {
+      text: parsed.text,
+      format: parsed.format,
+      mime,
+      filename,
+      metadata: parsed.metadata,
+    };
+  }
+
   /** POST /participants — mint a participant + single-use key (no auth needed). */
   createParticipant(
     input: CreateParticipantRequest,
@@ -198,5 +231,18 @@ export class ClubClient {
       ...(room ? { room } : {}),
       timeoutMs: this.timeoutMs,
     });
+  }
+
+  /** DELETE /messages/:id — soft-delete (recall) a message. Only the author
+   *  may delete their own messages. Throws on 404 (not found or not yours). */
+  deleteMessage(id: string): Promise<void> {
+    return deleteMessageFn(this.conn(), id, { timeoutMs: this.timeoutMs });
+  }
+
+  /** POST /messages/:id/reactions { emoji } — toggle a reaction on a message.
+   *  Adds the reaction if not present, removes if already present. Returns the
+   *  updated aggregate [{ emoji, count }] so the caller can refresh the UI. */
+  toggleReaction(id: string, emoji: string): Promise<{ emoji: string; count: number }[]> {
+    return toggleMessageReactionFn(this.conn(), id, emoji, { timeoutMs: this.timeoutMs });
   }
 }

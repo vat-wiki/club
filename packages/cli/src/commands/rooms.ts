@@ -28,14 +28,9 @@ export function makeRoomsCommand(): Command {
     .description("list all rooms (current marked with *)")
     .action(async () => {
       const cfg = requireConfig();
-      try {
-        const list = await new ClubClient(cfg).rooms();
-        const current = defaultRoom(cfg);
-        for (const r of list) console.log(formatRoomLine(r, current));
-        if (list.length === 0) console.log("(no rooms)");
-      } catch (err) {
-        console.error((err as Error).message);
-        process.exit(1);
-      }
+      const list = await new ClubClient(cfg).rooms();
+      const current = defaultRoom(cfg);
+      for (const r of list) console.log(formatRoomLine(r, current));
+      if (list.length === 0) console.log("(no rooms)");
     });
 }

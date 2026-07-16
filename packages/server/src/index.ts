@@ -38,7 +38,11 @@ app.route("/files", files);
 app.route("/agents", agents);
 app.route("/rooms", rooms);
 
-app.get("/health", (c) => c.json({ ok: true }));
+// Health check endpoint. Returns 200 with basic server status. This endpoint
+// is intentionally lightweight (no DB queries) so it can be used for liveness
+// probes without adding load. For a fuller "readiness" check, clients should
+// hit an authenticated endpoint like GET /me.
+app.get("/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
 
 // Production: serve the built web UI (packages/web/dist) at the same origin so
 // the SPA ships without a separate host. In dev the Vite app runs on :6100 and

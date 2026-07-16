@@ -46,10 +46,7 @@ export async function runEnter(input: EnterInput, deps: EnterDeps): Promise<Ente
       `invalid room name "${input.room}" — must be 1-30 chars of [a-z0-9-], starting alphanumeric`,
     );
   }
-  // Build/enter are the same action: ensure the room exists. Idempotent — an
-  // existing slug returns that room without error (PRD §4.5).
   const room = await deps.createRoom(slug);
-  // Preserve server+key; only the room preference changes.
   deps.saveConfig({ ...input.config, room: room.slug });
   return { room };
 }
@@ -61,15 +58,10 @@ export function makeEnterCommand(): Command {
     .action(async (room: string) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
-      try {
-        const { room: r } = await runEnter(
-          { room, config: cfg },
-          { createRoom: (n) => client.createRoom(n), saveConfig },
-        );
-        console.log(`entered #${r.slug}`);
-      } catch (err) {
-        console.error((err as Error).message);
-        process.exit(1);
-      }
+      const { room: r } = await runEnter(
+        { room, config: cfg },
+        { createRoom: (n) => client.createRoom(n), saveConfig },
+      );
+      console.log(`entered #${r.slug}`);
     });
 }

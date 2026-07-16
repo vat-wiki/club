@@ -596,8 +596,16 @@ export function getFile(id: string): FileRow | undefined {
 // Fetch several files by id, preserving the requested order. Used by
 // POST /messages to rehydrate attachments from the client's `attachmentIds` —
 // order matters so the message shows images in the order the user picked them.
+//
+// Security: ids are validated by the caller to be base64url-format server-issued
+// identifiers; the IN clause is safely parameterized to prevent injection.
 export function getFilesByIds(ids: string[]): FileRow[] {
   if (ids.length === 0) return [];
+  if (ids.length > 100) {
+    // Defensive: a message shouldn't reference this many files. This protects
+    // against pathological abuse while staying far above legitimate limits.
+    throw new Error("too many file ids requested (max 100)");
+  }
   const placeholders = ids.map(() => "?").join(",");
   const rows = db
     .prepare<string[], FileRow>(

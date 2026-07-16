@@ -335,8 +335,8 @@ describe("dispatchTool", () => {
   it("send rejects empty / missing content without calling the client", async () => {
     const send = vi.fn(async () => makeMsg("x"));
     const client = fakeClient({ send });
-    expect(await dispatchTool("send", {}, client)).toBe("error: missing content");
-    expect(await dispatchTool("send", { content: "" }, client)).toBe("error: missing content");
+    expect(await dispatchTool("send", {}, client)).toContain("error: Send failed");
+    expect(await dispatchTool("send", { content: "" }, client)).toContain("error: Send failed");
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -641,9 +641,10 @@ describe("dispatchTool", () => {
   });
 
   it("an unknown tool name yields an 'unknown tool' error string", async () => {
-    expect(await dispatchTool("frobnicate", {}, fakeClient())).toBe(
-      'error: unknown tool "frobnicate"',
-    );
+    const err = await dispatchTool("frobnicate", {}, fakeClient());
+    expect(err).toContain('error: Unknown tool "frobnicate"');
+    expect(err).toContain("Available tools:");
+    expect(err).toContain("whoami");
   });
 
   describe("thinking heartbeat (TTL refresh)", () => {

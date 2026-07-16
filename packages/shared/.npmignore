@@ -1,0 +1,19 @@
+# TypeScript sources
+src/
+*.ts
+!*.d.ts
+
+# Test files (including compiled tests in dist)
+*.test.ts
+*.test.js
+dist/*.test.*
+dist/*.test.d.*
+dist/*.test.js.map
+
+# Config files
+tsconfig.json
+vitest.config.ts
+
+# Development files
+.DS_Store
+*.log

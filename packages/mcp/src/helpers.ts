@@ -158,6 +158,10 @@ export interface DispatchClient {
    *  (POST /messages), so callers don't need a paired reportAgentIdle in the
    *  common send-after-listen path. */
   reportAgentThinking(room?: string): Promise<void>;
+  /** Delete (recall) a message by ID. Only the author may delete their messages. */
+  deleteMessage(id: string): Promise<void>;
+  /** Toggle a reaction on a message. Returns the updated aggregate. */
+  toggleReaction(id: string, emoji: string): Promise<{ emoji: string; count: number }[]>;
 }
 
 // ── Thinking heartbeat (TTL refresh) ──────────────────────────────────
@@ -236,7 +240,7 @@ export async function dispatchTool(
       // Need at least one of: text, images, videos, or documents. Bare media
       // with no text is a legitimate intent ("text-optional").
       if (!content && images.length === 0 && videos.length === 0 && documents.length === 0)
-        return "error: missing content";
+        return "error: Send failed - provide at least one of: content (text), images, videos, or files. Bare media without text is allowed.";
       // Fail fast on too many attachments before any upload happens. Images,
       // videos, and documents all share one per-message cap.
       assertImageCount([...images, ...videos, ...documents]);
@@ -319,7 +323,22 @@ export async function dispatchTool(
         ? matched.map(formatMessage).join("\n")
         : "(no matching messages within timeout)";
     }
+    case "delete": {
+      const id = str(args.id);
+      if (!id) return "error: Delete failed - message ID is required";
+      await client.deleteMessage(id);
+      return `deleted message ${id}`;
+    }
+    case "react": {
+      const id = str(args.id);
+      const emoji = str(args.emoji);
+      if (!id) return "error: React failed - message ID is required";
+      if (!emoji) return "error: React failed - emoji is required";
+      const reactions = await client.toggleReaction(id, emoji);
+      const updated = reactions.map((r) => `${r.emoji}(${r.count})`).join(" ");
+      return `reactions on ${id}: ${updated || "(none)"}`;
+    }
     default:
-      return `error: unknown tool "${name}"`;
+      return `error: Unknown tool "${name}". Available tools: whoami, read, send, rooms, members, listen, delete, react. Use whoami to get started.`;
   }
 }

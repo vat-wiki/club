@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { render, useInput, useApp, Box, Text } from "ink";
 import type { Message, Participant, Room } from "@club/shared";
 import { ClubClient } from "@club/sdk";
@@ -12,19 +12,21 @@ interface Props {
 function App({ cfg }: Props) {
   const [me, setMe] = useState<Participant | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
-  // The focused room starts from the config default (`club enter`), else general.
   const [currentRoom, setCurrentRoom] = useState<string>(() => defaultRoom(cfg));
   const [lines, setLines] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [helpVisible, setHelpVisible] = useState(false);
+  const [reactMode, setReactMode] = useState(false);
+  const [reactEmoji, setReactEmoji] = useState("");
   const { exit } = useApp();
+  const clientRef = useRef<ClubClient | null>(null);
 
-  // initial load: whoami + the room list (once). The room list drives the
-  // switcher bar; if the config's default room isn't in it yet, that's fine —
-  // the bar just shows what exists and history/stream still target currentRoom.
   useEffect(() => {
     (async () => {
       try {
         const c = new ClubClient(cfg);
+        clientRef.current = c;
         const [m, rs] = await Promise.all([c.me(), c.rooms()]);
         setMe(m);
         setRooms(rs);
@@ -34,14 +36,15 @@ function App({ cfg }: Props) {
     })();
   }, [cfg]);
 
-  // recent history for the focused room. Re-runs on every room switch so the
-  // view reflects that room's conversation, not the previous room's tail.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const recent = await new ClubClient(cfg).messages({ limit: 50, room: currentRoom });
-        if (!cancelled) setLines(recent.map(formatMessage));
+        if (!cancelled) {
+          setMessages(recent);
+          setLines(recent.map(formatMessage));
+        }
       } catch (err) {
         if (!cancelled) setLines(["error: " + (err as Error).message]);
       }
@@ -51,15 +54,11 @@ function App({ cfg }: Props) {
     };
   }, [cfg, currentRoom]);
 
-  // live stream, scoped to the focused room. Re-subscribes on room switch: the
-  // old subscription is torn down (cleanup) and a new one opens for the new
-  // room, so a client watching room A never receives room B's events (MR10).
   useEffect(() => {
     const sub = new ClubClient(cfg).stream(
       (m: Message) => {
-        // Server-side filtering already scopes by room, but guard anyway: a
-        // message from another room must never bleed into this view.
         if (m.room !== currentRoom) return;
+        setMessages((prev) => [...prev, m].slice(-200));
         setLines((prev) => [...prev, formatMessage(m)].slice(-200));
       },
       { room: currentRoom },
@@ -72,9 +71,50 @@ function App({ cfg }: Props) {
       exit();
       return;
     }
-    // Tab cycles to the next room in the switcher bar. A focused client follows
-    // one room at a time (PRD §5.3); cycling re-runs the history + stream
-    // effects above.
+    if (key.ctrl && ch === "l") {
+      setLines([]);
+      return;
+    }
+    if (key.ctrl && ch === "u") {
+      setInput("");
+      return;
+    }
+    if (ch === "?" && !input && !reactMode) {
+      setHelpVisible((v) => !v);
+      return;
+    }
+    // React mode: press 'r' to enter, type emoji, Enter to react, Esc to cancel
+    if (ch === "r" && !input && !reactMode) {
+      setReactMode(true);
+      setReactEmoji("");
+      return;
+    }
+    if (reactMode) {
+      if (key.escape) {
+        setReactMode(false);
+        setReactEmoji("");
+        return;
+      }
+      if (key.return) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && reactEmoji) {
+          clientRef.current?.toggleReaction(lastMsg.id, reactEmoji)
+            .then(() => setLines((prev) => [...prev, `reacted with ${reactEmoji}`]))
+            .catch(() => setLines((prev) => [...prev, "react failed"]));
+        }
+        setReactMode(false);
+        setReactEmoji("");
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setReactEmoji((p) => p.slice(0, -1));
+        return;
+      }
+      if (ch && !key.ctrl && !key.meta) {
+        setReactEmoji((p) => p + ch);
+      }
+      return;
+    }
     if (key.tab) {
       if (rooms.length > 0) {
         const idx = rooms.findIndex((r) => r.slug === currentRoom);
@@ -86,7 +126,6 @@ function App({ cfg }: Props) {
     if (key.return) {
       const text = input.trim();
       if (text) {
-        // optimistic; server echoes via stream. Posts to the focused room.
         new ClubClient(cfg)
           .send(text, undefined, { room: currentRoom })
           .catch((e) => setLines((prev) => [...prev, "send error: " + (e as Error).message]));
@@ -105,7 +144,6 @@ function App({ cfg }: Props) {
 
   return (
     <Box flexDirection="column" height={process.stdout.rows || 24}>
-      {/* Room switcher bar: every room inline, the focused one highlighted. */}
       <Box>
         <Text dimColor>rooms </Text>
         {rooms.length === 0 ? (
@@ -129,16 +167,35 @@ function App({ cfg }: Props) {
           ))
         )}
       </Box>
+      {helpVisible && (
+        <Box>
+          <Text dimColor>
+            {" ? help · Tab switch · r react · Enter send · Ctrl-L clear · Ctrl-U input · Ctrl-C quit "}
+          </Text>
+        </Box>
+      )}
       <Box>
-        <Text color="green">
-          {me ? `${me.name}> ` : "> "}
-        </Text>
-        <Text>{input}</Text>
-        <Text dimColor>
-          {input
-            ? ""
-            : `#${currentRoom} · Tab switch · Enter send · Ctrl-C quit`}
-        </Text>
+        {reactMode ? (
+          <>
+            <Text color="yellow">React mode: </Text>
+            <Text color="cyan">{reactEmoji}</Text>
+            <Text dimColor>
+              {reactEmoji ? " · Enter to react" : "type emoji..."} · Esc cancel
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text color="green">
+              {me ? `${me.name}> ` : "> "}
+            </Text>
+            <Text>{input}</Text>
+            <Text dimColor>
+              {input
+                ? ""
+                : `#${currentRoom} · Tab switch · Enter send · Ctrl-C quit`}
+            </Text>
+          </>
+        )}
       </Box>
     </Box>
   );

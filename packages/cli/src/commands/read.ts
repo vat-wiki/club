@@ -4,6 +4,33 @@ import { defaultRoom, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";
 import { formatMessage } from "./format.js";
 
+function formatMessageWithIds(m: any): string {
+  const t = new Date(m.createdAt);
+  const hh = String(t.getHours()).padStart(2, "0");
+  const mm = String(t.getMinutes()).padStart(2, "0");
+  const icon = m.authorKind === "agent" ? "🤖" : "🧑";
+
+  if (m.deleted) {
+    return `[${hh}:${mm}] ${icon}${m.authorName}: (recalled)`;
+  }
+
+  const media = (m.attachments ?? [])
+    .map((a: any) => {
+      if (a.mime.startsWith("video/")) return `[视频: ${a.url} id:${a.id}]`;
+      if (a.mime.startsWith("image/")) return `[图片: ${a.url} id:${a.id}]`;
+      return `[文件: ${a.filename ?? a.id} id:${a.id}]`;
+    })
+    .join(" ");
+  const body = media ? `${m.content} ${media}`.trim() : m.content;
+
+  const reactions = (m.reactions ?? [])
+    .map((r: any) => `${r.emoji}(${r.count})`)
+    .join(" ");
+
+  const base = `[${hh}:${mm}] ${icon}${m.authorName}: ${body}`;
+  return reactions ? `${base} ${reactions}` : base;
+}
+
 export function makeReadCommand(): Command {
   return new Command("read")
     .description("print recent messages (one-shot)")
@@ -14,23 +41,19 @@ export function makeReadCommand(): Command {
       "--room <slug>",
       "read from this room (default: the room from `club enter`, or general)",
     )
+    .option("--show-ids", "show attachment IDs (for use with `club cat`)")
     .action(
-      async (opts: { since?: string; before?: string; limit: string; room?: string }) => {
+      async (opts: { since?: string; before?: string; limit: string; room?: string; showIds?: boolean }) => {
         const cfg = requireConfig();
-        try {
-          const msgs = await new ClubClient(cfg).messages({
-            since: opts.since,
-            before: opts.before,
-            limit: parseLimit(opts.limit),
-            // Same resolution as send: flag → config default → general.
-            room: opts.room ?? defaultRoom(cfg),
-          });
-          for (const m of msgs) console.log(formatMessage(m));
-          if (msgs.length === 0) console.log("(no messages)");
-        } catch (err) {
-          console.error((err as Error).message);
-          process.exit(1);
-        }
+        const msgs = await new ClubClient(cfg).messages({
+          since: opts.since,
+          before: opts.before,
+          limit: parseLimit(opts.limit),
+          room: opts.room ?? defaultRoom(cfg),
+        });
+        const formatter = opts.showIds ? formatMessageWithIds : formatMessage;
+        for (const m of msgs) console.log(formatter(m));
+        if (msgs.length === 0) console.log("(no messages)");
       },
     );
 }

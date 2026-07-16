@@ -6,12 +6,20 @@ import { z } from "zod";
 // into "human" vs "agent". Whether someone is an agent is something they convey
 // themselves (name, self-introduction, behavior), never a system-assigned label.
 // See .pd-docs/requirements/category-blind.md.
+
 export interface Participant {
   id: string;
   name: string;
   createdAt: number;
 }
 
+/**
+ * A single chat message with optional attachments.
+ *
+ * Messages are created via POST /messages and broadcast via SSE.
+ * The `status` field is client-only for optimistic UI; server-sourced
+ * messages never have it set.
+ */
 export interface Message {
   id: string;
   participantId: string;
@@ -50,6 +58,7 @@ export interface Message {
 // The MIME types club accepts as images. Single source of truth shared by the
 // upload route (authoritative), the web client (pre-flight local reject), and
 // the SDK/CLI.
+/** Accepted image MIME types */
 export const ImageMime = z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 export type ImageMime = z.infer<typeof ImageMime>;
 
@@ -62,6 +71,7 @@ export type ImageMime = z.infer<typeof ImageMime>;
 // server does NOT probe width/height for video — the <video> element reads them
 // client-side via `onLoadedMetadata`, so no duration/dimension column is needed
 // on `files` and the existing schema serves video unchanged.
+/** Accepted video MIME types (mp4, webm - formats browsers decode natively) */
 export const VideoMime = z.enum(["video/mp4", "video/webm"]);
 export type VideoMime = z.infer<typeof VideoMime>;
 
@@ -70,6 +80,7 @@ export type VideoMime = z.infer<typeof VideoMime>;
 // .docx/.xlsx via in-browser transcode libs (mammoth / sheetjs), markdown as a
 // plain download. The server stores them verbatim and records only mime +
 // filename + size (no probing).
+/** Accepted document MIME types (pdf, docx, xlsx, markdown) */
 export const DocumentMime = z.enum([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
@@ -78,9 +89,7 @@ export const DocumentMime = z.enum([
 ]);
 export type DocumentMime = z.infer<typeof DocumentMime>;
 
-// Every MIME club will store and serve as an attachment (image, video, OR
-// document). The upload route branches on this union; clients render based on
-// which kind matches (<img> / <video> / file card).
+/** Union of all accepted attachment MIME types */
 export const AttachmentMime = z.enum([
   ...ImageMime.options,
   ...VideoMime.options,
@@ -88,13 +97,15 @@ export const AttachmentMime = z.enum([
 ]);
 export type AttachmentMime = z.infer<typeof AttachmentMime>;
 
-// One image attached to a message. `id` is a server-generated unguessable random
-// slug that doubles as the public `/files/{id}` path (serving is intentionally
-// unauthenticated — `<img src>` cannot carry the bearer header, and club is a
-// single room whose history every member sees anyway). `url` is root-relative so
-// each client resolves it against its own server origin. The server is the sole
-// source of truth for mime/width/height/size; clients only echo `id`s back when
-// sending, so dimensions can't be forged.
+/**
+ * One attachment (image, video, or document) on a message.
+ *
+ * The `id` is a server-generated unguessable random slug that doubles as the
+ * public `/files/{id}` path. Serving is intentionally unauthenticated — `<img src>`
+ * cannot carry the bearer header, and club is a single room whose history every
+ * member sees anyway. The server is the sole source of truth for dimensions;
+ * clients only echo `id`s back, so they can't be forged.
+ */
 export interface MessageAttachment {
   id: string;
   url: string; // root-relative, e.g. "/files/{id}"
@@ -109,10 +120,14 @@ export interface MessageAttachment {
   filename?: string;
 }
 
-// A @-mention of one participant by another. Persisted server-side so an agent
-// (or human) that is offline when the mention happens can catch up later —
-// this is the "inbox" that makes agents first-class without requiring them to
-// be permanently online. `readAt` is null until the recipient marks it read.
+/**
+ * A @-mention of one participant by another.
+ *
+ * Persisted server-side so an agent (or human) that is offline when the mention
+ * happens can catch up later — this is the "inbox" that makes agents first-class
+ * without requiring them to be permanently online. `readAt` is null until the
+ * recipient marks it read.
+ */
 export interface Mention {
   id: string;
   messageId: string;
@@ -146,10 +161,14 @@ export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
 // addressed by a stable canonical slug. `general` is the seeded system room;
 // it always exists and is the default when a request omits room.
 
-// Room slug: 1–30 chars of lowercase alphanumerics and hyphens, starting with
-// an alphanumeric. Single source of truth shared by the server (POST /rooms,
-// POST /messages room param) and any client doing pre-flight validation. The
-// {0,29} after the leading char yields 1–30 total.
+// ── Rooms (multi-room) ──────────────────────────────────────────────
+//
+// A room is an open topic channel — NOT an access-control boundary. Every
+// authed participant reads/writes every room equally (PRD §4.1). Rooms are
+// addressed by a stable canonical slug. `general` is the seeded system room;
+// it always exists and is the default when a request omits room.
+
+/** Room slug regex: 1–30 chars of lowercase alphanumerics and hyphens, starting with alphanumeric */
 export const ROOM_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,29}$/;
 export const RoomSlug = z
   .string()
@@ -158,11 +177,14 @@ export const RoomSlug = z
     "room name must be 1-30 chars of [a-z0-9-], starting alphanumeric",
   );
 
-// One room in the list returned by GET /rooms. `lastActivityAt` is the
-// created_at of the most recent message in the room (null for an empty room)
-// so clients can sort "unread-first, most-recently-active-first" without an
-// extra round-trip. There is no server-side read state — unread is tracked
-// client-side (PRD §5.2).
+/**
+ * One room in the list returned by GET /rooms.
+ *
+ * `lastActivityAt` is the created_at of the most recent message in the room
+ * (null for an empty room) so clients can sort "unread-first,
+ * most-recently-active-first" without an extra round-trip. There is no
+ * server-side read state — unread is tracked client-side (PRD §5.2).
+ */
 export interface Room {
   id: string;
   slug: string;
@@ -178,11 +200,14 @@ export const CreateRoomRequest = z.object({
 });
 export type CreateRoomRequest = z.infer<typeof CreateRoomRequest>;
 
-// Returned exactly once by POST /participants; the plaintext key and recovery
-// code are never persisted server-side (only their sha256 hashes are stored).
-// The recovery code is a fallback credential: present it with the callsign at
-// POST /participants/recover to reissue the key (and a fresh recovery code)
-// after losing the original key.
+/**
+ * Response from POST /participants.
+ *
+ * The plaintext key and recovery code are never persisted server-side
+ * (only their sha256 hashes are stored). The recovery code is a fallback
+ * credential: present it with the callsign at POST /participants/recover
+ * to reissue the key (and a fresh recovery code) after losing the original key.
+ */
 export interface CreateParticipantResponse {
   key: string;
   recoverCode: string;
@@ -206,18 +231,24 @@ export interface RecoverParticipantResponse {
   participant: Participant;
 }
 
-// Image-input limits — shared so the web client's pre-flight checks and the
-// upload route's authoritative checks can never drift apart.
+// ── Content limits ─────────────────────────────────────────────────────
+// Shared constants so client pre-flight checks and server validation never drift.
+
+/** Maximum message content length in characters */
 export const MAX_MESSAGE_CONTENT = 4000;
 // Per-message cap on attachments. Historically image-only ("MAX_IMAGES"), now a
 // shared budget covering BOTH images and videos (a message may mix them) — kept
 // under the original name so the SDK/CLI/web references don't churn. Videos are
 // far heavier than images, so in practice a message rarely holds many, but the
 // ceiling is uniform rather than tracking two separate counters.
+/** Maximum number of attachments per message (images + videos combined) */
 export const MAX_IMAGES_PER_MESSAGE = 8;
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
-export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
-export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024; // 25 MB
+/** Maximum file size for image uploads in bytes (10 MB) */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** Maximum file size for video uploads in bytes (50 MB) */
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+/** Maximum file size for document uploads in bytes (25 MB) */
+export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
 // content is optional IFF at least one attachment is supplied ("text-optional"
 // keeps the common screenshot-then-send path frictionless — a bare image is a
@@ -282,44 +313,59 @@ export interface AgentThinkingEvent {
   room?: string;
 }
 
-// SSE `event: agent_idle` payload. Just the id — the client removes it from its
-// thinking set. Emitted on: reply posted (server-detected), agent-reported
-// done/error, or server TTL expiry (crashed/offline agent). `room` mirrors the
-// room the agent was thinking in so the clear event reaches the same stream.
+/**
+ * SSE `event: agent_idle` payload.
+ *
+ * Just the id — the client removes it from its thinking set. Emitted on:
+ * reply posted (server-detected), agent-reported done/error, or server TTL
+ * expiry (crashed/offline agent). `room` mirrors the room the agent was
+ * thinking in so the clear event reaches the same stream.
+ */
 export interface AgentIdleEvent {
   participantId: string;
   room?: string;
 }
 
-// SSE `event: presence` payload. Broadcast on connect (online: true) and
-// disconnect (online: false) so the roster can tell who's actually in the room
-// right now from historical registrations. A newcomer is also seeded with the
-// current online set on connect (server-side, see stream.ts).
+/**
+ * SSE `event: presence` payload.
+ *
+ * Broadcast on connect (online: true) and disconnect (online: false) so the
+ * roster can tell who's actually in the room right now from historical
+ * registrations. A newcomer is also seeded with the current online set on
+ * connect (server-side, see stream.ts).
+ */
 export interface PresenceEvent {
   participantId: string;
   name: string;
   online: boolean;
 }
 
-// SSE `event: message_deleted` payload. The author recalled a message; clients
-// mark that id recalled (hide content, show a "recalled" placeholder) rather
-// than removing the row entirely (so replies/context still make sense). `room`
-// lets the stream fan-out stay room-scoped (a client watching room B does not
-// receive a recall from room A).
+/**
+ * SSE `event: message_deleted` payload.
+ *
+ * The author recalled a message; clients mark that id recalled (hide content,
+ * show a "recalled" placeholder) rather than removing the row entirely
+ * (so replies/context still make sense). `room` lets the stream fan-out stay
+ * room-scoped (a client watching room B does not receive a recall from room A).
+ */
 export interface MessageDeletedEvent {
   id: string;
   room: string;
 }
 
-// One emoji reaction aggregate on a message.
+/** One emoji reaction aggregate on a message */
 export interface Reaction {
   emoji: string;
   count: number;
 }
 
-// SSE `event: message_reaction` payload. A reaction was toggled; carries the
-// refreshed aggregate so clients just swap it in. `room` keeps the fan-out
-// room-scoped (a client watching room B does not receive a reaction from A).
+/**
+ * SSE `event: message_reaction` payload.
+ *
+ * A reaction was toggled; carries the refreshed aggregate so clients just swap
+ * it in. `room` keeps the fan-out room-scoped (a client watching room B does not
+ * receive a reaction from A).
+ */
 export interface MessageReactionEvent {
   messageId: string;
   reactions: Reaction[];

@@ -217,7 +217,7 @@ function OfficePreview({ kind, url }: { kind: Exclude<PreviewKind, "markdown">; 
           )}
         </div>
       )}
-      <div ref={ref} className="min-h-full" />
+      <div ref={ref} className="h-full w-full" />
     </div>
   );
 }

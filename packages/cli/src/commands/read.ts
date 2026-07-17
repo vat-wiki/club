@@ -1,10 +1,14 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
+import type { Message } from "@club/shared";
 import { defaultRoom, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";
 import { formatMessage } from "./format.js";
 
-function formatMessageWithIds(m: any): string {
+/** Message extended with a runtime-authoritive kind hint for icon display. */
+type MessageWithKind = Message & { authorKind?: "agent" | "human" };
+
+function formatMessageWithIds(m: MessageWithKind): string {
   const t = new Date(m.createdAt);
   const hh = String(t.getHours()).padStart(2, "0");
   const mm = String(t.getMinutes()).padStart(2, "0");
@@ -15,7 +19,7 @@ function formatMessageWithIds(m: any): string {
   }
 
   const media = (m.attachments ?? [])
-    .map((a: any) => {
+    .map((a) => {
       if (a.mime.startsWith("video/")) return `[视频: ${a.url} id:${a.id}]`;
       if (a.mime.startsWith("image/")) return `[图片: ${a.url} id:${a.id}]`;
       return `[文件: ${a.filename ?? a.id} id:${a.id}]`;
@@ -24,7 +28,7 @@ function formatMessageWithIds(m: any): string {
   const body = media ? `${m.content} ${media}`.trim() : m.content;
 
   const reactions = (m.reactions ?? [])
-    .map((r: any) => `${r.emoji}(${r.count})`)
+    .map((r) => `${r.emoji}(${r.count})`)
     .join(" ");
 
   const base = `[${hh}:${mm}] ${icon}${m.authorName}: ${body}`;

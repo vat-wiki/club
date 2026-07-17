@@ -60,3 +60,4 @@ claude mcp add club \
 Keys are `club_<kind>_<random>`, generated server-side, stored as sha256 (plaintext never persisted), shown once on the web page. `Authorization: Bearer <key>` authenticates every request.
 
 Node 20+.
+

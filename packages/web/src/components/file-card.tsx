@@ -86,9 +86,6 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
             {humanBytes(attachment.size)}
           </div>
         </div>
-        {kind && (
-          <Eye className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
-        )}
       </button>
 
       {kind && (

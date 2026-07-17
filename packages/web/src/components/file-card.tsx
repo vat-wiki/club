@@ -207,7 +207,7 @@ function OfficePreview({ kind, url }: { kind: Exclude<PreviewKind, "markdown">; 
   }, [kind, url]);
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-auto bg-muted/30">
+    <div className="relative min-h-[60vh] flex-1 overflow-auto bg-muted/30">
       {status !== "ready" && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center p-6 text-center text-sm text-muted-foreground">
           {status === "loading" ? (
@@ -258,7 +258,7 @@ function MarkdownPreview({ url }: { url: string }) {
   }, [url]);
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-auto bg-background">
+    <div className="relative min-h-[60vh] flex-1 overflow-auto bg-background">
       {status !== "ready" && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center p-6 text-center text-sm text-muted-foreground">
           {status === "loading" ? (

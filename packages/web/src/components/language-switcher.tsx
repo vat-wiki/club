@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Languages } from "lucide-react";
+import { createPortal } from "react-dom";
 import { LANGS, LANG_LABEL, useI18n, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -8,16 +9,24 @@ import { cn } from "@/lib/utils";
 // language (so a user who can't read the current language can still find
 // theirs). The choice persists to localStorage via the i18n provider.
 //
-// Accessibility: a real <button> trigger with an aria-label, a Radix-free
-// menu rendered as a focused listbox-like list with roving focus, Esc to
-// close, click-outside to close, and the active option marked
-// aria-current. We avoid pulling in a Radix Select/Menu primitive for two
-// options — keeps the bundle lean (club "若无必要无增实体").
+// The dropdown is rendered via createPortal to document.body with fixed
+// positioning so it escapes the topbar header's `overflow: hidden` clipping.
+// Position is recalculated on open and resize so the menu stays anchored to
+// the trigger button.
+//
+// Accessibility: a real <button> trigger with an aria-label, a focused
+// listbox-like list with roving focus, Esc to close, click-outside to close,
+// and the active option marked aria-current. We avoid pulling in a Radix
+// Select/Menu primitive for two options — keeps the bundle lean.
 export function LanguageSwitcher() {
   const { lang, setLang, t } = useI18n();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
+  const [position, setPosition] = useState<{ top: string; left: string }>({
+    top: "0px",
+    left: "0px",
+  });
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -45,6 +54,22 @@ export function LanguageSwitcher() {
       document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open]);
+
+  // Compute menu position anchored below the trigger, and update on resize.
+  const positionMenu = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPosition({
+      top: `${rect.bottom + 4}px`,
+      left: `${rect.right - 128}px`, // center-ish on trigger (min-w-[8rem]=128px)
+    });
+  };
+  useEffect(() => {
+    if (!open) return;
+    positionMenu();
+    window.addEventListener("resize", positionMenu);
+    return () => window.removeEventListener("resize", positionMenu);
   }, [open]);
 
   // When the menu opens, focus the active option (or the first).
@@ -84,6 +109,41 @@ export function LanguageSwitcher() {
     }
   };
 
+  const menu = (
+    <ul
+      ref={menuRef}
+      role="menu"
+      aria-label={t("topbar.lang.aria")}
+      onKeyDown={onMenuKeyDown}
+      style={{ position: "fixed", top: position.top, left: position.left }}
+      className="z-50 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover p-1 shadow-lg shadow-black/40"
+    >
+      {LANGS.map((l) => (
+        <li key={l} role="none">
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={l === lang}
+            aria-current={l === lang ? "true" : undefined}
+            data-testid={`lang-option-${l}`}
+            onClick={() => choose(l)}
+            className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-sm px-2.5 py-1.5 text-left text-sm transition-colors",
+              l === lang
+                ? "bg-accent text-accent-foreground"
+                : "text-popover-foreground hover:bg-accent/70",
+            )}
+          >
+            <span>{LANG_LABEL[l]}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              {l}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <div className="relative">
       <button
@@ -100,39 +160,7 @@ export function LanguageSwitcher() {
         <Languages className="h-3.5 w-3.5" aria-hidden />
         <span aria-hidden className="uppercase">{lang}</span>
       </button>
-      {open && (
-        <ul
-          ref={menuRef}
-          role="menu"
-          aria-label={t("topbar.lang.aria")}
-          onKeyDown={onMenuKeyDown}
-          className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover p-1 shadow-lg shadow-black/40"
-        >
-          {LANGS.map((l) => (
-            <li key={l} role="none">
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={l === lang}
-                aria-current={l === lang ? "true" : undefined}
-                data-testid={`lang-option-${l}`}
-                onClick={() => choose(l)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-sm px-2.5 py-1.5 text-left text-sm transition-colors",
-                  l === lang
-                    ? "bg-accent text-accent-foreground"
-                    : "text-popover-foreground hover:bg-accent/70",
-                )}
-              >
-                <span>{LANG_LABEL[l]}</span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {l}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {open && typeof document !== "undefined" && createPortal(menu, document.body)}
     </div>
   );
 }

@@ -29,7 +29,6 @@ const COPY_LIVE = "mobile-menu-viewkey-copy-status";
 type Props = {
   status: TopbarStatus;
   members: Participant[];
-  selfId?: string;
   onlineIds?: Set<string>;
   key_: string | null;
   onSignOutRequest: () => void;
@@ -39,7 +38,6 @@ type Props = {
 export function MobileTopbarMenu({
   status,
   members,
-  selfId,
   onlineIds,
   key_,
   onSignOutRequest,

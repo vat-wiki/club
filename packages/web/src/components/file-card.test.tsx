@@ -26,13 +26,12 @@ describe("FileCard — markdown preview", () => {
 
   it("shows a preview button for a markdown attachment", () => {
     renderWithI18n(<FileCard attachment={mdAtt()} />);
-    expect(screen.getByTestId("file-preview-btn")).toBeTruthy();
+    const btn = screen.getByTestId("attachment-file");
+    expect(btn).toBeTruthy();
+    expect(btn).not.toBeDisabled();
   });
 
   it("renders parsed markdown and strips dangerous markup", async () => {
-    // marked passes raw HTML through, so DOMPurify is the only thing standing
-    // between this string and the DOM. Assert both render (h1/strong) and
-    // sanitize (no <script>, no javascript: href).
     const dirty =
       "# Title\n\nhello **world**\n\n<script>alert(1)</script>\n\n[a](javascript:alert(1))";
     vi.stubGlobal(
@@ -44,7 +43,7 @@ describe("FileCard — markdown preview", () => {
     );
 
     renderWithI18n(<FileCard attachment={mdAtt()} />);
-    fireEvent.click(screen.getByTestId("file-preview-btn"));
+    fireEvent.click(screen.getByTestId("attachment-file"));
 
     const body = await screen.findByTestId("markdown-body");
     await waitFor(() => {
@@ -61,7 +60,7 @@ describe("FileCard — markdown preview", () => {
       vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve("") }),
     );
     renderWithI18n(<FileCard attachment={mdAtt()} />);
-    fireEvent.click(screen.getByTestId("file-preview-btn"));
+    fireEvent.click(screen.getByTestId("attachment-file"));
     await waitFor(() => {
       expect(screen.getByText("预览失败——请尝试下载后打开")).toBeTruthy();
     });

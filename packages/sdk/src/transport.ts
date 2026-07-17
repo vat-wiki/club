@@ -11,6 +11,7 @@ import type {
   Room,
   UploadFileResponse,
 } from "@club/shared";
+import { MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
 import { ClubApiError } from "./errors.js";
 
 // ── Connection ──────────────────────────────────────────────────────
@@ -199,11 +200,8 @@ export interface UploadFileInput {
 
 // Client-side upload limits. These should match or be slightly more conservative
 // than the server limits to avoid uploading bytes that will be rejected.
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50MB
-const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB
+// Single source of truth: @club/shared constants — never duplicate here.
 
-// Extract the base size limit from the MIME type.
 function getMaxLengthForMime(mime: string): number {
   if (mime.startsWith("video/")) return MAX_VIDEO_BYTES;
   if (mime.startsWith("image/")) return MAX_IMAGE_BYTES;

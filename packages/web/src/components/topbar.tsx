@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { Participant, Room } from "@club/shared";
 import type { RoomUnread } from "@/hooks/use-rooms";
 
-type Status = "connecting" | "connected" | "lost";
+export type Status = "connecting" | "connected" | "lost";
 
 const statusColor: Record<Status, string> = {
   connected: "bg-agent",
@@ -107,7 +107,6 @@ export function Topbar({
       <MobileTopbarMenu
         status={status}
         members={members}
-        selfId={selfId}
         onlineIds={onlineIds}
         key_={key_}
         onSignOutRequest={onSignOutRequest}

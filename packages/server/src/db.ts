@@ -599,6 +599,11 @@ export function getFile(id: string): FileRow | undefined {
 //
 // Security: ids are validated by the caller to be base64url-format server-issued
 // identifiers; the IN clause is safely parameterized to prevent injection.
+const getFilesByIdsStmt = db.prepare<[string], FileRow>(
+  `SELECT id, participant_id, mime, width, height, size, created_at, filename
+   FROM files WHERE id = ?`,
+);
+
 export function getFilesByIds(ids: string[]): FileRow[] {
   if (ids.length === 0) return [];
   if (ids.length > 100) {
@@ -606,16 +611,12 @@ export function getFilesByIds(ids: string[]): FileRow[] {
     // against pathological abuse while staying far above legitimate limits.
     throw new Error("too many file ids requested (max 100)");
   }
-  const placeholders = ids.map(() => "?").join(",");
-  const rows = db
-    .prepare<string[], FileRow>(
-      `SELECT id, participant_id, mime, width, height, size, created_at, filename
-       FROM files WHERE id IN (${placeholders})`,
-    )
-    .all(...ids);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  // Filter undefined (id not found) but keep order; caller validates ownership.
-  return ids.map((id) => byId.get(id)).filter((r): r is FileRow => !!r);
+  const byId = new Map<string, FileRow>();
+  for (const id of ids) {
+    const row = getFilesByIdsStmt.get(id);
+    if (row) byId.set(id, row);
+  }
+  return ids.map((id) => byId.get(id)).filter((r): r is FileRow => r !== undefined);
 }
 
 // ── Rooms (multi-room) ───────────────────────────────────────────────

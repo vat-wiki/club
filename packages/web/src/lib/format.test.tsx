@@ -110,6 +110,11 @@ describe("mentionsSelf", () => {
     expect(mentionsSelf("talking about alice here", "alice")).toBe(false);
   });
 
+  it("does not match @alice_bob when selfName is alice (word-boundary check)", () => {
+    expect(mentionsSelf("ping @alice_bob", "alice")).toBe(false);
+    expect(mentionsSelf("hey @alice2", "alice")).toBe(false);
+  });
+
   it("does not match @alexandra when selfName is alice", () => {
     expect(mentionsSelf("ping @alexandra", "alice")).toBe(false);
   });

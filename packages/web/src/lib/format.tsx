@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Message, Participant } from "@club/shared";
+import { mentionMatches } from "@club/shared";
 
 // Default locale keeps the previous zh-CN behavior when a caller doesn't pass
 // one (e.g. unit tests). Components pass the active locale from useI18n() so
@@ -206,13 +207,15 @@ export function renderContent(
   return out;
 }
 
-// Cheap substring check used by MessageRow to decide whether a row visually
+// Cheap mention check used by MessageRow to decide whether a row visually
 // flags "this mentions the current user" (row-level signal that complements
-// the inline self-mention highlight). Case-insensitive to match the server's
-// mention parser semantics. Pure so it can be unit-tested directly.
+// the inline self-mention highlight). Delegates to @club/shared `mentionMatches`
+// so it shares the same word-boundary logic as the server's inbox and the CLI
+// matcher — no false-positives on @alice_bob when self is alice.
+// Pure so it can be unit-tested directly.
 export function mentionsSelf(content: string, selfName?: string): boolean {
   if (!selfName) return false;
-  return content.toLowerCase().includes("@" + selfName.toLowerCase());
+  return mentionMatches(content, selfName);
 }
 
 export type { Message, Participant };

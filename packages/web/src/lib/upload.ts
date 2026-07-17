@@ -18,15 +18,15 @@ export const VIDEO_MIME_WHITELIST: readonly string[] = VideoMime.options;
 export const DOCUMENT_MIME_WHITELIST: readonly string[] = DocumentMime.options;
 
 export function isAllowedImageMime(mime: string): boolean {
-  return (IMAGE_MIME_WHITELIST as readonly string[]).includes(mime);
+  return IMAGE_MIME_WHITELIST.includes(mime);
 }
 
 export function isAllowedVideoMime(mime: string): boolean {
-  return (VIDEO_MIME_WHITELIST as readonly string[]).includes(mime);
+  return VIDEO_MIME_WHITELIST.includes(mime);
 }
 
 export function isAllowedDocumentMime(mime: string): boolean {
-  return (DOCUMENT_MIME_WHITELIST as readonly string[]).includes(mime);
+  return DOCUMENT_MIME_WHITELIST.includes(mime);
 }
 
 export function humanBytes(bytes: number): string {
@@ -43,51 +43,34 @@ export function humanBytes(bytes: number): string {
 
 export type RejectReason = { key: string; vars?: Record<string, string | number> };
 
-// Validate a single candidate image file against the shared limits. Returns
-// null when accepted, or a localized reject reason when rejected. Pure (no
-// network, no i18n dependency) — the caller turns the reason into text via t().
+function validateAgainst(
+  file: File,
+  mimeWhitelist: readonly string[],
+  maxBytes: number,
+  keyPrefix: string,
+): RejectReason | null {
+  if (!mimeWhitelist.includes(file.type)) {
+    return { key: `${keyPrefix}.invalidMime` };
+  }
+  if (file.size > maxBytes) {
+    return {
+      key: `${keyPrefix}.tooLarge`,
+      vars: { max: humanBytes(maxBytes), size: humanBytes(file.size) },
+    };
+  }
+  return null;
+}
+
 export function validateImageFile(file: File): RejectReason | null {
-  if (!isAllowedImageMime(file.type)) {
-    return { key: "image.invalidMime" };
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return {
-      key: "image.tooLarge",
-      vars: { max: humanBytes(MAX_IMAGE_BYTES), size: humanBytes(file.size) },
-    };
-  }
-  return null;
+  return validateAgainst(file, IMAGE_MIME_WHITELIST, MAX_IMAGE_BYTES, "image");
 }
 
-// Same shape as validateImageFile but against the video limits (mp4/webm,
-// 50MB). Mirrors the image path so the composer can validate any picked file
-// through one entry point (validateMediaFile) without branching on type itself.
 export function validateVideoFile(file: File): RejectReason | null {
-  if (!(VIDEO_MIME_WHITELIST as readonly string[]).includes(file.type)) {
-    return { key: "video.invalidMime" };
-  }
-  if (file.size > MAX_VIDEO_BYTES) {
-    return {
-      key: "video.tooLarge",
-      vars: { max: humanBytes(MAX_VIDEO_BYTES), size: humanBytes(file.size) },
-    };
-  }
-  return null;
+  return validateAgainst(file, VIDEO_MIME_WHITELIST, MAX_VIDEO_BYTES, "video");
 }
 
-// Same shape as the image/video validators but for documents (pdf/docx/xlsx/md,
-// 25MB).
 export function validateDocumentFile(file: File): RejectReason | null {
-  if (!(DOCUMENT_MIME_WHITELIST as readonly string[]).includes(file.type)) {
-    return { key: "document.invalidMime" };
-  }
-  if (file.size > MAX_DOCUMENT_BYTES) {
-    return {
-      key: "document.tooLarge",
-      vars: { max: humanBytes(MAX_DOCUMENT_BYTES), size: humanBytes(file.size) },
-    };
-  }
-  return null;
+  return validateAgainst(file, DOCUMENT_MIME_WHITELIST, MAX_DOCUMENT_BYTES, "document");
 }
 
 // Validate any attachment file (image, video, OR document) by dispatching on

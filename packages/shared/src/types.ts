@@ -161,13 +161,6 @@ export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
 // addressed by a stable canonical slug. `general` is the seeded system room;
 // it always exists and is the default when a request omits room.
 
-// ── Rooms (multi-room) ──────────────────────────────────────────────
-//
-// A room is an open topic channel — NOT an access-control boundary. Every
-// authed participant reads/writes every room equally (PRD §4.1). Rooms are
-// addressed by a stable canonical slug. `general` is the seeded system room;
-// it always exists and is the default when a request omits room.
-
 /** Room slug regex: 1–30 chars of lowercase alphanumerics and hyphens, starting with alphanumeric */
 export const ROOM_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,29}$/;
 export const RoomSlug = z

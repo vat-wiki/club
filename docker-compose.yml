@@ -60,3 +60,4 @@ networks:
   dev-lan:                       # 共享内网（与 ~/projects/dener 的 dev 容器同网段；外部已建好）
     name: dev-lan
     external: true
+https://carljin.com/%E4%BD%BF%E7%94%A8-github-actions-%E8%87%AA%E5%8A%A8%E5%8F%91%E5%B8%83-npm-%E5%8C%85/

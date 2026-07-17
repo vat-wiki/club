@@ -1,6 +1,6 @@
 {
   "name": "club-cli",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "author": "club",
   "type": "module",
   "bin": {

@@ -7,24 +7,57 @@ import type { Participant } from "@club/shared";
 
 // Mobile-only roster: on small screens the desktop aside is hidden, so this
 // trigger in the topbar opens a right-side sheet with the same sections.
+// When `open`/`onOpenChange` are provided, the component renders without its
+// own trigger button (used by the mobile topbar menu).
 export function MobileRoster({
   members,
   selfId,
   onlineIds,
   onlineCount,
   key_,
+  open,
+  onOpenChange,
 }: {
   members: Participant[];
   selfId?: string;
   onlineIds?: Set<string>;
   onlineCount: number;
   key_: string | null;
+  /** When provided, the component is controlled externally (no trigger button). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const t = useT();
+
+  const dialogContent = (
+    <DialogContent
+      showClose
+      closeLabel={t("dialog.close")}
+      className="left-auto right-0 top-0 h-[100dvh] max-h-full w-[80vw] max-w-[320px] translate-x-0 translate-y-0 rounded-none rounded-l-lg border-l border-border p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-right-full data-[state=closed]:zoom-out-100 data-[state=closed]:slide-out-to-right-full sm:rounded-l-lg"
+    >
+      <DialogTitle className="sr-only">{t("roster.mobile.title")}</DialogTitle>
+      <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] scrollbar-thin">
+        <h2 className="font-display text-sm font-semibold tracking-tight">
+          {t("roster.mobile.title")}<span className="text-agent">.</span>
+        </h2>
+        <ViewKeyDialog key_={key_} triggerLabel={t("viewKey.open")} />
+        <RosterSections members={members} selfId={selfId} onlineIds={onlineIds} />
+      </div>
+    </DialogContent>
+  );
+
+  // Controlled mode: no trigger button, driven by the parent menu.
+  if (onOpenChange !== undefined) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        {dialogContent}
+      </Dialog>
+    );
+  }
+
+  // Default mode: trigger button opens the roster (used when not in the menu).
   return (
     <Dialog>
-      {/* DialogTrigger wires open/close state and exposes aria-haspopup/expanded
-          on the button. asChild keeps our styling + accessible name. */}
       <DialogTrigger asChild>
         <button
           type="button"
@@ -35,29 +68,7 @@ export function MobileRoster({
           <span>{onlineCount}</span>
         </button>
       </DialogTrigger>
-      <DialogContent
-        showClose
-        closeLabel={t("dialog.close")}
-        className="left-auto right-0 top-0 h-[100dvh] max-h-full w-[80vw] max-w-[320px] translate-x-0 translate-y-0 rounded-none rounded-l-lg border-l border-border p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-right-full data-[state=closed]:zoom-out-100 data-[state=closed]:slide-out-to-right-full sm:rounded-l-lg"
-      >
-        {/* Visually-hidden title keeps the dialog accessible; the visible
-            heading below is for sighted users. */}
-        <DialogTitle className="sr-only">{t("roster.mobile.title")}</DialogTitle>
-        <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] scrollbar-thin">
-          <h2 className="font-display text-sm font-semibold tracking-tight">
-            {t("roster.mobile.title")}<span className="text-agent">.</span>
-          </h2>
-          {/* The login key is the only credential for this identity. On mobile
-              the topbar trigger is hidden to save space, so the roster sheet is
-              where users view/copy it — keeping "see my key" in the identity
-              panel instead of buried behind the sign-out flow. Pinned right
-              under the title so it's reachable without scrolling past a long
-              member list. */}
-          <ViewKeyDialog key_={key_} triggerLabel={t("viewKey.open")} />
-
-          <RosterSections members={members} selfId={selfId} onlineIds={onlineIds} />
-        </div>
-      </DialogContent>
+      {dialogContent}
     </Dialog>
   );
 }

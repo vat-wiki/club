@@ -92,6 +92,11 @@ const zh: Dict = {
   "topbar.signOut.short": "切换",
   "topbar.signOut.label": "退出",
   "topbar.lang.aria": "切换语言",
+  "topbar.menu.aria": "更多选项",
+  "topbar.menu.title": "更多",
+  "topbar.menu.lang": "语言",
+  "topbar.menu.lang.aria": "当前语言：{lang}，点击切换",
+  "topbar.menu.roster": "成员",
 
   // Roster
   "roster.you": "（你）",
@@ -339,6 +344,11 @@ const en: Dict = {
   "topbar.signOut.short": "Switch",
   "topbar.signOut.label": "Sign out",
   "topbar.lang.aria": "Switch language",
+  "topbar.menu.aria": "More options",
+  "topbar.menu.title": "More",
+  "topbar.menu.lang": "Language",
+  "topbar.menu.lang.aria": "Current language: {lang}, tap to switch",
+  "topbar.menu.roster": "Members",
 
   // Roster
   "roster.you": "(you)",

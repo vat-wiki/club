@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Eye, FileText, Loader2, X } from "lucide-react";
+import { Download, Eye, File, FileBox, FileSpreadsheet, FileText, Loader2, X } from "lucide-react";
 import type { MessageAttachment } from "@club/shared";
 import { humanBytes } from "@/lib/upload";
 import { useT } from "@/lib/i18n";
@@ -21,6 +21,14 @@ function resolveUrl(url: string): string {
 }
 
 type PreviewKind = "docx" | "excel" | "pdf" | "markdown";
+
+// Distinct icon per file kind so users can tell docs apart at a glance.
+const FileKindIcon: Record<PreviewKind, React.ComponentType<{ className?: string }>> = {
+  pdf: FileText,
+  docx: FileBox,
+  excel: FileSpreadsheet,
+  markdown: FileText,
+};
 
 // Which previewer renders this attachment, if any. PDF/DOCX/XLSX go through
 // @js-preview; Markdown (by MIME or .md/.markdown extension) renders as HTML.
@@ -61,6 +69,7 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
   const kind = previewKind(attachment.mime, attachment.filename);
   const url = resolveUrl(attachment.url);
   const name = attachment.filename ?? attachment.id;
+  const FileIcon = kind ? FileKindIcon[kind] : File;
 
   return (
     <>
@@ -77,7 +86,7 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
         )}
         aria-label={kind ? t("file.preview") : name}
       >
-        <FileText className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden />
+        <FileIcon className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1 text-left">
           <div className="truncate text-xs font-medium" title={name}>
             {name}
@@ -99,7 +108,7 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
           >
             <DialogTitle className="sr-only">{name}</DialogTitle>
             <header className="flex flex-none items-center gap-2 border-b border-border/60 px-3 py-2">
-              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-sm font-medium" title={name}>
                 {name}
               </span>

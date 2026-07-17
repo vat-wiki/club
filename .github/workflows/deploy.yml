@@ -25,6 +25,8 @@ jobs:
 
   publish-cli:
     runs-on: self-hosted
+    permissions:
+      id-token: write
     needs: deploy
     defaults:
       run:

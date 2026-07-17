@@ -61,4 +61,4 @@ jobs:
           fi
           echo "✓ Publishing version $LOCAL_VERSION"
           cd packages/cli
-          npm publish --provenance --access public
+          npm publish --access public

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Eye, File, FileBox, FileSpreadsheet, FileText, Loader2, X } from "lucide-react";
+import { Download, File, FileBox, FileSpreadsheet, FileText, Loader2, X } from "lucide-react";
 import type { MessageAttachment } from "@club/shared";
 import { humanBytes } from "@/lib/upload";
 import { useT } from "@/lib/i18n";

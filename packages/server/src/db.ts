@@ -239,6 +239,11 @@ export interface MessageRow {
   room: string; // canonical room slug; "general" for backfilled rows
 }
 
+const insertMessageStmt = db.prepare(
+  `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+);
+
 export function insertMessage(
   id: string,
   participantId: string,
@@ -248,18 +253,15 @@ export function insertMessage(
   replyToId: string | null,
   room: string,
 ): void {
-  db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt, attachments, replyToId, room);
+  insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
 
+const allParticipantsStmt = db.prepare<[], { id: string; name: string; created_at: number }>(
+  `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
+);
+
 export function getAllParticipants() {
-  return db
-    .prepare<[], { id: string; name: string; created_at: number }>(
-      `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
-    )
-    .all();
+  return allParticipantsStmt.all();
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(
@@ -426,6 +428,11 @@ export function getParticipantByName(name: string) {
     .get(name);
 }
 
+const insertParticipantStmt = db.prepare(
+  `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
+   VALUES (?, ?, ?, ?, ?)`,
+);
+
 export function insertParticipant(
   id: string,
   name: string,
@@ -433,10 +440,7 @@ export function insertParticipant(
   recoverHash: string,
   createdAt: number,
 ): void {
-  db.prepare(
-    `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, name, keyHash, recoverHash, createdAt);
+  insertParticipantStmt.run(id, name, keyHash, recoverHash, createdAt);
 }
 
 // ── Identity recovery ───────────────────────────────────────────────

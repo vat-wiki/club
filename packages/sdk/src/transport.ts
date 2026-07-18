@@ -157,7 +157,7 @@ export async function sendMessage(
 ): Promise<Message> {
   // Backward compatible: when no attachmentIds/replyToId/room are supplied the
   // body is just { content } exactly as before. With any, the body carries them.
-  const body: CreateMessageRequest = { content, attachmentIds: [], room: "general" };
+  const body: Partial<CreateMessageRequest> = { content };
   if (opts.attachmentIds && opts.attachmentIds.length > 0) {
     body.attachmentIds = opts.attachmentIds;
   }

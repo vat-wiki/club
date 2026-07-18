@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for cli/src/update.ts</title>
+    <title>Code coverage report for stream.ts</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../../prettify.css" />
-    <link rel="stylesheet" href="../../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <link rel="stylesheet" href="prettify.css" />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../../sort-arrow-sprite.png);
+            background-image: url(sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">cli/src</a> update.ts</h1>
+        <h1><a href="index.html">All files</a> stream.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">70.12% </span>
+                <span class="strong">88.65% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>54/77</span>
+                <span class='fraction'>86/97</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">75% </span>
+                <span class="strong">71.83% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>33/44</span>
+                <span class='fraction'>51/71</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>9/18</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">71.42% </span>
+                <span class="strong">91.76% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>50/70</span>
+                <span class='fraction'>78/85</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -304,21 +304,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">21x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -329,411 +322,418 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">36x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">107x</span>
-<span class="cline-any cline-yes">107x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Self-update machinery for club-cli.
-//
-// Two entry points:
-//   • `club update`              — manual, forces a registry fetch (see commands/update.ts).
-//   • preAction hook in index.ts — checks before every command, with a 24h TTL cache so
-//     high-frequency commands (send/listen) aren't slowed down.
-//
-// Philosophy: every step is best-effort and fails open. A flaky network, missing global
-// write permission, or a non-global install must never block the user's real command.
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
+import { jitteredBackoff, sleep } from "@club/shared";
+import { type ClubConn, listMessages, listRooms } from "./transport.js";
 &nbsp;
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { spawn } from "node:child_process";
-import pkg from "../package.json" with { type: "json" };
-import { configPath } from "./config.js";
+// ── SSE streaming with reconnect + catch-up ─────────────────────────
 &nbsp;
-// The published package lives at `club-cli` on npm (bin: `club`).
-const REGISTRY_URL = "https://registry.npmjs.org/club-cli/latest";
-const FETCH_TIMEOUT_MS = 5_000;
-const TTL_MS = 24 * 60 * 60 * 1000; // re-fetch at most once per day
-const INSTALL_BACKOFF_MS = 60 * 60 * 1000; // after a failed install, don't retry for 1h
-const VERSION_RE = /^\d+\.\d+\.\d+/; // accept any leading x.y.z (pre-release tags stripped later)
-&nbsp;
-/** Current club-cli version, baked in at build time. Single source of truth. */
-export const CURRENT_VERSION: string = pkg.version;
-&nbsp;
-/**
- * Where the update cache lives: next to the config file (`~/.club/update-cache.json`),
- * so `CLUB_CONFIG` relocates both together.
- */
-export function updateCachePath(): string {
-  return join(dirname(configPath()), "update-cache.json");
+export interface StreamOptions {
+  /** Reconnect automatically when the stream drops (default true). */
+  reconnect?: boolean;
+  /** Max reconnect attempts before giving up (default Infinity — keep trying). */
+  maxReconnects?: number;
+  /** Base backoff ms for reconnect (default 500; exponential, jittered, capped 15s). */
+  backoffMs?: number;
+  /** Notified on stream errors and on each reconnect attempt. */
+  onError?: (err: Error) =&gt; void;
+  /** Fired for each `agent_thinking` event (P1-5). Omit to ignore. */
+  onAgentThinking?: (e: AgentThinkingEvent) =&gt; void;
+  /** Fired for each `agent_idle` event (P1-5). Omit to ignore. */
+  onAgentIdle?: (e: AgentIdleEvent) =&gt; void;
+  /** Fired for each `presence` event (online/offline). Omit to ignore. */
+  onPresence?: (e: PresenceEvent) =&gt; void;
+  /** Fired when a message is recalled (`message_deleted` event). */
+  onMessageDeleted?: (e: MessageDeletedEvent) =&gt; void;
+  /** Fired when a reaction is toggled (`message_reaction` event). */
+  onReaction?: (e: MessageReactionEvent) =&gt; void;
+  /** Subscribe to a single room only (room-scoped stream). */
+  room?: string;
+  /** Subscribe to multiple rooms. Ignored if `room` is set. */
+  rooms?: string[];
 }
 &nbsp;
-interface UpdateCache {
-  /** Last-known latest version from npm. */
-  latest?: string;
-  /** When we last successfully contacted the registry (ms epoch). */
-  checkedAt?: number;
-  /** If set, skip the whole update flow until this time (install-failure backoff). */
-  skipUntil?: number;
+export interface StreamHandle {
+  /** Stop the stream and tear down the current connection. Idempotent. */
+  stop: () =&gt; void;
 }
 &nbsp;
-// --- semver (hand-rolled; no dependency) -------------------------------------
+const RECONNECT_CAP_MS = 15_000;
 &nbsp;
-/**
- * Compare two version strings. Returns &lt;0 if a&lt;b, 0 if equal, &gt;0 if a&gt;b.
- * Pre-release suffixes are stripped (`1.2.3-rc` ranks as `1.2.3`); missing/NaN segments
- * count as 0. Club has never used pre-release tags, so this is intentionally simple.
- */
-export function compareVersions(a: string, b: string): number {
-  const parse = (v: string): number[] =&gt;
-    v
-      .split("-")[0]
-      .split(".")
-      .map((s) =&gt; {
-        const n = Number(s);
-        return Number.isFinite(n) ? n : 0;
-      });
-  const pa = parse(a);
-  const pb = parse(b);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i &lt; len; i++) {
-    const da = pa[i] ?? 0;
-    const db = pb[i] ?? <span class="branch-1 cbranch-no" title="branch not covered" >0;</span>
-    if (da !== db) return da &lt; db ? -1 : 1;
+// Subscribe to /messages/stream. onMessage fires for each event. The stream
+// reconnects on drop and catches up on anything missed while disconnected
+// (fetched via GET /messages?since=&lt;lastId&gt;), de-duplicating by message id so
+// overlap between the live buffer and the catch-up query is delivered exactly
+// once. Returns a stop() handle.
+export function streamMessages(
+  c: ClubConn,
+  onMessage: (m: Message) =&gt; void,
+  opts: StreamOptions = {},
+): StreamHandle {
+  const reconnect = opts.reconnect ?? true;
+  const maxReconnects = opts.maxReconnects ?? Infinity;
+  const base = opts.backoffMs ?? 500;
+&nbsp;
+  // Room filter for the stream: a single room, a set of rooms, or null = all.
+  // Drives both the /messages/stream?room=|?rooms= query and the catch-up
+  // fetches (which must mirror the subscription scope, else a multi-room client
+  // would only catch up general on reconnect).
+  const roomFilter: string[] | null = opts.room
+    ? <span class="branch-0 cbranch-no" title="branch not covered" >[opts.room]</span>
+    : opts.rooms &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >opts.rooms.length &gt; 0</span>
+      ? <span class="branch-0 cbranch-no" title="branch not covered" >opts.rooms</span>
+      : null;
+  const roomQuery = opts.room
+    ? <span class="branch-0 cbranch-no" title="branch not covered" >`room=${encodeURIComponent(opts.room)}`</span>
+    : opts.rooms &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >opts.rooms.length &gt; 0</span>
+      ? <span class="branch-0 cbranch-no" title="branch not covered" >`rooms=${opts.rooms.map(encodeURIComponent).join(",")}`</span>
+      : "";
+&nbsp;
+  // One abort signal for the whole subscription lifetime; stop() aborts it,
+  // which cuts the reconnect backoff short and tears down the live fetch.
+  const stopSignal = new AbortController();
+  let fetchController: AbortController | null = null;
+  // Highest message id seen. ulid ids are lexicographically monotonic, so this
+  // doubles as a "resume cursor" for catch-up and a de-dup bound.
+  let lastId: string | undefined;
+&nbsp;
+  void loop();
+&nbsp;
+  async function loop(): Promise&lt;void&gt; {
+    let attempts = 0;
+    while (!stopSignal.signal.aborted) {
+      try {
+        await openStream();
+<span class="cstat-no" title="statement not covered" >        attempts = 0; // healthy connection resets the backoff window</span>
+      } catch (err) {
+        if (stopSignal.signal.aborted) return;
+        const err2 = err instanceof Error ? err : <span class="branch-1 cbranch-no" title="branch not covered" >new Error(String(err));</span>
+        if (!reconnect || attempts &gt;= maxReconnects) {
+          opts.onError?.(err2);
+          return;
+        }
+        opts.onError?.(err2);
+        await sleep(jitteredBackoff(attempts, base, RECONNECT_CAP_MS), stopSignal.signal);
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (stopSignal.signal.aborted) <span class="cstat-no" title="statement not covered" >return;</span>
+        attempts++;
+      }
+    }
   }
-  return 0;
-}
 &nbsp;
-export function isNewer(latest: string, current: string): boolean {
-  return compareVersions(latest, current) &gt; 0;
-}
-&nbsp;
-// --- cache I/O (mirrors src/config.ts) ---------------------------------------
-&nbsp;
-function readCache(): UpdateCache {
-  try {
-    const raw = readFileSync(updateCachePath(), "utf8");
-    const obj = JSON.parse(raw);
-    return obj &amp;&amp; typeof obj === "object" ? (obj as UpdateCache) : <span class="branch-1 cbranch-no" title="branch not covered" >{};</span>
-  } catch {
-    return {};
-  }
-}
-&nbsp;
-function writeCache(c: UpdateCache): void {
-  try {
-    const p = updateCachePath();
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (!existsSync(dirname(p))) <span class="cstat-no" title="statement not covered" >mkdirSync(dirname(p), { recursive: true });</span>
-    writeFileSync(p, JSON.stringify(c, null, 2) + "\n", "utf8");
-  } catch {
-    /* cache writes are best-effort */
-  }
-}
-&nbsp;
-// --- registry lookup ---------------------------------------------------------
-&nbsp;
-/**
- * Fetch the latest published version from npm. Returns null on any failure
- * (network, non-2xx, malformed body, timeout) — callers treat null as "unknown".
- */
-export async function fetchLatestVersion(): Promise&lt;string | null&gt; {
-  const ctrl = new AbortController();
-  const timer = <span class="fstat-no" title="function not covered" >setTimeout(() =&gt; <span class="cstat-no" title="statement not covered" >c</span>trl.abort(), F</span>ETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(REGISTRY_URL, { signal: ctrl.signal });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { version?: string };
-    const v = json?.version;
-    return typeof v === "string" &amp;&amp; VERSION_RE.test(v) ? v : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-&nbsp;
-/**
- * TTL-aware update check.
- *
- * - Within TTL: uses the cached `latest` (no network).
- * - Past TTL: fetches fresh; on success updates `latest`, and **always** updates
- *   `checkedAt` (even on fetch failure) so a prolonged outage doesn't make every
- *   single command pay the 5s timeout — the TTL still advances, and a previously
- *   known `latest` stays usable.
- * - Honors `skipUntil` (install-failure backoff): skip entirely until it expires.
- */
-export async function checkForUpdate(): Promise&lt;{ update: boolean; latest: string | null }&gt; {
-  const cache = readCache();
-  const now = Date.now();
-&nbsp;
-  if (typeof cache.skipUntil === "number" &amp;&amp; now &lt; cache.skipUntil) {
-    return { update: false, latest: null };
-  }
-&nbsp;
-  const fresh = typeof cache.checkedAt === "number" &amp;&amp; now - cache.checkedAt &lt; TTL_MS;
-  let latest: string | null;
-&nbsp;
-  if (fresh) {
-    // No network: reuse whatever we knew, if anything.
-    latest = typeof cache.latest === "string" ? cache.latest : null;
-  } else {
-    latest = await fetchLatestVersion();
-    // Advance checkedAt regardless; only adopt a freshly-fetched latest.
-    writeCache({ ...cache, ...(latest ? { latest } : {}), checkedAt: now });
-  }
-&nbsp;
-  if (!latest) return { update: false, latest: null };
-  return { update: isNewer(latest, CURRENT_VERSION), latest };
-}
-&nbsp;
-// --- install + relaunch ------------------------------------------------------
-&nbsp;
-/**
- * Run `npm i -g club-cli@latest`.
- *
- * stdout is dropped (`'ignore'`) so npm's summary never corrupts a user pipe such as
- * `club members | jq` — we only inherit stderr so install progress/errors are visible.
- */
-export function <span class="fstat-no" title="function not covered" >runSelfUpdate(): Promise&lt;void&gt; {</span>
-<span class="cstat-no" title="statement not covered" >  return new <span class="fstat-no" title="function not covered" >Promise&lt;void&gt;((r</span>esolve, reject) =&gt; {</span>
-    const child = <span class="cstat-no" title="statement not covered" >spawn("npm", ["i", "-g", "club-cli@latest", "--no-progress"], {</span>
-      stdio: ["inherit", "ignore", "inherit"],
-      // Windows needs a shell to resolve `npm` on PATH.
-      shell: process.platform === "win32",
-    });
-<span class="cstat-no" title="statement not covered" >    child.on("error", reject);</span>
-<span class="cstat-no" title="statement not covered" >    child.on(<span class="fstat-no" title="function not covered" >"exit", (c</span>ode) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      if (code === 0) <span class="cstat-no" title="statement not covered" >resolve();</span></span>
-      else <span class="cstat-no" title="statement not covered" >reject(new Error(`npm install failed (exit ${code})`));</span>
-    });
-  });
-}
-&nbsp;
-/**
- * Re-execute the current binary with the exact same argv, but flagged to skip the
- * update check (prevents a loop). Waits for the child and exits with its code, so the
- * caller's original action never runs in this (old) process.
- *
- * Uses `process.execPath` (node) + `process.argv[1]` (bin/club.js) rather than relying
- * on a `club` shim being on PATH — more portable across platforms.
- */
-export function <span class="fstat-no" title="function not covered" >relaunchWithSameArgs(): Promise&lt;never&gt; {</span>
-<span class="cstat-no" title="statement not covered" >  return new <span class="fstat-no" title="function not covered" >Promise&lt;never&gt;((_</span>resolve, reject) =&gt; {</span>
-    const child = <span class="cstat-no" title="statement not covered" >spawn(process.execPath, [process.argv[1], ...process.argv.slice(2)], {</span>
-      stdio: "inherit",
-      env: { ...process.env, CLUB_NO_UPDATE_CHECK: "1" },
-    });
-<span class="cstat-no" title="statement not covered" >    child.on("error", reject);</span>
-<span class="cstat-no" title="statement not covered" >    child.on(<span class="fstat-no" title="function not covered" >"exit", (c</span>ode, signal) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      process.exit(code ?? (signal ? 128 : 0));</span>
-    });
-  });
-}
-&nbsp;
-/**
- * Install the new version, then relaunch to continue the user's original command on the
- * new code. On success this never returns (the relaunch exits the process). On any
- * failure it writes an install-failure backoff and returns, letting the caller fall
- * through to the original command on the old version.
- */
-export async function <span class="fstat-no" title="function not covered" >autoUpdateAndRelaunch(l</span>atest: string): Promise&lt;void&gt; {
-<span class="cstat-no" title="statement not covered" >  process.stderr.write(`club: updating club-cli ${CURRENT_VERSION} → ${latest}\n`);</span>
-<span class="cstat-no" title="statement not covered" >  try {</span>
-<span class="cstat-no" title="statement not covered" >    await runSelfUpdate();</span>
-<span class="cstat-no" title="statement not covered" >    await relaunchWithSameArgs(); // never returns on success</span>
-  } catch {
-    const cache = <span class="cstat-no" title="statement not covered" >readCache();</span>
-<span class="cstat-no" title="statement not covered" >    writeCache({ ...cache, skipUntil: Date.now() + INSTALL_BACKOFF_MS });</span>
-<span class="cstat-no" title="statement not covered" >    process.stderr.write(</span>
-      `club: auto-update failed, continuing with ${CURRENT_VERSION}. run: club update\n`,
+  async function openStream(): Promise&lt;void&gt; {
+    fetchController = new AbortController();
+    // If stop() fires mid-connection, abort the in-flight fetch too.
+    stopSignal.signal.addEventListener(
+      "abort",
+      () =&gt; fetchController?.abort(),
+      { once: true },
     );
-  }
-}
+    const headers: Record&lt;string, string&gt; = { Accept: "text/event-stream" };
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (c.key) headers.Authorization = `Bearer ${c.key}`;
+    const res = await fetch(
+      `${c.server}/messages/stream${roomQuery ? <span class="branch-0 cbranch-no" title="branch not covered" >"?" + roomQuery : "</span>"}`,
+      {
+        headers,
+        signal: fetchController.signal,
+      },
+    );
+    if (!res.ok || !res.body) throw new Error(`stream failed: HTTP ${res.status}`);
 &nbsp;
-/**
- * True when club is launched via tsx against the TypeScript source (e.g. `npm -w club-cli
- * run dev`), where self-updating the published npm package makes no sense.
- */
-export function <span class="fstat-no" title="function not covered" >isDevRun(): boolean {</span>
-  const a1 = <span class="cstat-no" title="statement not covered" >process.argv[1] ?? "";</span>
-<span class="cstat-no" title="statement not covered" >  return /[/\\]src[/\\]index\.[tj]sx?$/.test(a1);</span>
+    // Subscribe-first: the SSE connection is now live, so anything broadcast
+    // during catch-up lands in its buffer. Catch up on the gap (if any); the
+    // id-based de-dup in deliver() collapses any overlap to exactly-once.
+    await catchUp();
+&nbsp;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    // Defensive: protect against malformed servers sending unbounded frame data.
+    // A frame larger than this likely indicates a broken implementation or abuse.
+    const MAX_FRAME_SIZE = 1_000_000; // 1MB per SSE frame
+    while (!stopSignal.signal.aborted) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      // Guard against buffer overflow from a malicious or broken server.
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (buf.length &gt; MAX_FRAME_SIZE) {
+<span class="cstat-no" title="statement not covered" >        throw new Error("SSE frame exceeded maximum size (1MB); disconnecting");</span>
+      }
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        const raw = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        // An SSE frame may carry an `event:` line (named event) and one or more
+        // `data:` lines. Split into the event name (default "message") and the
+        // joined data payload, then dispatch by name. Unknown event names are
+        // ignored — forward-compatible with future named events.
+        let eventName = "message";
+        const dataLines: string[] = [];
+        for (const line of raw.split("\n")) {
+          if (line.startsWith("event:")) {
+            eventName = line.slice(6).trim();
+          } else <span class="missing-if-branch" title="else path not taken" >E</span>if (line.startsWith("data:")) {
+            dataLines.push(line.slice(5).trimStart());
+          }
+        }
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (dataLines.length === 0) <span class="cstat-no" title="statement not covered" >continue; // heartbeat/empty</span>
+        const payload = dataLines.join("\n");
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (payload === "") <span class="cstat-no" title="statement not covered" >continue;</span>
+        try {
+          const obj = JSON.parse(payload);
+          if (eventName === "agent_thinking") {
+            opts.onAgentThinking?.(obj as AgentThinkingEvent);
+          } else if (eventName === "agent_idle") {
+            opts.onAgentIdle?.(obj as AgentIdleEvent);
+          } else <span class="missing-if-branch" title="if path not taken" >I</span>if (eventName === "presence") {
+<span class="cstat-no" title="statement not covered" >            opts.onPresence?.(obj as PresenceEvent);</span>
+          } else <span class="missing-if-branch" title="if path not taken" >I</span>if (eventName === "message_deleted") {
+<span class="cstat-no" title="statement not covered" >            opts.onMessageDeleted?.(obj as MessageDeletedEvent);</span>
+          } else <span class="missing-if-branch" title="if path not taken" >I</span>if (eventName === "message_reaction") {
+<span class="cstat-no" title="statement not covered" >            opts.onReaction?.(obj as MessageReactionEvent);</span>
+          } else if (eventName === "message") {
+            // The default SSE event (no `event:` line) — the original feed.
+            deliver(obj as Message);
+          }
+          // Any other named event is ignored — forward-compatible with future
+          // events the client doesn't yet know about.
+        } catch {
+          /* ignore malformed */
+        }
+      }
+    }
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (!stopSignal.signal.aborted) throw new Error("stream ended");
+  }
+&nbsp;
+  function deliver(m: Message): void {
+    // De-dup: skip anything at or before the resume cursor (catch-up overlap).
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (lastId !== undefined &amp;&amp; m.id &lt;= lastId) <span class="cstat-no" title="statement not covered" >return;</span>
+    lastId = m.id;
+    onMessage(m);
+  }
+&nbsp;
+  async function catchUp(): Promise&lt;void&gt; {
+    if (lastId === undefined) return; // nothing to resume from
+    // Catch up the gap per subscribed room: GET /messages is single-room, so a
+    // multi-room subscription fetches each room's new-since-cursor messages.
+    // ulid ids are globally monotonic, so the id-based de-dup in deliver()
+    // collapses any overlap to exactly-once and lastId advances correctly
+    // across rooms. For an all-rooms subscription we first enumerate rooms
+    // (best-effort — a failure just skips catch-up, the live stream covers it).
+    let rooms: string[];
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (roomFilter !== null) {
+<span class="cstat-no" title="statement not covered" >      rooms = roomFilter;</span>
+    } else {
+      try {
+        rooms = (await listRooms(c)).map((r) =&gt; r.slug);
+      } catch {
+<span class="cstat-no" title="statement not covered" >        return;</span>
+      }
+    }
+    for (const room of rooms) {
+      try {
+        const missed = await listMessages(c, { since: lastId, room });
+        for (const m of missed) deliver(m);
+      } catch {
+        /* best-effort; the reopened stream keeps delivering live messages */
+      }
+    }
+  }
+&nbsp;
+  return {
+    stop: () =&gt; {
+      stopSignal.abort();
+      fetchController?.abort();
+    },
+  };
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -742,16 +742,16 @@ export function <span class="fstat-no" title="function not covered" >isDevRun():
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-18T07:04:57.503Z
+                at 2026-07-18T07:04:47.933Z
             </div>
-        <script src="../../prettify.js"></script>
+        <script src="prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../../sorter.js"></script>
-        <script src="../../block-navigation.js"></script>
+        <script src="sorter.js"></script>
+        <script src="block-navigation.js"></script>
     </body>
 </html>
     

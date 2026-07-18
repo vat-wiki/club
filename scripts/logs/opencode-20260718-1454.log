@@ -642,3 +642,65 @@ dist/assets/index-B-7Qgq7o.js         2,324.57 kB │ gzip: 786.39 kB
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 ✓ built in 5.09s
 [0m
+[0m$ [0mnpm test -- --run 2>&1 | tail -60
+3:04:06 PM [vite] warning: `optimizeDeps.esbuildOptions` option was specified by "vite:react-babel" plugin. This option is deprecated, please use `optimizeDeps.rolldownOptions` instead.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ jsx: 'automatic', jsxImportSource: undefined }`
+
+ RUN  v4.1.10 /home/dev/repos/club/packages/web
+      Coverage enabled with v8
+
+
+ Test Files  19 passed (19)
+      Tests  203 passed (203)
+   Start at  15:04:06
+   Duration  1.70s (transform 1.62s, setup 1.11s, import 4.03s, tests 2.14s, environment 6.39s)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   68.28 |    60.14 |   63.73 |   69.99 |                   
+ components        |   63.11 |    57.38 |   58.94 |   64.85 |                   
+  auth-dialog.tsx  |   25.35 |    31.14 |   11.11 |   25.75 | ...11-133,143-304 
+  avatar.tsx       |     100 |       50 |     100 |     100 | 14                
+  boot-screen.tsx  |   84.78 |    79.16 |   66.66 |   87.17 | 67-68,88-89,169   
+  composer.tsx     |   63.57 |    54.92 |   68.11 |   63.98 | ...56-570,720-721 
+  file-card.tsx    |   55.71 |    41.26 |   64.28 |   57.37 | 50-58,138,162-209 
+  ...-lightbox.tsx |   94.44 |    91.66 |     100 |     100 | 43-53             
+  ...al-dialog.tsx |   86.36 |    76.19 |    62.5 |      85 | 84,141-142        
+  ...-switcher.tsx |    30.3 |    21.62 |   27.77 |   29.82 | ...95-108,129,157 
+  ...view-chip.tsx |     100 |    76.47 |     100 |     100 | 67-81,147         
+  ...ion-popup.tsx |   93.33 |       90 |     100 |     100 | 46                
+  ...ion-toast.tsx |      75 |       50 |   66.66 |      85 | 30-31,53          
+  message-list.tsx |   71.77 |    65.97 |   62.06 |   77.27 | ...85,494-496,541 
+  ...oom-sheet.tsx |   42.85 |      100 |   33.33 |   42.85 | 54-59             
+  ...pbar-menu.tsx |   51.85 |       50 |   14.28 |   53.84 | ...98-131,172-200 
+  ...er-dialog.tsx |   28.57 |    22.22 |    12.5 |   29.62 | 48-66,76-121      
+  room-list.tsx    |   80.35 |    75.86 |   76.92 |      86 | 135-136,175-184   
+  roster.tsx       |   82.75 |    68.75 |   88.88 |   84.61 | 52,67-68,80       
+  ...rm-dialog.tsx |      75 |       60 |   33.33 |      75 | 60-97             
+  topbar.tsx       |   85.71 |       75 |   66.66 |   85.71 | 113               
+  ...ey-dialog.tsx |   63.63 |    44.44 |   33.33 |      70 | 43-91             
+ components/ui     |     100 |    76.92 |     100 |     100 |                   
+  button.tsx       |     100 |    66.66 |     100 |     100 | 37                
+  input.tsx        |     100 |       50 |     100 |     100 | 18                
+  separator.tsx    |     100 |       75 |     100 |     100 | 15                
+ hooks             |   87.65 |    80.59 |   80.43 |   90.97 |                   
+  use-copy.ts      |     100 |    93.33 |     100 |     100 | 46                
+  use-rooms.ts     |   77.52 |     73.8 |   66.66 |   82.85 | ...36-142,148,152 
+  ...ing-agents.ts |     100 |    83.33 |     100 |     100 | 40                
+ lib               |   70.67 |    63.51 |   64.38 |   71.88 |                   
+  api.ts           |       5 |        0 |       0 |       5 | 18,22-102         
+  format.tsx       |    74.6 |       70 |      75 |   73.77 | ...49-154,163-164 
+  i18n.tsx         |   83.92 |       50 |   93.75 |    87.5 | 54,63,624-626,643 
+  mention.ts       |   94.44 |    86.36 |     100 |   96.66 | 70                
+  upload.ts        |   52.56 |    60.97 |      60 |   56.92 | 136-178           
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 68.28% ( 982/1438 )
+Branches     : 60.14% ( 593/986 )
+Functions    : 63.73% ( 239/375 )
+Lines        : 69.99% ( 884/1263 )
+================================================================================
+[0m

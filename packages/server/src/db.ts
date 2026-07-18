@@ -260,7 +260,7 @@ const allParticipantsStmt = db.prepare<[], { id: string; name: string; created_a
   `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
 );
 
-export function getAllParticipants() {
+export function getAllParticipants(): { id: string; name: string; created_at: number }[] {
   return allParticipantsStmt.all();
 }
 
@@ -294,7 +294,11 @@ export function getRecentMessages(room: string, limit: number): MessageRow[] {
   return recentStmt.all(room, limit).reverse();
 }
 
-export function getMessagesSince(sinceId: string, room: string, limit: number) {
+export function getMessagesSince(
+  sinceId: string,
+  room: string,
+  limit: number,
+): { rowid: number; messages: MessageRow[] } {
   const row = sinceStmt.get(sinceId);
   if (!row) return { rowid: 0, messages: [] as MessageRow[] };
   return { rowid: row.rowid, messages: sinceMessagesStmt.all(row.rowid, room, limit) };

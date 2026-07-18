@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10% </span>
+                <span class="strong">80% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/20</span>
+                <span class='fraction'>16/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">69.23% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>9/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>2/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10.52% </span>
+                <span class="strong">84.21% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/19</span>
+                <span class='fraction'>16/19</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -120,41 +120,41 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Lightweight in-memory rate limiter for Hono.
@@ -177,31 +177,31 @@ const buckets = new Map&lt;string, Bucket&gt;();
   }
 }, 120_000).unref();
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >rateLimit(o</span>ptions: {
+export function rateLimit(options: {
   max: number; // max requests per window
   windowMs: number; // window in milliseconds
   key?: (c: import("hono").Context) =&gt; string; // custom key extractor
 }): import("hono").MiddlewareHandler {
-  const { max, windowMs, key } = <span class="cstat-no" title="statement not covered" >options;</span>
+  const { max, windowMs, key } = options;
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return <span class="fstat-no" title="function not covered" >async (c</span>, next) =&gt; {</span>
-    const identifier = <span class="cstat-no" title="statement not covered" >key ? key(c) : c.req.header("x-forwarded-for") ?? c.req.raw.headers.get("x-real-ip") ?? "unknown";</span>
+  return async (c, next) =&gt; {
+    const identifier = key ? key(c) : c.req.header("x-forwarded-for") ?? <span class="branch-1 cbranch-no" title="branch not covered" >c.req.raw.headers.get("x-real-ip") ?? <span class="branch-2 cbranch-no" title="branch not covered" >"</span>unknown";</span>
 &nbsp;
-    const now = <span class="cstat-no" title="statement not covered" >Date.now();</span>
-    let bucket = <span class="cstat-no" title="statement not covered" >buckets.get(identifier);</span>
-<span class="cstat-no" title="statement not covered" >    if (!bucket || now - bucket.lastRefill &gt; windowMs) {</span>
-<span class="cstat-no" title="statement not covered" >      bucket = { tokens: max, lastRefill: now };</span>
-<span class="cstat-no" title="statement not covered" >      buckets.set(identifier, bucket);</span>
+    const now = Date.now();
+    let bucket = buckets.get(identifier);
+    if (!bucket || now - bucket.lastRefill &gt; windowMs) {
+      bucket = { tokens: max, lastRefill: now };
+      buckets.set(identifier, bucket);
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (bucket.tokens &lt;= 0) {</span>
-      const remaining = <span class="cstat-no" title="statement not covered" >Math.ceil((bucket.lastRefill + windowMs - now) / 1000);</span>
-<span class="cstat-no" title="statement not covered" >      c.header("Retry-After", String(remaining));</span>
-<span class="cstat-no" title="statement not covered" >      return c.json({ error: "rate limited" }, 429);</span>
+    if (bucket.tokens &lt;= 0) {
+      const remaining = Math.ceil((bucket.lastRefill + windowMs - now) / 1000);
+      c.header("Retry-After", String(remaining));
+      return c.json({ error: "rate limited" }, 429);
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    bucket.tokens--;</span>
-<span class="cstat-no" title="statement not covered" >    await next();</span>
+    bucket.tokens--;
+    await next();
   };
 }
 &nbsp;</pre></td></tr></table></pre>
@@ -211,7 +211,7 @@ export function <span class="fstat-no" title="function not covered" >rateLimit(o
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-18T07:40:56.662Z
+                at 2026-07-18T07:57:21.901Z
             </div>
         <script src="../prettify.js"></script>
         <script>

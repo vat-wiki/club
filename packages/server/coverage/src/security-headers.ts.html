@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for src/auth.ts</title>
+    <title>Code coverage report for src/security-headers.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -19,20 +19,20 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">src</a> auth.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">src</a> security-headers.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">91.66% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/12</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">75% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/8</span>
+                <span class='fraction'>0/0</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90.9% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>10/11</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -98,7 +98,16 @@
 <a name='L33'></a><a href='#L33'>33</a>
 <a name='L34'></a><a href='#L34'>34</a>
 <a name='L35'></a><a href='#L35'>35</a>
-<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -114,61 +123,79 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">182x</span>
-<span class="cline-any cline-yes">182x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">177x</span>
-<span class="cline-any cline-yes">177x</span>
-<span class="cline-any cline-yes">176x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">176x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { createMiddleware } from "hono/factory";
-import type { Participant } from "@club/shared";
-import { parseBearer } from "@club/shared";
-import { getParticipantByKeyHash } from "./db.js";
-import { hashKey } from "./crypto.js";
 &nbsp;
-export { hashKey };
-&nbsp;
-declare module "hono" {
-  interface ContextVariableMap {
-    participant: Participant;
-  }
-}
-&nbsp;
-// parseBearer() lives in ./lib.ts (pure + unit-tested).
-&nbsp;
-export const requireAuth = createMiddleware(async (c, next) =&gt; {
-  const key = parseBearer(c.req.header("Authorization"));
-  if (!key) {
-    // Distinguish missing header from malformed header for better debugging.
-    // Both are 401 (authentication required), but the message guides the client.
-    const authHeader = c.req.header("Authorization");
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (!authHeader || <span class="branch-1 cbranch-no" title="branch not covered" >authHeader.trim() === "") {</span>
-      return c.json({ error: "missing Authorization header" }, 401);
-    }
-<span class="cstat-no" title="statement not covered" >    return c.json({ error: "invalid Authorization format (expected 'Bearer &lt;token&gt;')" }, 401);</span>
-  }
-  const row = getParticipantByKeyHash(hashKey(key));
-  if (!row) return c.json({ error: "invalid key" }, 401);
-  c.set("participant", {
-    id: row.id,
-    name: row.name,
-    createdAt: row.created_at,
-  });
+/**
+ * Security response headers middleware.
+ *
+ * Adds standard defense-in-depth headers to every response:
+ *   - Content-Security-Policy: restricts script/style/font origins; blocks framing.
+ *   - Strict-Transport-Security: forces HTTPS on supporting clients.
+ *   - X-Content-Type-Options: prevents MIME-type sniffing.
+ *   - X-Frame-Options: legacy framing protection (backup for CSP frame-ancestors).
+ *   - Referrer-Policy: limits referrer information leakage.
+ *   - Permissions-Policy: disables unnecessary browser features.
+ *
+ * All header values are safe defaults for a chat SPA served at the same origin
+ * as the API. In a production deployment behind a reverse proxy that also
+ * terminates TLS, HSTS and the security headers still help when clients access
+ * the origin directly.
+ */
+export const securityHeaders = createMiddleware(async (c, next) =&gt; {
+  c.header(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self'",
+      "connect-src 'self' ws: wss:",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests",
+    ].join("; "),
+  );
+  c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=()",
+  );
   await next();
-});</pre></td></tr></table></pre>
+});
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->

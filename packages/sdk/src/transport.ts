@@ -1,4 +1,5 @@
 import type {
+  CreateMessageRequest,
   CreateParticipantRequest,
   CreateParticipantResponse,
   ListMessagesQuery,
@@ -11,8 +12,16 @@ import type {
   Room,
   UploadFileResponse,
 } from "@club/shared";
-import { MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
-import { ClubApiError } from "./errors.js";
+import {
+  ClubApiError,
+  formatError,
+  shouldRetry,
+  jitteredBackoff,
+  sleep,
+  MAX_DOCUMENT_BYTES,
+  MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES,
+} from "@club/shared";
 
 // ── Connection ──────────────────────────────────────────────────────
 // key is optional: createParticipant() needs no auth, so a client can be
@@ -51,40 +60,33 @@ async function check<T>(res: Response): Promise<T> {
   return (res.status === 204 ? null : await res.json()) as T;
 }
 
-// ── Retry / timeout policy (pure, exported for testing) ─────────────
-
-/** Whether a response of this status on this method is worth retrying. */
-export function shouldRetry(method: string, status: number): boolean {
-  // Only idempotent reads are retried; POST /messages is never retried
-  // (a retry could duplicate the message).
-  if (method !== "GET") return false;
-  return status === 429 || status >= 500;
-}
-
-/** Deterministic exponential backoff (ms) for a 0-based attempt. */
-export function computeBackoff(attempt: number, base = 200, cap = 2000): number {
-  return Math.min(cap, base * 2 ** attempt);
-}
-
-function jitteredBackoff(attempt: number): number {
-  // Full jitter: 50–100% of the exponential value, capped at 2s.
-  return computeBackoff(attempt) * (0.5 + Math.random() * 0.5);
-}
+// ── Retry / timeout policy ──────────────────────────────────────────
+// Delegated to @club/shared utilities for consistency across SDK and
+// any other consumer (CLI, MCP, web).
 
 function wrapErr(err: unknown): ClubApiError {
   if (err instanceof ClubApiError) return err;
-  if ((err as Error)?.name === "AbortError") return new ClubApiError("request timeout", 408);
-  return new ClubApiError((err as Error)?.message ?? "network error", 0);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+  if (err instanceof Error && err.name === "AbortError") {
+    return new ClubApiError("request timeout", 408);
+  }
+  return new ClubApiError(formatError(err), 0);
 }
 
 export interface RequestOptions extends CallOpts {
   method?: string;
-  body?: unknown;
+  /** JSON-serializable request body. */
+  body?: Jsonable;
 }
+
+/** JSON-serializable values accepted as `RequestOptions.body`. */
+type Jsonable =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Jsonable[]
+  | { [k: string]: Jsonable };
 
 // Core request: typed JSON over fetch, with per-request timeout and retry on
 // transient failures (network errors / timeouts / 429 / 5xx) for idempotent
@@ -155,10 +157,16 @@ export async function sendMessage(
 ): Promise<Message> {
   // Backward compatible: when no attachmentIds/replyToId/room are supplied the
   // body is just { content } exactly as before. With any, the body carries them.
-  const body: Record<string, unknown> = { content };
-  if (opts.attachmentIds && opts.attachmentIds.length > 0) body.attachmentIds = opts.attachmentIds;
-  if (opts.replyToId) body.replyToId = opts.replyToId;
-  if (opts.room) body.room = opts.room;
+  const body: CreateMessageRequest = { content, attachmentIds: [], room: "general" };
+  if (opts.attachmentIds && opts.attachmentIds.length > 0) {
+    body.attachmentIds = opts.attachmentIds;
+  }
+  if (opts.replyToId) {
+    body.replyToId = opts.replyToId;
+  }
+  if (opts.room) {
+    body.room = opts.room;
+  }
   return request<Message>(c, "/messages", {
     method: "POST",
     body,

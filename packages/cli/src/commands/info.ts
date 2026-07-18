@@ -3,7 +3,7 @@
 // Display current session info and useful stats.
 
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk";
+import { ClubClient, formatError } from "@club/sdk";
 import { defaultRoom, requireConfig } from "../config.js";
 
 export function makeInfoCommand(): Command {
@@ -37,7 +37,7 @@ export function makeInfoCommand(): Command {
           console.log(`  ${m.name}`);
         }
       } catch (err) {
-        console.error((err as Error).message);
+        console.error(formatError(err));
         process.exit(1);
       }
     });

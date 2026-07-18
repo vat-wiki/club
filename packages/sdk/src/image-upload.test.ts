@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClubApiError } from "./index.js";
 import {
-  assertImageCount,
+  assertAttachmentCount,
   uploadImageFile,
   uploadVideoFile,
   uploadDocumentFile,
@@ -36,18 +36,18 @@ function tmpDir(): string {
   return mkdtempSync(join(tmpdir(), "club-img-"));
 }
 
-describe("assertImageCount", () => {
+describe("assertAttachmentCount", () => {
   it("accepts up to MAX_IMAGES_PER_MESSAGE (8) paths", () => {
-    expect(() => assertImageCount(Array(8).fill("a.png"))).not.toThrow();
+    expect(() => assertAttachmentCount(Array(8).fill("a.png"))).not.toThrow();
   });
 
   it("throws ClubApiError when too many attachments are requested", () => {
-    expect(() => assertImageCount(Array(9).fill("a.png"))).toThrow(/too many attachments/);
-    expect(() => assertImageCount(Array(9).fill("a.png"))).toThrow(ClubApiError);
+    expect(() => assertAttachmentCount(Array(9).fill("a.png"))).toThrow(/too many attachments/);
+    expect(() => assertAttachmentCount(Array(9).fill("a.png"))).toThrow(ClubApiError);
   });
 
   it("accepts an empty list", () => {
-    expect(() => assertImageCount([])).not.toThrow();
+    expect(() => assertAttachmentCount([])).not.toThrow();
   });
 });
 

@@ -45,6 +45,26 @@ COPY --from=build /app/packages/server/dist packages/server/dist
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/web/dist    packages/web/dist
 
+# Non-root user for runtime (defense-in-depth: container breakouts can't
+# escalate from root inside the container). 'node' user already exists in the
+# bookworm-slim image (UID 1000). The /data volume is mounted by docker-compose
+# and must be writable by this user.
+RUN chown -R node:node /app && \
+    mkdir -p /data && \
+    chown -R node:node /data
+USER node
+
+# Entrypoint: ensure /data is writable by the non-root user. Docker named
+# volumes are created root-owned; this chown is idempotent and harmless on
+# bind-mounts that already have correct ownership. Runs before CMD.
+RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
+    echo 'if [ -d /data ] && [ "$(stat -c %u /data 2>/dev/null)" = "0" ]; then' >> /usr/local/bin/entrypoint.sh && \
+    echo '  chown -R node:node /data || true' >> /usr/local/bin/entrypoint.sh && \
+    echo 'fi' >> /usr/local/bin/entrypoint.sh && \
+    echo 'exec "$@"' >> /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
 # HOST/PORT server 已有默认；CLUB_DB 指向卷内，持久化 SQLite。
 ENV HOST=0.0.0.0 \
     PORT=6200 \

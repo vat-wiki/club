@@ -7,7 +7,8 @@
 // here) keeps this module dependent only on shape — the test fakes them; the
 // action wires the real SDK functions.
 
-import { assertImageCount, type ClubConn } from "@club/sdk/node";
+import { type Message } from "@club/shared";
+import { assertAttachmentCount, type ClubConn } from "@club/sdk/node";
 
 export interface SendDeps {
   /** Upload one local image path → attachment id. Throws on any pre-flight failure. */
@@ -17,7 +18,7 @@ export interface SendDeps {
   /** Upload one local document path → attachment id. Throws on any pre-flight failure. */
   uploadDocument: (conn: ClubConn, path: string) => Promise<{ id: string }>;
   /** Send the composed message (text + attachment ids) into `room`. */
-  send: (content: string, attachmentIds?: string[], room?: string) => Promise<unknown>;
+  send: (content: string, attachmentIds?: string[], room?: string) => Promise<Message>;
 }
 
 export interface SendInput {
@@ -57,7 +58,7 @@ export async function runSend(
 
   // Fail fast on an over-long attachment list before any upload happens.
   // Images, videos, and documents all share one per-message cap.
-  assertImageCount([...images, ...videos, ...documents]);
+  assertAttachmentCount([...images, ...videos, ...documents]);
 
   const attachmentIds: string[] = [];
   for (const p of images) {

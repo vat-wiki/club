@@ -5,6 +5,7 @@ import type {
   Mention,
   Message,
   Participant,
+  Reaction,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
   Room,
@@ -242,7 +243,7 @@ export class ClubClient {
   /** POST /messages/:id/reactions { emoji } — toggle a reaction on a message.
    *  Adds the reaction if not present, removes if already present. Returns the
    *  updated aggregate [{ emoji, count }] so the caller can refresh the UI. */
-  toggleReaction(id: string, emoji: string): Promise<{ emoji: string; count: number }[]> {
+  toggleReaction(id: string, emoji: string): Promise<Reaction[]> {
     return toggleMessageReactionFn(this.conn(), id, emoji, { timeoutMs: this.timeoutMs });
   }
 }

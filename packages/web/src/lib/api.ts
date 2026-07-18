@@ -1,5 +1,6 @@
 import { ClubClient, request, type ClubConn } from "@club/sdk";
 import type {
+  CreateMessageRequest,
   Participant,
   Message,
   Room,
@@ -36,9 +37,12 @@ export const api = {
     room?: string,
   ): Promise<Message> => {
     if (attachmentIds.length > 0 || replyToId || room) {
-      const body: Record<string, unknown> = { content, attachmentIds: [...attachmentIds] };
-      if (replyToId) body.replyToId = replyToId;
-      if (room) body.room = room;
+      const body: CreateMessageRequest = {
+        content,
+        attachmentIds: [...attachmentIds],
+        room: room ?? "general",
+        ...(replyToId ? { replyToId } : {}),
+      };
       return request<Message>(c, "/messages", { method: "POST", body });
     }
     return client(c).send(content);
@@ -52,14 +56,12 @@ export const api = {
   search: (c: ClubConn, q: string, room?: string): Promise<Message[]> =>
     client(c).search(q, room ? { room } : undefined),
   deleteMessage: (c: ClubConn, id: string): Promise<void> =>
-    request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
-      () => undefined,
-    ),
+    request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }),
   react: (c: ClubConn, messageId: string, emoji: string): Promise<void> =>
     request<void>(c, `/messages/${encodeURIComponent(messageId)}/reactions`, {
       method: "POST",
       body: { emoji },
-    }).then(() => undefined),
+    }),
   // Report "I'm typing" / "I stopped" — drives the typing indicator for both
   // humans (debounced while composing) and agents (while processing a mention).
   // `room` scopes the indicator to that room's stream (PRD §5.1).

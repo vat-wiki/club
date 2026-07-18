@@ -6,7 +6,7 @@
 // Use --meta to view file metadata.
 
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk/node";
+import { ClubClient, formatError } from "@club/sdk/node";
 import { requireConfig } from "../config.js";
 
 export function makeCatCommand(): Command {
@@ -57,7 +57,7 @@ export function makeCatCommand(): Command {
         process.stdout.write(base64);
 
       } catch (err) {
-        console.error((err as Error).message);
+        console.error(formatError(err));
         process.exit(1);
       }
     });

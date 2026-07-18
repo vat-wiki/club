@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { AgentStatusRequest } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import {
@@ -23,6 +24,15 @@ import {
 export const agents = new Hono();
 agents.use("*", requireAuth);
 
+// Content-type guard: reject non-JSON POST bodies.
+const requireJson = createMiddleware(async (c, next) => {
+  const ct = c.req.header("content-type");
+  if (ct && !ct.toLowerCase().startsWith("application/json")) {
+    return c.json({ error: "Content-Type must be application/json" }, 415);
+  }
+  await next();
+});
+
 // POST /agents/thinking   { room? } -> 204 (and an `agent_thinking` SSE broadcast)
 //
 // Lights up the typing/thinking indicator for the authenticated participant.
@@ -38,7 +48,7 @@ agents.use("*", requireAuth);
 // re-broadcasting (no indicator strobe).
 //
 // Agent-only: Human keys get 404 (they have no use for this endpoint).
-agents.post("/thinking", async (c) => {
+agents.post("/thinking", requireJson, async (c) => {
   const me = c.get("participant");
 
   const body = await c.req.json().catch(() => ({}));
@@ -74,7 +84,7 @@ agents.post("/thinking", async (c) => {
 // reaches the same room-scoped subscribers that saw the indicator.
 //
 // Security: Same as /thinking — the authed key identifies the participant.
-agents.post("/idle", async (c) => {
+agents.post("/idle", requireJson, async (c) => {
   const me = c.get("participant");
 
   const body = await c.req.json().catch(() => ({}));

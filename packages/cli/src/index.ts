@@ -28,6 +28,12 @@ function die(msg: string | Error): never {
   process.exit(1);
 }
 
+// Catch unhandled promise rejections that escape the Commander lifecycle.
+// parseAsync().catch() above handles rejections from command actions, but this
+// safety net catches anything that slips through (e.g. a preAction hook firing
+// after the process has already started shutting down).
+process.on("unhandledRejection", (err) => die(err as Error));
+
 const program = new Command();
 
 program

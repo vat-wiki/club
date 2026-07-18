@@ -1,4 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createMiddleware } from "hono/factory";
 import { Hono } from "hono";
 import { ulid } from "ulid";
 import {
@@ -14,8 +15,33 @@ import {
   updateParticipantRecover,
 } from "../db.js";
 import { hashKey } from "../crypto.js";
+import { rateLimit } from "../rate-limit.js";
 
 export const participants = new Hono();
+
+// Strict rate limit on key-issuance endpoints: 10 requests per minute per IP.
+// Key issuance (POST /participants) and recovery (POST /participants/recover)
+// are high-value targets for brute-force / credential-stuffing attacks. The
+// global 120/min limit is too permissive here; this tighter cap makes it
+// impractical to enumerate names or hammer recovery attempts.
+// Disabled in test mode (NODE_ENV=test) so tests can exercise these endpoints
+// without hitting the rate ceiling.
+const isTest = process.env.NODE_ENV === "test";
+const authLimiter = isTest
+  ? undefined
+  : rateLimit({ max: 10, windowMs: 60_000 });
+
+// Content-type guard: reject POST/PUT/PATCH requests that don't declare
+// application/json. Prevents content-type spoofing where an attacker sends
+// a non-JSON body that the route might still try to parse. Accepts empty
+// Content-Type (test harnesses that JSON.stringify without an explicit header).
+const requireJson = createMiddleware(async (c, next) => {
+  const ct = c.req.header("content-type");
+  if (ct && !ct.toLowerCase().startsWith("application/json")) {
+    return c.json({ error: "Content-Type must be application/json" }, 415);
+  }
+  await next();
+});
 
 // Generate a single-use key. Plaintext returned exactly once. The key carries
 // only the `club_` namespace prefix — no participant kind, since club no longer
@@ -46,26 +72,49 @@ function safeEqualHex(a: string, b: string): boolean {
 }
 
 // POST /participants  { name } -> { key, recoverCode, participant }
-participants.post("/", async (c) => {
-  const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
-  }
-  const { name } = parsed.data;
-  if (getParticipantByName(name)) {
-    return c.json({ error: `name "${name}" is taken` }, 409);
-  }
-  const id = ulid();
-  const plaintext = newKey();
-  const recoverCode = newRecoverCode();
-  insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
-  const participant: Participant = {
-    id,
-    name,
-    createdAt: Date.now(),
-  };
-  return c.json({ key: plaintext, recoverCode, participant }, 201);
-});
+if (isTest) {
+  participants.post("/", requireJson, async (c) => {
+    const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    }
+    const { name } = parsed.data;
+    if (getParticipantByName(name)) {
+      return c.json({ error: `name "${name}" is taken` }, 409);
+    }
+    const id = ulid();
+    const plaintext = newKey();
+    const recoverCode = newRecoverCode();
+    insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
+    const participant: Participant = {
+      id,
+      name,
+      createdAt: Date.now(),
+    };
+    return c.json({ key: plaintext, recoverCode, participant }, 201);
+  });
+} else {
+  participants.post("/", requireJson, authLimiter!, async (c) => {
+    const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    }
+    const { name } = parsed.data;
+    if (getParticipantByName(name)) {
+      return c.json({ error: `name "${name}" is taken` }, 409);
+    }
+    const id = ulid();
+    const plaintext = newKey();
+    const recoverCode = newRecoverCode();
+    insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
+    const participant: Participant = {
+      id,
+      name,
+      createdAt: Date.now(),
+    };
+    return c.json({ key: plaintext, recoverCode, participant }, 201);
+  });
+}
 
 // POST /participants/recover  { name, recoverCode }
 //   -> { key, recoverCode, participant }   (reissued key + fresh recovery code)
@@ -75,40 +124,80 @@ participants.post("/", async (c) => {
 // On success the recovery code is single-use: it is rotated to a brand-new one
 // (PRD §5.4 / §8.1 "换发新恢复码"), keeping each participant always armed with
 // exactly one active recovery code.
-participants.post("/recover", async (c) => {
-  const parsed = RecoverParticipantRequest.safeParse(
-    await c.req.json().catch(() => ({})),
-  );
-  if (!parsed.success) {
-    // Validation failure leaks nothing about name existence; treat as bad
-    // shape and return 400 with the generic message.
-    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
-  }
-  const { name, recoverCode } = parsed.data;
-  const row = getParticipantForRecover(name);
+if (isTest) {
+  participants.post("/recover", requireJson, async (c) => {
+    const parsed = RecoverParticipantRequest.safeParse(
+      await c.req.json().catch(() => ({})),
+    );
+    if (!parsed.success) {
+      // Validation failure leaks nothing about name existence; treat as bad
+      // shape and return 400 with the generic message.
+      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    }
+    const { name, recoverCode } = parsed.data;
+    const row = getParticipantForRecover(name);
 
-  // Reject (uniformly) when the name is unknown OR no recovery code is armed
-  // OR the code doesn't match. Constant-time compare when there is a hash to
-  // compare against; the missing-name and missing-hash branches are folded
-  // into the same 401 so they are indistinguishable to a caller.
-  const matches =
-    !!row &&
-    !!row.recover_hash &&
-    safeEqualHex(hashKey(recoverCode), row.recover_hash);
-  if (!matches) {
-    return c.json({ error: "invalid recovery code" }, 401);
-  }
+    // Reject (uniformly) when the name is unknown OR no recovery code is armed
+    // OR the code doesn't match. Constant-time compare when there is a hash to
+    // compare against; the missing-name and missing-hash branches are folded
+    // into the same 401 so they are indistinguishable to a caller.
+    const matches =
+      !!row &&
+      !!row.recover_hash &&
+      safeEqualHex(hashKey(recoverCode), row.recover_hash);
+    if (!matches) {
+      return c.json({ error: "invalid recovery code" }, 401);
+    }
 
-  // Reissue both credentials, reusing the original id + name.
-  const newPlainKey = newKey();
-  const newCode = newRecoverCode();
-  updateParticipantKey(row.id, hashKey(newPlainKey));
-  updateParticipantRecover(row.id, hashKey(newCode));
+    // Reissue both credentials, reusing the original id + name.
+    const newPlainKey = newKey();
+    const newCode = newRecoverCode();
+    updateParticipantKey(row.id, hashKey(newPlainKey));
+    updateParticipantRecover(row.id, hashKey(newCode));
 
-  const participant: Participant = {
-    id: row.id,
-    name: row.name,
-    createdAt: row.created_at,
-  };
-  return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);
-});
+    const participant: Participant = {
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+    };
+    return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);
+  });
+} else {
+  participants.post("/recover", requireJson, authLimiter!, async (c) => {
+    const parsed = RecoverParticipantRequest.safeParse(
+      await c.req.json().catch(() => ({})),
+    );
+    if (!parsed.success) {
+      // Validation failure leaks nothing about name existence; treat as bad
+      // shape and return 400 with the generic message.
+      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    }
+    const { name, recoverCode } = parsed.data;
+    const row = getParticipantForRecover(name);
+
+    // Reject (uniformly) when the name is unknown OR no recovery code is armed
+    // OR the code doesn't match. Constant-time compare when there is a hash to
+    // compare against; the missing-name and missing-hash branches are folded
+    // into the same 401 so they are indistinguishable to a caller.
+    const matches =
+      !!row &&
+      !!row.recover_hash &&
+      safeEqualHex(hashKey(recoverCode), row.recover_hash);
+    if (!matches) {
+      return c.json({ error: "invalid recovery code" }, 401);
+    }
+
+    // Reissue both credentials, reusing the original id + name.
+    const newPlainKey = newKey();
+    const newCode = newRecoverCode();
+    updateParticipantKey(row.id, hashKey(newPlainKey));
+    updateParticipantRecover(row.id, hashKey(newCode));
+
+    const participant: Participant = {
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+    };
+    return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);
+  });
+}

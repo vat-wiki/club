@@ -26,6 +26,14 @@ function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
     },
     send: async (content, attachmentIds, room) => {
       sent.push({ content, attachmentIds, room });
+      return {
+        id: "msg_1",
+        participantId: "p_1",
+        authorName: "test",
+        content,
+        createdAt: 1,
+        room,
+      };
     },
   };
   // Let a test override any function; the tracker arrays stay live so the

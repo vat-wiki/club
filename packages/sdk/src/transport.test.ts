@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ClubApiError } from "./errors.js";
+import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
 import {
-  computeBackoff,
-  shouldRetry,
   getMe,
   listMessages,
   sendMessage,
   uploadFile,
   createParticipant,
+  searchMessages,
+  getFile,
+  listMentions,
+  markMentionRead,
+  recoverParticipant,
+  reportAgentThinking,
+  reportAgentIdle,
+  listRooms,
+  createRoom,
+  deleteMessage,
+  toggleMessageReaction,
 } from "./transport.js";
 
 const realFetch = globalThis.fetch;
@@ -91,6 +100,30 @@ describe("sendMessage", () => {
     });
     globalThis.fetch = fetchMock as typeof fetch;
     await sendMessage({ server: "http://x", key: "k" }, "hi");
+  });
+
+  it("includes room in the body when supplied", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({
+        content: "hello",
+        room: "build",
+      });
+      return jsonRes({ id: "m1", content: "hello", room: "build" });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    await sendMessage({ server: "http://x", key: "k" }, "hello", { room: "build" });
+  });
+
+  it("includes replyToId in the body when supplied", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({
+        content: "reply",
+        replyToId: "parent-1",
+      });
+      return jsonRes({ id: "m2", content: "reply", replyToId: "parent-1" });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    await sendMessage({ server: "http://x", key: "k" }, "reply", { replyToId: "parent-1" });
   });
 
   it("includes attachmentIds in the body when supplied (non-empty)", async () => {
@@ -227,5 +260,236 @@ describe("request retry / timeout", () => {
     await expect(
       getMe({ server: "http://x", key: "k" }, { timeoutMs: 30, retries: 0 }),
     ).rejects.toMatchObject({ status: 408 });
+  });
+});
+
+describe("searchMessages", () => {
+  it("sends GET /messages/search with q, room, and limit params", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(String(url)).toBe("http://x/messages/search?q=hello&room=build&limit=10");
+      return jsonRes([{ id: "m1" }]);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const msgs = await searchMessages({ server: "http://x", key: "k" }, {
+      q: "hello",
+      room: "build",
+      limit: 10,
+    });
+    expect(msgs).toHaveLength(1);
+  });
+
+  it("omits room when not provided", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(String(url)).toBe("http://x/messages/search?q=test");
+      return jsonRes([]);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await searchMessages({ server: "http://x", key: "k" }, { q: "test" });
+  });
+});
+
+describe("getFile", () => {
+  it("fetches file bytes with auth and parses content-disposition", async () => {
+    const headers = new Headers();
+    headers.set("content-type", "application/pdf");
+    headers.set('content-disposition', 'attachment; filename="report.pdf"');
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => new ArrayBuffer(4),
+      headers,
+    })) as typeof fetch;
+
+    const { buffer, mime, filename } = await getFile({ server: "http://x", key: "k" }, "file123");
+    expect(buffer).toBeInstanceOf(ArrayBuffer);
+    expect(mime).toBe("application/pdf");
+    expect(filename).toBe("report.pdf");
+  });
+
+  it("uses default mime when content-type header is missing", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => new ArrayBuffer(2),
+      headers: new Headers(),
+    })) as typeof fetch;
+
+    const { mime } = await getFile({ server: "http://x" }, "file456");
+    expect(mime).toBe("application/octet-stream");
+  });
+
+  it("parses error response on non-OK status", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonRes({ error: "file not found" }, 404),
+    ) as typeof fetch;
+
+    await expect(getFile({ server: "http://x", key: "k" }, "missing")).rejects.toMatchObject({
+      message: "file not found",
+      status: 404,
+    });
+  });
+});
+
+describe("listMentions", () => {
+  it("GETs /me/mentions with auth", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/me/mentions");
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer k");
+      return jsonRes([{ id: "ment1" }]);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const mentions = await listMentions({ server: "http://x", key: "k" });
+    expect(mentions).toHaveLength(1);
+    expect(mentions[0].id).toBe("ment1");
+  });
+});
+
+describe("markMentionRead", () => {
+  it("POSTs to /me/mentions/:id/read", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/me/mentions/ment1/read");
+      expect(init.method).toBe("POST");
+      return jsonRes({ id: "ment1", read: true });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const mention = await markMentionRead({ server: "http://x", key: "k" }, "ment1");
+    expect(mention.read).toBe(true);
+  });
+});
+
+describe("recoverParticipant", () => {
+  it("POSTs recovery request and returns new key", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/participants/recover");
+      expect(JSON.parse(init.body as string)).toEqual({ name: "alice", recoverCode: "abc123" });
+      return jsonRes(
+        { key: "club_agent_new", participant: { id: "1", name: "alice", createdAt: 1 } },
+        201,
+      );
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const res = await recoverParticipant({ server: "http://x" }, { name: "alice", recoverCode: "abc123" });
+    expect(res.key).toBe("club_agent_new");
+  });
+
+  it("throws ClubApiError(401) on recovery failure", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonRes({ error: "invalid recovery code" }, 401),
+    ) as typeof fetch;
+
+    await expect(
+      recoverParticipant({ server: "http://x" }, { name: "alice", recoverCode: "wrong" }),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe("reportAgentThinking", () => {
+  it("POSTs empty body to /agents/thinking", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/agents/thinking");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({});
+      return new Response(null, { status: 204 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await reportAgentThinking({ server: "http://x", key: "agent1" });
+  });
+
+  it("includes room in body when supplied", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({ room: "build" });
+      return new Response(null, { status: 204 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await reportAgentThinking({ server: "http://x", key: "agent1" }, { room: "build" });
+  });
+});
+
+describe("reportAgentIdle", () => {
+  it("POSTs to /agents/idle", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/agents/idle");
+      expect(init.method).toBe("POST");
+      return new Response(null, { status: 204 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await reportAgentIdle({ server: "http://x", key: "agent1" });
+  });
+});
+
+describe("listRooms", () => {
+  it("GETs /rooms and returns sorted rooms", async () => {
+    const fetchMock = vi.fn(async () => {
+      return jsonRes([
+        { slug: "general", lastActivityAt: null },
+        { slug: "build", lastActivityAt: 2 },
+        { slug: "deploy", lastActivityAt: 1 },
+      ]);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const rooms = await listRooms({ server: "http://x", key: "k" });
+    expect(rooms).toHaveLength(3);
+    expect(rooms[0].slug).toBe("general");
+  });
+});
+
+describe("createRoom", () => {
+  it("POSTs to /rooms with name and returns room", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/rooms");
+      expect(JSON.parse(init.body as string)).toEqual({ name: "new-room" });
+      return jsonRes({ slug: "new-room", lastActivityAt: null });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const room = await createRoom({ server: "http://x", key: "k" }, "new-room");
+    expect(room.slug).toBe("new-room");
+  });
+});
+
+describe("deleteMessage", () => {
+  it("DELETEs /messages/:id", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/messages/msg123");
+      expect(init.method).toBe("DELETE");
+      return new Response(null, { status: 204 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await deleteMessage({ server: "http://x", key: "k" }, "msg123");
+  });
+
+  it("throws ClubApiError(404) when message not found", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonRes({ error: "message not found" }, 404),
+    ) as typeof fetch;
+
+    await expect(deleteMessage({ server: "http://x", key: "k" }, "missing")).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+});
+
+describe("toggleMessageReaction", () => {
+  it("POSTs emoji to /messages/:id/reactions", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/messages/msg1/reactions");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({ emoji: "👍" });
+      return jsonRes([{ emoji: "👍", count: 1 }]);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const reactions = await toggleMessageReaction({ server: "http://x", key: "k" }, "msg1", "👍");
+    expect(reactions).toEqual([{ emoji: "👍", count: 1 }]);
   });
 });

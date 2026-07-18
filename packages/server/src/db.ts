@@ -189,30 +189,35 @@ export function runMigrations(
   database: Database.Database,
   maxVersion = Infinity,
 ): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS schema_version (
-      version INTEGER NOT NULL
-    );
-  `);
-  // Seed the version row at 0 the first time (baseline schema above is "v0").
-  database
-    .prepare(`INSERT OR IGNORE INTO schema_version (version) VALUES (0)`)
-    .run();
-
-  const currentVersion = (
+  try {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER NOT NULL
+      );
+    `);
+    // Seed the version row at 0 the first time (baseline schema above is "v0").
     database
-      .prepare<[], { version: number }>(`SELECT version FROM schema_version`)
-      .get() ?? { version: 0 }
-  ).version;
+      .prepare(`INSERT OR IGNORE INTO schema_version (version) VALUES (0)`)
+      .run();
 
-  for (const m of migrations) {
-    if (m.version > maxVersion) break;
-    if (m.version <= currentVersion) continue;
-    const tx = database.transaction(() => {
-      database.exec(m.sql);
-      database.prepare(`UPDATE schema_version SET version = ?`).run(m.version);
-    });
-    tx();
+    const currentVersion = (
+      database
+        .prepare<[], { version: number }>(`SELECT version FROM schema_version`)
+        .get() ?? { version: 0 }
+    ).version;
+
+    for (const m of migrations) {
+      if (m.version > maxVersion) break;
+      if (m.version <= currentVersion) continue;
+      const tx = database.transaction(() => {
+        database.exec(m.sql);
+        database.prepare(`UPDATE schema_version SET version = ?`).run(m.version);
+      });
+      tx();
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`database migration failed: ${msg}`);
   }
 }
 
@@ -273,6 +278,12 @@ const sinceStmt = db.prepare<[string], { rowid: number }>(
   `SELECT rowid FROM messages WHERE id = ?`,
 );
 
+const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
+  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
+           p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
+    WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
+);
+
 export function getMessagesAfter(rowid: number, room: string, limit: number): MessageRow[] {
   return afterStmt.all(rowid, room, limit);
 }
@@ -284,7 +295,7 @@ export function getRecentMessages(room: string, limit: number): MessageRow[] {
 export function getMessagesSince(sinceId: string, room: string, limit: number) {
   const row = sinceStmt.get(sinceId);
   if (!row) return { rowid: 0, messages: [] as MessageRow[] };
-  return { rowid: row.rowid, messages: getMessagesAfter(row.rowid, room, limit) };
+  return { rowid: row.rowid, messages: sinceMessagesStmt.all(row.rowid, room, limit) };
 }
 
 const beforeStmt = db.prepare<[number, string, number], MessageRow>(
@@ -362,6 +373,33 @@ export function getReactionsForMessage(messageId: string): { emoji: string; coun
   const counts = new Map<string, number>();
   for (const r of rows) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
   return [...counts.entries()].map(([emoji, count]) => ({ emoji, count }));
+}
+
+/** Batch-fetch reactions for multiple messages in a single query.
+ *  Returns a Map<message_id, Reaction[]> keyed by the ids that had reactions. */
+export function getReactionsForMessages(
+  messageIds: string[],
+): Map<string, { emoji: string; count: number }[]> {
+  if (messageIds.length === 0) return new Map();
+  const placeholders = messageIds.map(() => "?").join(",");
+  const stmt = db.prepare<[...string[]], { message_id: string; emoji: string; participant_id: string }>(
+    `SELECT message_id, emoji, participant_id FROM reactions WHERE message_id IN (${placeholders})`,
+  );
+  const rows = stmt.all(...messageIds);
+  const byMsg = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    let counts = byMsg.get(r.message_id);
+    if (!counts) {
+      counts = new Map<string, number>();
+      byMsg.set(r.message_id, counts);
+    }
+    counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+  }
+  const out = new Map<string, { emoji: string; count: number }[]>();
+  for (const [msgId, counts] of byMsg) {
+    out.set(msgId, [...counts.entries()].map(([emoji, count]) => ({ emoji, count })));
+  }
+  return out;
 }
 
 /** Toggle a reaction (remove if present, add if absent). Returns the refreshed
@@ -494,21 +532,21 @@ export function insertMention(
     .changes > 0;
 }
 
-const unreadMentionsStmt = db.prepare<[string], MentionRow>(
+const unreadMentionsStmt = db.prepare<[string, number], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
-          p.name AS author_name,
-          m.content AS content, m.created_at AS message_created_at,
-          mn.read_at, mn.room
-   FROM mentions mn
-   JOIN messages m ON m.id = mn.message_id
-   JOIN participants p ON p.id = mn.author_id
-   WHERE mn.participant_id = ? AND mn.read_at IS NULL
-   ORDER BY m.created_at ASC`,
+           p.name AS author_name,
+           m.content AS content, m.created_at AS message_created_at,
+           mn.read_at, mn.room
+    FROM mentions mn
+    JOIN messages m ON m.id = mn.message_id
+    JOIN participants p ON p.id = mn.author_id
+    WHERE mn.participant_id = ? AND mn.read_at IS NULL
+    ORDER BY m.created_at ASC LIMIT ?`,
 );
 
-/** Unread mentions for `participantId`, oldest first. */
-export function getUnreadMentions(participantId: string): MentionRow[] {
-  return unreadMentionsStmt.all(participantId);
+/** Unread mentions for `participantId`, oldest first, capped at `limit`. */
+export function getUnreadMentions(participantId: string, limit = 100): MentionRow[] {
+  return unreadMentionsStmt.all(participantId, limit);
 }
 
 const mentionByIdStmt = db.prepare<
@@ -571,7 +609,7 @@ const insertFileStmt = db.prepare(
    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 
-export function insertFile(f: Omit<FileRow, never>): void {
+export function insertFile(f: FileRow): void {
   insertFileStmt.run(
     f.id,
     f.participant_id,
@@ -599,10 +637,6 @@ export function getFile(id: string): FileRow | undefined {
 //
 // Security: ids are validated by the caller to be base64url-format server-issued
 // identifiers; the IN clause is safely parameterized to prevent injection.
-const getFilesByIdsStmt = db.prepare<[string], FileRow>(
-  `SELECT id, participant_id, mime, width, height, size, created_at, filename
-   FROM files WHERE id = ?`,
-);
 
 export function getFilesByIds(ids: string[]): FileRow[] {
   if (ids.length === 0) return [];
@@ -611,10 +645,14 @@ export function getFilesByIds(ids: string[]): FileRow[] {
     // against pathological abuse while staying far above legitimate limits.
     throw new Error("too many file ids requested (max 100)");
   }
+  const placeholders = ids.map(() => "?").join(",");
+  const stmt = db.prepare<[...string[]], FileRow>(
+    `SELECT id, participant_id, mime, width, height, size, created_at, filename
+    FROM files WHERE id IN (${placeholders})`,
+  );
   const byId = new Map<string, FileRow>();
-  for (const id of ids) {
-    const row = getFilesByIdsStmt.get(id);
-    if (row) byId.set(id, row);
+  for (const row of stmt.all(...ids)) {
+    byId.set(row.id, row);
   }
   return ids.map((id) => byId.get(id)).filter((r): r is FileRow => r !== undefined);
 }
@@ -655,7 +693,7 @@ export function listRooms(): RoomRow[] {
 }
 
 const roomBySlugStmt = db.prepare<
-  string,
+  [string],
   { id: string; slug: string; created_at: number }
 >(`SELECT id, slug, created_at FROM rooms WHERE slug = ?`);
 

@@ -27,4 +27,12 @@ describe("formatRoomLine", () => {
   it("tags general as system even when it is not the current room", () => {
     expect(formatRoomLine(makeRoom("general"), "deploy-debug")).toBe("#general (system)");
   });
+
+  it("marks a custom current room with * and no system tag", () => {
+    expect(formatRoomLine(makeRoom("build"), "build")).toBe("#build *");
+  });
+
+  it("shows plain line for non-current custom room", () => {
+    expect(formatRoomLine(makeRoom("deploy-debug"), "build")).toBe("#deploy-debug");
+  });
 });

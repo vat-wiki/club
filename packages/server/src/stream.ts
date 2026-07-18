@@ -207,7 +207,7 @@ function reapExpiredThinking(): void {
 
 // Keep idle connections warm, surface dead ones, and reap expired thinking
 // state. One timer does double duty (no need for a second scheduler).
-setInterval(() => {
+export const heartbeatInterval = setInterval(() => {
   for (const sub of subscribers) {
     if (sub.dead) {
       subscribers.delete(sub);

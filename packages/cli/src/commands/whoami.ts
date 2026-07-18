@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk";
+import { ClubClient, formatError } from "@club/sdk";
 import { requireConfig } from "../config.js";
 
 export function makeWhoamiCommand(): Command {
@@ -11,7 +11,7 @@ export function makeWhoamiCommand(): Command {
         const me = await new ClubClient(cfg).me();
         console.log(`${me.name}  id=${me.id}`);
       } catch (err) {
-        console.error((err as Error).message);
+        console.error(formatError(err));
         process.exit(1);
       }
     });

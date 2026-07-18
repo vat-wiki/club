@@ -13,15 +13,27 @@ import { me } from "./routes/me.js";
 import { files } from "./routes/files.js";
 import { agents } from "./routes/agents.js";
 import { rooms } from "./routes/rooms.js";
+import { rateLimit } from "./rate-limit.js";
+import { heartbeatInterval } from "./stream.js";
+import { securityHeaders } from "./security-headers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const joinHtmlPath = resolve(__dirname, "public", "join.html");
 
 const app = new Hono();
 
-// CORS: the chat UI, CLI, and MCP all hit this backend. The web client runs on
-// a different origin in dev (Vite), and agents call from anywhere.
-app.use("*", cors());
+// Global rate limiter: 120 requests per minute per IP (generous for read paths).
+app.use("*", rateLimit({ max: 120, windowMs: 60_000 }));
+
+// Security headers: CSP, HSTS, X-Content-Type-Options, etc.
+app.use("*", securityHeaders);
+
+// CORS: the chat UI, CLI, and MCP all hit this backend. Restrict origins
+// via ALLOWED_ORIGINS (comma-separated) when set; falls back to open "*"
+// for dev/internal LAN use (where TLS is typically not present).
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const corsOpts = allowedOrigins.length > 0 ? { origin: allowedOrigins, credentials: true } : undefined;
+app.use("*", cors(corsOpts));
 
 // Key-issuance page: mint a key + copy the CLI/MCP onboarding snippets.
 // The React web app (packages/web) is the friendly chat UI, served separately.
@@ -75,7 +87,15 @@ app.notFound((c) => c.json({ error: "not found" }, 404));
 const port = Number(process.env.PORT ?? 6200);
 const host = process.env.HOST ?? "0.0.0.0";
 
-serve({ fetch: app.fetch, port, hostname: host }, (info) => {
+const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
   console.log(`club server listening on http://${host}:${info.port}`);
   console.log(`  /join to mint a key · packages/web for the chat UI`);
 });
+
+function shutdown(signal: string) {
+  clearInterval(heartbeatInterval);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 5000);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

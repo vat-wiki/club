@@ -1,4 +1,5 @@
 import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
+import { jitteredBackoff, sleep } from "@club/shared";
 import { type ClubConn, listMessages, listRooms } from "./transport.js";
 
 // ── SSE streaming with reconnect + catch-up ─────────────────────────
@@ -34,26 +35,6 @@ export interface StreamHandle {
 }
 
 const RECONNECT_CAP_MS = 15_000;
-
-function reconnectDelay(attempt: number, base: number): number {
-  const exp = Math.min(RECONNECT_CAP_MS, base * 2 ** attempt);
-  return exp * (0.5 + Math.random() * 0.5); // full jitter
-}
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal.aborted) return resolve();
-    const t = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
-      { once: true },
-    );
-  });
-}
 
 // Subscribe to /messages/stream. onMessage fires for each event. The stream
 // reconnects on drop and catches up on anything missed while disconnected
@@ -108,7 +89,7 @@ export function streamMessages(
           return;
         }
         opts.onError?.(err2);
-        await sleep(reconnectDelay(attempts, base), stopSignal.signal);
+        await sleep(jitteredBackoff(attempts, base, RECONNECT_CAP_MS), stopSignal.signal);
         if (stopSignal.signal.aborted) return;
         attempts++;
       }

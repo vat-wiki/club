@@ -16,7 +16,7 @@
 // server's `name "X" is taken` verbatim.
 
 import { Command } from "commander";
-import { ClubClient, ClubApiError } from "@club/sdk";
+import { ClubClient, ClubApiError, formatError } from "@club/sdk";
 import { saveConfig } from "../config.js";
 import type { Participant } from "@club/shared";
 
@@ -102,7 +102,7 @@ export function makeJoinCommand(): Command {
           console.log(line);
         }
       } catch (err) {
-        console.error((err as Error).message);
+        console.error(formatError(err));
         process.exit(1);
       }
     });

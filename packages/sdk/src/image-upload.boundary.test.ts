@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MAX_IMAGE_BYTES } from "@club/shared";
 import { ClubApiError } from "./index.js";
-import { assertImageCount, uploadImageFile } from "./image-upload.js";
+import { assertAttachmentCount, uploadImageFile } from "./image-upload.js";
 
 // Boundary + magic-byte sniff tests that complement image-upload.test.ts. The
 // headline behavior under test: uploadImageFile decides the mime from the
@@ -185,14 +185,14 @@ describe("uploadImageFile: byte-size boundary", () => {
   });
 });
 
-describe("assertImageCount boundary", () => {
+describe("assertAttachmentCount boundary", () => {
   it("accepts exactly MAX_IMAGES_PER_MESSAGE (8)", () => {
-    expect(() => assertImageCount(Array(8).fill("a.png"))).not.toThrow();
+    expect(() => assertAttachmentCount(Array(8).fill("a.png"))).not.toThrow();
   });
 
   it("rejects 9 with the count + max in the message", () => {
     try {
-      assertImageCount(Array(9).fill("a.png"));
+      assertAttachmentCount(Array(9).fill("a.png"));
       throw new Error("should have thrown");
     } catch (e) {
       expect(e).toBeInstanceOf(ClubApiError);

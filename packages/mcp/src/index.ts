@@ -4,7 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ClubClient } from "@club/sdk";
+import { ClubClient, formatError } from "@club/sdk";
 import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
 import { dispatchTool, type DispatchClient } from "./helpers.js";
 
@@ -43,6 +43,14 @@ const dispatchClient: DispatchClient = {
   deleteMessage: (id) => client.deleteMessage(id),
   toggleReaction: (id, emoji) => client.toggleReaction(id, emoji),
 };
+
+// Catch unhandled promise rejections that escape the MCP server lifecycle.
+// The tool handlers are try/catch-wrapped, but this safety net catches anything
+// that slips through (e.g. a transport-level error during connect).
+process.on("unhandledRejection", (err) => {
+  console.error("[club-mcp] Unhandled rejection:", err);
+  process.exit(1);
+});
 
 const server = new Server(
   { name: "club", version: "0.1.0" },
@@ -293,7 +301,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     return text(await dispatchTool(name, (args ?? {}) as Record<string, unknown>, dispatchClient));
   } catch (err) {
-    const msg = (err as Error).message;
+    const msg = formatError(err);
     // Add context to common errors so AI can self-correct
     if (msg.includes("ENOENT") || msg.includes("no such file")) {
       return text(`error: File not found - ${msg}. Check the file path is correct and the file exists.`);

@@ -10,7 +10,7 @@
 //
 // This main entry is BROWSER-SAFE: it has no Node-only imports (no node:fs,
 // no image-size), so the web app can bundle `ClubClient`/`request`/types from
-// here. The Node image-upload helper (uploadImageFile / assertImageCount) is
+// here. The Node image-upload helper (uploadImageFile / assertAttachmentCount) is
 // kept off this entry to avoid pulling fs into the browser bundle — Node
 // consumers (cli, mcp) import it from the `@club/sdk/node` subpath instead.
 

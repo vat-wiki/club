@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { CreateRoomRequest, type Room } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { listRooms, ensureRoom, type RoomRow } from "../db.js";
@@ -13,6 +14,15 @@ import { listRooms, ensureRoom, type RoomRow } from "../db.js";
 
 export const rooms = new Hono();
 rooms.use("*", requireAuth);
+
+// Content-type guard: reject non-JSON POST bodies.
+const requireJson = createMiddleware(async (c, next) => {
+  const ct = c.req.header("content-type");
+  if (ct && !ct.toLowerCase().startsWith("application/json")) {
+    return c.json({ error: "Content-Type must be application/json" }, 415);
+  }
+  await next();
+});
 
 // snake_case db row → camelCase contract. last_activity_at is nullable for
 // empty rooms (no messages yet).
@@ -38,16 +48,20 @@ rooms.get("/", (c) => {
 // Idempotent: posting an existing slug returns the existing room. `name` is the
 // canonical slug, validated by CreateRoomRequest (regex ^[a-z0-9][a-z0-9-]{0,29}$).
 // "general" is seeded by the migration, so posting it just returns that row.
-rooms.post("/", async (c) => {
+rooms.post("/", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateRoomRequest.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
   }
   const slug = parsed.data.name;
-  const created = ensureRoom(slug, Date.now()).created;
-  // Re-read via listRooms so the response carries the authoritative
-  // lastActivityAt (non-null when the room already had messages).
+  const room = ensureRoom(slug, Date.now());
+  if (room.created) {
+    const r: Room = { id: room.id, slug: room.slug, createdAt: room.created_at, lastActivityAt: null };
+    return c.json(r, 201);
+  }
+  // Room already existed — re-read via listRooms so the response carries the
+  // authoritative lastActivityAt (non-null when the room already had messages).
   const full = listRooms().find((r) => r.slug === slug)!;
-  return c.json(toRoom(full), created ? 201 : 200);
+  return c.json(toRoom(full), 200);
 });

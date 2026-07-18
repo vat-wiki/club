@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { imageSize } from "image-size";
 import {
@@ -76,12 +76,7 @@ files.post("/", requireAuth, async (c) => {
 
   // Read once into a buffer. For video/document this can reach tens of MB —
   // acceptable for club's single-room, low-concurrency profile. The write below
-  // is synchronous by design: it provides atomicity (file either fully lands or
-  // not at all) without complex rollback logic. At the enforced size caps
-  // (MAX_VIDEO_BYTES = 50MB, MAX_IMAGE_BYTES = 10MB, MAX_DOCUMENT_BYTES = 10MB),
-  // the blocking window is bounded and acceptable for the target deployment.
-  // A future high-concurrency deployment can swap this for a streaming write at
-  // the files-dir.ts seam without changing the API contract.
+  // is async by design to avoid blocking the event loop on disk I/O.
   const buf = Buffer.from(await file.arrayBuffer());
 
   // Only images get dimension-probed (via image-size); video + document bytes
@@ -105,8 +100,8 @@ files.post("/", requireAuth, async (c) => {
   // the server starts even if the volume isn't writable yet.
   const id = randomBytes(16).toString("base64url");
   const dir = filesDir();
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(filePath(id), buf);
+  if (!existsSync(dir)) await mkdir(dir, { recursive: true });
+  await writeFile(filePath(id), buf);
 
   const createdAt = Date.now();
   insertFile({
@@ -185,7 +180,7 @@ files.get("/:id", (c) => {
       // createReadStream's end is inclusive — exactly what Content-Range describes.
       const rangedStream = createReadStream(path, { start, end });
       return c.body(
-        Readable.toWeb(rangedStream) as unknown as ReadableStream<Uint8Array>,
+        Readable.toWeb(rangedStream),
         206,
       );
     }
@@ -197,7 +192,7 @@ files.get("/:id", (c) => {
   c.header("Content-Length", String(total));
   const nodeStream = createReadStream(path);
   return c.body(
-    Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>,
+    Readable.toWeb(nodeStream),
     200,
   );
 });

@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk";
+import { ClubClient, formatError } from "@club/sdk";
 import { requireConfig } from "../config.js";
 
 export function makeMembersCommand(): Command {
@@ -14,7 +14,7 @@ export function makeMembersCommand(): Command {
         }
         if (list.length === 0) console.log("(no members)");
       } catch (err) {
-        console.error((err as Error).message);
+        console.error(formatError(err));
         process.exit(1);
       }
     });

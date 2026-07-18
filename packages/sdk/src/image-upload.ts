@@ -23,7 +23,7 @@ import {
   MAX_IMAGES_PER_MESSAGE,
   type MessageAttachment,
 } from "@club/shared";
-import { ClubApiError } from "./errors.js";
+import { ClubApiError, formatError } from "./errors.js";
 import { uploadFile, type ClubConn } from "./transport.js";
 
 // image-size reports the format as the lowercased extension (e.g. "jpg", not
@@ -60,7 +60,7 @@ function sniffVideoMime(buf: Buffer): string | undefined {
   return undefined;
 }
 
-export interface UploadImageOpts {
+export interface UploadFileOpts {
   timeoutMs?: number;
 }
 
@@ -72,14 +72,14 @@ export interface UploadImageOpts {
 export async function uploadImageFile(
   conn: ClubConn,
   path: string,
-  opts: UploadImageOpts = {},
+  opts: UploadFileOpts = {},
 ): Promise<MessageAttachment> {
   let buf: Buffer;
   try {
     buf = await readFile(path);
   } catch (err) {
     // ENOENT / EACCES etc. — the underlying message already names the path.
-    throw new ClubApiError(`could not read ${path}: ${(err as Error).message}`, 0);
+    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, 0);
   }
 
   if (buf.byteLength > MAX_IMAGE_BYTES) {
@@ -120,13 +120,13 @@ export async function uploadImageFile(
 export async function uploadVideoFile(
   conn: ClubConn,
   path: string,
-  opts: UploadImageOpts = {},
+  opts: UploadFileOpts = {},
 ): Promise<MessageAttachment> {
   let buf: Buffer;
   try {
     buf = await readFile(path);
   } catch (err) {
-    throw new ClubApiError(`could not read ${path}: ${(err as Error).message}`, 0);
+    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, 0);
   }
 
   if (buf.byteLength > MAX_VIDEO_BYTES) {
@@ -173,13 +173,13 @@ const EXT_TO_DOC_MIME: Record<string, string> = {
 export async function uploadDocumentFile(
   conn: ClubConn,
   path: string,
-  opts: UploadImageOpts = {},
+  opts: UploadFileOpts = {},
 ): Promise<MessageAttachment> {
   let buf: Buffer;
   try {
     buf = await readFile(path);
   } catch (err) {
-    throw new ClubApiError(`could not read ${path}: ${(err as Error).message}`, 0);
+    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, 0);
   }
 
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -208,7 +208,7 @@ export async function uploadDocumentFile(
  * for images AND videos combined — pass the total count. Returns void; throws
  * ClubApiError(400) on overflow.
  */
-export function assertImageCount(paths: readonly string[]): void {
+export function assertAttachmentCount(paths: readonly string[]): void {
   if (paths.length > MAX_IMAGES_PER_MESSAGE) {
     throw new ClubApiError(
       `too many attachments: ${paths.length} (max ${MAX_IMAGES_PER_MESSAGE} per message)`,

@@ -1,4 +1,4 @@
-import { assertImageCount } from "@club/sdk/node";
+import { assertAttachmentCount } from "@club/sdk/node";
 
 // Pure input-coercion helpers used by the MCP tool dispatcher.
 //
@@ -7,7 +7,7 @@ import { assertImageCount } from "@club/sdk/node";
 // (resolveConn → process.exit, server.connect) that make importing it directly
 // impractical from a test.
 
-import { mentionMatches, type Message, type Participant, type Room } from "@club/shared";
+import { mentionMatches, type Message, type Participant, type Room, type MessageAttachment } from "@club/shared";
 import { formatMessage } from "@club/sdk";
 
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
@@ -130,19 +130,19 @@ export interface DispatchClient {
   messages(opts: { since?: string; limit: number; room?: string }): Promise<Message[]>;
   send(content: string, attachmentIds?: string[], opts?: { room?: string }): Promise<Message>;
   /** Upload one local image file, returning its attachment descriptor.
-   *  Index.ts wires this to @club/sdk uploadImageFile (read→sniff→validate→
-   *  POST /files); declared on the interface so dispatchTool stays fakeable. */
-  uploadImage(path: string): Promise<{ id: string }>;
+    *  Index.ts wires this to @club/sdk uploadImageFile (read→sniff→validate→
+    *  POST /files); declared on the interface so dispatchTool stays fakeable. */
+  uploadImage(path: string): Promise<MessageAttachment>;
   /** Upload one local video file, returning its attachment descriptor.
-   *  Index.ts wires this to @club/sdk uploadVideoFile (read→sniff magic bytes→
-   *  validate→POST /files); declared on the interface so dispatchTool stays
-   *  fakeable. */
-  uploadVideo(path: string): Promise<{ id: string }>;
+    *  Index.ts wires this to @club/sdk uploadVideoFile (read→sniff magic bytes→
+    *  validate→POST /files); declared on the interface so dispatchTool stays
+    *  fakeable. */
+  uploadVideo(path: string): Promise<MessageAttachment>;
   /** Upload one local document file, returning its attachment descriptor.
-   *  Index.ts wires this to @club/sdk uploadDocumentFile (read→infer MIME from
-   *  extension→validate→POST /files); declared on the interface so dispatchTool
-   *  stays fakeable. */
-  uploadDocument(path: string): Promise<{ id: string }>;
+    *  Index.ts wires this to @club/sdk uploadDocumentFile (read→infer MIME from
+    *  extension→validate→POST /files); declared on the interface so dispatchTool
+    *  stays fakeable. */
+  uploadDocument(path: string): Promise<MessageAttachment>;
   members(): Promise<Participant[]>;
   /** GET /rooms — every room, general first then most-recently-active first. */
   rooms(): Promise<Room[]>;
@@ -243,7 +243,7 @@ export async function dispatchTool(
         return "error: Send failed - provide at least one of: content (text), images, videos, or files. Bare media without text is allowed.";
       // Fail fast on too many attachments before any upload happens. Images,
       // videos, and documents all share one per-message cap.
-      assertImageCount([...images, ...videos, ...documents]);
+      assertAttachmentCount([...images, ...videos, ...documents]);
       const room = resolveRoom(args.room, process.env.CLUB_ROOM);
       let attachmentIds: string[] | undefined;
       if (images.length > 0 || videos.length > 0 || documents.length > 0) {

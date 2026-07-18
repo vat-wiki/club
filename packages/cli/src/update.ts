@@ -106,7 +106,7 @@ export async function fetchLatestVersion(): Promise<string | null> {
   try {
     const res = await fetch(REGISTRY_URL, { signal: ctrl.signal });
     if (!res.ok) return null;
-    const json = (await res.json()) as { version?: unknown };
+    const json = (await res.json()) as { version?: string };
     const v = json?.version;
     return typeof v === "string" && VERSION_RE.test(v) ? v : null;
   } catch {

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import {
@@ -15,6 +16,7 @@ import {
   searchMessages,
   deleteMessage,
   getReactionsForMessage,
+  getReactionsForMessages,
   toggleReaction,
   insertMessage,
   getFilesByIds,
@@ -30,6 +32,18 @@ import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
+
+// Content-type guard: reject non-JSON POST bodies to prevent content-type
+// spoofing (e.g. sending form-data that a route might still try to parse).
+// Accepts empty Content-Type (common in test harnesses that JSON.stringify
+// the body without an explicit header).
+const requireJson = createMiddleware(async (c, next) => {
+  const ct = c.req.header("content-type");
+  if (ct && !ct.toLowerCase().startsWith("application/json")) {
+    return c.json({ error: "Content-Type must be application/json" }, 415);
+  }
+  await next();
+});
 
 messages.use("*", requireAuth);
 
@@ -48,7 +62,10 @@ function parseAttachments(raw: string | null): MessageAttachment[] | undefined {
   }
 }
 
-function toMessage(r: MessageRow): Message {
+function toMessage(
+  r: MessageRow,
+  reactionsMap?: Map<string, { emoji: string; count: number }[]>,
+): Message {
   const msg: Message = {
     id: r.id,
     participantId: r.participant_id,
@@ -61,7 +78,7 @@ function toMessage(r: MessageRow): Message {
   if (attachments) msg.attachments = attachments;
   if (r.reply_to_id) msg.replyToId = r.reply_to_id;
   if (r.deleted) msg.deleted = true;
-  const reactions = getReactionsForMessage(r.id);
+  const reactions = reactionsMap?.get(r.id) ?? getReactionsForMessage(r.id);
   if (reactions.length) msg.reactions = reactions as Reaction[];
   return msg;
 }
@@ -70,7 +87,7 @@ function toMessage(r: MessageRow): Message {
 // content is optional iff at least one attachment is supplied (plan §1 — a bare
 // screenshot is the most common intent, forcing text would add friction). The
 // cross-field rule is enforced here, not in zod, because zod can't express it.
-messages.post("/", async (c) => {
+messages.post("/", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateMessageRequest.safeParse(body);
   if (!parsed.success) {
@@ -205,7 +222,8 @@ messages.get("/", (c) => {
     : since
       ? getMessagesSince(since, room, limit).messages
       : getRecentMessages(room, limit);
-  return c.json(rows.map(toMessage));
+  const reactionsMap = getReactionsForMessages(rows.map((r) => r.id));
+  return c.json(rows.map((r) => toMessage(r, reactionsMap)));
 });
 
 // GET /messages/search?q=<text>&room=<slug>&limit=<n> -> Message[] (newest first)
@@ -215,7 +233,9 @@ messages.get("/search", (c) => {
   if (!q) return c.json([]);
   const limit = parseLimit(c.req.query("limit"));
   const room = c.req.query("room");
-  return c.json(searchMessages(q, room || null, limit).map(toMessage));
+  const rows = searchMessages(q, room || null, limit);
+  const reactionsMap = getReactionsForMessages(rows.map((r) => r.id));
+  return c.json(rows.map((r) => toMessage(r, reactionsMap)));
 });
 
 // DELETE /messages/:id -> 204 (recall). Only the author may (participant_id
@@ -237,7 +257,7 @@ messages.delete("/:id", async (c) => {
 // POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
 // `message_reaction` with the refreshed aggregate so all clients update. The
 // event carries the message's room so the fan-out stays room-scoped.
-messages.post("/:id/reactions", async (c) => {
+messages.post("/:id/reactions", requireJson, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
@@ -274,16 +294,11 @@ messages.get("/stream", (c) => {
     stream.onAbort(() => {
       unsubscribe();
     });
-    // Keep the stream open until the client disconnects.
-    let alive = true;
-    stream.onAbort(() => {
-      alive = false;
-    });
-    while (alive) {
+    // Keep the stream open until the client disconnects. hono/streaming keeps
+    // the connection alive while the callback is pending; the short sleeper
+    // bounds wakeups without doing anything useful.
+    while (true) {
       await new Promise((r) => setTimeout(r, 30000));
-      // hono/streaming keeps the connection; this loop just holds it open in
-      // addition to broadcast()'d writes. A short sleeper bounds wakeups.
     }
-    unsubscribe();
   });
 });

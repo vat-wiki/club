@@ -8,7 +8,10 @@ export interface ReadableLike {
   /** True when stdin is an interactive terminal (i.e. nothing is piped in). */
   isTTY?: boolean;
   setEncoding(encoding: string): void;
-  on(event: string, listener: (...args: unknown[]) => void): unknown;
+  on(event: "data", listener: (chunk: Buffer) => void): void;
+  on(event: "error", listener: (err: Error) => void): void;
+  on(event: "end", listener: () => void): void;
+  on(event: string, listener: (...args: unknown[]) => void): void;
 }
 
 /**
@@ -29,10 +32,10 @@ export function readStream(stream: ReadableLike): Promise<string> {
     }
     let data = "";
     stream.setEncoding("utf8");
-    stream.on("data", (chunk: unknown) => {
+    stream.on("data", (chunk) => {
       data += String(chunk);
     });
     stream.on("end", () => resolve(data));
-    stream.on("error", (err: unknown) => reject(err));
+    stream.on("error", (err) => reject(err));
   });
 }

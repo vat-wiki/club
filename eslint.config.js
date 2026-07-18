@@ -1,4 +1,6 @@
-/** @type {import("eslint").Linter.Config[]} */
+import tsParser from "@typescript-eslint/parser";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import reactHooks from "eslint-plugin-react-hooks";
 export default [
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -10,7 +12,7 @@ export default [
       "docs/**",
     ],
     languageOptions: {
-      parser: "@typescript-eslint/parser",
+      parser: tsParser,
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
@@ -18,8 +20,8 @@ export default [
       },
     },
     plugins: {
-      "@typescript-eslint": require("@typescript-eslint/eslint-plugin"),
-      "react-hooks": require("eslint-plugin-react-hooks"),
+      "@typescript-eslint": tsPlugin,
+      "react-hooks": reactHooks,
     },
     rules: {
       // --- Core ---

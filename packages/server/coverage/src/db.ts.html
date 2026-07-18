@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.53% </span>
+                <span class="strong">81.95% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>106/130</span>
+                <span class='fraction'>109/133</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.95% </span>
+                <span class="strong">85.34% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>96/113</span>
+                <span class='fraction'>99/116</span>
             </div>
         
             
@@ -779,7 +779,15 @@
 <a name='L714'></a><a href='#L714'>714</a>
 <a name='L715'></a><a href='#L715'>715</a>
 <a name='L716'></a><a href='#L716'>716</a>
-<a name='L717'></a><a href='#L717'>717</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L717'></a><a href='#L717'>717</a>
+<a name='L718'></a><a href='#L718'>718</a>
+<a name='L719'></a><a href='#L719'>719</a>
+<a name='L720'></a><a href='#L720'>720</a>
+<a name='L721'></a><a href='#L721'>721</a>
+<a name='L722'></a><a href='#L722'>722</a>
+<a name='L723'></a><a href='#L723'>723</a>
+<a name='L724'></a><a href='#L724'>724</a>
+<a name='L725'></a><a href='#L725'>725</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1020,6 +1028,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1032,15 +1045,12 @@
 <span class="cline-any cline-yes">49x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">11x</span>
@@ -1071,6 +1081,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1207,6 +1221,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1215,9 +1234,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">102x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1736,6 +1752,11 @@ export interface MessageRow {
   room: string; // canonical room slug; "general" for backfilled rows
 }
 &nbsp;
+const insertMessageStmt = db.prepare(
+  `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+);
+&nbsp;
 export function insertMessage(
   id: string,
   participantId: string,
@@ -1745,18 +1766,15 @@ export function insertMessage(
   replyToId: string | null,
   room: string,
 ): void {
-  db.prepare(
-    `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, participantId, content, createdAt, attachments, replyToId, room);
+  insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
 &nbsp;
-export function getAllParticipants() {
-  return db
-    .prepare&lt;[], { id: string; name: string; created_at: number }&gt;(
-      `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
-    )
-    .all();
+const allParticipantsSelectStmt = db.prepare&lt;[], { id: string; name: string; created_at: number }&gt;(
+  `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
+);
+&nbsp;
+export function getAllParticipants(): { id: string; name: string; created_at: number }[] {
+  return allParticipantsSelectStmt.all();
 }
 &nbsp;
 const afterStmt = db.prepare&lt;[number, string, number], MessageRow&gt;(
@@ -1789,7 +1807,11 @@ export function getRecentMessages(room: string, limit: number): MessageRow[] {
   return recentStmt.all(room, limit).reverse();
 }
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >getMessagesSince(s</span>inceId: string, room: string, limit: number) {
+export function <span class="fstat-no" title="function not covered" >getMessagesSince(</span>
+  sinceId: string,
+  room: string,
+  limit: number,
+): { rowid: number; messages: MessageRow[] } {
   const row = <span class="cstat-no" title="statement not covered" >sinceStmt.get(sinceId);</span>
 <span class="cstat-no" title="statement not covered" >  if (!row) <span class="cstat-no" title="statement not covered" >return { rowid: 0, messages: [] as MessageRow[] };</span></span>
 <span class="cstat-no" title="statement not covered" >  return { rowid: row.rowid, messages: sinceMessagesStmt.all(row.rowid, room, limit) };</span>
@@ -1923,6 +1945,11 @@ export function getParticipantByName(name: string) {
     .get(name);
 }
 &nbsp;
+const insertParticipantStmt = db.prepare(
+  `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
+   VALUES (?, ?, ?, ?, ?)`,
+);
+&nbsp;
 export function insertParticipant(
   id: string,
   name: string,
@@ -1930,10 +1957,7 @@ export function insertParticipant(
   recoverHash: string,
   createdAt: number,
 ): void {
-  db.prepare(
-    `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, name, keyHash, recoverHash, createdAt);
+  insertParticipantStmt.run(id, name, keyHash, recoverHash, createdAt);
 }
 &nbsp;
 // ── Identity recovery ───────────────────────────────────────────────
@@ -2218,7 +2242,7 @@ export function ensureRoom(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-18T07:07:00.689Z
+                at 2026-07-18T07:40:56.662Z
             </div>
         <script src="../prettify.js"></script>
         <script>

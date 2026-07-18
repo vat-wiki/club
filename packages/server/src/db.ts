@@ -256,12 +256,12 @@ export function insertMessage(
   insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
 
-const allParticipantsStmt = db.prepare<[], { id: string; name: string; created_at: number }>(
+const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; created_at: number }>(
   `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
 );
 
 export function getAllParticipants(): { id: string; name: string; created_at: number }[] {
-  return allParticipantsStmt.all();
+  return allParticipantsSelectStmt.all();
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(

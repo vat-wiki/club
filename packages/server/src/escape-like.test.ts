@@ -54,7 +54,7 @@ function makeDb() {
     return searchStmt.all(`%${escapeLike(q)}%`, limit);
   }
 
-  return { db, path, search, rows };
+  return { db, path, search };
 }
 
 afterAll(() => {

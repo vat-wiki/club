@@ -163,14 +163,18 @@ export default function App() {
     [handleSwitchRoom, rooms],
   );
 
-  // boot: validate stored key (initial + on every retry nonce bump)
+  // boot: validate stored key (initial + on every retry nonce bump).
+  // validateConn runs in the server-response path (401 / 404) and never throws
+  // at this level, but we keep .catch so no unhandled-rejection bubble escapes.
   useEffect(() => {
     if (!conn) return;
     let cancelled = false;
     (async () => {
       await validateConn(conn);
       if (cancelled) return;
-    })();
+    })().catch(() => {
+      /* keep app mounted; errors are surfaced inside validateConn */
+    });
     return () => {
       cancelled = true;
     };

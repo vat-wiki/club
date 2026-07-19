@@ -41,7 +41,7 @@ rooms.post("/", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateRoomRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    return c.json({ error: "bad request" }, 400);
   }
   const slug = parsed.data.name;
   const room = ensureRoom(slug, Date.now());

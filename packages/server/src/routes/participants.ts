@@ -64,7 +64,7 @@ if (isTest) {
   participants.post("/", requireJson, async (c) => {
     const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) {
-      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+      return c.json({ error: "bad request" }, 400);
     }
     const { name } = parsed.data;
     if (getParticipantByName(name)) {
@@ -85,7 +85,7 @@ if (isTest) {
   participants.post("/", requireJson, authLimiter!, async (c) => {
     const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) {
-      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+      return c.json({ error: "bad request" }, 400);
     }
     const { name } = parsed.data;
     if (getParticipantByName(name)) {
@@ -120,7 +120,7 @@ if (isTest) {
     if (!parsed.success) {
       // Validation failure leaks nothing about name existence; treat as bad
       // shape and return 400 with the generic message.
-      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+      return c.json({ error: "bad request" }, 400);
     }
     const { name, recoverCode } = parsed.data;
     const row = getParticipantForRecover(name);
@@ -158,7 +158,7 @@ if (isTest) {
     if (!parsed.success) {
       // Validation failure leaks nothing about name existence; treat as bad
       // shape and return 400 with the generic message.
-      return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+      return c.json({ error: "bad request" }, 400);
     }
     const { name, recoverCode } = parsed.data;
     const row = getParticipantForRecover(name);

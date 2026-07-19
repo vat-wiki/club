@@ -45,7 +45,7 @@ agents.post("/thinking", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = AgentStatusRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    return c.json({ error: "bad request" }, 400);
   }
 
   const room = parsed.data.room ?? null;
@@ -81,7 +81,7 @@ agents.post("/idle", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = AgentStatusRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    return c.json({ error: "bad request" }, 400);
   }
 
   const entry = markThinkingIdle(me.id);

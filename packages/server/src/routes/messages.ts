@@ -79,7 +79,7 @@ messages.post("/", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateMessageRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, 400);
+    return c.json({ error: "bad request" }, 400);
   }
   const { content, attachmentIds, replyToId, room } = parsed.data;
 
@@ -105,25 +105,31 @@ messages.post("/", requireJson, async (c) => {
   // uploaded, never another participant's.
   let attachments: MessageAttachment[] = [];
   if (attachmentIds.length > 0) {
-    const rows = getFilesByIds(attachmentIds);
-    // Reject if any id is missing or doesn't belong to this participant.
-    if (rows.length !== attachmentIds.length) {
-      return c.json({ error: "attachment not found" }, 400);
+    try {
+      const rows = getFilesByIds(attachmentIds);
+      // Reject if any id is missing or doesn't belong to this participant.
+      if (rows.length !== attachmentIds.length) {
+        return c.json({ error: "attachment not found" }, 400);
+      }
+      if (rows.some((r) => r.participant_id !== c.get("participant").id)) {
+        return c.json({ error: "attachment not owned by sender" }, 403);
+      }
+      // Preserve the order the user chose (getFilesByIds already keeps input
+      // order); build the attachment list from authoritative server metadata.
+      attachments = rows.map((r) => ({
+        id: r.id,
+        url: `/files/${r.id}`,
+        mime: r.mime as MessageAttachment["mime"],
+        ...(r.width != null ? { width: r.width } : {}),
+        ...(r.height != null ? { height: r.height } : {}),
+        size: r.size,
+        ...(r.filename ? { filename: r.filename } : {}),
+      }));
+    } catch {
+      // DB errors and input violations (e.g. too many ids) must not leak
+      // internal diagnostics to the caller.
+      return c.json({ error: "attachments unavailable" }, 500);
     }
-    if (rows.some((r) => r.participant_id !== c.get("participant").id)) {
-      return c.json({ error: "attachment not owned by sender" }, 403);
-    }
-    // Preserve the order the user chose (getFilesByIds already keeps input
-    // order); build the attachment list from authoritative server metadata.
-    attachments = rows.map((r) => ({
-      id: r.id,
-      url: `/files/${r.id}`,
-      mime: r.mime as MessageAttachment["mime"],
-      ...(r.width != null ? { width: r.width } : {}),
-      ...(r.height != null ? { height: r.height } : {}),
-      size: r.size,
-      ...(r.filename ? { filename: r.filename } : {}),
-    }));
   }
 
   // Cross-field rule: text OR image. Empty text with no images is rejected.

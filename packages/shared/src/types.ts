@@ -386,36 +386,49 @@ export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;
 // thin wrapper around this one pure function so the bounds and fallback rules
 // stay in sync across packages.
 
-/** Clamp a number into the supported [1, 500] range. Pure; non-finite inputs
-  *  are treated as "use the default". */
-export function clampLimitN(n: number, fallback: number): number {
-  if (!Number.isFinite(n)) return fallback;
+// Shared core: given a finite positive number, clamp it to [1, 500].
+// Pure; called only by the helpers below after each validates finiteness.
+function clampPositive(n: number): number {
   return Math.min(Math.max(1, Math.floor(n)), 500);
 }
 
 /** Parse `limit` from an HTTP query parameter (string | number | undefined).
-  *  Used by the server routes. */
+  *  Used by the server routes. Strict semantics: non-finite numbers, 0, and
+  * negatives all fall back to the default rather than being clamped to 1, so
+  * a malformed query-param can never result in an unbounded SQL LIMIT (negative
+  * LIMIT means "no limit" in SQLite). */
 export function parseQueryLimit(
   raw: string | number | undefined,
   fallback = 100,
 ): number {
   const n = typeof raw === "number" ? raw : Number(raw);
-  return clampLimitN(n, fallback);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return clampPositive(n);
 }
 
-/** Parse `limit` from a CLI flag string. Used by the CLI `read` command. */
+/** Parse `limit` from a CLI flag string. Used by the CLI `read` command.
+  *  Tolerant: 0/negatives clamp to 1 (CLI is an interactive tool; a typo
+  *  should degrade gracefully to the smallest batch, not trigger a fallback
+  *  that surprises the user). */
 export function parseFlagLimit(raw: string | undefined, fallback = 50): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const n = Number(raw);
-  return clampLimitN(n, fallback);
+  if (!Number.isFinite(n)) return fallback;
+  return clampPositive(n);
 }
 
 /** Parse `limit` from an MCP tool argument (any shape). Used by the MCP
-  *  dispatcher. Accepts `number | string | null | undefined` and falls back
-  *  for non-finite numbers so a malformed argument can never yield NaN/Infinity.
-  *  @default 50 */
+  *  dispatcher. Tolerant of 0/negatives (same rationale as CLI) — an LLM
+  *  that sends a bad limit should get a small result, not an error. */
 export function parseToolLimit(raw: unknown, fallback = 50): number {
-  if (typeof raw === "number") return clampLimitN(raw, fallback);
-  if (typeof raw === "string") return clampLimitN(Number(raw), fallback);
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw)) return fallback;
+    return clampPositive(raw);
+  }
+  if (typeof raw === "string") {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return fallback;
+    return clampPositive(n);
+  }
   return fallback;
 }

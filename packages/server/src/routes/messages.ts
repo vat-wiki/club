@@ -3,6 +3,8 @@ import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import {
   CreateMessageRequest,
+  MAX_IMAGES_PER_MESSAGE,
+  MAX_MESSAGE_CONTENT,
   type Message,
   type MessageAttachment,
   type Reaction,
@@ -83,26 +85,24 @@ messages.post("/", requireJson, async (c) => {
   }
   const { content, attachmentIds, replyToId, room } = parsed.data;
 
-  // Defensive: content length is validated at the zod layer, but we enforce
-  // a hard server-side cap to protect against oversized payloads that could
-  // impact storage or delivery performance.
-  const MAX_CONTENT_LENGTH = 100_000; // 100k characters
-  if (content.length > MAX_CONTENT_LENGTH) {
-    return c.json({ error: `content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters` }, 400);
-  }
-
-  // Validate attachment count to prevent abuse. The client-side SDK enforces
-  // this too; this is the authoritative server-side check.
-  const MAX_ATTACHMENTS = 10;
-  if (attachmentIds.length > MAX_ATTACHMENTS) {
-    return c.json({ error: `too many attachments (max ${MAX_ATTACHMENTS})` }, 400);
+  // content length is already capped by zod (MAX_MESSAGE_CONTENT), but we keep
+  // a cheap server-side guard so malformed payloads are rejected deterministically
+  // even if the schema changes. The threshold mirrors the schema constant so the
+  // two can never drift.
+  if (content.length > MAX_MESSAGE_CONTENT) {
+    return c.json({ error: `content exceeds maximum length of ${MAX_MESSAGE_CONTENT} characters` }, 400);
   }
 
   // Rehydrate attachments server-side from the requested ids. The server is the
   // sole source of truth for mime/width/height/size, so the client only sends
   // ids — dimensions can't be forged. We also enforce that every requested id
   // exists AND belongs to the sender: a participant can only attach files it
-  // uploaded, never another participant's.
+  // uploaded, never another participant's. attachment count is capped by
+  // MAX_IMAGES_PER_MESSAGE (shared server/client/MCP limit).
+  if (attachmentIds.length > MAX_IMAGES_PER_MESSAGE) {
+    return c.json({ error: `too many attachments (max ${MAX_IMAGES_PER_MESSAGE})` }, 400);
+  }
+
   let attachments: MessageAttachment[] = [];
   if (attachmentIds.length > 0) {
     try {

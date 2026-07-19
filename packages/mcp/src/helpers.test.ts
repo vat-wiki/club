@@ -479,7 +479,7 @@ describe("dispatchTool", () => {
     const uploadImage = vi.fn(async () => ({ id: "x" }));
     const client = fakeClient({ uploadImage });
     await expect(
-      dispatchTool("send", { images: Array(9).fill("a.png") }, client),
+      dispatchTool("send", { images: Array(11).fill("a.png") }, client),
     ).rejects.toThrow(/too many attachments/);
     expect(uploadImage).not.toHaveBeenCalled();
   });

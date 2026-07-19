@@ -128,8 +128,8 @@ describe("runSend", () => {
       runSend(
         {
           content: "",
-          images: Array(5).fill("a.png"),
-          videos: Array(4).fill("b.mp4"),
+          images: Array(6).fill("a.png"),
+          videos: Array(5).fill("b.mp4"),
           conn: CONN,
         },
         deps,

@@ -186,19 +186,19 @@ describe("uploadImageFile: byte-size boundary", () => {
 });
 
 describe("assertAttachmentCount boundary", () => {
-  it("accepts exactly MAX_IMAGES_PER_MESSAGE (8)", () => {
-    expect(() => assertAttachmentCount(Array(8).fill("a.png"))).not.toThrow();
+  it("accepts exactly MAX_IMAGES_PER_MESSAGE (10)", () => {
+    expect(() => assertAttachmentCount(Array(10).fill("a.png"))).not.toThrow();
   });
 
-  it("rejects 9 with the count + max in the message", () => {
+  it("rejects 11 with the count + max in the message", () => {
     try {
-      assertAttachmentCount(Array(9).fill("a.png"));
+      assertAttachmentCount(Array(11).fill("a.png"));
       throw new Error("should have thrown");
     } catch (e) {
       expect(e).toBeInstanceOf(ClubApiError);
       expect((e as ClubApiError).status).toBe(400);
-      expect((e as Error).message).toMatch(/too many attachments: 9/);
-      expect((e as Error).message).toMatch(/max 8/);
+      expect((e as Error).message).toMatch(/too many attachments: 11/);
+      expect((e as Error).message).toMatch(/max 10/);
     }
   });
 });

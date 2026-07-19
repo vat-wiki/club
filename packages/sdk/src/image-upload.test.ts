@@ -37,13 +37,13 @@ function tmpDir(): string {
 }
 
 describe("assertAttachmentCount", () => {
-  it("accepts up to MAX_IMAGES_PER_MESSAGE (8) paths", () => {
-    expect(() => assertAttachmentCount(Array(8).fill("a.png"))).not.toThrow();
+  it("accepts up to MAX_IMAGES_PER_MESSAGE (10) paths", () => {
+    expect(() => assertAttachmentCount(Array(10).fill("a.png"))).not.toThrow();
   });
 
   it("throws ClubApiError when too many attachments are requested", () => {
-    expect(() => assertAttachmentCount(Array(9).fill("a.png"))).toThrow(/too many attachments/);
-    expect(() => assertAttachmentCount(Array(9).fill("a.png"))).toThrow(ClubApiError);
+    expect(() => assertAttachmentCount(Array(11).fill("a.png"))).toThrow(/too many attachments/);
+    expect(() => assertAttachmentCount(Array(11).fill("a.png"))).toThrow(ClubApiError);
   });
 
   it("accepts an empty list", () => {

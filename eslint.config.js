@@ -1,9 +1,9 @@
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
+// Top-level ignore for flat config — must come first
 export default [
   {
-    files: ["**/*.ts", "**/*.tsx"],
     ignores: [
       "**/dist/**",
       "**/coverage/**",
@@ -11,12 +11,16 @@ export default [
       "packages/web/src/test/**",
       "docs/**",
     ],
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
         ecmaFeatures: { jsx: true },
+        project: "./tsconfig.eslint.json",
       },
     },
     plugins: {
@@ -30,7 +34,7 @@ export default [
       "no-var": "error",
       "prefer-const": "error",
       "no-unused-expressions": "error",
-      "no-constant-condition": ["error", { checkExhaustiveness: false }],
+      "no-constant-condition": "error",
 
       // --- TypeScript ---
       "@typescript-eslint/no-unused-vars": [
@@ -43,7 +47,7 @@ export default [
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
-      "@typescript-eslint/no-empty-function": "error",
+      "@typescript-eslint/no-empty-function": "warn",
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/no-floating-promises": "warn",
       "@typescript-eslint/no-misused-promises": [

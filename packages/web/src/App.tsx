@@ -175,7 +175,7 @@ export default function App() {
       cancelled = true;
     };
     // bootRetryNonce drives manual/auto re-runs without changing `conn` identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [conn, bootRetryNonce, validateConn]);
 
   // Kick a retry: bump the nonce so the boot effect re-runs validateConn, and

@@ -82,7 +82,7 @@ describe("AttachmentGallery lightbox — open/close + keyboard", () => {
 
     // Open the second thumbnail.
     fireEvent.click(screen.getByTestId("attachment-thumb-1"));
-    let lb = await screen.findByTestId("lightbox-image");
+    const lb = await screen.findByTestId("lightbox-image");
     expect(lb.getAttribute("src")).toContain("/files/second");
   });
 

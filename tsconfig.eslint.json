@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "packages/**/src/**/*.ts",
+    "packages/**/src/**/*.tsx",
+    "packages/**/vitest.config.ts",
+    "packages/**/tsup.config.ts",
+    "packages/web/vite.config.ts",
+    "packages/web/tailwind.config.ts",
+    "eslint.config.js",
+    "scripts/**/*.ts"
+  ],
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/coverage/**"]
+}

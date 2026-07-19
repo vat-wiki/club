@@ -40,9 +40,14 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at     INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
-CREATE INDEX IF NOT EXISTS idx_messages_room_created ON messages(room, created_at);
 `;
 db.exec(BASELINE_SCHEMA);
+
+// NOTE: `idx_messages_room_created` is defined in migration v11 (it depends on
+// the `room` column added in v7). It is not in BASELINE_SCHEMA because v0
+// predates multi-room; a fresh database walks the migration chain to reach v11.
+// Duplicate `CREATE INDEX IF NOT EXISTS` calls are idempotent, so re-running v11
+// on a database that already has the index is a no-op.
 
 // ── Schema migrations ─────────────────────────────────────────────────
 // A tiny, dependency-free migration runner. Each migration is an ordered DDL

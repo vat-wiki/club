@@ -3,6 +3,7 @@ import { CreateRoomRequest, type Room } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { listRooms, ensureRoom, type RoomRow } from "../db.js";
 import { requireJson } from "../lib/json-content-type.js";
+import { jsonErr } from "../lib.js";
 
 // Open-topic rooms: every authed participant (human or agent, equally) can list
 // and create rooms. A room is a topic channel, NOT an access boundary — there
@@ -41,7 +42,7 @@ rooms.post("/", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateRoomRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "bad request" }, 400);
+    return jsonErr(c, "bad request");
   }
   const slug = parsed.data.name;
   const room = ensureRoom(slug, Date.now());
@@ -51,6 +52,12 @@ rooms.post("/", requireJson, async (c) => {
   }
   // Room already existed — re-read via listRooms so the response carries the
   // authoritative lastActivityAt (non-null when the room already had messages).
-  const full = listRooms().find((r) => r.slug === slug)!;
+  const full = listRooms().find((r) => r.slug === slug);
+  if (!full) {
+    // Slug collided between ensureRoom() and the re-read — extremely rare,
+    // but avoid leaking internals; treat as server error rather than leaking
+    // the newly-created room's fields.
+    return jsonErr(c, "could not create room", 500);
+  }
   return c.json(toRoom(full), 200);
 });

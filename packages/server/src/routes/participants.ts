@@ -16,6 +16,7 @@ import {
 import { hashKey } from "../crypto.js";
 import { rateLimit } from "../rate-limit.js";
 import { requireJson } from "../lib/json-content-type.js";
+import { jsonErr } from "../lib.js";
 
 export const participants = new Hono();
 
@@ -64,11 +65,11 @@ if (isTest) {
   participants.post("/", requireJson, async (c) => {
     const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) {
-      return c.json({ error: "bad request" }, 400);
+      return jsonErr(c, "bad request");
     }
     const { name } = parsed.data;
     if (getParticipantByName(name)) {
-      return c.json({ error: `name "${name}" is taken` }, 409);
+      return jsonErr(c, `name "${name}" is taken`, 409);
     }
     const id = ulid();
     const plaintext = newKey();
@@ -82,14 +83,14 @@ if (isTest) {
     return c.json({ key: plaintext, recoverCode, participant }, 201);
   });
 } else {
-  participants.post("/", requireJson, authLimiter!, async (c) => {
+  participants.post("/", requireJson, ...(authLimiter ? [authLimiter] : []), async (c) => {
     const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) {
-      return c.json({ error: "bad request" }, 400);
+      return jsonErr(c, "bad request");
     }
     const { name } = parsed.data;
     if (getParticipantByName(name)) {
-      return c.json({ error: `name "${name}" is taken` }, 409);
+      return jsonErr(c, `name "${name}" is taken`, 409);
     }
     const id = ulid();
     const plaintext = newKey();
@@ -120,7 +121,7 @@ if (isTest) {
     if (!parsed.success) {
       // Validation failure leaks nothing about name existence; treat as bad
       // shape and return 400 with the generic message.
-      return c.json({ error: "bad request" }, 400);
+      return jsonErr(c, "bad request");
     }
     const { name, recoverCode } = parsed.data;
     const row = getParticipantForRecover(name);
@@ -134,7 +135,7 @@ if (isTest) {
       !!row.recover_hash &&
       safeEqualHex(hashKey(recoverCode), row.recover_hash);
     if (!matches) {
-      return c.json({ error: "invalid recovery code" }, 401);
+      return jsonErr(c, "invalid recovery code", 401);
     }
 
     // Reissue both credentials, reusing the original id + name.
@@ -151,14 +152,14 @@ if (isTest) {
     return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);
   });
 } else {
-  participants.post("/recover", requireJson, authLimiter!, async (c) => {
+  participants.post("/recover", requireJson, ...(authLimiter ? [authLimiter] : []), async (c) => {
     const parsed = RecoverParticipantRequest.safeParse(
       await c.req.json().catch(() => ({})),
     );
     if (!parsed.success) {
       // Validation failure leaks nothing about name existence; treat as bad
       // shape and return 400 with the generic message.
-      return c.json({ error: "bad request" }, 400);
+      return jsonErr(c, "bad request");
     }
     const { name, recoverCode } = parsed.data;
     const row = getParticipantForRecover(name);
@@ -172,7 +173,7 @@ if (isTest) {
       !!row.recover_hash &&
       safeEqualHex(hashKey(recoverCode), row.recover_hash);
     if (!matches) {
-      return c.json({ error: "invalid recovery code" }, 401);
+      return jsonErr(c, "invalid recovery code", 401);
     }
 
     // Reissue both credentials, reusing the original id + name.

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { AgentStatusRequest } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { requireJson } from "../lib/json-content-type.js";
+import { jsonErr } from "../lib.js";
 import {
   markThinking,
   markThinkingIdle,
@@ -45,7 +46,7 @@ agents.post("/thinking", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = AgentStatusRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "bad request" }, 400);
+    return jsonErr(c, "bad request");
   }
 
   const room = parsed.data.room ?? null;
@@ -81,7 +82,7 @@ agents.post("/idle", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = AgentStatusRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "bad request" }, 400);
+    return jsonErr(c, "bad request");
   }
 
   const entry = markThinkingIdle(me.id);

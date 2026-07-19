@@ -30,7 +30,7 @@ import {
 import { requireAuth } from "../auth.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
-import { parseLimit } from "../lib.js";
+import { parseLimit, jsonErr } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
@@ -81,7 +81,7 @@ messages.post("/", requireJson, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateMessageRequest.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "bad request" }, 400);
+    return jsonErr(c, "bad request");
   }
   const { content, attachmentIds, replyToId, room } = parsed.data;
 
@@ -90,7 +90,7 @@ messages.post("/", requireJson, async (c) => {
   // even if the schema changes. The threshold mirrors the schema constant so the
   // two can never drift.
   if (content.length > MAX_MESSAGE_CONTENT) {
-    return c.json({ error: `content exceeds maximum length of ${MAX_MESSAGE_CONTENT} characters` }, 400);
+    return jsonErr(c, `content exceeds maximum length of ${MAX_MESSAGE_CONTENT} characters`);
   }
 
   // Rehydrate attachments server-side from the requested ids. The server is the
@@ -100,7 +100,7 @@ messages.post("/", requireJson, async (c) => {
   // uploaded, never another participant's. attachment count is capped by
   // MAX_IMAGES_PER_MESSAGE (shared server/client/MCP limit).
   if (attachmentIds.length > MAX_IMAGES_PER_MESSAGE) {
-    return c.json({ error: `too many attachments (max ${MAX_IMAGES_PER_MESSAGE})` }, 400);
+    return jsonErr(c, `too many attachments (max ${MAX_IMAGES_PER_MESSAGE})`);
   }
 
   let attachments: MessageAttachment[] = [];
@@ -109,10 +109,10 @@ messages.post("/", requireJson, async (c) => {
       const rows = getFilesByIds(attachmentIds);
       // Reject if any id is missing or doesn't belong to this participant.
       if (rows.length !== attachmentIds.length) {
-        return c.json({ error: "attachment not found" }, 400);
+        return jsonErr(c, "attachment not found");
       }
       if (rows.some((r) => r.participant_id !== c.get("participant").id)) {
-        return c.json({ error: "attachment not owned by sender" }, 403);
+        return jsonErr(c, "attachment not owned by sender", 403);
       }
       // Preserve the order the user chose (getFilesByIds already keeps input
       // order); build the attachment list from authoritative server metadata.
@@ -128,13 +128,13 @@ messages.post("/", requireJson, async (c) => {
     } catch {
       // DB errors and input violations (e.g. too many ids) must not leak
       // internal diagnostics to the caller.
-      return c.json({ error: "attachments unavailable" }, 500);
+      return jsonErr(c, "attachments unavailable", 500);
     }
   }
 
   // Cross-field rule: text OR image. Empty text with no images is rejected.
   if (!content.trim() && attachments.length === 0) {
-    return c.json({ error: "content or attachment required" }, 400);
+    return jsonErr(c, "content or attachment required");
   }
 
   const me = c.get("participant");
@@ -243,11 +243,11 @@ messages.get("/search", (c) => {
 // message's room so the fan-out stays room-scoped (a client watching another
 // room never sees the recall). Soft-delete keeps the row, so the room is still
 // readable after the successful update.
-messages.delete("/:id", async (c) => {
+messages.delete("/:id", (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const ok = deleteMessage(id, me.id);
-  if (!ok) return c.json({ error: "not found" }, 404);
+  if (!ok) return jsonErr(c, "not found", 404);
   const room = getMessageRoom(id) ?? "general";
   broadcastDeleted({ id, room });
   return c.body(null, 204);
@@ -261,7 +261,7 @@ messages.post("/:id/reactions", requireJson, async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
   const emoji = typeof body.emoji === "string" ? body.emoji.trim() : "";
-  if (!emoji || emoji.length > 32) return c.json({ error: "bad emoji" }, 400);
+  if (!emoji || emoji.length > 32) return jsonErr(c, "bad emoji");
   const reactions = toggleReaction(id, me.id, emoji);
   const room = getMessageRoom(id) ?? "general";
   broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room } satisfies MessageReactionEvent);

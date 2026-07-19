@@ -13,6 +13,7 @@ import {
 } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { insertFile, getFile } from "../db.js";
+import { jsonErr } from "../lib.js";
 import { filesDir, filePath } from "../files-dir.js";
 
 export const files = new Hono();
@@ -25,17 +26,17 @@ files.post("/", requireAuth, async (c) => {
   try {
     body = await c.req.parseBody();
   } catch {
-    return c.json({ error: "expected multipart form data" }, 400);
+    return jsonErr(c, "expected multipart form data");
   }
 
   const file = body.file;
   if (!(file instanceof File)) {
-    return c.json({ error: 'missing "file" field' }, 400);
+    return jsonErr(c, 'missing "file" field');
   }
 
   const size = file.size;
   if (size <= 0) {
-    return c.json({ error: "empty file" }, 400);
+    return jsonErr(c, "empty file");
   }
 
   const me = c.get("participant");
@@ -46,7 +47,7 @@ files.post("/", requireAuth, async (c) => {
   // branch on it to pick the size cap and whether to probe dimensions.
   const parsed = AttachmentMime.safeParse(file.type);
   if (!parsed.success) {
-    return c.json({ error: "unsupported file type" }, 415);
+    return jsonErr(c, "unsupported file type", 415);
   }
   const mime = parsed.data; // ImageMime | VideoMime | DocumentMime
   const isImage = mime.startsWith("image/");
@@ -92,7 +93,7 @@ files.post("/", requireAuth, async (c) => {
     } catch {
       // Malformed image header — reject rather than store something clients
       // can't render.
-      return c.json({ error: "could not read image dimensions" }, 422);
+      return jsonErr(c, "could not read image dimensions", 422);
     }
   }
 
@@ -134,10 +135,10 @@ files.post("/", requireAuth, async (c) => {
 files.get("/:id", (c) => {
   const id = c.req.param("id");
   const row = getFile(id);
-  if (!row) return c.json({ error: "not found" }, 404);
+  if (!row) return jsonErr(c, "not found", 404);
 
   const path = filePath(id);
-  if (!existsSync(path)) return c.json({ error: "not found" }, 404);
+  if (!existsSync(path)) return jsonErr(c, "not found", 404);
 
   const stat = statSync(path);
   const total = stat.size;

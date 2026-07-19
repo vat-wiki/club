@@ -18,6 +18,31 @@ setInterval(() => {
   }
 }, 120_000).unref();
 
+/**
+ * Resolve the most trustworthy client IP from a Hono context.
+ *
+ * Preference order:
+ *   1. `x-forwarded-for` (leftmost entry) — trusted when behind a reverse proxy.
+ *   2. `x-real-ip` — nginx/caddy convention.
+ *   3. Direct socket address via `getConnInfo` (from `@hono/node-server/conninfo`).
+ *
+ * The socket address is the hard fallback: it cannot be forged by the client
+ * even without a reverse proxy, so we prefer it over the string "unknown" which
+ * collapses every bypass into a single bucket.
+ */
+export function getClientIp(
+  c: import("hono").Context,
+  getConnInfo?: () => { remote?: { address?: string } } | undefined,
+): string {
+  const xff = c.req.header("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  const xri = c.req.raw.headers.get("x-real-ip");
+  if (xri) return xri;
+  const conn = getConnInfo?.();
+  if (conn?.remote?.address) return conn.remote.address;
+  return "unknown";
+}
+
 export function rateLimit(options: {
   max: number; // max requests per window
   windowMs: number; // window in milliseconds
@@ -26,7 +51,8 @@ export function rateLimit(options: {
   const { max, windowMs, key } = options;
 
   return async (c, next) => {
-    const identifier = key ? key(c) : c.req.header("x-forwarded-for") ?? c.req.raw.headers.get("x-real-ip") ?? "unknown";
+    // When a custom key extractor is not provided, use the hardened IP resolver.
+    const identifier = key ? key(c) : getClientIp(c);
 
     const now = Date.now();
     let bucket = buckets.get(identifier);

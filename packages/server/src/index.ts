@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { existsSync } from "node:fs";
@@ -13,7 +14,7 @@ import { me } from "./routes/me.js";
 import { files } from "./routes/files.js";
 import { agents } from "./routes/agents.js";
 import { rooms } from "./routes/rooms.js";
-import { rateLimit } from "./rate-limit.js";
+import { rateLimit, getClientIp } from "./rate-limit.js";
 import { heartbeatInterval } from "./stream.js";
 import { securityHeaders } from "./security-headers.js";
 
@@ -23,7 +24,14 @@ const joinHtmlPath = resolve(__dirname, "public", "join.html");
 const app = new Hono();
 
 // Global rate limiter: 120 requests per minute per IP (generous for read paths).
-app.use("*", rateLimit({ max: 120, windowMs: 60_000 }));
+// Wraps `getConnInfo` so the rate-limiter uses the real socket address as a
+// hard fallback when no reverse proxy headers are present, closing the IP
+// spoofing bypass that collapsed all untrusted clients into one "unknown" bucket.
+app.use("*", rateLimit({
+  max: 120,
+  windowMs: 60_000,
+  key: (c) => getClientIp(c, () => getConnInfo(c)),
+}));
 
 // Security headers: CSP, HSTS, X-Content-Type-Options, etc.
 app.use("*", securityHeaders);

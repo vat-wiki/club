@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import { rateLimit } from "./rate-limit.js";
+import { rateLimit, getClientIp } from "./rate-limit.js";
 
 // Each test creates its own Hono instance so route registration is isolated.
 // The rate-limit middleware uses module-level state (`buckets`), so tests use
@@ -77,5 +77,56 @@ describe("rateLimit", () => {
     // Different IP — new bucket
     const res3 = await app.request("/test", { headers: { "x-forwarded-for": "10.0.0.2" } });
     expect(res3.status).toBe(200);
+  });
+
+  it("falls back to socket address via getConnInfo when headers absent", async () => {
+    const limiter = rateLimit({
+      max: 1,
+      windowMs: 60_000,
+      key: (c) => getClientIp(c, () => ({ remote: { address: "127.0.0.1" } })),
+    });
+    const app = mkApp(limiter);
+
+    const res1 = await app.request("/test");
+    expect(res1.status).toBe(200);
+
+    // Same socket IP — should be limited
+    const res2 = await app.request("/test");
+    expect(res2.status).toBe(429);
+  });
+
+  it("getClientIp picks leftmost x-forwarded-for entry", async () => {
+    const c = {
+      req: {
+        header: (h: string) => (h === "x-forwarded-for" ? "203.0.113.5, 10.0.0.2" : undefined),
+        raw: { headers: { get: () => null } },
+      },
+    } as any;
+    expect(getClientIp(c)).toBe("203.0.113.5");
+  });
+
+  it("getClientIp falls back to x-real-ip", async () => {
+    const c = {
+      req: {
+        header: () => undefined,
+        raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "198.51.100.7" : null) } },
+      },
+    } as any;
+    expect(getClientIp(c)).toBe("198.51.100.7");
+  });
+
+  it("getClientIp falls back to socket address from getConnInfo", async () => {
+    const c = {
+      req: { header: () => undefined, raw: { headers: { get: () => null } } },
+    } as any;
+    expect(getClientIp(c, () => ({ remote: { address: "10.0.0.3" } }))).toBe("10.0.0.3");
+  });
+
+  it("getClientIp falls back to 'unknown' when nothing available", async () => {
+    const c = {
+      req: { header: () => undefined, raw: { headers: { get: () => null } } },
+    } as any;
+    expect(getClientIp(c)).toBe("unknown");
+    expect(getClientIp(c, () => undefined)).toBe("unknown");
   });
 });

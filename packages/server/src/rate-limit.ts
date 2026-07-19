@@ -1,22 +1,58 @@
-// Lightweight in-memory rate limiter for Hono.
-// Uses a sliding-window counter per key (IP address by default).
-// No external dependency — avoids adding hono-rate-limiter or similar.
+// Lightweight fixed-window rate limiter for Hono.
+//
+// Fixed-window semantics: each unique key gets a bucket that resets to `max`
+// tokens at the start of its window and depletes on each request. Once the
+// window expires the bucket is fully replenished — partial refill is not
+// attempted (a true sliding-window counter is simpler and cheaper than a
+// leaky-bucket or token-bucket model, which we do not need at this scale).
+//
+// The module keeps no external dependency; hono-rate-limiter is overkill.
+//
+// Internal clock is a module export (`_getNow`) so tests can pin time without
+// relying on `setTimeout`. Production code calls `Date.now` directly.
+// Exported only for tests; underscore prefix signals "private API".
 
 interface Bucket {
+  // Last moment the window started (used to decide when it expires).
+  windowStart: number;
+  // Tokens remaining in the current window.
   tokens: number;
-  lastRefill: number;
 }
 
-// Module-level store so cleanup can evict stale entries.
+// Module-level store; `_cleanup` evicts stale entries on a background timer.
 const buckets = new Map<string, Bucket>();
 
+// Internal clock exported for tests so time-related assertions don't depend on
+// `setTimeout` sleeps. Production calls `Date.now`. Because ESM `export` bindings
+// are immutable, we use a mutable wrapper (the `__clock` symbol is never part of
+// the public API).
+const _clock = { fn: Date.now as () => number };
+export const _getNow: () => number = () => _clock.fn();
+export function _setNow(fn: () => number): void {
+  _clock.fn = fn;
+}
+
 // Periodic cleanup of stale buckets to prevent memory leak.
-setInterval(() => {
-  const now = Date.now();
+// `unref()` keeps the timer from blocking Node's event loop once all other
+// handles are idle (e.g. in tests or single-shot requests).
+_cleanupRef = setInterval(_cleanup, 120_000).unref();
+
+function _cleanup(): void {
+  const now = _getNow();
   for (const [key, bucket] of buckets.entries()) {
-    if (now - bucket.lastRefill > 120_000) buckets.delete(key);
+    if (now - bucket.windowStart > 120_000) buckets.delete(key);
   }
-}, 120_000).unref();
+}
+
+/** Releases the background cleanup timer. Primarily for tests so the GC can
+ *  walk away cleanly; not required in production (the unref'd timer won't
+ *  prevent process exit). */
+export function _clearCleanup(): void {
+  if (_cleanupRef) clearInterval(_cleanupRef);
+}
+
+// eslint-disable-next-line no-var -- mutable ref kept alive across calls
+var _cleanupRef: ReturnType<typeof setInterval> | undefined;
 
 // IPv4 / IPv6 (compressed) validation. Rejects anything that isn't a
 // well-formed IP so forged proxy headers can't poison the rate-limiter
@@ -84,20 +120,27 @@ export function rateLimit(options: {
     // When a custom key extractor is not provided, use the hardened IP resolver.
     const identifier = key ? key(c) : getClientIp(c);
 
-    const now = Date.now();
+    const now = _getNow();
     let bucket = buckets.get(identifier);
-    if (!bucket || now - bucket.lastRefill > windowMs) {
-      bucket = { tokens: max, lastRefill: now };
+    if (!bucket || now - bucket.windowStart >= windowMs) {
+      // Window has expired (or never existed) — start a fresh one.
+      bucket = { windowStart: now, tokens: max };
       buckets.set(identifier, bucket);
     }
 
     if (bucket.tokens <= 0) {
-      const remaining = Math.ceil((bucket.lastRefill + windowMs - now) / 1000);
+      // Window is fixed: the bucket won't refill until the original window
+      // expires, regardless of how much time has elapsed within it. This
+      // matches fixed-window semantics and prevents a client from getting a
+      // partial refill mid-window.
+      const remaining = Math.ceil((bucket.windowStart + windowMs - now) / 1000);
       c.header("Retry-After", String(remaining));
       return c.json({ error: "rate limited" }, 429);
     }
 
     bucket.tokens--;
+    c.header("X-RateLimit-Limit", String(max));
+    c.header("X-RateLimit-Remaining", String(bucket.tokens));
     await next();
   };
 }

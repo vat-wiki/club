@@ -1,10 +1,27 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Hono } from "hono";
-import { rateLimit, getClientIp } from "./rate-limit.js";
+import { rateLimit, getClientIp, _getNow, _clearCleanup } from "./rate-limit.js";
 
 // Each test creates its own Hono instance so route registration is isolated.
 // The rate-limit middleware uses module-level state (`buckets`), so tests use
 // unique prefixes in their key extractors to avoid collisions across tests.
+
+// Reset the internal clock and stale buckets after every test so no real-time
+// timer state leaks between cases.
+let _savedNow: (() => number) | undefined;
+function resetLimiterState() {
+  _getNow = Date.now as () => number;
+  _savedNow = undefined;
+}
+function stubNow(at: number): () => number {
+  _savedNow = _getNow;
+  return (_getNow = () => at);
+}
+afterEach(() => {
+  // Clear the module's internal store so leftover buckets don't affect later tests.
+  resetLimiterState();
+  _clearCleanup();
+});
 
 function mkApp(limiter: ReturnType<typeof rateLimit>): Hono {
   const app = new Hono();
@@ -19,6 +36,9 @@ describe("rateLimit", () => {
     const app = mkApp(limiter);
     const res = await app.request("/test");
     expect(res.status).toBe(200);
+    // Standard rate-limit headers are present.
+    expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+    expect(Number(res.headers.get("X-RateLimit-Remaining"))).toBe(4);
   });
 
   it("rejects requests that exceed the limit with 429", async () => {
@@ -32,9 +52,33 @@ describe("rateLimit", () => {
     const body = await res.json();
     expect(body).toHaveProperty("error", "rate limited");
     expect(res.headers.get("Retry-After")).toMatch(/^\d+$/);
+    // Bucket is fully exhausted — Remaining should read 0.
+    expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
   });
 
-  it("resets the bucket when the window expires", async () => {
+  it("uses a fixed window: expires at window boundary, not mid-window", async () => {
+    // Pin time so no `setTimeout` wait is needed.
+    stubNow(0);
+    const prefix = `rl-fixed-${Math.random().toString(36).slice(2)}`;
+    const limiter = rateLimit({ max: 1, windowMs: 100, key: () => prefix });
+    const app = mkApp(limiter);
+
+    // First request at t=0 consumes the single token.
+    await app.request("/test");
+
+    // At t=99 (within the same window) the bucket is still empty.
+    stubNow(99);
+    const mid = await app.request("/test");
+    expect(mid.status).toBe(429);
+
+    // At t=100 the window has expired — fresh bucket, token restored.
+    stubNow(100);
+    const after = await app.request("/test");
+    expect(after.status).toBe(200);
+    resetLimiterState();
+  });
+
+  it("resets the bucket when the window expires (real-time wait)", async () => {
     const prefix = `rl-expire-${Math.random().toString(36).slice(2)}`;
     const limiter = rateLimit({ max: 1, windowMs: 5, key: () => prefix });
     const app = mkApp(limiter);
@@ -95,85 +139,92 @@ describe("rateLimit", () => {
     expect(res2.status).toBe(429);
   });
 
-  it("getClientIp picks leftmost x-forwarded-for entry", async () => {
-    const c = {
+type MockContext = {
+  req: {
+    header: (h: string) => string | undefined;
+    raw: { headers: { get: (h: string) => string | null } };
+  };
+};
+
+  it("getClientIp picks leftmost x-forwarded-for entry", () => {
+    const c: MockContext = {
       req: {
         header: (h: string) => (h === "x-forwarded-for" ? "203.0.113.5, 10.0.0.2" : undefined),
         raw: { headers: { get: () => null } },
       },
-    } as any;
+    };
     expect(getClientIp(c)).toBe("203.0.113.5");
   });
 
-  it("getClientIp falls back to x-real-ip", async () => {
-    const c = {
+  it("getClientIp falls back to x-real-ip", () => {
+    const c: MockContext = {
       req: {
         header: () => undefined,
         raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "198.51.100.7" : null) } },
       },
-    } as any;
+    };
     expect(getClientIp(c)).toBe("198.51.100.7");
   });
 
-  it("getClientIp falls back to socket address from getConnInfo", async () => {
-    const c = {
+  it("getClientIp falls back to socket address from getConnInfo", () => {
+    const c: MockContext = {
       req: { header: () => undefined, raw: { headers: { get: () => null } } },
-    } as any;
+    };
     expect(getClientIp(c, () => ({ remote: { address: "10.0.0.3" } }))).toBe("10.0.0.3");
   });
 
-  it("getClientIp falls back to 'unknown' when nothing available", async () => {
-    const c = {
+  it("getClientIp falls back to 'unknown' when nothing available", () => {
+    const c: MockContext = {
       req: { header: () => undefined, raw: { headers: { get: () => null } } },
-    } as any;
+    };
     expect(getClientIp(c)).toBe("unknown");
     expect(getClientIp(c, () => undefined)).toBe("unknown");
   });
 
   it("getClientIp rejects malformed x-forwarded-for and falls through", () => {
-    const c = {
+    const c: MockContext = {
       req: {
         header: () => "invalid, 1.2.3.4",
         raw: { headers: { get: () => null } },
       },
-    } as any;
+    };
     // Invalid leftmost → skip; no socket → fallback to "unknown".
     expect(getClientIp(c)).toBe("unknown");
   });
 
   it("getClientIp rejects spoofed x-forwarded-for", () => {
-    const c = {
+    const c: MockContext = {
       req: {
         header: () => "1.2.3.4, attacker-injection",
         raw: { headers: { get: () => null } },
       },
-    } as any;
+    };
     expect(getClientIp(c)).toBe("1.2.3.4");
   });
 
   it("getClientIp accepts an IPv6 address", () => {
-    const c = {
+    const c: MockContext = {
       req: {
         header: () => undefined,
         raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "::1" : null) } },
       },
-    } as any;
+    };
     expect(getClientIp(c)).toBe("::1");
 
     // Separate context: no proxy headers, only socket address (IPv6).
-    const c2 = {
+    const c2: MockContext = {
       req: { header: () => undefined, raw: { headers: { get: () => null } } },
-    } as any;
+    };
     expect(getClientIp(c2, () => ({ remote: { address: "2001:db8::1" } }))).toBe("2001:db8::1");
   });
 
   it("getClientIp rejects empty and garbage proxy headers", () => {
-    const c = {
+    const c: MockContext = {
       req: {
         header: (h: string) => (h === "x-forwarded-for" ? "" : undefined),
         raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "not-an-ip" : null) } },
       },
-    } as any;
+    };
     expect(getClientIp(c)).toBe("unknown");
   });
 });

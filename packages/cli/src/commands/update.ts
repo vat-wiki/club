@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { formatError } from "@club/sdk";
 import { CURRENT_VERSION, fetchLatestVersion, isNewer, runSelfUpdate } from "../update.js";
 
 /**
@@ -24,7 +25,7 @@ export function makeUpdateCommand(): Command {
         await runSelfUpdate();
         console.log(`updated to ${latest}`);
       } catch (e) {
-        console.error(`error: ${(e as Error).message}`);
+        console.error(formatError(e));
         process.exit(1);
       }
     });

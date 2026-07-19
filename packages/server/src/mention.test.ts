@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { extractMentionedParticipants } from "./mention.js";
+import { extractMentionedParticipants, type NamedParticipant } from "./mention.js";
 
-const P = (id: string, name: string) => ({ id, name });
+const P = (id: string, name: string): NamedParticipant => ({ id, name });
 
 describe("extractMentionedParticipants", () => {
   it("matches a literal @mention", () => {
@@ -88,6 +88,41 @@ describe("extractMentionedParticipants", () => {
     // The client `listen --mention alice` matcher does not exclude the author,
     // so neither do we — the inbox must equal what a live listen would catch.
     expect(extractMentionedParticipants("note to @alice self", [P("1", "alice")])).toEqual([
+      P("1", "alice"),
+    ]);
+  });
+
+  it("does not match @ preceded by a name char (email-like) so 'user@alice.com' is not an @alice mention", () => {
+    // The single-pass scanner skips `@` occurrences whose previous char is a
+    // NAME_CHAR, matching the client-side mentionMatches intent.
+    expect(extractMentionedParticipants("user@alice.com", [P("1", "alice")])).toEqual([]);
+    expect(extractMentionedParticipants("a@alice rest", [P("1", "alice")])).toEqual([]);
+    // But when preceded by a non-name char it matches normally.
+    expect(extractMentionedParticipants("(check)@alice", [P("1", "alice")])).toEqual([P("1", "alice")]);
+  });
+
+  it("recognises CJK, numeric and hyphen/underscore in names (NAME_CHAR class)", () => {
+    expect(extractMentionedParticipants("@走查-体验 帮忙", [P("1", "走查-体验")])).toEqual([P("1", "走查-体验")]);
+    expect(extractMentionedParticipants("@bob_42 ping", [P("1", "bob_42")])).toEqual([P("1", "bob_42")]);
+    expect(extractMentionedParticipants("@张三 看", [P("1", "张三")])).toEqual([P("1", "张三")]);
+  });
+
+  it("does not treat a lone trailing @ (no name chars after it) as a mention", () => {
+    expect(extractMentionedParticipants("hi @", [P("1", "alice")])).toEqual([]);
+    expect(extractMentionedParticipants("hi @ ", [P("1", "alice")])).toEqual([]);
+  });
+
+  it("handles @ embedded in a URL path without false-positive mention extraction", () => {
+    // The `user@` in email/host parts is suppressed; plain path-style `@foo`
+    // (preceded by `/`, a non-name char) still matches a real participant.
+    expect(extractMentionedParticipants("see /path/@alice", [P("1", "alice")])).toEqual([P("1", "alice")]);
+    expect(extractMentionedParticipants("mail: x@alice", [P("1", "alice")])).toEqual([]);
+  });
+
+  it("returns the mentions in text order (first-seen) not roster order", () => {
+    const roster = [P("1", "alice"), P("2", "bob"), P("3", "carol")];
+    expect(extractMentionedParticipants("@carol then @alice", roster)).toEqual([
+      P("3", "carol"),
       P("1", "alice"),
     ]);
   });

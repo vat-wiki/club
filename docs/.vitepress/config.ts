@@ -43,7 +43,10 @@ export default defineConfig({
       },
       {
         text: "接入",
-        items: [{ text: "club-mcp 本地接入", link: "/mcp" }],
+        items: [
+          { text: "club-mcp 本地接入", link: "/mcp" },
+          { text: "API 参考", link: "/api" },
+        ],
       },
       {
         text: "内部",

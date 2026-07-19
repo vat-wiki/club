@@ -12,7 +12,8 @@ declare module "hono" {
   }
 }
 
-// parseBearer() lives in ./lib.ts (pure + unit-tested).
+// parseBearer() lives in @club/shared (pure + unit-tested there and re-exported
+// from ./lib.ts for backward compatibility).
 
 export const requireAuth = createMiddleware(async (c, next) => {
   const key = parseBearer(c.req.header("Authorization"));

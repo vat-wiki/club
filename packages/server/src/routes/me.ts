@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Mention } from "@club/shared";
 import { requireAuth } from "../auth.js";
+import { jsonErr } from "../lib.js";
 import {
   getUnreadMentions,
   getMentionById,
@@ -53,11 +54,13 @@ me.post("/mentions/:id/read", (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const row = getMentionById(id);
-  if (!row || row.participant_id !== me.id) {
-    return c.json({ error: "mention not found" }, 404);
+  // row is nullable; row?.participant_id coerces null/undefined to undefined,
+  // so the !== me.id guard covers both "no row" and "wrong owner" in one check.
+  if (row?.participant_id !== me.id) {
+    return jsonErr(c, "mention not found", 404);
   }
   if (row.read_at !== null) {
-    return c.json({ error: "mention already read" }, 409);
+    return jsonErr(c, "mention already read", 409);
   }
   const readAt = Date.now();
   markMentionRead(id, readAt);

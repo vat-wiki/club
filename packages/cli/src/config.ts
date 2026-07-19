@@ -26,7 +26,7 @@ const ConfigSchema = z.object({
  */
 export function defaultRoom(cfg: { room?: string } | null): string {
   const r = cfg?.room?.trim();
-  return r || DEFAULT_ROOM;
+  return r ?? DEFAULT_ROOM;
 }
 
 // ~/.club/config.json by default; CLUB_CONFIG points elsewhere.

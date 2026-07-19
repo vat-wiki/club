@@ -174,7 +174,7 @@ function OfficePreview({ kind, url }: { kind: Exclude<PreviewKind, "markdown">; 
   useEffect(() => {
     let previewer: { preview: (src: string) => Promise<void>; destroy?: () => void } | null = null;
     let active = true;
-    (async () => {
+    void (async () => {
       try {
         // CJS packages — the default export holds the { init } API.
         const mod: Record<string, unknown> =
@@ -235,7 +235,7 @@ function MarkdownPreview({ url }: { url: string }) {
 
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`status ${res.status}`);

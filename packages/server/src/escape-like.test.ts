@@ -8,6 +8,9 @@ import { escapeLike } from "@club/shared";
 /** Build an isolated temp SQLite db with known messages so we can
  *  exercise the full search code path (LIKE + escapeLike) without touching
  *  the global CLUB_DB singleton (which runs schema migrations on import).
+ *
+ *  The queries use `ESCAPE '\\'` so backslash is the escape character,
+ *  matching what `db.ts` does now.
  */
 function makeDb() {
   const path = join(tmpdir(), `club-srch-${randomUUID()}.db`);
@@ -35,7 +38,7 @@ function makeDb() {
     "hello world",
     "hello 100%",
     "hello_world",
-    "hello\\world",
+    "hello\\world", // contains a literal backslash
     "foo bar baz",
     "100% off!",
     "%_%",
@@ -44,14 +47,14 @@ function makeDb() {
     insert.run(`m${i + 1}`, "p1", rows[i], i + 1);
 
   const searchStmt = db.prepare(
-    `SELECT id, content, participant_id, created_at FROM messages WHERE content LIKE ? ORDER BY content LIMIT ?`
+    `SELECT id, content, participant_id, created_at FROM messages WHERE content LIKE ? ESCAPE '\\' ORDER BY content LIMIT ?`
   );
 
   function search(q: string, limit = 100) {
     return searchStmt.all(`%${escapeLike(q)}%`, limit);
   }
 
-  return { db, path, search };
+  return { db, path, search, rows };
 }
 
 afterAll(() => {
@@ -68,8 +71,9 @@ describe("escapeLike", () => {
   it("escapes underscore", () => {
     expect(escapeLike("hello_world")).toBe("hello\\_world");
   });
-  it("escapes backslash", () => {
-    expect(escapeLike("a\\b")).toBe("a\\\\\\b");
+  it("doubles a literal backslash", () => {
+    // Input string contains one backslash between a and b
+    expect(escapeLike("a\\b")).toBe("a\\\\b");
   });
   it("escapes all three wildcards together", () => {
     expect(escapeLike("%_%")).toBe("\\%\\_\\%");
@@ -80,7 +84,7 @@ describe("escapeLike", () => {
 });
 
 describe("search: LIKE wildcard injection defense", () => {
-  const { search } = makeDb();
+  const { search, rows } = makeDb();
 
   it("a bare % does not match every row", () => {
     const hits = search("%");

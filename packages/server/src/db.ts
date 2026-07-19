@@ -358,13 +358,13 @@ export function getMessagesBeforeId(beforeId: string, room: string, limit: numbe
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
           p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.content LIKE ? ORDER BY m.rowid DESC LIMIT ?`,
+   WHERE m.content LIKE ? ESCAPE '\\' ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
   `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
           p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.content LIKE ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+   WHERE m.content LIKE ? ESCAPE '\\' AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 /** Messages whose content contains `q` (substring via LIKE), newest first.

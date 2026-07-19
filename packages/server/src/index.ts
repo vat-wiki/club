@@ -95,15 +95,62 @@ app.notFound((c) => c.json({ error: "not found" }, 404));
 const port = Number(process.env.PORT ?? 6200);
 const host = process.env.HOST ?? "0.0.0.0";
 
+// Best practice: log the actual listening address (host/port) after the kernel
+// allocates the socket, so log output matches reality when HOST=0.0.0.0 or
+// PORT is defaulted. Listen errors (EADDRINUSE / EACCES) are caught via the
+// returned server's error event and surfaced with a clear message + exit code
+// rather than an unhandled exception that drops a raw stack trace.
 const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
   console.log(`club server listening on http://${host}:${info.port}`);
   console.log(`  /join to mint a key · packages/web for the chat UI`);
 });
 
-function shutdown(_signal: string) {
+// Catch listen errors after `serve()` returns: EADDRINUSE means the port is
+// already taken; EACCES means the process lacks privilege for a port < 1024.
+// Once the socket is bound the listener fires and these never trigger, so the
+// one-time flag ensures we don't log on a later, unrelated error.
+let listenErrorHandled = false;
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (listenErrorHandled) return;
+  listenErrorHandled = true;
+  let exitCode = 1;
+  let msg = `failed to listen: ${error}`;
+  if (error.code === "EADDRINUSE") {
+    msg = `port ${port} is already in use; another server is listening on it. Set PORT to a different value and try again.`;
+  } else if (error.code === "EACCES") {
+    msg = `permission denied binding to port ${port} (ports < 1024 require elevated privileges). Set PORT to 1024 or higher.`;
+    exitCode = 126;
+  }
+  console.error(`[club server] ${msg}`);
+  process.exit(exitCode);
+});
+
+// Best practice: catch unhandled promise rejections and uncaught exceptions so
+// they log a readable message and exit 1 instead of crashing with an opaque
+// stack trace. Mirrors the safety net in packages/mcp/src/index.ts so the two
+// entry points behave identically.
+process.on("unhandledRejection", (err) => {
+  console.error(`[club server] Unhandled rejection: ${err}`);
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  console.error(`[club server] Uncaught exception: ${err}`);
+  process.exit(1);
+});
+
+function shutdown(signal: string) {
+  console.log(`[club server] ${signal} received; draining connections…`);
   clearInterval(heartbeatInterval);
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 5000);
+  server.close(() => {
+    console.log("[club server] all connections closed; exiting");
+    process.exit(0);
+  });
+  // Force exit after a short grace period if connections are stuck open (e.g.
+  // a stalled SSE stream), so `SIGTERM` from a container runtime still wins.
+  setTimeout(() => {
+    console.warn("[club server] shutdown timed out; forcing exit");
+    process.exit(1);
+  }, 5000);
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));

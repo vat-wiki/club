@@ -1,0 +1,11 @@
+# Force LF line endings for all text files (cross-platform consistency)
+* text=auto eol=lf
+
+# Treat DB binaries as binary
+*.db binary
+*.db-shm binary
+*.db-wal binary
+
+# Don't diff lock files
+package-lock.json diff
+package.json diff

@@ -40,13 +40,11 @@ export function addSubscriber(
     name: p.name,
     online,
   });
+  // Announce the newcomer's own online status to every live subscriber (global
+  // by design — presence is not room-scoped, PRD §8.7). writeAll handles
+  // delivery to all subscribers; do not write other subscribers' presence into
+  // the newcomer's own stream (the client never consumes those frames).
   broadcastPresence(presence(participant, true));
-  for (const sub of subscribers) {
-    if (sub === entry || sub.dead) continue;
-    void s
-      .writeSSE({ event: "presence", data: JSON.stringify(presence(sub.participant, true)) })
-      .catch(() => {});
-  }
   return () => {
     entry.dead = true;
     subscribers.delete(entry);

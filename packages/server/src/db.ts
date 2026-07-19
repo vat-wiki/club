@@ -454,20 +454,22 @@ export function toggleReaction(messageId: string, participantId: string, emoji: 
   return getReactionsForMessage(messageId);
 }
 
+const participantByKeyHashStmt = db.prepare<
+  [string],
+  { id: string; name: string; created_at: number }
+>(`SELECT id, name, created_at FROM participants WHERE key_hash = ?`);
+
 export function getParticipantByKeyHash(hash: string) {
-  return db
-    .prepare<[string], { id: string; name: string; created_at: number }>(
-      `SELECT id, name, created_at FROM participants WHERE key_hash = ?`,
-    )
-    .get(hash);
+  return participantByKeyHashStmt.get(hash);
 }
 
+const participantByNameStmt = db.prepare<
+  [string],
+  { id: string; name: string; created_at: number }
+>(`SELECT id, name, created_at FROM participants WHERE name = ?`);
+
 export function getParticipantByName(name: string) {
-  return db
-    .prepare<[string], { id: string; name: string; created_at: number }>(
-      `SELECT id, name, created_at FROM participants WHERE name = ?`,
-    )
-    .get(name);
+  return participantByNameStmt.get(name);
 }
 
 const insertParticipantStmt = db.prepare(

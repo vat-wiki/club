@@ -7,7 +7,7 @@ import { AttachmentMime, type AttachmentMime as AttachmentMimeType } from "@club
 import { formatError } from "./errors.js";
 
 /** Validate that a MIME type is one of the accepted attachment types. */
-function isValidAttachmentMime(mime: string): mime is AttachmentMimeType {
+function _isValidAttachmentMime(mime: string): mime is AttachmentMimeType {
   return AttachmentMime.safeParse(mime).success;
 }
 
@@ -48,7 +48,7 @@ export type FileContent = {
 export async function parseFileContent(
   buffer: ArrayBuffer,
   mime: string,
-  filename?: string,
+  _filename?: string,
 ): Promise<FileContent> {
   const uint8 = new Uint8Array(buffer);
 

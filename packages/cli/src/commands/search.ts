@@ -5,7 +5,7 @@
 
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
-import { defaultRoom, requireConfig } from "../config.js";
+import { requireConfig } from "../config.js";
 import { formatMessage } from "./format.js";
 
 const SEARCH_LIMIT_DEFAULT = 20;

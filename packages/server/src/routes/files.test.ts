@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { MAX_VIDEO_BYTES } from "@club/shared";
 import { Hono } from "hono";
-import { rmSync, mkdirSync, readFileSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";

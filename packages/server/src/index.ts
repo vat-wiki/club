@@ -92,7 +92,7 @@ const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
   console.log(`  /join to mint a key · packages/web for the chat UI`);
 });
 
-function shutdown(signal: string) {
+function shutdown(_signal: string) {
   clearInterval(heartbeatInterval);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 5000);

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { ClubClient, formatMessage } from "@club/sdk";
-import type { Message } from "@club/shared";
+import type { Message as _Message } from "@club/shared";
 import { defaultRoom, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";
 

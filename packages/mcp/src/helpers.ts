@@ -100,7 +100,7 @@ export function listenForMatch(
     const matched: Message[] = [];
     let settled = false;
     let handle: { stop: () => void } = { stop: () => {} };
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined; // eslint-disable-line prefer-const — reassigned in subscribe callback
 
     const finish = () => {
       if (settled) return;

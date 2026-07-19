@@ -7,6 +7,7 @@ import {
 import { ClubClient, formatError } from "@club/sdk";
 import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
 import { dispatchTool, type DispatchClient } from "./helpers.js";
+import type { ToolArgs } from "./types.js";
 
 // ── Connection config ────────────────────────────────────────────────
 // Resolve from env (preferred for `claude mcp add ... -e CLUB_KEY=...`)
@@ -297,9 +298,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 // injected). The handler shuttles the MCP request into it and wraps either the
 // returned text or a thrown error as a tool text response.
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const { name, arguments: args } = req.params;
+  // The MCP SDK validates the request shape upstream (inputSchema on TOOLS).
+  // Assert the name is one of our catalogue entries so dispatchTool sees a
+  // concrete per-tool argument type instead of Record<string, unknown>. This
+  // gives callers of dispatchTool compile-time guarantees; the handler itself
+  // still guards against malformed input via the coercion helpers inside.
+  const name = req.params.name as ToolArgs["name"];
+  const args = req.params.arguments ?? {};
   try {
-    return text(await dispatchTool(name, (args ?? {}) as Record<string, unknown>, dispatchClient));
+    return text(await dispatchTool(name, args, dispatchClient));
   } catch (err) {
     const msg = formatError(err);
     // Add context to common errors so AI can self-correct

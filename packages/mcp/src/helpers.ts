@@ -9,6 +9,7 @@ import { assertAttachmentCount } from "@club/sdk/node";
 
 import { mentionMatches, type Message, type Participant, type Room, type MessageAttachment } from "@club/shared";
 import { formatMessage } from "@club/sdk";
+import type { ArgsFor } from "./types.js";
 
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
 export function str(v: unknown): string {
@@ -211,6 +212,25 @@ export const __test = { stopThinkingHeartbeat, THINKING_REFRESH_MS };
  * directly is impractical: it process.exit()s when CLUB_KEY is unset and binds
  * stdio at module top level).
  *
+ * Generic in the tool name so the `args` shape is resolved to the matching
+ * per-tool interface from types.ts rather than a raw `Record<string, unknown>`,
+ * surfacing misspelled parameters at compile time instead of at runtime.
+ *
+ * Throws when the underlying client call fails; index.ts wraps the throw as an
+ * `error: <msg>` tool result, preserving the original behavior.
+ */
+/**
+ * Route one MCP tool call to the matching client action and return the
+ * human-readable text the tool should reply with. Extracted from index.ts so
+ * the dispatcher — every tool's formatting, empty-result, missing-arg, and
+ * error behavior — is unit-testable with a fake client (importing index.ts
+ * directly is impractical: it process.exit()s when CLUB_KEY is unset and binds
+ * stdio at module top level).
+ *
+ * Each case is annotated with `ArgsFor<"toolName">` so the compiler validates
+ * that the accessed properties exist on the matching per-tool interface in
+ * types.ts. Adding a new tool that forgets a required field is caught here.
+ *
  * Throws when the underlying client call fails; index.ts wraps the throw as an
  * `error: <msg>` tool result, preserving the original behavior.
  */
@@ -225,19 +245,21 @@ export async function dispatchTool(
       return `You are ${me.name}. id=${me.id}`;
     }
     case "read": {
-      const limit = clampLimit(args.limit);
+      const a = args as ArgsFor<"read">;
+      const limit = clampLimit(a.limit);
       // send/read default to CLUB_ROOM → general (PRD §5.4). listen is the only
       // one that defaults to all rooms — it does NOT use resolveRoom.
-      const room = resolveRoom(args.room, process.env.CLUB_ROOM);
-      const msgs = await client.messages({ since: str(args.since), limit, room });
+      const room = resolveRoom(a.room, process.env.CLUB_ROOM);
+      const msgs = await client.messages({ since: str(a.since), limit, room });
       if (msgs.length === 0) return "(no messages)";
       return msgs.map(formatMessage).join("\n");
     }
     case "send": {
-      const content = str(args.content);
-      const images = strArray(args.images);
-      const videos = strArray(args.videos);
-      const documents = strArray(args.files);
+      const a = args as ArgsFor<"send">;
+      const content = str(a.content);
+      const images = strArray(a.images);
+      const videos = strArray(a.videos);
+      const documents = strArray(a.files);
       // Need at least one of: text, images, videos, or documents. Bare media
       // with no text is a legitimate intent ("text-optional").
       if (!content && images.length === 0 && videos.length === 0 && documents.length === 0)
@@ -245,7 +267,7 @@ export async function dispatchTool(
       // Fail fast on too many attachments before any upload happens. Images,
       // videos, and documents all share one per-message cap.
       assertAttachmentCount([...images, ...videos, ...documents]);
-      const room = resolveRoom(args.room, process.env.CLUB_ROOM);
+      const room = resolveRoom(a.room, process.env.CLUB_ROOM);
       let attachmentIds: string[] | undefined;
       if (images.length > 0 || videos.length > 0 || documents.length > 0) {
         // Pre-flight + upload each file; an unsupported/missing/too-large file
@@ -289,12 +311,13 @@ export async function dispatchTool(
         .join("\n");
     }
     case "listen": {
-      const mention = str(args.mention) || undefined;
+      const a = args as ArgsFor<"listen">;
+      const mention = str(a.mention) || undefined;
       // listen's room is a pure scoping filter: omit → all rooms (global). It
       // deliberately does NOT fall back to CLUB_ROOM (PRD §5.4 / §5.5) — a
       // dispatcher agent must hear a @mention from any room by default.
-      const room = str(args.room) || undefined;
-      const timeoutMs = num(args.timeoutMs) ?? 60000;
+      const room = str(a.room) || undefined;
+      const timeoutMs = num(a.timeoutMs) ?? 60000;
       const matched = await listenForMatch(
         (cb) => client.stream(cb, room ? { room } : {}),
         mention,
@@ -325,21 +348,28 @@ export async function dispatchTool(
         : "(no matching messages within timeout)";
     }
     case "delete": {
-      const id = str(args.id);
+      const a = args as unknown as ArgsFor<"delete">;
+      const id = str(a.id);
       if (!id) return "error: Delete failed - message ID is required";
       await client.deleteMessage(id);
       return `deleted message ${id}`;
     }
     case "react": {
-      const id = str(args.id);
-      const emoji = str(args.emoji);
+      const a = args as unknown as ArgsFor<"react">;
+      const id = str(a.id);
+      const emoji = str(a.emoji);
       if (!id) return "error: React failed - message ID is required";
       if (!emoji) return "error: React failed - emoji is required";
       const reactions = await client.toggleReaction(id, emoji);
       const updated = reactions.map((r) => `${r.emoji}(${r.count})`).join(" ");
       return `reactions on ${id}: ${updated || "(none)"}`;
     }
-    default:
-      return `error: Unknown tool "${name}". Available tools: whoami, read, send, rooms, members, listen, delete, react. Use whoami to get started.`;
+    default: {
+      // Exhaustive over ToolArgs["name"] — adding a new tool requires a new
+      // member on the union and a new case above. The union keeps this switch
+      // from being silently incomplete.
+      const _exhaustive: never = name as never;
+      return `error: Unknown tool "${_exhaustive}". Available tools: whoami, read, send, rooms, members, listen, delete, react. Use whoami to get started.`;
+    }
   }
 }

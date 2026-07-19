@@ -79,7 +79,7 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
 
     raw.close();
   });
@@ -95,7 +95,7 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
     // general still exactly one row (INSERT OR IGNORE is idempotent too).
     const count = raw
       .prepare<[], { n: number }>(
@@ -148,7 +148,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
     raw.close();
   });
 
@@ -162,7 +162,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
     raw.close();
   });
 });
@@ -191,7 +191,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
 
     // Populate data so EXPLAIN QUERY PLAN is meaningful.
     raw.exec(
@@ -238,7 +238,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
     raw.close();
   });
 });
@@ -292,7 +292,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
     raw.close();
   });
 
@@ -306,7 +306,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(11);
+    expect(version?.version).toBe(12);
     raw.close();
   });
 });

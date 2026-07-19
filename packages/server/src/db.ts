@@ -211,6 +211,19 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_messages_room_created ON messages(room, created_at);
     `,
   },
+  {
+    version: 12,
+    description:
+      "performance: composite (participant_id, id) index for deleteMessage ownership check",
+    // `deleteMessage` issues `UPDATE ... WHERE id = ? AND participant_id = ? AND deleted = 0`
+    // to verify the sender owns the message before recall. Without a covering index
+    // on (participant_id, id) the ownership check scans the entire messages table,
+    // which is linear in message count. The composite index makes the lookup an
+    // O(1) index seek; the B-tree on (participant_id, id) also avoids an extra
+    // rowid hop since both filtered columns are the key.
+    sql: `CREATE INDEX IF NOT EXISTS idx_messages_participant_id_id
+           ON messages(participant_id, id);`,
+  },
 ];
 
 db.exec(`

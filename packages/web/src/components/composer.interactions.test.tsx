@@ -154,22 +154,22 @@ describe("Composer — drop", () => {
   });
 });
 
-describe("Composer — client-side image count cap (MAX_IMAGES_PER_MESSAGE = 8)", () => {
-  it("caps accepted drafts at 8 and announces the cap when more are added", async () => {
+describe("Composer — client-side image count cap (MAX_IMAGES_PER_MESSAGE = 10)", () => {
+  it("caps accepted drafts at 10 and announces the cap when more are added", async () => {
     uploadFileMock.mockResolvedValue(makeAttachment("id"));
     const { container } = renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
 
-    // Pick 8 images first — all accepted.
-    fireEvent.change(input, { target: { files: Array.from({ length: 8 }, (_, i) => png(`a${i}.png`)) } });
-    await waitFor(() => expect(uploadFileMock).toHaveBeenCalledTimes(8));
+    // Pick 10 images first — all accepted.
+    fireEvent.change(input, { target: { files: Array.from({ length: 10 }, (_, i) => png(`a${i}.png`)) } });
+    await waitFor(() => expect(uploadFileMock).toHaveBeenCalledTimes(10));
     expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
 
-    // A 9th pick is rejected with the localized "too many" message; no 9th upload.
+    // A 11th pick is rejected with the localized "too many" message; no 11th upload.
     uploadFileMock.mockClear();
-    fireEvent.change(input, { target: { files: [png("ninth.png")] } });
+    fireEvent.change(input, { target: { files: [png("eleventh.png")] } });
     await waitFor(() => {
-      expect(screen.getByText(/最多 8 个附件/)).toBeTruthy();
+      expect(screen.getByText(/最多 10 个附件/)).toBeTruthy();
     });
     expect(uploadFileMock).not.toHaveBeenCalled();
   });

@@ -79,7 +79,7 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(9);
+    expect(version?.version).toBe(10);
 
     raw.close();
   });
@@ -89,13 +89,13 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     files.push(path);
     const raw = new Database(path);
     raw.exec(BASELINE_SCHEMA);
-    runMigrations(raw); // applies the full chain (1..7) on a fresh db
+    runMigrations(raw); // applies the full chain (1..10) on a fresh db
 
     expect(() => runMigrations(raw)).not.toThrow(); // second start-up → no-op
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(9);
+    expect(version?.version).toBe(10);
     // general still exactly one row (INSERT OR IGNORE is idempotent too).
     const count = raw
       .prepare<[], { n: number }>(
@@ -132,12 +132,12 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
 describe("MR1b — category-blind migration (v9): drops participant.kind", () => {
   // club no longer classifies participants (category-blind — see
   // .pd-docs/requirements/category-blind.md). v9 drops the kind column.
-  it("removes the kind column and reaches schema_version 9", () => {
+  it("removes the kind column and reaches schema_version 10", () => {
     const path = tmpDb();
     files.push(path);
     const raw = new Database(path);
     raw.exec(BASELINE_SCHEMA);
-    runMigrations(raw); // full chain incl. v9
+    runMigrations(raw); // full chain incl. v9 + v10
 
     const cols = raw
       .prepare<[], { name: string }>("PRAGMA table_info(participants)")
@@ -148,7 +148,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(9);
+    expect(version?.version).toBe(10);
     raw.close();
   });
 
@@ -159,6 +159,77 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     raw.exec(BASELINE_SCHEMA);
     runMigrations(raw);
     expect(() => runMigrations(raw)).not.toThrow();
+    const version = raw
+      .prepare<[], { version: number }>("SELECT version FROM schema_version")
+      .get();
+    expect(version?.version).toBe(10);
+    raw.close();
+  });
+});
+
+describe("MR2 — reactions index migration (v10)", () => {
+  it("creates idx_reactions_message_id and keeps lookups bounded", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw);
+
+    // Verify the index exists on the reactions table.
+    const idx = raw
+      .prepare<[], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_reactions_message_id'",
+      )
+      .get();
+    expect(idx).not.toBeUndefined();
+
+    // Populate a few messages + reactions so the query plan is meaningful.
+    raw.exec(`
+      INSERT INTO participants (id, name, key_hash, created_at)
+      VALUES ('p1','a','h',1),('p2','b','h',2);
+    `);
+    raw.exec(`
+      INSERT INTO messages (id, participant_id, content, created_at, room)
+      VALUES ('m1','p1','hi',1,'general'),
+             ('m2','p1','by',2,'general');
+    `);
+    raw.exec(`
+      INSERT INTO reactions (message_id, participant_id, emoji)
+      VALUES ('m1','p1','👍'),('m1','p2','🎉'),
+             ('m2','p1','👍');
+    `);
+
+    // The WHERE message_id query must use an index (never a full scan).
+    // For the simple (emoji, participant_id) select SQLite picks the existing
+    // UNIQUE covering autoindex; for wider selections (e.g. aggregate joins)
+    // idx_reactions_message_id is what bounds the scan.
+    const plan = raw
+      .prepare<[string], { detail: string }>(
+        `EXPLAIN QUERY PLAN SELECT emoji, participant_id FROM reactions WHERE message_id = ?`,
+      )
+      .all("m1");
+    const details = plan.map((r) => r.detail).join(" ");
+    expect(details).toMatch(/USING.*INDEX/); // bounded by *an* index
+    expect(details).not.toContain("SCAN reactions");
+
+    const version = raw
+      .prepare<[], { version: number }>("SELECT version FROM schema_version")
+      .get();
+    expect(version?.version).toBe(10);
+    raw.close();
+  });
+
+  it("is idempotent — re-running after v10 is a no-op", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw);
+    expect(() => runMigrations(raw)).not.toThrow();
+    const version = raw
+      .prepare<[], { version: number }>("SELECT version FROM schema_version")
+      .get();
+    expect(version?.version).toBe(10);
     raw.close();
   });
 });

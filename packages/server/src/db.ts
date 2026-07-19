@@ -172,6 +172,19 @@ const migrations: Migration[] = [
     // SQLite ≥3.35 supports DROP COLUMN; better-sqlite3 bundles it.
     sql: `ALTER TABLE participants DROP COLUMN kind;`,
   },
+  {
+    version: 10,
+    description: "index reactions on message_id for lookups and fan-out",
+    // `getReactionsForMessage`, `getReactionsForMessages`, and `toggleReaction`
+    // all query `reactions` by `message_id`. Without this index every read does a
+    // full table scan — linear in total reaction count. As the room ages the
+    // reactions table grows faster than the messages table (multiple reactions
+    // per message), so the read path for history/stream was the hidden N-per-row
+    // cost. The index lets every reaction lookup become a constant-time index
+    // seek; the existing UNIQUE(message_id, participant_id, emoji) already
+    // prevents duplicate entries, so this secondary index is cheap to maintain.
+    sql: `CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON reactions(message_id);`,
+  },
 ];
 
 db.exec(`

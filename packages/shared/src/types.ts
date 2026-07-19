@@ -388,15 +388,39 @@ export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;
 
 // Shared core: given a finite positive number, clamp it to [1, 500].
 // Pure; called only by the helpers below after each validates finiteness.
-function clampPositive(n: number): number {
+/**
+ * Clamp a finite positive number into the supported query range [1, 500].
+ *
+ * The value is floored before clamping so fractional requesters never
+ * exceed the ceiling. Pure and deterministic.
+ *
+ * @param n - A finite positive number (must already be validated by caller).
+ * @returns `n` floored and clamped to the inclusive range [1, 500].
+ * @example
+ * clampPositive(100); // 100
+ * clampPositive(1000); // 500
+ * clampPositive(0.5);  // 1
+ */
+export function clampPositive(n: number): number {
   return Math.min(Math.max(1, Math.floor(n)), 500);
 }
 
-/** Parse `limit` from an HTTP query parameter (string | number | undefined).
-  *  Used by the server routes. Strict semantics: non-finite numbers, 0, and
-  * negatives all fall back to the default rather than being clamped to 1, so
-  * a malformed query-param can never result in an unbounded SQL LIMIT (negative
-  * LIMIT means "no limit" in SQLite). */
+/**
+ * Parse a `limit` from an HTTP query parameter (string | number | undefined).
+ *
+ * Strict semantics: non-finite numbers, 0, and negatives all fall back to the
+ * default rather than being clamped to 1, so a malformed query-param can never
+ * result in an unbounded SQL LIMIT (negative LIMIT means "no limit" in SQLite).
+ *
+ * @param raw - The raw query parameter value (`?limit=…`).
+ * @param fallback - Default when `raw` is invalid / absent. Defaults to 100.
+ * @returns A value in [1, 500], or `fallback` when `raw` is missing, non-finite, or ≤ 0.
+ * @example
+ * parseQueryLimit("25")        // 25
+ * parseQueryLimit("-5")        // fallback (100)
+ * parseQueryLimit(undefined)   // fallback (100)
+ * parseQueryLimit("1000")      // 500
+ */
 export function parseQueryLimit(
   raw: string | number | undefined,
   fallback = 100,
@@ -406,10 +430,22 @@ export function parseQueryLimit(
   return clampPositive(n);
 }
 
-/** Parse `limit` from a CLI flag string. Used by the CLI `read` command.
-  *  Tolerant: 0/negatives clamp to 1 (CLI is an interactive tool; a typo
-  *  should degrade gracefully to the smallest batch, not trigger a fallback
-  *  that surprises the user). */
+/**
+ * Parse a `limit` from a CLI flag string. Used by the CLI `read` command.
+ *
+ * Tolerant: 0/negatives clamp to 1 (CLI is an interactive tool; a typo
+ * should degrade gracefully to the smallest batch, not trigger a fallback
+ * that surprises the user).
+ *
+ * @param raw - The raw CLI option string (e.g. `"100"`).
+ * @param fallback - Default when `raw` is absent, blank, or non-finite. Defaults to 50.
+ * @returns A value in [1, 500] (0 / negative inputs are floored to 1), or `fallback` when absent/blank/non-finite.
+ * @example
+ * parseFlagLimit("25")        // 25
+ * parseFlagLimit("-5")        // 1 (graceful degrade)
+ * parseFlagLimit(undefined)   // 50
+ * parseFlagLimit("0")         // 1
+ */
 export function parseFlagLimit(raw: string | undefined, fallback = 50): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const n = Number(raw);
@@ -417,9 +453,23 @@ export function parseFlagLimit(raw: string | undefined, fallback = 50): number {
   return clampPositive(n);
 }
 
-/** Parse `limit` from an MCP tool argument (any shape). Used by the MCP
-  *  dispatcher. Tolerant of 0/negatives (same rationale as CLI) — an LLM
-  *  that sends a bad limit should get a small result, not an error. */
+/**
+ * Parse a `limit` from an MCP tool argument (any shape). Used by the MCP
+ * dispatcher.
+ *
+ * Tolerant of 0/negatives (same rationale as CLI) — an LLM that sends a bad
+ * limit should get a small result, not an error. Non-number, non-string
+ * values fall back directly.
+ *
+ * @param raw - The MCP tool argument value (any JSON type).
+ * @param fallback - Default when `raw` is an unsupported shape or non-finite. Defaults to 50.
+ * @returns A value in [1, 500], or `fallback` when `raw` can't be parsed as a finite number.
+ * @example
+ * parseToolLimit(25)        // 25
+ * parseToolLimit("-5")      // 1
+ * parseToolLimit(null)      // fallback (50)
+ * parseToolLimit("abc")     // fallback (50)
+ */
 export function parseToolLimit(raw: unknown, fallback = 50): number {
   if (typeof raw === "number") {
     if (!Number.isFinite(raw)) return fallback;

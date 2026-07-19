@@ -84,7 +84,7 @@ describe("escapeLike", () => {
 });
 
 describe("search: LIKE wildcard injection defense", () => {
-  const { search, rows } = makeDb();
+  const { search } = makeDb();
 
   it("a bare % does not match every row", () => {
     const hits = search("%");

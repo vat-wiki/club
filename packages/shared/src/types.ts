@@ -235,7 +235,7 @@ export const MAX_MESSAGE_CONTENT = 4000;
 // far heavier than images, so in practice a message rarely holds many, but the
 // ceiling is uniform rather than tracking two separate counters.
 /** Maximum number of attachments per message (images + videos combined) */
-export const MAX_IMAGES_PER_MESSAGE = 8;
+export const MAX_IMAGES_PER_MESSAGE = 10;
 /** Maximum file size for image uploads in bytes (10 MB) */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 /** Maximum file size for video uploads in bytes (50 MB) */

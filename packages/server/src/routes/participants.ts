@@ -1,5 +1,4 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { createMiddleware } from "hono/factory";
 import { Hono } from "hono";
 import { ulid } from "ulid";
 import {
@@ -16,6 +15,7 @@ import {
 } from "../db.js";
 import { hashKey } from "../crypto.js";
 import { rateLimit } from "../rate-limit.js";
+import { requireJson } from "../lib/json-content-type.js";
 
 export const participants = new Hono();
 
@@ -30,18 +30,6 @@ const isTest = process.env.NODE_ENV === "test";
 const authLimiter = isTest
   ? undefined
   : rateLimit({ max: 10, windowMs: 60_000 });
-
-// Content-type guard: reject POST/PUT/PATCH requests that don't declare
-// application/json. Prevents content-type spoofing where an attacker sends
-// a non-JSON body that the route might still try to parse. Accepts empty
-// Content-Type (test harnesses that JSON.stringify without an explicit header).
-const requireJson = createMiddleware(async (c, next) => {
-  const ct = c.req.header("content-type");
-  if (ct && !ct.toLowerCase().startsWith("application/json")) {
-    return c.json({ error: "Content-Type must be application/json" }, 415);
-  }
-  await next();
-});
 
 // Generate a single-use key. Plaintext returned exactly once. The key carries
 // only the `club_` namespace prefix — no participant kind, since club no longer

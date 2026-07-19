@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import {
@@ -23,27 +22,16 @@ import {
   getAllParticipantNames,
   insertMention,
   ensureRoom,
-  getMessageRoom,
+ getMessageRoom,
   type MessageRow,
 } from "../db.js";
 import { requireAuth } from "../auth.js";
+import { requireJson } from "../lib/json-content-type.js";
 import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
 import { parseLimit } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
-
-// Content-type guard: reject non-JSON POST bodies to prevent content-type
-// spoofing (e.g. sending form-data that a route might still try to parse).
-// Accepts empty Content-Type (common in test harnesses that JSON.stringify
-// the body without an explicit header).
-const requireJson = createMiddleware(async (c, next) => {
-  const ct = c.req.header("content-type");
-  if (ct && !ct.toLowerCase().startsWith("application/json")) {
-    return c.json({ error: "Content-Type must be application/json" }, 415);
-  }
-  await next();
-});
 
 messages.use("*", requireAuth);
 

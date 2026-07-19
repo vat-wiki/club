@@ -1,11 +1,9 @@
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 import { CreateRoomRequest, type Room } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { listRooms, ensureRoom, type RoomRow } from "../db.js";
+import { requireJson } from "../lib/json-content-type.js";
 
-// ── Rooms (multi-room) ───────────────────────────────────────────────
-//
 // Open-topic rooms: every authed participant (human or agent, equally) can list
 // and create rooms. A room is a topic channel, NOT an access boundary — there
 // is no membership/visibility concept this phase (PRD §4.1). POST is idempotent:
@@ -14,15 +12,6 @@ import { listRooms, ensureRoom, type RoomRow } from "../db.js";
 
 export const rooms = new Hono();
 rooms.use("*", requireAuth);
-
-// Content-type guard: reject non-JSON POST bodies.
-const requireJson = createMiddleware(async (c, next) => {
-  const ct = c.req.header("content-type");
-  if (ct && !ct.toLowerCase().startsWith("application/json")) {
-    return c.json({ error: "Content-Type must be application/json" }, 415);
-  }
-  await next();
-});
 
 // snake_case db row → camelCase contract. last_activity_at is nullable for
 // empty rooms (no messages yet).

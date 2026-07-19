@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 import { AgentStatusRequest } from "@club/shared";
 import { requireAuth } from "../auth.js";
+import { requireJson } from "../lib/json-content-type.js";
 import {
   markThinking,
   markThinkingIdle,
@@ -23,15 +23,6 @@ import {
 
 export const agents = new Hono();
 agents.use("*", requireAuth);
-
-// Content-type guard: reject non-JSON POST bodies.
-const requireJson = createMiddleware(async (c, next) => {
-  const ct = c.req.header("content-type");
-  if (ct && !ct.toLowerCase().startsWith("application/json")) {
-    return c.json({ error: "Content-Type must be application/json" }, 415);
-  }
-  await next();
-});
 
 // POST /agents/thinking   { room? } -> 204 (and an `agent_thinking` SSE broadcast)
 //

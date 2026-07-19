@@ -29,6 +29,15 @@ const DOCUMENT_MIMES: readonly AttachmentMimeType[] = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
+/**
+ * Parsed file content suitable for agent consumption.
+ *
+ * `text` is the readable body (plain text, pretty-printed JSON, extracted
+ * document text, or an error message for unparseable formats). `format` is a
+ * short machine-readable tag (e.g. "pdf", "docx-error") so callers can
+ * branch. `metadata` carries optional title/author/pages/sheets the parser
+ * could recover.
+ */
 export type FileContent = {
   text: string;
   format: string;
@@ -42,8 +51,19 @@ export type FileContent = {
 };
 
 /**
- * Parse file buffer into readable text based on MIME type.
- * Returns plain text representation that agents can process.
+ * Parse a file buffer into readable text for agent consumption.
+ *
+ * Decodes text files directly (plain, JSON, HTML, CSV, XML, markdown),
+ * pretty-prints JSON, and extracts text from documents via dynamic imports
+ * (`pdf-parse`, `mammoth`, `xlsx`). Unrecognised MIME types fall back to
+ * a descriptive binary placeholder.
+ *
+ * @param buffer - Raw file bytes.
+ * @param mime - MIME type (used to select the parser; must be an accepted
+ * AttachmentMime value for documents).
+ * @param _filename - Optional filename hint; surfaced in metadata where
+ * useful (currently reserved for future use).
+ * @returns Parsed text content with a `format` tag and optional metadata.
  */
 export async function parseFileContent(
   buffer: ArrayBuffer,

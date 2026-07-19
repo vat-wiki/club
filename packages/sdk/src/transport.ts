@@ -26,13 +26,33 @@ import {
 // ── Connection ──────────────────────────────────────────────────────
 // key is optional: createParticipant() needs no auth, so a client can be
 // built with just { server } to mint a key, then rebuilt with that key.
+/**
+ * Server connection config for the SDK transport.
+ *
+ * `key` is optional so a caller can bootstrap a fresh participant with just
+ * `{ server }` (createParticipant needs no auth), then rebuild with the
+ * returned bearer token for authenticated calls. Legacy keys may carry a
+ * `club_human_` / `club_agent_` prefix — the server's auth middleware handles
+ * the sha256-hash lookup and ignores the prefix.
+ */
 export interface ClubConn {
-  server: string; // base URL, e.g. http://localhost:6200
-  key?: string; // club_<...> bearer token (legacy keys may carry a club_human_/club_agent_ prefix)
+  /** Base URL of the club server, e.g. "http://localhost:6200". */
+  server: string;
+  /** Optional bearer token (the `club_<...>` key issued at POST /participants). */
+  key?: string;
 }
 
+/**
+ * Options that control per-request behaviour.
+ *
+ * Both `timeoutMs` and `retries` are optional and fall back to
+ * `DEFAULT_TIMEOUT_MS` (15s) and `DEFAULT_RETRIES` (2). Retries only apply
+ * to idempotent GET requests (transient network errors, timeouts, 429, 5xx).
+ */
 export interface CallOpts {
+  /** Request timeout in milliseconds (default 15_000). */
   timeoutMs?: number;
+  /** Max retries on transient failures for idempotent GETs (default 2). */
   retries?: number;
 }
 
@@ -72,7 +92,14 @@ function wrapErr(err: unknown): ClubApiError {
   return new ClubApiError(formatError(err), 0);
 }
 
+/**
+ * Extended request options for `request()`.
+ *
+ * Inherits `timeoutMs` and `retries` from `CallOpts` and adds the HTTP method
+ * and request body. The body must be JSON-serializable (`Jsonable`).
+ */
 export interface RequestOptions extends CallOpts {
+  /** HTTP method (default "GET"). */
   method?: string;
   /** JSON-serializable request body. */
   body?: Jsonable;
@@ -88,9 +115,23 @@ type Jsonable =
   | Jsonable[]
   | { [k: string]: Jsonable };
 
-// Core request: typed JSON over fetch, with per-request timeout and retry on
-// transient failures (network errors / timeouts / 429 / 5xx) for idempotent
-// GETs only.
+/**
+ * Low-level HTTP request over fetch, with typed JSON, timeout, and retry.
+ *
+ * Retries only fire for idempotent GET requests on transient failures
+ * (network errors / timeouts / 429 / 5xx). POSTs are never retried to avoid
+ * duplicate messages. Timeouts become `ClubApiError("request timeout", 408)`;
+ * network errors become `ClubApiError(message, 0)` so callers can branch
+ * uniformly on the status field.
+ *
+ * @param c - Server connection config (base URL and optional key).
+ * @param path - Path segment, e.g. "/me" or "/messages?limit=50".
+ * @param opts - Optional method, body, timeout and retry config.
+ * @returns Parsed response body typed as `T` (or `null` for 204).
+ * @throws {ClubApiError} On HTTP errors, timeout (status 408), or network failure (status 0).
+ * @example
+ * const participant = await request<Participant>(conn, "/me", { timeoutMs: 5000 });
+ */
 export async function request<T>(
   c: ClubConn,
   path: string,
@@ -197,6 +238,14 @@ export async function searchMessages(
 // authoritative mime/size checker, but callers should still pre-flight locally
 // (see packages/cli / packages/mcp) to avoid uploading bytes that are doomed
 // to be rejected.
+/**
+ * Input for a multipart file upload to POST /files.
+ *
+ * The MIME type must be one of `AttachmentMime` values (image, video, or
+ * document). The filename is surfaced in the multipart part's
+ * `Content-Disposition` header so the server can store it for document
+ * attachments.
+ */
 export interface UploadFileInput {
   /** Raw file bytes. */
   buffer: Buffer | Uint8Array;
@@ -217,8 +266,20 @@ function getMaxLengthForMime(mime: string): number {
   return MAX_DOCUMENT_BYTES;
 }
 
-// GET /files/:id — fetch file content as ArrayBuffer. Useful for agents
-// to read files uploaded by others. Returns raw bytes; caller decodes by mime.
+/**
+ * Fetch file content by id as raw bytes (GET /files/:id).
+ *
+ * Useful for agents to read files uploaded by others. Returns raw bytes;
+ * caller decodes by mime. Authenticated via bearer header when a key is
+ * present.
+ *
+ * @param c - Server connection config.
+ * @param id - File id (the slug returned by `uploadFile`).
+ * @param opts - Optional timeout config.
+ * @returns The raw bytes, content-type MIME, and the original filename if
+ * the server sent a `Content-Disposition` header.
+ * @throws {ClubApiError} On HTTP errors or timeout.
+ */
 export async function getFile(
   c: ClubConn,
   id: string,
@@ -262,6 +323,23 @@ export async function getFile(
   }
 }
 
+/**
+ * Multipart upload of a single file to POST /files.
+ *
+ * The core `request()` is JSON-only, so this builds a FormData body (same
+ * shape as the web client's upload) but accepts a Node Buffer so the CLI and
+ * MCP can use it. Auth mirrors the transport. The server is the authoritative
+ * mime/size checker, but callers should still pre-flight locally to avoid
+ * wasting bandwidth on bytes the server will reject.
+ *
+ * @param c - Server connection config.
+ * @param input - Buffer, filename and MIME type of the file to upload.
+ * @param opts - Optional timeout config.
+ * @returns The attachment descriptor (id, url, mime, dimensions, size).
+ * @throws {ClubApiError} With status 413 if `input.buffer.byteLength` exceeds
+ * the limit for the given MIME type, or with the server's HTTP status on
+ * transport/HTTP errors.
+ */
 export async function uploadFile(
   c: ClubConn,
   input: UploadFileInput,

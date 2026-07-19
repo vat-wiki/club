@@ -167,7 +167,8 @@ describe("POST /participants/recover", () => {
 
   // AC7: uniform 401 — unknown name vs wrong code are indistinguishable.
   it("returns the same 401 body for unknown name and wrong code (no enumeration)", async () => {
-    const created = (await mint("erin")).body;
+    // create erin but don't use the returned body — we only need erin to exist
+    await mint("erin");
 
     const unknownName = await app.request("/participants/recover", {
       method: "POST",

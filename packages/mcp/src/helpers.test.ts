@@ -411,7 +411,7 @@ describe("dispatchTool", () => {
   it("send accepts a bare image (no content) — text-optional path", async () => {
     const client = fakeClient({
       uploadImage: async () => ({ id: "x" }),
-      send: async (_c, attachmentIds) =>
+      send: async (_c, _attachmentIds) =>
         makeMsg("", [{ id: "x", url: "/files/x", mime: "image/png", size: 1 }]),
     });
     const out = await dispatchTool("send", { images: ["only.png"] }, client);

@@ -191,7 +191,7 @@ Send a message. Requires `Content-Type: application/json`.
 | Field | Type | Required | Default | Constraints |
 |---|---|---|---|---|
 | `content` | `string` | _(see below)_ | `""` | max 4000 chars; optional if `attachmentIds` non-empty |
-| `attachmentIds` | `string[]` | no | `[]` | max 8; ids from prior `POST /files` |
+| `attachmentIds` | `string[]` | no | `[]` | max 10; ids from prior `POST /files` |
 | `replyToId` | `string` | no | _(none)_ | id of message being replied to |
 | `room` | `string` | no | `"general"` | valid room slug; posting to unknown-but-valid room auto-creates it |
 
@@ -212,6 +212,7 @@ with no attachments is rejected (`400`).
 |---|---|---|
 | `400` | `content or attachment required` | Empty text + no attachments |
 | `400` | `attachment not found` | Unknown attachment id |
+| `400` | `too many attachments (max 10)` | More than 10 attachment ids in the request |
 | `403` | `attachment not owned by sender` | Attaching someone else's file |
 | `400` | _(zod issue message)_ | Validation failure on any field |
 | `415` | `Content-Type must be application/json` | Non-JSON body |
@@ -229,7 +230,7 @@ Toggle an emoji reaction.
 
 **Request body**: `{ "emoji": "👍" }`.
 
-**Response**: `200` with the message's refreshed reaction list.
+**Response**: `204` on success. Broadcasts a `message_reaction` SSE event with the refreshed aggregate so all clients update in real time. **Error**: `400 { "error": "bad emoji" }` if `emoji` is missing or empty.
 
 ### `GET /messages/search?q=&room?`
 
@@ -436,7 +437,10 @@ All participants, ordered by creation time ascending.
 ## 11. Cross-Cutting Concerns
 
 ### Rate Limiting
-- **Global**: 120 req/min per IP (applied to all endpoints).
+- **Global**: 120 req/min per IP (fixed-window, applied to all endpoints). A
+  window does not partially refill mid-period; the full bucket is restored at
+  the boundary. Response includes `Retry-After` (seconds until reset),
+  `X-RateLimit-Limit`, and `X-RateLimit-Remaining` headers.
 - **Key issuance** (`POST /participants`, `POST /participants/recover`): 10 req/min
   per IP. Disabled in `NODE_ENV=test`.
 

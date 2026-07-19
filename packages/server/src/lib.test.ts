@@ -1,5 +1,13 @@
+import type { Context } from "hono";
+import { Hono } from "hono";
 import { describe, it, expect } from "vitest";
-import { parseLimit, parseBearer } from "./lib.js";
+import { jsonErr, parseLimit, parseBearer } from "./lib.js";
+
+function buildApp(handler: (c: Context) => Response) {
+  const app = new Hono();
+  app.get("/", handler);
+  return app;
+}
 
 describe("parseLimit", () => {
   it("returns the fallback for missing/undefined input", () => {
@@ -74,5 +82,52 @@ describe("parseBearer", () => {
   it("returns undefined for non-Bearer schemes", () => {
     expect(parseBearer("Basic dXNlcjpwYXNz")).toBeUndefined();
     expect(parseBearer("Token club_x")).toBeUndefined();
+  });
+});
+
+describe("jsonErr", () => {
+  it("returns a { error: message } JSON body with the given status", async () => {
+    const app = buildApp((c) => jsonErr(c, "not found", 404));
+    const res = await app.request("/");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not found" });
+  });
+
+  it("defaults to status 400 when no status is provided", async () => {
+    const app = buildApp((c) => jsonErr(c, "bad request"));
+    const res = await app.request("/");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad request" });
+  });
+
+  it("sets Content-Type to application/json", async () => {
+    const app = buildApp((c) => jsonErr(c, "oops"));
+    const res = await app.request("/");
+    expect(res.headers.get("content-type")).toContain("application/json");
+  });
+
+  it("preserves the message string exactly, including special chars", async () => {
+    const app = buildApp((c) =>
+      jsonErr(c, "invalid: foo\nbar 'baz' <>&", 422),
+    );
+    const res = await app.request("/");
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toBe("invalid: foo\nbar 'baz' <>&");
+  });
+
+  it("returns a non-empty response even for an empty message string", async () => {
+    const app = buildApp((c) => jsonErr(c, ""));
+    const res = await app.request("/");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "" });
+  });
+
+  it("allows any contentful status code", async () => {
+    for (const status of [200, 201, 301, 403, 500] as const) {
+      const app = buildApp((c) => jsonErr(c, "msg", status));
+      const res = await app.request("/");
+      expect(res.status).toBe(status);
+      expect(await res.json()).toEqual({ error: "msg" });
+    }
   });
 });

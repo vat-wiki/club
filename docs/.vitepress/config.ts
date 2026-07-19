@@ -27,6 +27,7 @@ export default defineConfig({
       { text: "设计", link: "/design" },
       { text: "路线图", link: "/roadmap" },
       { text: "MCP 接入", link: "/mcp" },
+      { text: "部署运维", link: "/deploy" },
     ],
 
     sidebar: [
@@ -45,12 +46,16 @@ export default defineConfig({
         text: "接入",
         items: [
           { text: "club-mcp 本地接入", link: "/mcp" },
+          { text: "Agent CLI 使用", link: "/agent-cli" },
           { text: "API 参考", link: "/api" },
         ],
       },
       {
-        text: "内部",
-        items: [{ text: "自动优化日志", link: "/auto-opt-log" }],
+        text: "运维",
+        items: [
+          { text: "部署运维", link: "/deploy" },
+          { text: "自动优化日志", link: "/auto-opt-log" },
+        ],
       },
     ],
 

@@ -33,7 +33,7 @@ function App({ cfg }: Props) {
       } catch (err) {
         setLines(["error: " + (err as Error).message]);
       }
-    })();
+    })().catch(() => { /* init errors surfaced via catch above */ });
   }, [cfg]);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ function App({ cfg }: Props) {
       } catch (err) {
         if (!cancelled) setLines(["error: " + (err as Error).message]);
       }
-    })();
+    })().catch(() => { /* room load errors surfaced via catch above */ });
     return () => {
       cancelled = true;
     };

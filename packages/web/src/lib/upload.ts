@@ -149,8 +149,9 @@ export async function uploadImage(
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
 
     if (opts.onProgress) {
+      const onProgress = opts.onProgress;
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) opts.onProgress!(e.loaded, e.total);
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
       };
     }
 

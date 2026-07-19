@@ -4,7 +4,11 @@ import App from "./App";
 import { I18nProvider } from "@/lib/i18n";
 import "./index.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById("root");
+if (!rootEl) {
+  throw new Error("Root element <div id='root'> not found in index.html");
+}
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <I18nProvider>
       <App />

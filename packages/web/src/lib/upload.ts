@@ -122,6 +122,14 @@ export function extractAttachmentFiles(items: Iterable<File>): File[] {
   return out;
 }
 
+// Internal XHR factory so the upload path can be exercised in tests without
+// mocking a global constructor. Production code keeps the default, which just
+// returns a real XMLHttpRequest.
+let createXHR: () => XMLHttpRequest = () => new XMLHttpRequest();
+export function _setCreateXHR(fn: () => XMLHttpRequest) {
+  createXHR = fn;
+}
+
 // HEADS-UP: this lives in web rather than @club/sdk because the SDK's
 // transport layer is JSON-only (it JSON.stringifies every body). A multipart
 // upload needs FormData + the browser's stream body, so it can't go through
@@ -140,11 +148,11 @@ export async function uploadImage(
   const timeoutMs = opts.timeoutMs ?? 30_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    const headers: Record<string, string> = {};
-    if (conn.key) headers.Authorization = `Bearer ${conn.key}`;
+  const xhr = createXHR();
+  const headers: Record<string, string> = {};
+  if (conn.key) headers.Authorization = `Bearer ${conn.key}`;
 
-    const xhr = new XMLHttpRequest();
+  try {
     xhr.open("POST", `${conn.server}/files`);
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
 

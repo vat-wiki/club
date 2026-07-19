@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, MAX_DOCUMENT_BYTES } from "@club/shared";
+import { ClubApiError, type ClubConn } from "@club/sdk";
 import {
   validateImageFile,
   validateVideoFile,
@@ -15,6 +16,8 @@ import {
   IMAGE_MIME_WHITELIST,
   VIDEO_MIME_WHITELIST,
   DOCUMENT_MIME_WHITELIST,
+  uploadImage,
+  _setCreateXHR,
 } from "./upload";
 
 function file(name: string, type: string, size: number): File {
@@ -234,5 +237,172 @@ describe("upload helpers — extractAttachmentFiles", () => {
   it("returns empty for a list with no attachments", () => {
     expect(extractAttachmentFiles([file("d.zip", "application/zip", 10)])).toEqual([]);
     expect(extractAttachmentFiles([])).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// uploadImage — mock XHR so the multipart upload can be exercised in jsdom
+// without hitting a real server. The real flow: FormData → POST /files →
+// JSON body, with a Bearer Authorization header when conn.key is set.
+// ---------------------------------------------------------------------------
+
+interface MockXHR {
+  status: number;
+  responseText: string;
+  open: ReturnType<typeof vi.fn>;
+  setRequestHeader: ReturnType<typeof vi.fn>;
+  send: ReturnType<typeof vi.fn>;
+  onload?: () => void;
+  onerror?: () => void;
+  ontimeout?: () => void;
+  onabort?: () => void;
+  upload: { onprogress: (e: ProgressEvent) => void };
+  headers: Record<string, string>;
+  sentBody: FormData | null;
+  calledAbort: boolean;
+  sendWasCalled: boolean;
+}
+
+function mkXHR(): MockXHR {
+  return {
+    status: 200,
+    responseText: "",
+    open: vi.fn(),
+    setRequestHeader: vi.fn(),
+    send: vi.fn(),
+    upload: { onprogress: vi.fn<(e: ProgressEvent) => void>() },
+    headers: {},
+    sentBody: null,
+    calledAbort: false,
+    sendWasCalled: false,
+  };
+}
+
+function withXHR<T>(factory: (xhr: MockXHR) => Promise<T> | T): Promise<T> {
+  const xhr = mkXHR();
+  const orig = xhr.setRequestHeader;
+  xhr.setRequestHeader = vi.fn((k: string, v: string) => {
+    xhr.headers[k] = v;
+    orig(k, v);
+  });
+  xhr.send = vi.fn((body: unknown) => {
+    xhr.sentBody = body as FormData;
+    xhr.sendWasCalled = true;
+  });
+  _setCreateXHR(() => xhr as unknown as XMLHttpRequest);
+  return Promise.resolve(factory(xhr)).finally(() => {
+    _setCreateXHR(() => new XMLHttpRequest());
+  });
+}
+
+function okBody() {
+  return JSON.stringify({ id: "f1", url: "/files/f1", mime: "image/png", filename: "pic.png", size: 1024 });
+}
+
+const conn: ClubConn = { server: "http://localhost:3000", key: "club_human_test" };
+const fileConn: ClubConn = { server: "http://localhost:3000", key: undefined };
+
+describe("upload helpers — uploadImage (XHR path)", () => {
+  const img = file("pic.png", "image/png", 1024);
+
+  it("posts to /files with the file in FormData and returns the JSON body", async () => {
+    await withXHR(async (xhr) => {
+      xhr.responseText = okBody();
+      const p = uploadImage(conn, img);
+      xhr.onload!();
+      const res = await p;
+      expect(xhr.open).toHaveBeenCalledWith("POST", "http://localhost:3000/files");
+      expect(xhr.headers).toHaveProperty("Authorization", "Bearer club_human_test");
+      expect(xhr.sentBody).toBeInstanceOf(FormData);
+      expect(res).toEqual({ id: "f1", url: "/files/f1", mime: "image/png", filename: "pic.png", size: 1024 });
+    });
+  });
+
+  it("omits the Authorization header when conn.key is absent", async () => {
+    await withXHR(async (xhr) => {
+      xhr.responseText = okBody();
+      const p = uploadImage(fileConn, img);
+      xhr.onload!();
+      await p;
+      expect(xhr.headers).not.toHaveProperty("Authorization");
+    });
+  });
+
+  it("emits progress events to onProgress", async () => {
+    const onProgress = vi.fn();
+    await withXHR(async (xhr) => {
+      xhr.responseText = okBody();
+      const p = uploadImage(conn, img, { onProgress });
+      xhr.upload.onprogress({ loaded: 512, total: 1024, lengthComputable: true } as ProgressEvent);
+      xhr.onload!();
+      await p;
+      expect(onProgress).toHaveBeenCalledWith(512, 1024);
+    });
+  });
+
+  it("skips onProgress when length is not computable", async () => {
+    const onProgress = vi.fn();
+    await withXHR(async (xhr) => {
+      xhr.responseText = okBody();
+      const p = uploadImage(conn, img, { onProgress });
+      xhr.upload.onprogress({ loaded: 512, total: 1024, lengthComputable: false } as ProgressEvent);
+      xhr.onload!();
+      await p;
+      expect(onProgress).not.toHaveBeenCalled();
+    });
+  });
+
+  it("throws ClubApiError on non-2xx status", async () => {
+    await withXHR(async (xhr) => {
+      xhr.status = 500;
+      xhr.responseText = JSON.stringify({ error: "disk full" });
+      const p = uploadImage(conn, img);
+      xhr.onload!();
+      await expect(p).rejects.toThrow(ClubApiError);
+    });
+  });
+
+  it("uses the response error string as the message", async () => {
+    await withXHR(async (xhr) => {
+      xhr.status = 413;
+      xhr.responseText = JSON.stringify({ error: "file too big" });
+      const p = uploadImage(conn, img);
+      xhr.onload!();
+      await expect(p).rejects.toThrow("file too big");
+    });
+  });
+
+  it("falls back to HTTP <status> when the body is not JSON", async () => {
+    await withXHR(async (xhr) => {
+      xhr.status = 403;
+      xhr.responseText = "forbidden";
+      const p = uploadImage(conn, img);
+      xhr.onload!();
+      await expect(p).rejects.toThrow("HTTP 403");
+    });
+  });
+
+  it("throws ClubApiError on network error", async () => {
+    await withXHR(async (xhr) => {
+      const p = uploadImage(conn, img);
+      xhr.onerror!();
+      await expect(p).rejects.toThrow("network error");
+    });
+  });
+
+  it("throws ClubApiError on timeout", async () => {
+    await withXHR(async (xhr) => {
+      const p = uploadImage(conn, img);
+      xhr.ontimeout!();
+      await expect(p).rejects.toThrow("upload timeout");
+    });
+  });
+
+  it("throws ClubApiError on abort (from explicit AbortController)", async () => {
+    await withXHR(async (xhr) => {
+      const p = uploadImage(conn, img);
+      xhr.onabort!();
+      await expect(p).rejects.toThrow("upload timeout");
+    });
   });
 });

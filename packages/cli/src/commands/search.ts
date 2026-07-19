@@ -7,6 +7,7 @@ import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 import { formatMessage } from "./format.js";
+import { withCatchExit } from "../catch-exit.js";
 
 const SEARCH_LIMIT_DEFAULT = 20;
 const SEARCH_LIMIT_MAX = 100;
@@ -25,7 +26,7 @@ export function makeSearchCommand(): Command {
     .argument("<query>", "text to search for")
     .option("--room <slug>", "scope to a specific room (default: all rooms)")
     .option("--limit <n>", `max results (default: ${SEARCH_LIMIT_DEFAULT}, max: ${SEARCH_LIMIT_MAX})`, String(SEARCH_LIMIT_DEFAULT))
-    .action(async (query: string, opts: { room?: string; limit?: string }) => {
+    .action(withCatchExit(async (query: string, opts: { room?: string; limit?: string }) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
       const limit = parseSearchLimit(opts.limit);
@@ -41,5 +42,5 @@ export function makeSearchCommand(): Command {
         const roomTag = msg.room !== "general" ? `[#${msg.room}] ` : "";
         console.log(`  ${roomTag}${formatMessage(msg)}`);
       }
-    });
+    }));
 }

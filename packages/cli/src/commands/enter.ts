@@ -15,6 +15,7 @@ import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { ROOM_SLUG_REGEX, type Room } from "@club/shared";
 import { requireConfig, saveConfig, type ClubConfig } from "../config.js";
+import { withCatchExit } from "../catch-exit.js";
 
 export interface EnterDeps {
   /** Ensure a room exists (idempotent create). Throws on HTTP failure. */
@@ -55,7 +56,7 @@ export function makeEnterCommand(): Command {
   return new Command("enter")
     .description("switch to a room — sets it as the default for send/read (creates it if new)")
     .argument("<room>", "room slug (1-30 chars [a-z0-9-])")
-    .action(async (room: string) => {
+    .action(withCatchExit(async (room: string) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
       const { room: r } = await runEnter(
@@ -63,5 +64,5 @@ export function makeEnterCommand(): Command {
         { createRoom: (n) => client.createRoom(n), saveConfig },
       );
       console.log(`entered #${r.slug}`);
-    });
+    }));
 }

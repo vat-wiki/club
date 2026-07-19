@@ -3,6 +3,7 @@ import { ClubClient } from "@club/sdk";
 import { mentionMatches, type Message } from "@club/shared";
 import { requireConfig } from "../config.js";
 import { formatMessage } from "./format.js";
+import { withCatchExit } from "../catch-exit.js";
 
 export function makeListenCommand(): Command {
   return new Command("listen")
@@ -13,7 +14,7 @@ export function makeListenCommand(): Command {
       "--room <slug>",
       "listen to one room only (default: all rooms — a mention in any room wakes you)",
     )
-    .action(async (opts: { mention?: string; once?: boolean; room?: string }) => {
+    .action(withCatchExit(async (opts: { mention?: string; once?: boolean; room?: string }) => {
       const cfg = requireConfig();
       const mention = opts.mention;
       const once = opts.once ?? true;
@@ -42,5 +43,5 @@ export function makeListenCommand(): Command {
         sub.stop();
         process.exit(0);
       });
-    });
+    }));
 }

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { loadConfig, saveConfig } from "../config.js";
+import { withCatchExit } from "../catch-exit.js";
 
 // club recover <name> <code>
 // Recovers an existing identity by callsign + one-time recovery code. The
@@ -16,7 +17,7 @@ export function makeRecoverCommand(): Command {
     .argument("<name>", "callsign of the identity to recover")
     .argument("<code>", "the one-time recovery code issued at signup")
     .option("-s, --server <url>", "server base url", "http://localhost:6200")
-    .action(async (name: string, code: string, opts: { server: string }) => {
+    .action(withCatchExit(async (name: string, code: string, opts: { server: string }) => {
       const existing = loadConfig();
       const server = (existing?.server ?? opts.server).replace(/\/$/, "");
       const client = new ClubClient({ server });
@@ -27,5 +28,5 @@ export function makeRecoverCommand(): Command {
       console.log(`new recovery code (save it — the old one is now invalid):`);
       console.log(`  ${res.recoverCode}`);
       console.log(`try: club whoami`);
-    });
+    }));
 }

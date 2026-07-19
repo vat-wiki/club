@@ -7,17 +7,18 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
+import { withCatchExit } from "../catch-exit.js";
 
 export function makeReactCommand(): Command {
   return new Command("react")
     .description("add or remove a reaction emoji on a message")
     .argument("<id>", "message ID to react to")
     .argument("<emoji>", "emoji to react with (e.g. 👍, 🎉, ❤️)")
-    .action(async (id: string, emoji: string) => {
+    .action(withCatchExit(async (id: string, emoji: string) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
       const reactions = await client.toggleReaction(id.trim(), emoji.trim());
       const updated = reactions.map((r) => `${r.emoji}(${r.count})`).join(" ");
       console.log(`${id} reactions: ${updated || "(none)"}`);
-    });
+    }));
 }

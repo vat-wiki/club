@@ -8,6 +8,7 @@ import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import type { Room } from "@club/shared";
 import { defaultRoom, requireConfig } from "../config.js";
+import { withCatchExit } from "../catch-exit.js";
 
 /**
  * Render one room line. Pure so the marker rule (current → ` *`, general system
@@ -26,11 +27,11 @@ export function formatRoomLine(room: Room, current: string): string {
 export function makeRoomsCommand(): Command {
   return new Command("rooms")
     .description("list all rooms (current marked with *)")
-    .action(async () => {
+    .action(withCatchExit(async () => {
       const cfg = requireConfig();
       const list = await new ClubClient(cfg).rooms();
       const current = defaultRoom(cfg);
       for (const r of list) console.log(formatRoomLine(r, current));
       if (list.length === 0) console.log("(no rooms)");
-    });
+    }));
 }

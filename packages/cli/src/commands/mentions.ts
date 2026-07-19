@@ -3,6 +3,7 @@ import { ClubClient } from "@club/sdk";
 import { formatMessage } from "./format.js";
 import { requireConfig } from "../config.js";
 import type { Mention } from "@club/shared";
+import { withCatchExit } from "../catch-exit.js";
 
 function formatMention(m: Mention): string {
   return formatMessage({
@@ -19,7 +20,7 @@ export function makeMentionsCommand(): Command {
   return new Command("mentions")
     .description("show your unread @-mentions; --read to mark them read")
     .option("--read", "mark all listed mentions as read after printing")
-    .action(async (opts: { read?: boolean }) => {
+    .action(withCatchExit(async (opts: { read?: boolean }) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
       const list = await client.mentions();
@@ -39,5 +40,5 @@ export function makeMentionsCommand(): Command {
         }
         console.log(`(marked ${list.length} read)`);
       }
-    });
+    }));
 }

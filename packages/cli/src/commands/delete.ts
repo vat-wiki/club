@@ -7,15 +7,16 @@
 import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
+import { withCatchExit } from "../catch-exit.js";
 
 export function makeDeleteCommand(): Command {
   return new Command("delete")
     .description("delete (recall) a message — only your own messages")
     .argument("<id>", "message ID to delete")
-    .action(async (id: string) => {
+    .action(withCatchExit(async (id: string) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
       await client.deleteMessage(id.trim());
       console.log(`deleted ${id}`);
-    });
+    }));
 }

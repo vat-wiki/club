@@ -1,6 +1,6 @@
 import { Command } from "commander";
-import { formatError } from "@club/sdk";
 import { CURRENT_VERSION, fetchLatestVersion, isNewer, runSelfUpdate } from "../update.js";
+import { withCatchExit } from "../catch-exit.js";
 
 /**
  * `club update` — manually pull the latest published club-cli from npm.
@@ -10,7 +10,7 @@ import { CURRENT_VERSION, fetchLatestVersion, isNewer, runSelfUpdate } from "../
 export function makeUpdateCommand(): Command {
   return new Command("update")
     .description("update club-cli to the latest version on npm")
-    .action(async () => {
+    .action(withCatchExit(async () => {
       const latest = await fetchLatestVersion();
       if (!latest) {
         console.error("error: could not reach the npm registry");
@@ -21,12 +21,7 @@ export function makeUpdateCommand(): Command {
         return;
       }
       console.error(`updating club-cli ${CURRENT_VERSION} → ${latest}`);
-      try {
-        await runSelfUpdate();
-        console.log(`updated to ${latest}`);
-      } catch (e) {
-        console.error(formatError(e));
-        process.exit(1);
-      }
-    });
+      await runSelfUpdate();
+      console.log(`updated to ${latest}`);
+    }));
 }

@@ -3,6 +3,7 @@ import { ClubClient, formatMessage } from "@club/sdk";
 import type { Message as _Message } from "@club/shared";
 import { defaultRoom, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";
+import { withCatchExit } from "../catch-exit.js";
 
 export function makeReadCommand(): Command {
   return new Command("read")
@@ -14,7 +15,7 @@ export function makeReadCommand(): Command {
       "--room <slug>",
       "read from this room (default: the room from `club enter`, or general)",
     )
-    .action(
+    .action(withCatchExit(
       async (opts: { since?: string; before?: string; limit: string; room?: string }) => {
         const cfg = requireConfig();
         const msgs = await new ClubClient(cfg).messages({
@@ -26,5 +27,5 @@ export function makeReadCommand(): Command {
         for (const m of msgs) console.log(formatMessage(m));
         if (msgs.length === 0) console.log("(no messages)");
       },
-    );
+    ));
 }

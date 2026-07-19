@@ -16,9 +16,10 @@
 // server's `name "X" is taken` verbatim.
 
 import { Command } from "commander";
-import { ClubClient, ClubApiError, formatError } from "@club/sdk";
+import { ClubClient, ClubApiError } from "@club/sdk";
 import { saveConfig } from "../config.js";
 import type { Participant } from "@club/shared";
+import { withCatchExit } from "../catch-exit.js";
 
 export interface JoinCreateResult {
   key: string;
@@ -84,26 +85,21 @@ export function makeJoinCommand(): Command {
     .description("one-step onboarding — mint a participant and save its config")
     .argument("<name>", "your callsign (1-40 chars)")
     .option("-s, --server <url>", "server base url", "http://localhost:6200")
-    .action(async (name: string, opts: { server: string }) => {
+    .action(withCatchExit(async (name: string, opts: { server: string }) => {
       const server = opts.server.replace(/\/$/, "");
       const client = new ClubClient({ server });
-      try {
-        const { participant, recoverCode } = await runJoin(
-          { name, server },
-          {
-            createParticipant: (input) => client.createParticipant(input),
-            saveConfig,
-          },
-        );
-        // Each line goes to stdout so a caller can capture recoverCode from the
-        // stream. The plaintext key is never part of this output (it's in
-        // config).
-        for (const line of renderJoinSuccess({ participant, recoverCode })) {
-          console.log(line);
-        }
-      } catch (err) {
-        console.error(formatError(err));
-        process.exit(1);
+      const { participant, recoverCode } = await runJoin(
+        { name, server },
+        {
+          createParticipant: (input) => client.createParticipant(input),
+          saveConfig,
+        },
+      );
+      // Each line goes to stdout so a caller can capture recoverCode from the
+      // stream. The plaintext key is never part of this output (it's in
+      // config).
+      for (const line of renderJoinSuccess({ participant, recoverCode })) {
+        console.log(line);
       }
-    });
+    }));
 }

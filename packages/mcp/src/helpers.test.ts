@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/require-await -- test-only mocks: empty stop()/no-await async are unavoidable when stubbing DispatchClient */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Message, Participant, Room } from "@club/shared";
 import {
@@ -697,5 +698,77 @@ describe("dispatchTool", () => {
   it("propagates client errors so the handler can wrap them as 'error: <msg>'", async () => {
     const client = fakeClient({ me: async () => { throw new Error("boom"); } });
     await expect(dispatchTool("whoami", {}, client)).rejects.toThrow("boom");
+  });
+
+  describe("delete", () => {
+    it("rejects a missing/empty id without calling the client", async () => {
+      const deleteFn = vi.fn(async () => {});
+      const client = fakeClient({ deleteMessage: deleteFn });
+      expect(await dispatchTool("delete", { id: "" }, client)).toBe(
+        "error: Delete failed - message ID is required",
+      );
+      expect(deleteFn).not.toHaveBeenCalled();
+      expect(await dispatchTool("delete", {}, client)).toBe(
+        "error: Delete failed - message ID is required",
+      );
+      expect(deleteFn).toHaveBeenCalledTimes(0);
+    });
+
+    it("deletes a message by id on success", async () => {
+      const deleteFn = vi.fn(async () => {});
+      const client = fakeClient({ deleteMessage: deleteFn });
+      expect(await dispatchTool("delete", { id: "msg-123" }, client)).toBe(
+        "deleted message msg-123",
+      );
+      expect(deleteFn).toHaveBeenCalledWith("msg-123");
+    });
+  });
+
+  describe("react", () => {
+    it("rejects a missing id without calling the client", async () => {
+      const toggle = vi.fn(async () => []);
+      const client = fakeClient({ toggleReaction: toggle });
+      expect(await dispatchTool("react", { emoji: "👍" }, client)).toBe(
+        "error: React failed - message ID is required",
+      );
+      expect(toggle).not.toHaveBeenCalled();
+    });
+
+    it("rejects a missing emoji even when id is present", async () => {
+      const toggle = vi.fn(async () => []);
+      const client = fakeClient({ toggleReaction: toggle });
+      expect(await dispatchTool("react", { id: "msg-123" }, client)).toBe(
+        "error: React failed - emoji is required",
+      );
+      expect(toggle).not.toHaveBeenCalled();
+    });
+
+    it("toggles a reaction and formats the aggregate", async () => {
+      const toggle = vi.fn(async () => [{ emoji: "👍", count: 1 }]);
+      const client = fakeClient({ toggleReaction: toggle });
+      expect(await dispatchTool("react", { id: "msg-123", emoji: "👍" }, client)).toBe(
+        "reactions on msg-123: 👍(1)",
+      );
+      expect(toggle).toHaveBeenCalledWith("msg-123", "👍");
+    });
+
+    it("formats '(none)' when the toggle returns an empty aggregate", async () => {
+      const client = fakeClient({ toggleReaction: async () => [] });
+      expect(await dispatchTool("react", { id: "msg-123", emoji: "❤️" }, client)).toBe(
+        "reactions on msg-123: (none)",
+      );
+    });
+
+    it("formats multiple reactions space-separated", async () => {
+      const client = fakeClient({
+        toggleReaction: async () => [
+          { emoji: "👍", count: 2 },
+          { emoji: "🎉", count: 1 },
+        ],
+      });
+      expect(await dispatchTool("react", { id: "msg-123", emoji: "👍" }, client)).toBe(
+        "reactions on msg-123: 👍(2) 🎉(1)",
+      );
+    });
   });
 });

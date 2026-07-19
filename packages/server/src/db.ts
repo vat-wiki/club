@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at     INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_room_created ON messages(room, created_at);
 `;
 db.exec(BASELINE_SCHEMA);
 
@@ -184,6 +185,25 @@ const migrations: Migration[] = [
     // seek; the existing UNIQUE(message_id, participant_id, emoji) already
     // prevents duplicate entries, so this secondary index is cheap to maintain.
     sql: `CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON reactions(message_id);`,
+  },
+  {
+    version: 11,
+    description:
+      "performance: participants lookup indexes (key_hash, name) + compound (room, created_at) index",
+    // Better-sqlite3 prepared statements in db.ts issue single-row lookups by
+    // key_hash and name on every auth + mention-parse path. Without a secondary
+    // index on those columns each lookup is a full-table scan (linear in
+    // participant count). For a chat product with small rosters this is
+    // invisible, but it keeps the read path O(1) as the deployment grows.
+    // The compound (room, created_at) index lets chronological room history
+    // scans avoid the (room, rowid) fallback on older SQLite / better-sqlite3
+    // builds that can't combine the room index with the rowid cursor in one
+    // seek.
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_participants_key_hash ON participants(key_hash);
+      CREATE INDEX IF NOT EXISTS idx_participants_name     ON participants(name);
+      CREATE INDEX IF NOT EXISTS idx_messages_room_created ON messages(room, created_at);
+    `,
   },
 ];
 

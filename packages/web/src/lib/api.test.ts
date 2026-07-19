@@ -213,7 +213,7 @@ describe("createParticipant — returns key + recoverCode", () => {
 describe("recoverParticipant — posts recovery request", () => {
   it("calls request with empty key", async () => {
     await recoverParticipant("https://example.club", {
-      callsign: "alice",
+      name: "alice",
       recoverCode: "rec-123",
     });
     const { request } = await import("@club/sdk");
@@ -222,7 +222,7 @@ describe("recoverParticipant — posts recovery request", () => {
       "/participants/recover",
       expect.objectContaining({
         method: "POST",
-        body: { callsign: "alice", recoverCode: "rec-123" },
+        body: { name: "alice", recoverCode: "rec-123" },
       }),
     );
   });

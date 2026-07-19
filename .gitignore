@@ -18,6 +18,9 @@ packages/server/files/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 
+# Vitest V8 覆盖率报告（每次运行时间戳变更，不入库）
+packages/**/coverage/
+
 .claude/
 # 本地部署版本状态（.env：每次 build/promote 变动，不入库）
 .env

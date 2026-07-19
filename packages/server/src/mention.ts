@@ -1,5 +1,3 @@
-import { mentionMatches } from "@club/shared";
-
 /**
  * Server-side @-mention parsing.
  *

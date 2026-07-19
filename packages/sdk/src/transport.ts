@@ -246,7 +246,7 @@ export async function getFile(
       throw new ClubApiError(msg, res.status);
     }
     const buffer = await res.arrayBuffer();
-    const mime = res.headers.get("content-type") || "application/octet-stream";
+    const mime = res.headers.get("content-type") ?? "application/octet-stream";
     // Content-Disposition may contain original filename: "attachment; filename=\"foo.pdf\""
     const contentDisposition = res.headers.get("content-disposition");
     let filename: string | undefined;

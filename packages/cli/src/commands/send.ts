@@ -50,7 +50,7 @@ export function makeSendCommand(): Command {
       ) => {
         // Auto-detect stdin: when no text args and stdin is piped, read it.
         // Explicit --stdin still works for clarity or testing.
-        const useStdin = opts.stdin || (!text.length && !process.stdin.isTTY);
+        const useStdin = opts.stdin ?? (!text.length && !process.stdin.isTTY);
         let content: string;
         if (useStdin) {
           content = await readStream(process.stdin as unknown as ReadableLike);

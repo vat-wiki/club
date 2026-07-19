@@ -232,7 +232,7 @@ messages.get("/search", (c) => {
   const q = raw.length > SEARCH_QUERY_MAX ? raw.slice(0, SEARCH_QUERY_MAX) : raw;
   const limit = parseLimit(c.req.query("limit"));
   const room = c.req.query("room");
-  const rows = searchMessages(q, room || null, limit);
+  const rows = searchMessages(q, room ?? null, limit);
   const reactionsMap = getReactionsForMessages(rows.map((r) => r.id));
   return c.json(rows.map((r) => toMessage(r, reactionsMap)));
 });

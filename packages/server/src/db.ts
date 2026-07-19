@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { ulid } from "ulid";
+import { escapeLike } from "@club/shared";
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), "club.db");
 
@@ -368,11 +369,14 @@ const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
 
 /** Messages whose content contains `q` (substring via LIKE), newest first.
  *  Backs the search box. When `room` is null/empty the search spans all rooms;
- *  otherwise it is scoped to that room. */
+ *  otherwise it is scoped to that room.
+ *
+ *  The user-supplied `q` is escaped so `%` / `_` / `\\` are treated as
+ *  literal characters (no LIKE wildcard injection).
+ */
 export function searchMessages(q: string, room: string | null, limit: number): MessageRow[] {
-  return room
-    ? searchRoomStmt.all(`%${q}%`, room, limit)
-    : searchAllStmt.all(`%${q}%`, limit);
+  const escaped = `%${escapeLike(q)}%`;
+  return room ? searchRoomStmt.all(escaped, room, limit) : searchAllStmt.all(escaped, limit);
 }
 
 // The room a message lives in. Used to room-scope `message_deleted` /

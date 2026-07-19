@@ -465,21 +465,31 @@ export function toggleReaction(messageId: string, participantId: string, emoji: 
   return getReactionsForMessage(messageId);
 }
 
+export interface ParticipantRow {
+  id: string;
+  name: string;
+  created_at: number;
+}
+
 const participantByKeyHashStmt = db.prepare<
   [string],
-  { id: string; name: string; created_at: number }
+  ParticipantRow | undefined
 >(`SELECT id, name, created_at FROM participants WHERE key_hash = ?`);
 
-export function getParticipantByKeyHash(hash: string) {
+/** Participant row looked up by hashed key (auth path). Returns undefined if
+ *  no participant matches the key. */
+export function getParticipantByKeyHash(hash: string): ParticipantRow | undefined {
   return participantByKeyHashStmt.get(hash);
 }
 
 const participantByNameStmt = db.prepare<
   [string],
-  { id: string; name: string; created_at: number }
+  ParticipantRow | undefined
 >(`SELECT id, name, created_at FROM participants WHERE name = ?`);
 
-export function getParticipantByName(name: string) {
+/** Participant row looked up by callsign. Returns undefined if the name
+ *  doesn't exist. */
+export function getParticipantByName(name: string): ParticipantRow | undefined {
   return participantByNameStmt.get(name);
 }
 
@@ -613,8 +623,17 @@ const mentionByIdStmt = db.prepare<
   { id: string; participant_id: string; read_at: number | null }
 >(`SELECT id, participant_id, read_at FROM mentions WHERE id = ?`);
 
-/** A single mention row, or undefined. Only the fields the caller needs. */
-export function getMentionById(id: string) {
+/** Lightweight mention ownership lookup by id (for PATCH /me/mentions/:id/read).
+ *  Only the fields the caller needs are selected. Returns undefined when the id
+ *  is unknown. */
+export interface MentionByIdRow {
+  id: string;
+  participant_id: string;
+  read_at: number | null;
+}
+
+/** A single mention's ownership + read-state, or undefined. */
+export function getMentionById(id: string): MentionByIdRow | undefined {
   return mentionByIdStmt.get(id);
 }
 

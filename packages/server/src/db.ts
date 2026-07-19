@@ -420,16 +420,27 @@ export function getReactionsForMessage(messageId: string): { emoji: string; coun
 }
 
 /** Batch-fetch reactions for multiple messages in a single query.
- *  Returns a Map<message_id, Reaction[]> keyed by the ids that had reactions. */
+ *  Returns a Map<message_id, Reaction[]> keyed by the ids that had reactions.
+ *
+ *  Performance: the SELECT statement is cached per placeholder count rather
+ *  than recreated per call. Reactions are queried frequently during history
+ *  renders (a list of messages), so a one-time-allocated statement per batch
+ *  size avoids repeated statement creation on the hot path.
+ */
+const reactionsForMessagesCache = new Map<number, ReturnType<typeof db.prepare<[...string[]], { message_id: string; emoji: string; participant_id: string }>>>();
+
 export function getReactionsForMessages(
   messageIds: string[],
 ): Map<string, { emoji: string; count: number }[]> {
   if (messageIds.length === 0) return new Map();
-  const placeholders = messageIds.map(() => "?").join(",");
-  const stmt = db.prepare<[...string[]], { message_id: string; emoji: string; participant_id: string }>(
-    `SELECT message_id, emoji, participant_id FROM reactions WHERE message_id IN (${placeholders})`,
-  );
-  const rows = stmt.all(...messageIds);
+  const placeholders = "?,".repeat(messageIds.length).slice(0, -1);
+  let stmt = reactionsForMessagesCache.get(messageIds.length);
+  if (!stmt) {
+    const sql = `SELECT message_id, emoji, participant_id FROM reactions WHERE message_id IN (${placeholders})`;
+    stmt = db.prepare<[...string[]], { message_id: string; emoji: string; participant_id: string }>(sql);
+    reactionsForMessagesCache.set(messageIds.length, stmt);
+  }
+  const rows = stmt.all(...messageIds as [...string[]]);
   const byMsg = new Map<string, Map<string, number>>();
   for (const r of rows) {
     let counts = byMsg.get(r.message_id);
@@ -683,8 +694,19 @@ export function getFile(id: string): FileRow | undefined {
 // POST /messages to rehydrate attachments from the client's `attachmentIds` —
 // order matters so the message shows images in the order the user picked them.
 //
-// Security: ids are validated by the caller to be base64url-format server-issued
-// identifiers; the IN clause is safely parameterized to prevent injection.
+// Performance: the SELECT statement is cached per placeholder count rather than
+// recreated per call. Each batch size gets one prepared statement (mirroring the
+// cached participantByKeyHashStmt / participantByNameStmt pattern) — avoids
+// repeatedly allocating statement objects for identical SQL across hot-path
+// requests. better-sqlite3 also caches by SQL string internally, but an explicit
+// cache keeps the statement alive across requests and makes the intent clear.
+const fileGetByIdsCache = new Map<number, ReturnType<typeof db.prepare<[...string[]], FileRow>>>();
+const FILE_GET_BY_IDS_SQL =
+  `SELECT id, participant_id, mime, width, height, size, created_at, filename
+   FROM files WHERE id IN (${"?,".repeat(1).slice(0, -1)})`;
+// Note: we cannot pre-build the SQL at module scope with a variable placeholder
+// count, so the cache is keyed by count and built lazily. The per-call overhead
+// is a Map.get + a one-time prepare per batch size.
 
 export function getFilesByIds(ids: string[]): FileRow[] {
   if (ids.length === 0) return [];
@@ -693,13 +715,18 @@ export function getFilesByIds(ids: string[]): FileRow[] {
     // against pathological abuse while staying far above legitimate limits.
     throw new Error("too many file ids requested (max 100)");
   }
-  const placeholders = ids.map(() => "?").join(",");
-  const stmt = db.prepare<[...string[]], FileRow>(
-    `SELECT id, participant_id, mime, width, height, size, created_at, filename
-    FROM files WHERE id IN (${placeholders})`,
-  );
+  const placeholders = "?,".repeat(ids.length).slice(0, -1);
+  let stmt = fileGetByIdsCache.get(ids.length);
+  if (!stmt) {
+    const sql =
+      `SELECT id, participant_id, mime, width, height, size, created_at, filename
+       FROM files WHERE id IN (${placeholders})`;
+    stmt = db.prepare<[...string[]], FileRow>(sql);
+    fileGetByIdsCache.set(ids.length, stmt);
+  }
   const byId = new Map<string, FileRow>();
-  for (const row of stmt.all(...ids)) {
+  const rows = stmt.all(...ids as [...string[]]);
+  for (const row of rows) {
     byId.set(row.id, row);
   }
   return ids.map((id) => byId.get(id)).filter((r): r is FileRow => r !== undefined);

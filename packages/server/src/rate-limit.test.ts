@@ -129,4 +129,51 @@ describe("rateLimit", () => {
     expect(getClientIp(c)).toBe("unknown");
     expect(getClientIp(c, () => undefined)).toBe("unknown");
   });
+
+  it("getClientIp rejects malformed x-forwarded-for and falls through", () => {
+    const c = {
+      req: {
+        header: () => "invalid, 1.2.3.4",
+        raw: { headers: { get: () => null } },
+      },
+    } as any;
+    // Invalid leftmost → skip; no socket → fallback to "unknown".
+    expect(getClientIp(c)).toBe("unknown");
+  });
+
+  it("getClientIp rejects spoofed x-forwarded-for", () => {
+    const c = {
+      req: {
+        header: () => "1.2.3.4, attacker-injection",
+        raw: { headers: { get: () => null } },
+      },
+    } as any;
+    expect(getClientIp(c)).toBe("1.2.3.4");
+  });
+
+  it("getClientIp accepts an IPv6 address", () => {
+    const c = {
+      req: {
+        header: () => undefined,
+        raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "::1" : null) } },
+      },
+    } as any;
+    expect(getClientIp(c)).toBe("::1");
+
+    // Separate context: no proxy headers, only socket address (IPv6).
+    const c2 = {
+      req: { header: () => undefined, raw: { headers: { get: () => null } } },
+    } as any;
+    expect(getClientIp(c2, () => ({ remote: { address: "2001:db8::1" } }))).toBe("2001:db8::1");
+  });
+
+  it("getClientIp rejects empty and garbage proxy headers", () => {
+    const c = {
+      req: {
+        header: (h: string) => (h === "x-forwarded-for" ? "" : undefined),
+        raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "not-an-ip" : null) } },
+      },
+    } as any;
+    expect(getClientIp(c)).toBe("unknown");
+  });
 });

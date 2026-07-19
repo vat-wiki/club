@@ -226,11 +226,16 @@ messages.get("/", (c) => {
   return c.json(rows.map((r) => toMessage(r, reactionsMap)));
 });
 
+// Maximum search query length. Beyond this the LIKE pattern gets too large
+// and is rarely useful; capping avoids O(n) pattern construction on huge input.
+const SEARCH_QUERY_MAX = 500;
+
 // GET /messages/search?q=<text>&room=<slug>&limit=<n> -> Message[] (newest first)
 // `room` is optional: omit to search across all rooms, pass a slug to scope it.
 messages.get("/search", (c) => {
-  const q = (c.req.query("q") ?? "").trim();
-  if (!q) return c.json([]);
+  const raw = (c.req.query("q") ?? "").trim();
+  if (!raw) return c.json([]);
+  const q = raw.length > SEARCH_QUERY_MAX ? raw.slice(0, SEARCH_QUERY_MAX) : raw;
   const limit = parseLimit(c.req.query("limit"));
   const room = c.req.query("room");
   const rows = searchMessages(q, room || null, limit);

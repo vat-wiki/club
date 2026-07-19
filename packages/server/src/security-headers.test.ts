@@ -58,4 +58,25 @@ describe("securityHeaders", () => {
     const res = await app.request("/ping");
     expect(await res.json()).toEqual({ ping: "pong" });
   });
+
+  it("adds a unique X-Request-ID on each request", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res1 = await app.request("/");
+    const res2 = await app.request("/");
+    const id1 = res1.headers.get("x-request-id");
+    const id2 = res2.headers.get("x-request-id");
+    expect(id1).toMatch(/^[0-9a-f-]{36}$/);
+    expect(id2).toMatch(/^[0-9a-f-]{36}$/);
+    expect(id1).not.toBe(id2);
+  });
+
+  it("disables DNS prefetch", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    expect(res.headers.get("x-dns-prefetch-control")).toBe("off");
+  });
 });

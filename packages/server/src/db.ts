@@ -701,9 +701,6 @@ export function getFile(id: string): FileRow | undefined {
 // requests. better-sqlite3 also caches by SQL string internally, but an explicit
 // cache keeps the statement alive across requests and makes the intent clear.
 const fileGetByIdsCache = new Map<number, ReturnType<typeof db.prepare<[...string[]], FileRow>>>();
-const FILE_GET_BY_IDS_SQL =
-  `SELECT id, participant_id, mime, width, height, size, created_at, filename
-   FROM files WHERE id IN (${"?,".repeat(1).slice(0, -1)})`;
 // Note: we cannot pre-build the SQL at module scope with a variable placeholder
 // count, so the cache is keyed by count and built lazily. The per-call overhead
 // is a Map.get + a one-time prepare per batch size.

@@ -10,7 +10,6 @@
 // output identical.
 
 import { formatError } from "@club/sdk";
-import type { Command } from "commander";
 
 /**
  * Wrap an async Commander `.action` callback so that errors are surfaced via

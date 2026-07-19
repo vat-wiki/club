@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { filesDir, filePath } from "./files-dir.js";
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 describe("files-dir", () => {

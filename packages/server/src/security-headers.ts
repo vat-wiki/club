@@ -12,8 +12,16 @@ import { randomUUID } from "node:crypto";
  *   - X-Frame-Options: legacy framing protection (backup for CSP frame-ancestors).
  *   - Referrer-Policy: limits referrer information leakage.
  *   - Permissions-Policy: disables unnecessary browser features.
+ *   - Cache-Control / Pragma / Vary: prevents caching of authenticated API
+ *     responses by browsers, CDNs, and reverse proxies; varies on
+ *     Authorization so unauthenticated error pages are cached separately.
  *   - X-Request-ID: per-request UUID for tracing/debugging in logs.
  *   - X-DNS-Prefetch-Control: disables speculative DNS lookups that leak intent.
+ *
+ * Cache-Control: no-store, no-cache, must-revalidate is applied globally as a
+ * safe default. Static assets served by serveStatic() (web app) and the
+ * GET /files/:id route explicitly set their own Cache-Control later in the
+ * pipeline, overriding this default for cacheable content.
  *
  * All header values are safe defaults for a chat SPA served at the same origin
  * as the API. In a production deployment behind a reverse proxy that also
@@ -48,5 +56,17 @@ export const securityHeaders = createMiddleware(async (c, next) => {
   c.header("X-Request-ID", randomUUID());
   // Disables speculative DNS prefetches that can leak navigation intent.
   c.header("X-DNS-Prefetch-Control", "off");
+  // Defensive cache control for API responses: prevent browsers, CDNs, and
+  // reverse proxies from storing sensitive data (messages, mentions, participant
+  // info, SSE frames). Static assets served by serveStatic() and
+  // GET /files/:id override this later in the pipeline.
+  c.header(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  );
+  c.header("Pragma", "no-cache");
+  // Cache unauthenticated 401 errors separately from authenticated responses
+  // so reverse proxies don't serve stale error bodies to valid clients.
+  c.header("Vary", "Authorization");
   await next();
 });

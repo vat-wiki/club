@@ -79,4 +79,44 @@ describe("securityHeaders", () => {
     const res = await app.request("/");
     expect(res.headers.get("x-dns-prefetch-control")).toBe("off");
   });
+
+  it("sets no-store Cache-Control on every response", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    const cc = res.headers.get("cache-control");
+    expect(cc).toContain("no-store");
+    expect(cc).toContain("no-cache");
+    expect(cc).toContain("must-revalidate");
+    expect(cc).toContain("max-age=0");
+  });
+
+  it("sets Pragma: no-cache for legacy caches", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    expect(res.headers.get("pragma")).toBe("no-cache");
+  });
+
+  it("varies cache key on Authorization header", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    const vary = res.headers.get("vary");
+    expect(vary).toBe("Authorization");
+  });
+
+  it("allows route handlers to override Cache-Control for cacheable content", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/asset", (c) => {
+      c.header("Cache-Control", "public, immutable, max-age=31536000");
+      return c.text("cached");
+    });
+    const res = await app.request("/asset");
+    expect(res.headers.get("cache-control")).toBe("public, immutable, max-age=31536000");
+  });
 });

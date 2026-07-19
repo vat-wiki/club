@@ -377,3 +377,45 @@ export const AgentStatusRequest = z
   })
   .strict();
 export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;
+
+// ── Shared limit parsing ────────────────────────────────────────────
+//
+// `parseLimit` is the single source of truth for clamping a request-side
+// `limit` argument into the supported [1, 500] range. Every consumer that
+// receives user input (server query-param, CLI flag, MCP tool arg) is now a
+// thin wrapper around this one pure function so the bounds and fallback rules
+// stay in sync across packages.
+
+/** Clamp a number into the supported [1, 500] range. Pure; non-finite inputs
+  *  are treated as "use the default". */
+export function clampLimitN(n: number, fallback: number): number {
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(1, Math.floor(n)), 500);
+}
+
+/** Parse `limit` from an HTTP query parameter (string | number | undefined).
+  *  Used by the server routes. */
+export function parseQueryLimit(
+  raw: string | number | undefined,
+  fallback = 100,
+): number {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return clampLimitN(n, fallback);
+}
+
+/** Parse `limit` from a CLI flag string. Used by the CLI `read` command. */
+export function parseFlagLimit(raw: string | undefined, fallback = 50): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw);
+  return clampLimitN(n, fallback);
+}
+
+/** Parse `limit` from an MCP tool argument (any shape). Used by the MCP
+  *  dispatcher. Accepts `number | string | null | undefined` and falls back
+  *  for non-finite numbers so a malformed argument can never yield NaN/Infinity.
+  *  @default 50 */
+export function parseToolLimit(raw: unknown, fallback = 50): number {
+  if (typeof raw === "number") return clampLimitN(raw, fallback);
+  if (typeof raw === "string") return clampLimitN(Number(raw), fallback);
+  return fallback;
+}

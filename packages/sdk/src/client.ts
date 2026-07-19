@@ -121,7 +121,6 @@ export class ClubClient {
    *  message. Posting into a non-existent-but-valid room auto-creates it. */
   send(
     content: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     attachmentIds?: string[],
     opts?: { room?: string; replyToId?: string },
   ): Promise<Message> {

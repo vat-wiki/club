@@ -278,6 +278,14 @@ export interface MessageRow {
   room: string; // canonical room slug; "general" for backfilled rows
 }
 
+// Shared SELECT fragment + JOIN for every messages↔participants projection.
+// A single constant so adding a column (e.g. a future status field) requires
+// one edit rather than hunting six prepared statements for stale aliases.
+// Consumers compose it with their own WHERE / ORDER BY / LIMIT clauses.
+const messageProjectionSql =
+  "SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, " +
+  "       p.id AS participant_id, p.name AS author_name FROM messages m JOIN participants p ON p.id = m.participant_id";
+
 const insertMessageStmt = db.prepare(
   `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
    VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -304,15 +312,11 @@ export function getAllParticipants(): { id: string; name: string; created_at: nu
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 const recentStmt = db.prepare<[string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 const sinceStmt = db.prepare<[string], { rowid: number }>(
@@ -320,9 +324,7 @@ const sinceStmt = db.prepare<[string], { rowid: number }>(
 );
 
 const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-           p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-    WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
 export function getMessagesAfter(rowid: number, room: string, limit: number): MessageRow[] {
@@ -344,9 +346,7 @@ export function getMessagesSince(
 }
 
 const beforeStmt = db.prepare<[number, string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 /** Messages older than `beforeId`, chronologic (oldest→newest within the page).
@@ -361,15 +361,11 @@ export function getMessagesBeforeId(beforeId: string, room: string, limit: numbe
 }
 
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.content LIKE ? ESCAPE '\\' ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
-  `SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room,
-          p.id AS participant_id, p.name AS author_name   FROM messages m JOIN participants p ON p.id = m.participant_id
-   WHERE m.content LIKE ? ESCAPE '\\' AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
 );
 
 /** Messages whose content contains `q` (substring via LIKE), newest first.

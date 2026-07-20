@@ -149,8 +149,37 @@ export interface Mention {
 // NOTE: no `kind` — club does not classify participants (category-blind). The
 // schema is non-strict, so a legacy client still sending `{ name, kind }` is
 // silently stripped of `kind` rather than rejected (graceful deprecation).
+//
+// Participant names must pass a whitelist so an attacker cannot register a name
+// containing CRLF / control / invisible-Unicode sequences that would otherwise
+// break SSE framing, log parsing, and terminal rendering. Alphanumerics,
+// common marks (CJK ideographs, accents, etc.), spaces, hyphens, underscores,
+// dots and apostrophes are allowed. ASCII control chars, newlines and the
+// entire invisible-Unicode range are rejected.
+//
+// Unicode categories:
+//   L  — letters  (Latin, CJK ideographs, Cyrillic, Hangul, …)
+//   N  — numbers  (Arabic, Indic, Kana, etc.)
+//   M  — marks    (accents, combining marks, variation selectors)
+//   "  — literal space
+//   -  _ . '     — safe structural punctuation
+//   /\u00A0/    — non-breaking space (commonly used in names)
+//
+// NOTE: we do NOT use /\s/ because it matches newlines and other whitespace
+// that we want to reject. Space is included explicitly via the literal ' ' in
+// the class; non-breaking space via the literal \u00A0.
+// Rejected: /\x00-\x1F\x7F/ (control + DEL), /\u200B-\u200F\u2028\u2029
+//   \u2060-\u206F/ (ZWSP, directional, BOM-like), /\uFEFF/ (BOM).
+export const ParticipantNameRegex = /^[\p{L}\p{N}\p{M} \u00A0\-_.']{1,40}$/u;
+export const ParticipantName = z
+  .string()
+  .regex(
+    ParticipantNameRegex,
+    "participant name may only contain letters, numbers, spaces, hyphens, underscores, dots and apostrophes",
+  );
+
 export const CreateParticipantRequest = z.object({
-  name: z.string().min(1).max(40),
+  name: ParticipantName,
 });
 export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
 
@@ -213,7 +242,7 @@ export interface CreateParticipantResponse {
 // On failure a uniform 401 is returned regardless of whether the name exists
 // or the code is wrong, to prevent callsign enumeration.
 export const RecoverParticipantRequest = z.object({
-  name: z.string().min(1).max(40),
+  name: ParticipantName,
   recoverCode: z.string().min(1),
 });
 export type RecoverParticipantRequest = z.infer<typeof RecoverParticipantRequest>;

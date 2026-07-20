@@ -66,16 +66,28 @@ function authHeaders(c: ClubConn): Record<string, string> {
 }
 
 // ── Response handling ───────────────────────────────────────────────
+/**
+ * Throw a `ClubApiError` with a human-readable message derived from the
+ * response status and, when available, the JSON `{ error }` body.
+ * Pure, shared by both `request()` and `getFile()` so error formatting stays
+ * in one place.
+ *
+ * @param res - The failed HTTP response.
+ */
+async function parseErrorFromResponse(res: Response): Promise<ClubApiError> {
+  let msg = `HTTP ${res.status}`;
+  try {
+    const body = (await res.json()) as { error?: string };
+    if (body?.error) msg = body.error;
+  } catch {
+    /* ignore non-JSON error bodies */
+  }
+  return new ClubApiError(msg, res.status);
+}
+
 async function check<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let msg = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body?.error) msg = body.error;
-    } catch {
-      /* ignore non-JSON error bodies */
-    }
-    throw new ClubApiError(msg, res.status);
+    throw await parseErrorFromResponse(res);
   }
   return (res.status === 204 ? null : await res.json()) as T;
 }
@@ -297,14 +309,7 @@ export async function getFile(
       signal: controller.signal,
     });
     if (!res.ok) {
-      let msg = `HTTP ${res.status}`;
-      try {
-        const body = (await res.json()) as { error?: string };
-        if (body?.error) msg = body.error;
-      } catch {
-        /* ignore non-JSON error bodies */
-      }
-      throw new ClubApiError(msg, res.status);
+      throw await parseErrorFromResponse(res);
     }
     const buffer = await res.arrayBuffer();
     const mime = res.headers.get("content-type") ?? "application/octet-stream";

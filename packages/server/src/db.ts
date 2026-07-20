@@ -642,26 +642,39 @@ const allParticipantsStmt = db.prepare<
  * @internal
  */
 const participantNamesCache = new Map<string, { id: string; name: string }>();
+// Mutable holder so we can swap the frozen snapshot reference without a `let`.
+// `extractMentionedParticipants()` compares its caller's roster by reference to
+// decide whether to rebuild its name→participant Map; returning the SAME array
+// reference between mutations keeps that comparison happy on every message send
+// (O(0) — no Map rebuild, no allocation). A fresh `[...map.values()]` on each
+// call would blow the identity check and pay the rebuild cost per message.
+const participantNamesRef = { current: Object.freeze([] as readonly { id: string; name: string }[]) };
 
-/**
- * Lightweight roster for mention parsing: every (id, name).
- *
- * Performance: served from an in-memory cache on the hot path (message sends).
- * Call {@link invalidateParticipantNamesCache} after any participant mutation.
- */
-export function getAllParticipantNames(): { id: string; name: string }[] {
-  // Populate cache on first call. In-memory maps preserve insertion order, so
-  // the list is stable within a process lifetime.
+function _buildSnapshot(): readonly { id: string; name: string }[] {
   if (participantNamesCache.size === 0) {
     const rows = allParticipantsStmt.all();
     for (const r of rows) participantNamesCache.set(r.id, r);
   }
-  return [...participantNamesCache.values()];
+  return Object.freeze([...participantNamesCache.values()]) as readonly { id: string; name: string }[];
 }
 
 /**
- * Invalidate the participant roster cache after a create or credential rotation.
- * Next `getAllParticipantNames()` will re-read from the database.
+ * Lightweight roster for mention parsing: every (id, name).
+ *
+ * Performance: served from a frozen in-memory snapshot on the hot path
+ * (message sends). The returned array reference is stable between
+ * mutations, so the caller can compare it by identity to decide whether
+ * its own caches need rebuilding. Call
+ * {@link invalidateParticipantNamesCache} after any participant mutation.
+ */
+export function getAllParticipantNames(): readonly { id: string; name: string }[] {
+  return participantNamesRef.current;
+}
+
+/**
+ * Invalidate the participant roster cache and snapshot after a create or
+ * credential rotation. Next `getAllParticipantNames()` will re-read from the
+ * database and emit a fresh frozen array reference.
  *
  * Must be called synchronously after every participant mutation (insert, key
  * update, recover-code rotation) so the message-send hot path never sees stale
@@ -669,6 +682,9 @@ export function getAllParticipantNames(): { id: string; name: string }[] {
  */
 export function invalidateParticipantNamesCache(): void {
   participantNamesCache.clear();
+  // Build a fresh frozen snapshot so the next call returns a new array ref,
+  // triggering the caller's identity-based cache rebuild.
+  participantNamesRef.current = _buildSnapshot();
 }
 
 const insertMentionStmt = db.prepare(

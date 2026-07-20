@@ -941,7 +941,18 @@ export function getFilesByIds(ids: string[]): FileRow[] {
   for (const row of rows) {
     byId.set(row.id, row);
   }
-  return ids.map((id) => byId.get(id)).filter((r): r is FileRow => r !== undefined);
+  // One-pass ordered build: skip the intermediate [FileRow|undefined][]
+  // allocation of ids.map().filter() and grow a pre-sized output array.
+  const result: FileRow[] = new Array(ids.length);
+  let outLen = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const hit = byId.get(ids[i]);
+    if (hit !== undefined) {
+      result[outLen++] = hit;
+    }
+  }
+  result.length = outLen;
+  return result;
 }
 
 // ── Rooms (multi-room) ───────────────────────────────────────────────

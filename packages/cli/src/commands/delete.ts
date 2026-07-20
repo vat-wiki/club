@@ -9,6 +9,25 @@ import { ClubClient } from "@club/sdk";
 import { requireConfig } from "../config.js";
 import { withCatchExit } from "../catch-exit.js";
 
+export interface DeleteDeps {
+  /** Simulate the SDK's `ClubClient.deleteMessage(id)` method. */
+  deleteMessage: (id: string) => Promise<void>;
+}
+
+/**
+ * Soft-delete (recall) a message.
+ *
+ * Dependency injection is used so the CLI can substitute a mocked
+ * `deleteMessage()` in tests without requiring a real network connection.
+ */
+export async function runDelete(
+  opts: { id: string },
+  deps: DeleteDeps,
+): Promise<void> {
+  await deps.deleteMessage(opts.id.trim());
+  console.log(`deleted ${opts.id}`);
+}
+
 export function makeDeleteCommand(): Command {
   return new Command("delete")
     .description("delete (recall) a message — only your own messages")
@@ -16,7 +35,6 @@ export function makeDeleteCommand(): Command {
     .action(withCatchExit(async (id: string) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
-      await client.deleteMessage(id.trim());
-      console.log(`deleted ${id}`);
+      return runDelete({ id }, { deleteMessage: (i) => client.deleteMessage(i) });
     }));
 }

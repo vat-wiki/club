@@ -4,6 +4,8 @@ import {
   NETWORK_ERROR_STATUS,
   formatError,
   isClubApiError,
+  isNetworkFailure,
+  parseHttpErrorStatus,
 } from "./errors";
 
 describe("ClubApiError", () => {
@@ -111,5 +113,55 @@ describe("formatError", () => {
 
   it("converts plain objects to '[object Object]'", () => {
     expect(formatError({ reason: "bad" })).toBe("[object Object]");
+  });
+});
+
+describe("isNetworkFailure", () => {
+  it("returns true for the network-failure sentinel", () => {
+    expect(isNetworkFailure(NETWORK_ERROR_STATUS)).toBe(true);
+  });
+
+  it("returns false for a normal HTTP status", () => {
+    expect(isNetworkFailure(404)).toBe(false);
+    expect(isNetworkFailure(500)).toBe(false);
+    expect(isNetworkFailure(429)).toBe(false);
+  });
+
+  it("narrows the type at compile time (smoke)", () => {
+    const status: typeof NETWORK_ERROR_STATUS | 404 | 500 = 0;
+    if (isNetworkFailure(status)) {
+      // Compiler proves `status` is NetworkFailureStatus here.
+      expect(typeof status).toBe("number");
+      expect(status).toBe(0);
+    }
+  });
+});
+
+describe("parseHttpErrorStatus", () => {
+  it("passes through the network-failure sentinel", () => {
+    expect(parseHttpErrorStatus(NETWORK_ERROR_STATUS)).toBe(0);
+  });
+
+  it("returns valid HTTP status codes unchanged", () => {
+    expect(parseHttpErrorStatus(100)).toBe(100);
+    expect(parseHttpErrorStatus(200)).toBe(200);
+    expect(parseHttpErrorStatus(404)).toBe(404);
+    expect(parseHttpErrorStatus(500)).toBe(500);
+    expect(parseHttpErrorStatus(511)).toBe(511);
+  });
+
+  it("throws on a status below the 100..511 range (except the network sentinel 0)", () => {
+    // 0 is the NETWORK_ERROR_STATUS sentinel and is allowed through.
+    expect(parseHttpErrorStatus(0)).toBe(0);
+    expect(() => parseHttpErrorStatus(99)).toThrow(TypeError);
+    expect(() => parseHttpErrorStatus(-1)).toThrow(TypeError);
+    expect(() => parseHttpErrorStatus(512)).toThrow(TypeError);
+    expect(() => parseHttpErrorStatus(999)).toThrow(TypeError);
+  });
+
+  it("throws on non-integer or non-number values", () => {
+    expect(() => parseHttpErrorStatus(404.5)).toThrow(TypeError);
+    expect(() => parseHttpErrorStatus(Number.NaN)).toThrow(TypeError);
+    expect(() => parseHttpErrorStatus(Number.POSITIVE_INFINITY)).toThrow(TypeError);
   });
 });

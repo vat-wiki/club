@@ -2,11 +2,6 @@
 // SSE) is fully usable on its own via the exported functions; ClubClient is a
 // stateful convenience wrapper. Domain types and zod schemas are re-exported
 // from @club/shared so consumers can import everything from one package.
-
-// @club/sdk — a typed client for a club server. The transport layer (REST +
-// SSE) is fully usable on its own via the exported functions; ClubClient is a
-// stateful convenience wrapper. Domain types and zod schemas are re-exported
-// from @club/shared so consumers can import everything from one package.
 //
 // This main entry is BROWSER-SAFE: it has no Node-only imports (no node:fs,
 // no image-size), so the web app can bundle `ClubClient`/`request`/types from

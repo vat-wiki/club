@@ -8,7 +8,7 @@ import {
   type MessageAttachment,
   type UploadFileResponse,
 } from "@club/shared";
-import { ClubApiError, NETWORK_ERROR_STATUS, type ClubApiErrorStatus, type ClubConn } from "@club/sdk";
+import { ClubApiError, NETWORK_ERROR_STATUS, parseHttpErrorStatus, type ClubConn } from "@club/sdk";
 
 // The MIME whitelist is the single source of truth in @club/shared (ImageMime).
 // Pre-flight locally so a wrong-format pick is rejected before any bytes hit
@@ -179,7 +179,7 @@ export async function uploadImage(
       } catch {
         /* ignore non-JSON error bodies */
       }
-      throw new ClubApiError(msg, res.status as ClubApiErrorStatus);
+      throw new ClubApiError(msg, parseHttpErrorStatus(res.status));
     }
 
     return JSON.parse(res.body) as MessageAttachment;

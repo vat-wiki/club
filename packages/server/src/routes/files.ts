@@ -208,7 +208,7 @@ files.post("/", requireAuth, async (c) => {
   const id = randomBytes(16).toString("base64url");
   const dir = filesDir();
   if (!existsSync(dir)) await mkdir(dir, { recursive: true });
-  await writeFile(filePath(id), buf);
+  await writeFile(await filePath(id), buf);
 
   const createdAt = Date.now();
   insertFile({
@@ -238,12 +238,12 @@ files.post("/", requireAuth, async (c) => {
 // random and never reused, so we cache aggressively. Supports HTTP Range
 // requests (206 Partial Content) so a <video> can seek/scrub; images ignore it
 // and get the full body. Accept-Ranges is advertised unconditionally.
-files.get("/:id", (c) => {
+files.get("/:id", async (c) => {
   const id = c.req.param("id");
   const row = getFile(id);
   if (!row) return jsonErr(c, "not found", 404);
 
-  const path = filePath(id);
+  const path = await filePath(id);
   if (!existsSync(path)) return jsonErr(c, "not found", 404);
 
   const stat = statSync(path);

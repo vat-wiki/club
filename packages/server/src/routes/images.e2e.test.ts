@@ -242,7 +242,7 @@ describe("SSE pushes attachment messages to live subscribers", () => {
     }
     controller.abort();
     try {
-      reader.cancel();
+      await reader.cancel();
     } catch {
       /* abort may race */
     }

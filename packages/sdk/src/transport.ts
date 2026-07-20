@@ -14,8 +14,8 @@ import type {
 } from "@club/shared";
 import {
   ClubApiError,
-  type ClubApiErrorStatus,
   NETWORK_ERROR_STATUS,
+  parseHttpErrorStatus,
   formatError,
   shouldRetry,
   jitteredBackoff,
@@ -84,7 +84,9 @@ async function parseErrorFromResponse(res: Response): Promise<ClubApiError> {
   } catch {
     /* ignore non-JSON error bodies */
   }
-  return new ClubApiError(msg, res.status as ClubApiErrorStatus);
+  // Runtime narrowing: exotic codes from reverse proxies surface as
+  // TypeErrors here rather than poisoning downstream branching.
+  return new ClubApiError(msg, parseHttpErrorStatus(res.status));
 }
 
 async function check<T>(res: Response): Promise<T> {

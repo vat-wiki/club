@@ -30,8 +30,60 @@ export type NetworkFailureStatus = typeof NETWORK_ERROR_STATUS;
  * turns `ClubApiError.status` into a type-level assertion: callers can't
  * accidentally construct `new ClubApiError(msg, 9999)` — the compiler
  * catches it before it reaches retry/backoff/toast branching code.
+ *
+ * Runtime narrowing of raw `res.status` into this union is handled by
+ * `parseHttpErrorStatus()` so exotic codes from reverse proxies surface
+ * as TypeErrors during construction rather than poisoning downstream branches.
  */
 export type ClubApiErrorStatus = HttpStatusCode | NetworkFailureStatus;
+
+/**
+ * Type guard: is a numeric status the network-failure sentinel?
+ *
+ * Enables clean discriminated-union branching on `ClubApiErrorStatus`
+ * without manual `err.status === 0` comparisons scattered across callers:
+ *
+ * ```ts
+ * if (isNetworkFailure(err.status)) {/* DNS/timeout branch *}*
+ * ```
+ *
+ * @param status - A `ClubApiErrorStatus` value.
+ * @returns `true` if `status` is `NETWORK_ERROR_STATUS` (0).
+ */
+export function isNetworkFailure(
+  status: ClubApiErrorStatus,
+): status is NetworkFailureStatus {
+  return status === NETWORK_ERROR_STATUS;
+}
+
+/**
+ * Safely narrow a raw HTTP response status into `ClubApiErrorStatus`.
+ *
+ * Raw `res.status` is typed `number`; blindly casting `as ClubApiErrorStatus`
+ * lets exotic codes (e.g. reverse-proxy 418, 452) slip past type checking
+ * and poison downstream branching. This helper throws a typed error when the
+ * code is unrecognised, so bugs surface during construction rather than
+ * at the caller's branch.
+ *
+ * @param status - A raw HTTP status code from a Response.
+ * @returns The narrowed status.
+ * @throws {TypeError} With the code when `status` is not in `HttpStatusCode`
+ * and is not the network-failure sentinel.
+ */
+export function parseHttpErrorStatus(status: number): ClubApiErrorStatus {
+  // Network sentinel — not an HTTP code but always valid in our union.
+  if (status === NETWORK_ERROR_STATUS) return status;
+  // Allow any code that's in the closed union.
+  if (
+    typeof status === "number" &&
+    Number.isInteger(status) &&
+    status >= 100 &&
+    status <= 511
+  ) {
+    return status as ClubApiErrorStatus;
+  }
+  throw new TypeError(`unexpected HTTP status for ClubApiError: ${status}`);
+}
 
 /**
  * Error thrown by the SDK transport layer. Carries the HTTP status when

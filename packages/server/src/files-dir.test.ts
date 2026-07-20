@@ -17,15 +17,15 @@ describe("files-dir", () => {
   process.env.CLUB_FILES = safeTestDir;
 
   describe("filePath path-traversal protection", () => {
-    it("resolves a normal base64url-like id inside the files dir", () => {
+    it("resolves a normal base64url-like id inside the files dir", async () => {
       const id = "abc123def456";
-      const p = filePath(id);
+      const p = await filePath(id);
       expect(p).toBe(join(safeTestDir, id));
       expect(p).not.toContain("..");
     });
 
-    it("rejects a path-traversal id containing '..'", () => {
-      const p = filePath("../decoy.txt");
+    it("rejects a path-traversal id containing '..'", async () => {
+      const p = await filePath("../decoy.txt");
       // Must not escape the files dir.
       expect(p).not.toBe(decoyFile);
       // Resolve result must still be under the files dir (or the safe fallback
@@ -34,14 +34,14 @@ describe("files-dir", () => {
       expect(existsSync(p)).toBe(false);
     });
 
-    it("rejects a traversal id using absolute path prefix", () => {
-      const p = filePath("/etc/passwd");
+    it("rejects a traversal id using absolute path prefix", async () => {
+      const p = await filePath("/etc/passwd");
       expect(p).not.toContain("etc/passwd");
       expect(existsSync(p)).toBe(false);
     });
 
-    it("rejects backslash path separators", () => {
-      const p = filePath("..\\decoy.txt");
+    it("rejects backslash path separators", async () => {
+      const p = await filePath("..\\decoy.txt");
       expect(p).not.toBe(decoyFile);
     });
   });

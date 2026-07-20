@@ -15,6 +15,7 @@ import { files } from "./routes/files.js";
 import { agents } from "./routes/agents.js";
 import { rooms } from "./routes/rooms.js";
 import { rateLimit, getClientIp } from "./rate-limit.js";
+import { bodySizeGuard } from "./body-size-guard.js";
 import { heartbeatInterval } from "./stream.js";
 import { securityHeaders } from "./security-headers.js";
 
@@ -36,6 +37,13 @@ app.use("*", rateLimit({
 
 // Security headers: CSP, HSTS, X-Content-Type-Options, etc.
 app.use("*", securityHeaders);
+
+// Request-body size guard: reject oversized JSON bodies with 413 before
+// they are buffered into memory. Uploads (multipart) are bounded by a
+// per-kind cap in the files route; this cap protects the small-payload
+// JSON endpoints (messages, reactions, room creation, etc.) from a
+// request-body DoS where an attacker advertises a multi-hundred-MB body.
+app.use("*", bodySizeGuard());
 
 // CORS: the chat UI, CLI, and MCP all hit this backend. Restrict origins
 // via ALLOWED_ORIGINS (comma-separated) when set; falls back to open "*"

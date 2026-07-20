@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function -- test-only beforeEach/afterEach hooks silence console; no-op is intentional */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ClubApiError } from "@club/sdk";
 import { formatMention, runMentions, type MentionDeps } from "./mentions.js";

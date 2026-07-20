@@ -5,6 +5,8 @@ export {
   ClubApiError,
   formatError,
   isClubApiError,
+  isNetworkFailure,
+  parseHttpErrorStatus,
   type ClubApiErrorStatus,
   type HttpStatusCode,
   type NetworkFailureStatus,

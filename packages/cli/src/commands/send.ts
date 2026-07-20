@@ -1,3 +1,11 @@
+// club send [text...] [--stdin] [--image <path>] [--video <path>] [--file <path>] [--room <slug>]
+//
+// Send a message into the current room (or --room <slug>). Accepts a literal
+// string, or reads from stdin when piped / --stdin. Attach up to 8 images,
+// videos, or document files via --image / --video / --file (repeatable).
+// Delegates the upload+send orchestration to send-impl so the commander
+// action stays thin and unit-testable.
+
 import { Command } from "commander";
 
 import { ClubClient } from "@club/sdk";

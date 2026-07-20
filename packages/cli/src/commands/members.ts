@@ -1,3 +1,9 @@
+// club members [--room <slug>]
+//
+// List participants in the current room (or --room <slug>). Each name is
+// printed on its own line for agent consumption; a friendly
+// "(no members)" footer appears when the room is empty.
+
 import { Command } from "commander";
 
 import { withAuthClient } from "../client-factory.js";

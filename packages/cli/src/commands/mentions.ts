@@ -1,3 +1,10 @@
+// club mentions [--room <slug>]
+//
+// Print the current participant's unread @-mentions in chronological order
+// (oldest first), scoped to the current room (or --room <slug>). Also used
+// by `club me --mentions` as the underlying listing; `formatMention` is
+// pure so both callers share one rendering path.
+
 import { Command } from "commander";
 
 import { ClubClient } from "@club/sdk";

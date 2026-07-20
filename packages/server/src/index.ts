@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import { bodySizeGuard } from "./body-size-guard.js";
-import { getClientIp,rateLimit } from "./rate-limit.js";
+import { getClientIp, rateLimit } from "./rate-limit.js";
 import { agents } from "./routes/agents.js";
 import { files } from "./routes/files.js";
 import { me } from "./routes/me.js";

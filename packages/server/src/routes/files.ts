@@ -18,8 +18,8 @@ import {
 } from "@club/shared";
 
 import { requireAuth } from "../auth.js";
-import { getFile,insertFile } from "../db.js";
-import { filePath,filesDir } from "../files-dir.js";
+import { getFile, insertFile } from "../db.js";
+import { filePath, filesDir } from "../files-dir.js";
 import { jsonErr, requireValidId } from "../lib.js";
 
 /**

@@ -1,4 +1,4 @@
-import { type Context,Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 
@@ -33,7 +33,7 @@ import {
   searchMessages,
   toggleReaction,
 } from "../db.js";
-import { jsonErr, parseJsonBody, parseLimit, requireValidId,requireValidRoomSlug } from "../lib.js";
+import { jsonErr, parseJsonBody, parseLimit, requireValidId, requireValidRoomSlug } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
 import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction, markThinkingIdle } from "../stream.js";

@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { isValidId,parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
+import { isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
 
 /**
  * Send a `{ error: message }` JSON response with the given status. Centralises

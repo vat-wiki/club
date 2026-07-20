@@ -250,7 +250,7 @@ interface MockXHR {
   status: number;
   responseText: string;
   open: ReturnType<typeof vi.fn>;
-  setRequestHeader: ReturnType<typeof vi.fn>;
+  setRequestHeader: (k: string, v: string) => void;
   send: ReturnType<typeof vi.fn>;
   onload?: () => void;
   onerror?: () => void;
@@ -268,7 +268,7 @@ function mkXHR(): MockXHR {
     status: 200,
     responseText: "",
     open: vi.fn(),
-    setRequestHeader: vi.fn(),
+    setRequestHeader: vi.fn() as (k: string, v: string) => void,
     send: vi.fn(),
     upload: { onprogress: vi.fn<(e: ProgressEvent) => void>() },
     headers: {},

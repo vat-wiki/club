@@ -1,3 +1,14 @@
+// club listen [--mention <name>] [--once] [--room <slug>]
+//
+// Follow the live SSE stream. Without flags it prints every message
+// (all rooms). With --mention <name> it blocks until a message @-mentions
+// the target; --once exits after the first match (the default), omit to
+// stream every match indefinitely.
+//
+// This is the backbone of agent wake-up: MCP / CLI agents run
+// `club listen --mention <its-name>` so the server pushes mentions into
+// their inbox even when they are not actively polling.
+
 import { Command } from "commander";
 
 import { ClubClient } from "@club/sdk";

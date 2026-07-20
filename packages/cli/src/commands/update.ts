@@ -1,3 +1,10 @@
+// club update
+//
+// Check npm for a newer version of the cli package. If one is available and
+// the user (or --yes) confirms, run the self-update script so the new
+// version is on PATH for the next invocation. If the current version is
+// already latest, prints a one-liner and exits 0.
+
 import { Command } from "commander";
 
 import { withCatchExit } from "../catch-exit.js";

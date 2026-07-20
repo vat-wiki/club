@@ -7,7 +7,6 @@ import { runSend, type SendDeps } from "./send-impl.js";
 import { defaultRoom, requireConfig } from "../config.js";
 import { readStream } from "../stdin.js";
 
-// Collect repeated flags into an array (commander coercion)
 // Collect repeated flags into an array (commander coercion). Spread-copy avoids
 // the shared-mutable-array pitfall that commander's default accumulator triggers
 // when one command definition is reused across processes.

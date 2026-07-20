@@ -1,3 +1,12 @@
+// club login <key> [--server <url>]
+//
+// Store an authentication key for the current session. Resolves the server
+// URL from --server, then the existing config, then the local default, and
+// writes { server, key } to the config file so subsequent commands
+// (`send`, `read`, `listen`, ...) run authenticated. Mirrors `recover` and
+// is superseded by `join` for onboarding — kept for explicit key injection
+// (e.g. CI, agents provisioning their own key from the /participants page).
+
 import { Command } from "commander";
 
 import { withCatchExit } from "../catch-exit.js";

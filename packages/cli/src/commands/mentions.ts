@@ -7,6 +7,13 @@ import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";
 
+// club mentions [--room <slug>]
+//
+// Print the current participant's unread @-mentions in chronological order
+// (oldest first), scoped to the current room (or --room <slug>). Also used
+// by `club me --mentions` as the underlying listing; `formatMention` is
+// pure so both callers share one rendering path.
+
 export function formatMention(m: Mention): string {
   return formatMessage({
     id: m.messageId,

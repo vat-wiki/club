@@ -106,7 +106,13 @@ function toMessage(
   if (attachments) msg.attachments = attachments;
   if (r.reply_to_id) msg.replyToId = r.reply_to_id;
   if (r.deleted) msg.deleted = true;
-  const reactions = reactionsMap?.get(r.id) ?? getReactionsForMessage(r.id);
+  // reactionsMap is only supplied on the batched list/search paths, where
+  // every message id was passed to getReactionsForMessages(). Keys that have
+  // no reactions are simply absent from the map; toMessage must distinguish
+  // "absent (maybe empty)" from "map not supplied at all" to preserve the
+  // existing per-row fallback for single-message routes.
+  const reactions =
+    reactionsMap?.has(r.id) ? (reactionsMap.get(r.id) ?? []) : getReactionsForMessage(r.id);
   if (reactions.length) msg.reactions = reactions as Reaction[];
   return msg;
 }
@@ -282,9 +288,11 @@ messages.get("/", (c) => {
       : getRecentMessages(room, limit);
   const messageIds = rows.map((r) => r.id);
   const reactionsMap = getReactionsForMessages(messageIds);
-  // Pre-fill missing message ids with empty reaction arrays so toMessage()
-  // never triggers its per-row fallback query on the list hot path.
-  for (const r of rows) reactionsMap.set(r.id, reactionsMap.get(r.id) ?? []);
+  // `toMessage` uses reactionsMap.has(r.id) to distinguish "batched (maybe
+  // empty)" from "not batched → per-row fallback". We intentionally do NOT
+  // pre-fill missing ids with []: that would make msg.reactions truthy for
+  // every message, defeating the if (reactions.length) guard in toMessage and
+  // wasting Map slots for the common case of no reactions.
   return c.json(rows.map((r) => toMessage(r, reactionsMap)));
 });
 
@@ -308,9 +316,9 @@ messages.get("/search", (c) => {
   const rows = searchMessages(q, room ?? null, limit);
   const messageIds = rows.map((r) => r.id);
   const reactionsMap = getReactionsForMessages(messageIds);
-  // Pre-fill missing message ids with empty reaction arrays so toMessage()
-  // never triggers its per-row fallback query on the search hot path.
-  for (const r of rows) reactionsMap.set(r.id, reactionsMap.get(r.id) ?? []);
+  // `toMessage` uses reactionsMap.has(r.id) to distinguish "batched (maybe
+  // empty)" from "not batched → per-row fallback", so only messages with no
+  // reactions on the search hot path fall back to a single per-row query.
   return c.json(rows.map((r) => toMessage(r, reactionsMap)));
 });
 

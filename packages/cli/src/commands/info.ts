@@ -3,38 +3,81 @@
 // Display current session info and useful stats.
 
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk";
-import { defaultRoom, requireConfig } from "../config.js";
-import { withCatchExit } from "../catch-exit.js";
+import type { Participant, Room } from "@club/shared";
+import { withAuthClient } from "../client-factory.js";
+
+export interface InfoDeps {
+  /** Simulate `ClubClient.me()`. */
+  me: () => Promise<Participant>;
+  /** Simulate `ClubClient.rooms()`. */
+  rooms: () => Promise<Room[]>;
+  /** Simulate `ClubClient.members()`. */
+  members: () => Promise<Participant[]>;
+}
+
+interface DisplayOpts {
+  server: string;
+  currentRoom: string;
+}
+
+/**
+ * Print the participant identity, current room, all rooms with activity,
+ * and the member roster.
+ */
+export async function runInfo(opts: DisplayOpts, deps: InfoDeps): Promise<void> {
+  const [me, rooms, members] = await Promise.all([
+    deps.me(),
+    deps.rooms(),
+    deps.members(),
+  ]);
+
+  console.log(`You: ${me.name} (id=${me.id})`);
+  console.log(`Server: ${opts.server}`);
+  console.log(`Current room: #${opts.currentRoom}`);
+  console.log(`Total rooms: ${rooms.length}`);
+  console.log(`Total members: ${members.length}`);
+
+  console.log(`\nRooms:`);
+  for (const r of rooms) {
+    const active = r.lastActivityAt
+      ? `active ${Math.floor((Date.now() - r.lastActivityAt) / 60000)}m ago`
+      : "empty";
+    const tag = r.slug === opts.currentRoom ? "*" : " ";
+    console.log(` ${tag}#${r.slug} ${active}`);
+  }
+
+  console.log(`\nMembers:`);
+  for (const m of members) {
+    console.log(`  ${m.name}`);
+  }
+}
+
+/**
+ * Build the room-display label for a room slug. Returns "empty" when the
+ * room has never seen a message, otherwise "active <N>m ago".
+ */
+export function roomDisplayLabel(room: Room, now = Date.now()): string {
+  if (room.lastActivityAt == null) return "empty";
+  return `active ${Math.floor((now - room.lastActivityAt) / 60000)}m ago`;
+}
 
 export function makeInfoCommand(): Command {
   return new Command("info")
     .description("show current session info")
-    .action(withCatchExit(async () => {
-      const cfg = requireConfig();
-      const client = new ClubClient(cfg);
-      const [me, rooms, members] = await Promise.all([
-        client.me(),
-        client.rooms(),
-        client.members(),
-      ]);
-      const room = defaultRoom(cfg);
-      console.log(`You: ${me.name} (id=${me.id})`);
-      console.log(`Server: ${cfg.server}`);
-      console.log(`Current room: #${room}`);
-      console.log(`Total rooms: ${rooms.length}`);
-      console.log(`Total members: ${members.length}`);
-      console.log(`\nRooms:`);
-      for (const r of rooms) {
-        const active = r.lastActivityAt
-          ? `active ${Math.floor((Date.now() - r.lastActivityAt) / 60000)}m ago`
-          : "empty";
-        const tag = r.slug === room ? "*" : " ";
-        console.log(` ${tag}#${r.slug} ${active}`);
-      }
-      console.log(`\nMembers:`);
-      for (const m of members) {
-        console.log(`  ${m.name}`);
-      }
+    .action(withAuthClient(async (cfg, client) => {
+      // defaultRoom() returns the first room by insertion order, which is
+      // "general" for a fresh server — the canonical current room.
+      const currentRoom =
+        (await client.rooms()).sort((a, b) => a.createdAt - b.createdAt)[0]?.slug ??
+        "general";
+
+      return runInfo(
+        { server: cfg.server, currentRoom },
+        {
+          me: () => client.me(),
+          rooms: () => client.rooms(),
+          members: () => client.members(),
+        },
+      );
     }));
 }

@@ -8,6 +8,27 @@ import type {
   MessageReactionEvent,
   PresenceEvent,
 } from '@club/shared';
+
+// ── SSE event envelope ───────────────────────────────────────────────
+//
+// Discriminated union of every named event club can broadcast over the SSE
+// stream. The `event` literal is the SSE `event:` field name; `payload` is the
+// JSON body. Adding a new server-sourced event requires a new arm here and a
+// corresponding interface in `@club/shared/types.ts` — both must be kept in
+// sync so typos like `"message_deleetd"` are caught at compile time rather
+// than silently emitted on the wire.
+//
+// NOTE: `Message` is NOT in this union because `message` events use the
+// SSE *default* event (no `event:` field). That path goes through
+// `broadcast(msg: Message)` below and carries `event: undefined` on purpose.
+
+type SSEEvent =
+  | { event: "presence";              payload: PresenceEvent }
+  | { event: "message_deleted";       payload: MessageDeletedEvent }
+  | { event: "message_reaction";      payload: MessageReactionEvent }
+  | { event: "agent_thinking";        payload: AgentThinkingEvent }
+  | { event: "agent_idle";            payload: AgentIdleEvent };
+
 // Subscriber registered at SSE connect time. `rooms` scopes which room-scoped
 // events the stream receives (null = all rooms); `dead` marks a client whose
 // SSE write failed so the fan-out loop can drop it in a single pass.
@@ -63,21 +84,29 @@ export function addSubscriber(
   };
 }
 
+// Type-safe bridge: turn a named SSEEvent into the raw frame that writeAll
+// expects. Keeps the event-name literal and the payload shape in lockstep so
+// adding a new event requires touching only the SSEEvent union + its shared
+// interface, and the compiler rejects typos or wrong payloads.
+function eventToFrame(e: SSEEvent): { event: string; data: string } {
+  return { event: e.event, data: JSON.stringify(e.payload) };
+}
+
 // Push a named `presence` event (online/offline) to every live subscriber.
 // Presence is intentionally NOT room-scoped (room === null → all subscribers).
 export function broadcastPresence(e: PresenceEvent): void {
-  writeAll({ event: 'presence', data: JSON.stringify(e) }, null);
+  writeAll(eventToFrame({ event: 'presence', payload: e }), null);
 }
 
 // Push a named `message_deleted` event (recall). Clients mark the id recalled
 // rather than dropping the row, so replies/context still read coherently.
 export function broadcastDeleted(e: MessageDeletedEvent): void {
-  writeAll({ event: 'message_deleted', data: JSON.stringify(e) }, e.room);
+  writeAll(eventToFrame({ event: 'message_deleted', payload: e }), e.room);
 }
 
 // Push a named `message_reaction` event (refreshed aggregate after a toggle).
 export function broadcastReaction(e: MessageReactionEvent): void {
-  writeAll({ event: 'message_reaction', data: JSON.stringify(e) }, e.room);
+  writeAll(eventToFrame({ event: 'message_reaction', payload: e }), e.room);
 }
 
 // Push a `message` event (the default, unnamed event in SSE). Backwards
@@ -92,13 +121,13 @@ export function broadcast(msg: Message): void {
 // When `e.room` is present the event is scoped to that room's subscribers;
 // absent means an unscoped (legacy/global) report reaching everyone.
 export function broadcastAgentThinking(e: AgentThinkingEvent): void {
-  writeAll({ event: 'agent_thinking', data: JSON.stringify(e) }, e.room ?? null);
+  writeAll(eventToFrame({ event: 'agent_thinking', payload: e }), e.room ?? null);
 }
 
 // Push a named `agent_idle` event. `e.room` scopes the clear to the same room
 // the agent was thinking in; absent → unscoped (reaches everyone).
 export function broadcastAgentIdle(e: AgentIdleEvent): void {
-  writeAll({ event: 'agent_idle', data: JSON.stringify(e) }, e.room ?? null);
+  writeAll(eventToFrame({ event: 'agent_idle', payload: e }), e.room ?? null);
 }
 
 // Underlying fan-out: write one SSE frame to every live subscriber whose room
@@ -115,10 +144,7 @@ export function broadcastAgentIdle(e: AgentIdleEvent): void {
 // reuse a shared buffer because writeSSE reads the frame asynchronously, so
 // every subscriber must get its own stable reference.)
 function writeAll(
-  frame: {
-    event?: string;
-    data: string;
-  },
+  frame: { event?: string; data: string },
   room: string | null
 ): void {
   const dead: Subscriber[] = [];

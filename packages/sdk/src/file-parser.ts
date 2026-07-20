@@ -3,13 +3,8 @@
 // Converts various file formats into plain text that agents can read.
 // Supports: text, JSON, PDF, Word (.docx), Excel (.xlsx), markdown
 
-import { AttachmentMime, type AttachmentMime as AttachmentMimeType } from "@club/shared";
+import { type AttachmentMime as AttachmentMimeType } from "@club/shared";
 import { formatError } from "./errors.js";
-
-/** Validate that a MIME type is one of the accepted attachment types. */
-function _isValidAttachmentMime(mime: string): mime is AttachmentMimeType {
-  return AttachmentMime.safeParse(mime).success;
-}
 
 /** Map of accepted text-based MIME types for direct decoding. */
 const TEXT_MIMES: readonly string[] = [

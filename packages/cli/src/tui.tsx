@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { render, useInput, useApp, Box, Text } from "ink";
 import type { Message, Participant, Room } from "@club/shared";
 import { ClubClient } from "@club/sdk";

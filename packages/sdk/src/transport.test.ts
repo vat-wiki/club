@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await -- test-only mock fetch implementations; await is not reachable on these synchronous stubs */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
 import {

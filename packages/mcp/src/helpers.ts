@@ -100,7 +100,14 @@ export function listenForMatch(
   return new Promise((resolve) => {
     const matched: Message[] = [];
     let settled = false;
-    let handle: { stop: () => void } = { stop: () => {} };
+    let handle: { stop: () => void } = {
+      stop() {
+        // throw on misuse — the real subscription will always replace this
+        // default before stop() is ever called (first callback fires or timer
+        // fires before the initial default is referenced).
+        throw new Error("unsubscribe called without prior subscription");
+      },
+    };
     // eslint-disable-next-line prefer-const
     let timer: ReturnType<typeof setTimeout> | undefined;
 

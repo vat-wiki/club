@@ -99,4 +99,19 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
     },
   },
+
+  // Test files — mock spies and test helpers routinely use patterns that the
+  // main codebase flags: async spies with no await (vitest vi.fn(async ...)),
+  // empty arrow functions as no-op callbacks, non-null assertions on injected
+  // fakes, and any-typed mocks. All benign in a test context, so silence them
+  // to keep --max-warnings 0 clean without littering the suite with comments.
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ];

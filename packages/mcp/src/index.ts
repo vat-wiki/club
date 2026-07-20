@@ -291,7 +291,7 @@ Reactions are lightweight - perfect for quick acknowledgments without cluttering
   },
 ];
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: TOOLS }));
 
 // ── Tool dispatcher ────────────────────────────────────────────────────
 // dispatchTool() lives in ./helpers.ts (pure + unit-tested, with the client

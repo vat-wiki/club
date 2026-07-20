@@ -186,9 +186,13 @@ export function AuthDialog({
                 // Red border + ring as long as there's a blocking (whitespace)
                 // issue OR a stale submit error. Advisory length issues stay
                 // neutral so they read as a nudge, not a failure.
+                // aria-invalid: boolean OR is intentional here — `nicknameBlocked` is
+                // already a boolean and `false` is a legitimate value we want to treat
+                // as falsy, unlike `??` which would not short-circuit on `false`.
+                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                 aria-invalid={nicknameBlocked || !!error}
                 aria-describedby={
-                  nicknameBlocked || nicknameMessage ? nicknameErrorId : "name-hint"
+                  nicknameBlocked ?? nicknameMessage ? nicknameErrorId : "name-hint"
                 }
                 onChange={(e) => {
                   setName(e.target.value);

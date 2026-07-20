@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- test helper upload() returns loose body shape */
 import { describe, it, expect, afterAll } from "vitest";
 import { MAX_VIDEO_BYTES } from "@club/shared";
 import { Hono } from "hono";

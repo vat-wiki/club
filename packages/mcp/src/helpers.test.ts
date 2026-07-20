@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/require-await -- test-only mocks: empty stop()/no-await async are unavoidable when stubbing DispatchClient */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Message, Participant, Room } from "@club/shared";
 import {

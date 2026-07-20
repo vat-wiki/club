@@ -23,6 +23,31 @@ describe("ParticipantName schema", () => {
     expect(ParticipantName.parse(input)).toBe(expected);
   });
 
+  // ── Whitespace-only / leading-trailing whitespace ──
+
+  it.each([
+    ["   ", "whitespace-only (spaces)"],
+    ["\u00A0\u00A0", "whitespace-only (non-breaking)"],
+    [" Alice", "leading space"],
+    ["Alice ", "trailing space"],
+    [" \u00A0Bob\u00A0 ", "mixed leading/trailing space + NBSP"],
+  ] as const)("rejects %p", (input) => {
+    expect(() => ParticipantName.parse(input)).toThrow();
+  });
+
+  it("allows single-character names", () => {
+    expect(ParticipantName.parse("A")).toBe("A");
+    expect(ParticipantName.parse("_")).toBe("_");
+    expect(ParticipantName.parse(".")).toBe(".");
+  });
+
+  it("allows multi-word names with internal whitespace", () => {
+    expect(ParticipantName.parse("José García")).toBe("José García");
+    expect(ParticipantName.parse("a b c d e f g h i j")).toBe(
+      "a b c d e f g h i j",
+    );
+  });
+
   const invalid = [
     ["", "empty string"],
     ["a".repeat(41), "longer than 40 chars"],

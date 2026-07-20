@@ -7,6 +7,14 @@ import { z } from "zod";
 // themselves (name, self-introduction, behavior), never a system-assigned label.
 // See .pd-docs/requirements/category-blind.md.
 
+/**
+ * A registered participant in the club.
+ *
+ * Id is a server-generated unique string; createdAt is the Unix-timestamp (ms)
+ * when the participant was registered. Id and name together let a participant be
+ * looked up without an extra round-trip (denormalized across messages, mentions,
+ * and SSE events).
+ */
 export interface Participant {
   id: string;
   name: string;
@@ -169,15 +177,30 @@ export interface Mention {
 // that we want to reject. Space is included explicitly via the literal ' ' in
 // the class; non-breaking space via the literal \u00A0.
 // Rejected: /\x00-\x1F\x7F/ (control + DEL), /\u200B-\u200F\u2028\u2029
-//   \u2060-\u206F/ (ZWSP, directional, BOM-like), /\uFEFF/ (BOM).
-export const ParticipantNameRegex = /^[\p{L}\p{N}\p{M} \u00A0\-_.']{1,40}$/u;
+//   \u2060-\u206F/ (ZWSP, directional, BOM-like), /\uFEFF/ (BOM),
+//   leading/trailing whitespace, whitespace-only names.
+//
+// Security rationale: prior regex allowed "   " and " Alice " which enable
+// callsign confusion ("Alice" vs "Alice ") and DB bloat. The regex now
+// requires the first and last character to be non-whitespace (`[\p{L}\p{N}\p{M}\-_.']`)
+// while allowing spaces inside (e.g. "Maria José") so multi-word names survive.
+export const ParticipantNameRegex = /^[\p{L}\p{N}\p{M}\-_.'][\p{L}\p{N}\p{M} \u00A0\-_.']{0,38}[\p{L}\p{N}\p{M}\-_.']$/u;
+
+// A single-character name (e.g. "A", "_", "·") must still be allowed.
+// `ParticipantNameRegex` with its mandatory trailing non-space group enforces
+// length ≥ 2 for names with internal whitespace; use a permissive single-char
+// fallback for the 1-char case so names like "A" and "Z" aren't rejected.
+const SingleCharParticipantNameRegex = /^[\p{L}\p{N}\p{M}\-_.']$/u;
+
 export const ParticipantName = z
   .string()
-  .regex(
-    ParticipantNameRegex,
-    "participant name may only contain letters, numbers, spaces, hyphens, underscores, dots and apostrophes",
+  .refine(
+    (v) =>
+      ParticipantNameRegex.test(v) || SingleCharParticipantNameRegex.test(v),
+    "participant name may only contain letters, numbers, spaces, hyphens, underscores, dots and apostrophes, and must not start or end with whitespace",
   );
 
+/** Request body for POST /participants — create a new participant */
 export const CreateParticipantRequest = z.object({
   name: ParticipantName,
 });
@@ -217,6 +240,7 @@ export interface Room {
 // POST /rooms { name } — create/ensure a room exists. Idempotent: posting an
 // existing slug returns that room without error. `name` is the canonical slug;
 // there is no separate display name this phase (PRD §8.6).
+/** Request body for POST /rooms — create or ensure a room exists (idempotent) */
 export const CreateRoomRequest = z.object({
   name: RoomSlug,
 });
@@ -241,12 +265,14 @@ export interface CreateParticipantResponse {
 // recovery code is single-use and rotated), reusing the original id + name.
 // On failure a uniform 401 is returned regardless of whether the name exists
 // or the code is wrong, to prevent callsign enumeration.
+/** Request body for POST /participants/recover — recover identity by callsign + recovery code */
 export const RecoverParticipantRequest = z.object({
   name: ParticipantName,
   recoverCode: z.string().min(1),
 });
 export type RecoverParticipantRequest = z.infer<typeof RecoverParticipantRequest>;
 
+/** Response from POST /participants/recover */
 export interface RecoverParticipantResponse {
   key: string;
   recoverCode: string;
@@ -305,8 +331,10 @@ export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 // POST /files (multipart, field "file") returns a single attachment descriptor;
 // the client then references its `id` in a later POST /messages. Structurally a
 // MessageAttachment — declared separately only to name the response shape.
+/** Response from POST /files — a newly uploaded attachment */
 export type UploadFileResponse = MessageAttachment;
 
+/** Query parameters for GET /messages — list messages with optional pagination */
 export interface ListMessagesQuery {
   since?: string; // message id — return messages after this one
   before?: string; // message id — return messages BEFORE this one (older history; scroll-up pagination)
@@ -315,6 +343,7 @@ export interface ListMessagesQuery {
   room?: string;
 }
 
+/** Generic error response shape returned by the API on any failure */
 export interface ApiError {
   error: string;
 }
@@ -413,6 +442,7 @@ export interface MessageReactionEvent {
 // event is scoped to that room's stream; absent means unscoped (legacy/global).
 // The participant is taken from the authed key, so a client can't forge another
 // agent's status.
+/** Request body for POST /agents/thinking and POST /agents/idle — report agent status */
 export const AgentStatusRequest = z
   .object({
     room: RoomSlug.optional(),

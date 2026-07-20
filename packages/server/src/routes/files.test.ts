@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test helper upload() returns loose body shape */
 import { describe, it, expect, afterAll } from "vitest";
 import { MAX_VIDEO_BYTES } from "@club/shared";
 import { Hono } from "hono";
@@ -293,5 +294,53 @@ describe("POST /files — document branch", () => {
     const key = await mintKey("d4");
     const { status } = await upload(key, docFile("application/zip", "a.zip"));
     expect(status).toBe(415);
+  });
+});
+
+// ── Filename sanitization (control characters) ────────────────────────
+// Server-side display metadata only, but control chars (\x00, CRLF, BEL,
+// DEL) would break downstream JSON, HTML, or audit-log rendering if stored
+// verbatim. The upload handler strips them.
+
+describe("POST /files — filename control-character sanitization", () => {
+  function controlFile(name: string, mime = "application/pdf"): File {
+    return new File([DOC_BYTES], name, { type: mime });
+  }
+
+  it("rejects NUL byte in filename and returns the cleaned basename", async () => {
+    const key = await mintKey("c1");
+    const { status, body } = await upload(key, controlFile("a\x00b.pdf"));
+    expect(status).toBe(201);
+    expect(body.filename).toBe("ab.pdf");
+    expect(body.filename).not.toContain("\x00");
+  });
+
+  it("rejects CRLF-like control chars in filename", async () => {
+    const key = await mintKey("c2");
+    const { status, body } = await upload(key, controlFile("a\r\nb.pdf"));
+    expect(status).toBe(201);
+    expect(body.filename).toBe("ab.pdf");
+    expect(body.filename).not.toContain("\r");
+    expect(body.filename).not.toContain("\n");
+  });
+
+  it("rejects DEL (\\x7F) and invisible (\\x01) control chars", async () => {
+    const key = await mintKey("c3");
+    const { status, body } = await upload(key, controlFile("\x01name\x7F.pdf"));
+    expect(status).toBe(201);
+    expect(body.filename).toBe("name.pdf");
+  });
+
+  it("sanitizes a combined path-traversal + control-char attack", async () => {
+    const key = await mintKey("c4");
+    const { status, body } = await upload(
+      key,
+      controlFile("../../etc/passwd\x00exploit.pdf"),
+    );
+    expect(status).toBe(201);
+    expect(body.filename).toBe("passwdexploit.pdf");
+    expect(body.filename).not.toContain("..");
+    expect(body.filename).not.toContain("/");
+    expect(body.filename).not.toContain("\x00");
   });
 });

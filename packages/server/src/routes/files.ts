@@ -70,10 +70,16 @@ files.post("/", requireAuth, async (c) => {
   }
 
   // Original filename (display metadata only — the blob is stored under a
-  // random id). Strip any path component defensively and cap length.
+  // random id). Defensive pipeline:
+  //   1. Keep only the basename (strip any path component).
+  //   2. Remove ASCII control characters (\x00–\x1F, \x7F) — these can break
+  //      downstream JSON parsing, HTML rendering, or trigger CRLF-style
+  //      injection in debug/audit logs.
+  //   3. Cap length to avoid unbounded BLOB growth.
   const filename =
     typeof file.name === "string" && file.name.trim().length > 0
-      ? (file.name.split(/[/\\]/).pop() ?? file.name).slice(0, 200)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split() always returns a non-empty array for a non-empty string; the guard above guarantees we have one
+      ? file.name.split(/[\/\\]/).pop()!.replace(/[\x00-\x1F\x7F]/g, "").slice(0, 200)
       : null;
 
   // Read once into a buffer. For video/document this can reach tens of MB —

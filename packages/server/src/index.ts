@@ -24,9 +24,10 @@ const joinHtmlPath = resolve(__dirname, "public", "join.html");
 const app = new Hono();
 
 // Global rate limiter: 120 requests per minute per IP (generous for read paths).
-// Wraps `getConnInfo` so the rate-limiter uses the real socket address as a
-// hard fallback when no reverse proxy headers are present, closing the IP
-// spoofing bypass that collapsed all untrusted clients into one "unknown" bucket.
+// Proxy headers are read only when TRUSTED_PROXY=true — defaulting to socket
+// address for direct connections prevents forwarding-header spoofing bypasses.
+// This keeps the rate limiter effective even when the server is not behind a
+// trusted reverse proxy.
 app.use("*", rateLimit({
   max: 120,
   windowMs: 60_000,

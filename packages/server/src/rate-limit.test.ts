@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Hono } from "hono";
-import { rateLimit, getClientIp, _getNow, _clearCleanup } from "./rate-limit.js";
+import { rateLimit, getClientIp, _getNow, _setNow, _clearCleanup } from "./rate-limit.js";
 
 // Each test creates its own Hono instance so route registration is isolated.
 // The rate-limit middleware uses module-level state (`buckets`), so tests use
@@ -10,12 +10,13 @@ import { rateLimit, getClientIp, _getNow, _clearCleanup } from "./rate-limit.js"
 // timer state leaks between cases.
 let _savedNow: (() => number) | undefined;
 function resetLimiterState() {
-  _getNow = Date.now as () => number;
+  _setNow(Date.now as () => number);
   _savedNow = undefined;
 }
 function stubNow(at: number): () => number {
   _savedNow = _getNow;
-  return (_getNow = () => at);
+  _setNow(() => at);
+  return () => at;
 }
 afterEach(() => {
   // Clear the module's internal store so leftover buckets don't affect later tests.
@@ -146,30 +147,16 @@ type MockContext = {
   };
 };
 
-  it("getClientIp picks leftmost x-forwarded-for entry", () => {
+  it("getClientIp ignores proxy headers by default (trustedProxy=false)", () => {
     const c: MockContext = {
       req: {
         header: (h: string) => (h === "x-forwarded-for" ? "203.0.113.5, 10.0.0.2" : undefined),
-        raw: { headers: { get: () => null } },
-      },
-    };
-    expect(getClientIp(c)).toBe("203.0.113.5");
-  });
-
-  it("getClientIp falls back to x-real-ip", () => {
-    const c: MockContext = {
-      req: {
-        header: () => undefined,
         raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "198.51.100.7" : null) } },
       },
     };
-    expect(getClientIp(c)).toBe("198.51.100.7");
-  });
-
-  it("getClientIp falls back to socket address from getConnInfo", () => {
-    const c: MockContext = {
-      req: { header: () => undefined, raw: { headers: { get: () => null } } },
-    };
+    // Both proxy headers are present, but without trustedProxy=true they are
+    // ignored. The socket address is the sole source of truth.
+    expect(getClientIp(c)).toBe("unknown");
     expect(getClientIp(c, () => ({ remote: { address: "10.0.0.3" } }))).toBe("10.0.0.3");
   });
 
@@ -181,6 +168,66 @@ type MockContext = {
     expect(getClientIp(c, () => undefined)).toBe("unknown");
   });
 
+  it("getClientIp ignores spoofed proxy headers when trustedProxy=false", () => {
+    // This is the regression case the opt-in proxy behaviour was introduced to
+    // block: an attacker reaches the server directly and sends a forged
+    // X-Forwarded-For header to bypass the per-IP rate limit.
+    const c: MockContext = {
+      req: {
+        header: () => "1.2.3.4, attacker-injection",
+        raw: { headers: { get: () => null } },
+      },
+    };
+    expect(getClientIp(c)).toBe("unknown");
+    expect(getClientIp(c, () => ({ remote: { address: "2001:db8::1" } }))).toBe("2001:db8::1");
+  });
+
+  // ── Trusted-proxy mode (behind a reverse proxy) ────────────────────
+
+  it("getClientIp picks leftmost x-forwarded-for when trustedProxy=true", () => {
+    const c: MockContext = {
+      req: {
+        header: (h: string) => (h === "x-forwarded-for" ? "203.0.113.5, 10.0.0.2" : undefined),
+        raw: { headers: { get: () => null } },
+      },
+    };
+    expect(getClientIp(c, undefined, true)).toBe("203.0.113.5");
+  });
+
+  it("getClientIp falls back to x-real-ip when trustedProxy=true", () => {
+    const c: MockContext = {
+      req: {
+        header: () => undefined,
+        raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "198.51.100.7" : null) } },
+      },
+    };
+    expect(getClientIp(c, undefined, true)).toBe("198.51.100.7");
+  });
+
+  it("getClientIp falls back to socket address from getConnInfo", () => {
+    const c: MockContext = {
+      req: { header: () => undefined, raw: { headers: { get: () => null } } },
+    };
+    expect(getClientIp(c, () => ({ remote: { address: "10.0.0.3" } }))).toBe("10.0.0.3");
+  });
+
+  it("getClientIp accepts an IPv6 address from socket", () => {
+    const c: MockContext = {
+      req: { header: () => undefined, raw: { headers: { get: () => null } } },
+    };
+    expect(getClientIp(c, () => ({ remote: { address: "2001:db8::1" } }))).toBe("2001:db8::1");
+  });
+
+  it("getClientIp accepts an IPv6 address from proxy header when trustedProxy=true", () => {
+    const c: MockContext = {
+      req: {
+        header: () => undefined,
+        raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "::1" : null) } },
+      },
+    };
+    expect(getClientIp(c, undefined, true)).toBe("::1");
+  });
+
   it("getClientIp rejects malformed x-forwarded-for and falls through", () => {
     const c: MockContext = {
       req: {
@@ -189,33 +236,7 @@ type MockContext = {
       },
     };
     // Invalid leftmost → skip; no socket → fallback to "unknown".
-    expect(getClientIp(c)).toBe("unknown");
-  });
-
-  it("getClientIp rejects spoofed x-forwarded-for", () => {
-    const c: MockContext = {
-      req: {
-        header: () => "1.2.3.4, attacker-injection",
-        raw: { headers: { get: () => null } },
-      },
-    };
-    expect(getClientIp(c)).toBe("1.2.3.4");
-  });
-
-  it("getClientIp accepts an IPv6 address", () => {
-    const c: MockContext = {
-      req: {
-        header: () => undefined,
-        raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "::1" : null) } },
-      },
-    };
-    expect(getClientIp(c)).toBe("::1");
-
-    // Separate context: no proxy headers, only socket address (IPv6).
-    const c2: MockContext = {
-      req: { header: () => undefined, raw: { headers: { get: () => null } } },
-    };
-    expect(getClientIp(c2, () => ({ remote: { address: "2001:db8::1" } }))).toBe("2001:db8::1");
+    expect(getClientIp(c, undefined, true)).toBe("unknown");
   });
 
   it("getClientIp rejects empty and garbage proxy headers", () => {
@@ -225,6 +246,6 @@ type MockContext = {
         raw: { headers: { get: (h: string) => (h === "x-real-ip" ? "not-an-ip" : null) } },
       },
     };
-    expect(getClientIp(c)).toBe("unknown");
+    expect(getClientIp(c, undefined, true)).toBe("unknown");
   });
 });

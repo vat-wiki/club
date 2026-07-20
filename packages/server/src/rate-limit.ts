@@ -23,13 +23,17 @@ interface Bucket {
 const buckets = new Map<string, Bucket>();
 
 // Internal clock exported for tests so time-related assertions don't depend on
-// `setTimeout` sleeps. Production calls `Date.now`. Because ESM `export` bindings
-// are immutable, we use a mutable wrapper (the `__clock` symbol is never part of
-// the public API).
-const _clock = { fn: Date.now as () => number };
-export const _getNow: () => number = () => _clock.fn();
+// `setTimeout` sleeps. Production calls `Date.now`. Wrapped in an object so the
+// function reference can be reassigned at module scope without relying on a
+// mutable ESM export binding.
+const _clock = { current: Date.now };
+export function _getNow(): number {
+  return _clock.current();
+}
+/** Replaces the internal clock. Primarily for tests so time-dependent assertions
+ *  don't depend on real `setTimeout` sleeps. Production never calls this. */
 export function _setNow(fn: () => number): void {
-  _clock.fn = fn;
+  _clock.current = fn;
 }
 
 // Periodic cleanup of stale buckets to prevent memory leak.
@@ -77,32 +81,44 @@ function isIp(candidate: string): boolean {
 /**
  * Resolve the most trustworthy client IP from a Hono context.
  *
- * Preference order:
- *   1. `x-forwarded-for` (leftmost entry) — trusted when behind a reverse proxy.
- *   2. `x-real-ip` — nginx/caddy convention.
- *   3. Direct socket address via `getConnInfo` (from `@hono/node-server/conninfo`).
+ * When `trustedProxy` is `true` (server is behind a trusted reverse proxy that
+ * sets the forwarding headers), the resolver reads proxy headers:
+ *   1. `x-forwarded-for` (leftmost entry)
+ *   2. `x-real-ip` — nginx/caddy convention
+ * and uses the socket address as a fallback.
  *
- * Every candidate is validated as an IPv4 or compressed IPv6 address before
- * being accepted. A forged proxy header like "1.2.3.4, attacker" would
- * previously poison the rate-limiter bucket key; the validation rejects it
- * and falls through to the next candidate.
+ * When `trustedProxy` is `false` (default, direct-to-server deployment), proxy
+ * headers are ignored entirely and the socket address is used as the sole source
+ * of truth. This prevents an attacker who can reach the server directly from
+ * forging a forwarding header to bypass the per-IP rate limit.
  *
- * The socket address is the hard fallback: it cannot be forged by the client
- * even without a reverse proxy, so we prefer it over the string "unknown" which
- * collapses every bypass into a single bucket.
+ * Every candidate IP is validated as a well-formed IPv4 or compressed IPv6
+ * before acceptance; malformed values are rejected and the resolver falls
+ * through.
+ *
+ * @param c - Hono request context.
+ * @param getConnInfo - Supplier for the direct socket address
+ *   (`@hono/node-server/conninfo`).
+ * @param trustedProxy - Whether proxy forwarding headers should be trusted.
+ *   Default `false` (safe default for direct connections).
+ * @returns The resolved client IP, or `"unknown"` if nothing reliable is
+ *   available.
  */
 export function getClientIp(
   c: import("hono").Context,
   getConnInfo?: () => { remote?: { address?: string } } | undefined,
+  trustedProxy = false,
 ): string {
-  const xff = c.req.header("x-forwarded-for");
-  if (xff) {
-    const leftmost = xff.split(",")[0].trim();
-    if (isIp(leftmost)) return leftmost;
-    // If leftmost is malformed, fall through — do not trust the header.
+  if (trustedProxy) {
+    const xff = c.req.header("x-forwarded-for");
+    if (xff) {
+      const leftmost = xff.split(",")[0].trim();
+      if (isIp(leftmost)) return leftmost;
+      // If leftmost is malformed, fall through — do not trust the header.
+    }
+    const xri = c.req.raw.headers.get("x-real-ip");
+    if (xri && isIp(xri)) return xri;
   }
-  const xri = c.req.raw.headers.get("x-real-ip");
-  if (xri && isIp(xri)) return xri;
   const conn = getConnInfo?.();
   const socketAddr = conn?.remote?.address ?? "";
   if (isIp(socketAddr)) return socketAddr;

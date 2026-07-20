@@ -304,6 +304,19 @@ const insertMessageStmt = db.prepare(
    VALUES (?, ?, ?, ?, ?, ?, ?)`,
 );
 
+/**
+ * Insert a new message row. Used by the message-create handler after auth +
+ * mention extraction; caller is responsible for providing a valid `id` and
+ * the participant that authored the message.
+ *
+ * @param id - ULID message id (caller-generated).
+ * @param participantId - ID of the author participant.
+ * @param content - Normalised message body (may be empty for attachment-only messages).
+ * @param createdAt - Message timestamp in epoch ms.
+ * @param attachments - Optional JSON array of attachment ids, or `null`.
+ * @param replyToId - Optional id of the replied-to message, or `null`.
+ * @param room - Room slug the message belongs to.
+ */
 export function insertMessage(
   id: string,
   participantId: string,
@@ -320,6 +333,7 @@ const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; cre
   `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
 );
 
+/** All participants, newest first. Used by the room-member list endpoint. */
 export function getAllParticipants(): { id: string; name: string; created_at: number }[] {
   return allParticipantsSelectStmt.all();
 }
@@ -340,14 +354,31 @@ const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
   `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
 );
 
+/** Messages with `rowid > rowid` in the given room, newest first. Backs the
+ * "load more recent" SSE / polling path on the history tail. */
 export function getMessagesAfter(rowid: number, room: string, limit: number): MessageRow[] {
   return afterStmt.all(rowid, room, limit);
 }
 
+/** Most recent messages in the given room, newest first. Backs the initial
+ * history fetch when a client opens a room for the first time. */
 export function getRecentMessages(room: string, limit: number): MessageRow[] {
   return recentStmt.all(room, limit).reverse();
 }
 
+/** Messages published after the one with id `sinceId`, scoped to `room`,
+ * oldest→newest. Returns `{ rowid, messages }` so the caller can advance the
+ * cursor. Returns `{ rowid: 0, messages: [] }` when `sinceId` is unknown.
+ *
+ * Performance: `sinceId` is resolved to a rowid via a cached prepared
+ * statement before the paginated SELECT runs, so the cursor is monotonic
+ * even if clocks skew.
+ *
+ * @param sinceId - ULID message id to fetch messages after.
+ * @param room - Room slug.
+ * @param limit - Page size.
+ * @returns Current cursor rowid and the next page of messages.
+ */
 export function getMessagesSince(
   sinceId: string,
   room: string,
@@ -393,9 +424,12 @@ export function searchMessages(q: string, room: string | null, limit: number): M
   return room ? searchRoomStmt.all(escaped, room, limit) : searchAllStmt.all(escaped, limit);
 }
 
-// The room a message lives in. Used to room-scope `message_deleted` /
-// `message_reaction` SSE fan-out (the delete/reaction routes know only the id,
-// and a message's room never changes). Returns undefined if the id is unknown.
+/** The room a message lives in. Used to room-scope `message_deleted` / `message_reaction`
+ * SSE fan-out — the delete/reaction routes know only the id, and a message's
+ * room never changes. Returns `undefined` when the id is unknown.
+ *
+ * @param id - ULID message id.
+ */
 const messageRoomStmt = db.prepare<[string], { room: string }>(
   `SELECT room FROM messages WHERE id = ?`,
 );
@@ -512,6 +546,16 @@ const insertParticipantStmt = db.prepare(
    VALUES (?, ?, ?, ?, ?)`,
 );
 
+/** Insert a new participant (idempotent at the row level — only called from
+ * the create-participant handler after auth). Caller passes already-hashed
+ * key and recover values; see `crypto.ts` and the recover flow.
+ *
+ * @param id - ULID participant id (caller-generated).
+ * @param name - Callsign.
+ * @param keyHash - SHA-256 hex digest of the API key.
+ * @param recoverHash - SHA-256 hex digest of the one-time recovery code, or `''`.
+ * @param createdAt - Epoch ms.
+ */
 export function insertParticipant(
   id: string,
   name: string,
@@ -725,6 +769,19 @@ const markReadBatchCache = new Map<
   ReturnType<typeof db.prepare<[number, string, ...string[]], void>>
 >();
 
+/** Mark a batch of mentions read in one SQL statement, scoped to `ownerId`
+ * so the caller cannot mark another participant's mentions as read.
+ *
+ * Performance: uses a cached prepared statement keyed on placeholder count to
+ * avoid repeated statement creation on the hot path. Returns only the ids that
+ * were actually updated (already-read or unknown ids are excluded from the
+ * response body).
+ *
+ * @param ids - Mention ids to mark read.
+ * @param ownerId - Participant id that must own the mentions.
+ * @param readAt - Timestamp (epoch ms) to set as read time.
+ * @returns Subset of `ids` that were actually updated.
+ */
 export function markMentionsRead(
   ids: string[],
   ownerId: string,
@@ -775,6 +832,10 @@ const insertFileStmt = db.prepare(
    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 
+/** Persist a file metadata row after a successful upload.
+ *
+ * @param f - The file row (id is the public `/files/{id}` token).
+ */
 export function insertFile(f: FileRow): void {
   insertFileStmt.run(
     f.id,
@@ -793,6 +854,11 @@ const fileByIdStmt = db.prepare<[string], FileRow>(
    FROM files WHERE id = ?`,
 );
 
+/** Retrieve a file metadata row by its public id. Returns `undefined` when
+ * the id is unknown.
+ *
+ * @param id - Public file id used by the client.
+ */
 export function getFile(id: string): FileRow | undefined {
   return fileByIdStmt.get(id);
 }
@@ -812,6 +878,19 @@ const fileGetByIdsCache = new Map<number, ReturnType<typeof db.prepare<[...strin
 // count, so the cache is keyed by count and built lazily. The per-call overhead
 // is a Map.get + a one-time prepare per batch size.
 
+/** Fetch several files by id, preserving the requested order. Used by
+ * `POST /messages` to rehydrate attachments from the client's `attachmentIds`
+ * — order matters so the message shows images in the order the user picked
+ * them. Rejected ids are dropped silently.
+ *
+ * Performance: the SELECT statement is cached per placeholder count rather
+ * than recreated per call. Caps out at 100 ids as a defensive guard against
+ * pathological abuse.
+ *
+ * @param ids - File ids to fetch (returned in the same order).
+ * @returns File rows matching the given ids, in the same order.
+ * @throws When `ids.length > 100`.
+ */
 export function getFilesByIds(ids: string[]): FileRow[] {
   if (ids.length === 0) return [];
   if (ids.length > 100) {
@@ -867,6 +946,14 @@ const listRoomsStmt = db.prepare<[], RoomRow>(
    GROUP BY r.id, r.slug, r.created_at
    ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`,
 );
+/** All rooms with their last-activity timestamp in one scan. `general` sorts
+ * first, then most-recently-active first, then empty rooms (NULL activity)
+ * last by created_at. The LEFT JOIN + MAX yields NULL activity for rooms with
+ * no messages — exactly what clients need for "active-first" ordering without a
+ * second round-trip.
+ *
+ * @returns Room rows, active-first. `general` always first when it has activity.
+ */
 export function listRooms(): RoomRow[] {
   return listRoomsStmt.all();
 }

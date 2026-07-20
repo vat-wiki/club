@@ -14,7 +14,7 @@ export function makeListenCommand(): Command {
       "--room <slug>",
       "listen to one room only (default: all rooms — a mention in any room wakes you)",
     )
-    .action(withCatchExit(async (opts: { mention?: string; once?: boolean; room?: string }) => {
+    .action(withCatchExit((opts: { mention?: string; once?: boolean; room?: string }) => {
       const cfg = requireConfig();
       const mention = opts.mention;
       const once = opts.once ?? true;
@@ -23,6 +23,9 @@ export function makeListenCommand(): Command {
 
       const reportThinking = (m: Message) => {
         if (!mention || !mentionMatches(m.content, mention)) return;
+        // Best-effort: a transient thinking-report failure should never
+        // interrupt the live stream for the user; swallow silently.
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional best-effort swallow
         void client.reportAgentThinking(m.room).catch(() => {});
       };
 

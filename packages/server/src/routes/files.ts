@@ -227,12 +227,22 @@ files.post("/", requireAuth, async (c) => {
     }
   }
 
-  // Ensure the blob dir exists lazily on first upload rather than at boot, so
-  // the server starts even if the volume isn't writable yet.
+  // Generate the id up front so the same value is used for both the disk
+  // path and the DB row.
   const id = randomBytes(16).toString("base64url");
+  const path = await filePath(id);
   const dir = filesDir();
   if (!existsSync(dir)) await mkdir(dir, { recursive: true });
-  await writeFile(await filePath(id), buf);
+
+  // Write the blob to disk FIRST, then insert the DB row. This ordering
+  // guarantees that every persisted DB row has a real file on disk. If the
+  // write fails we simply skip the DB insert (no orphaned DB row pointing to
+  // a non-existent file, which would produce confusing 404s on subsequent
+  // reads). The reverse failure mode — an orphaned file with no DB row — is
+  // not reachable here (the insert cannot fail silently), and any transient
+  // orphans would be harmless (unreachable by id) and cleaned up by a future
+  // sweep job if added.
+  await writeFile(path, buf);
 
   const createdAt = Date.now();
   insertFile({

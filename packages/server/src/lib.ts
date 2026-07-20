@@ -17,9 +17,9 @@ import { parseQueryLimit, ROOM_SLUG_REGEX, isValidId } from "@club/shared";
 export function jsonErr(
   c: Context,
   message: string,
-  status: ContentfulStatusCode = 400,
+  status: ContentfulStatusCode | number = 400,
 ) {
-  return c.json({ error: message }, status);
+  return c.json({ error: message }, status as ContentfulStatusCode);
 }
 
 /**

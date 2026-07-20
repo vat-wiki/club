@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import {
@@ -37,21 +37,52 @@ export const messages = new Hono();
 
 messages.use("*", requireAuth);
 
-// Performance: attachment JSON is immutable per message row. Across history,
-// search, and SSE fan-out the same raw string is re-parsed on every call. A
-// LRU cache keyed on the raw JSON string amortizes the parse cost: the first
-// call parses; subsequent calls (common — history renders re-request the same
-// rows as the user scrolls) return a reference to the cached array. The cache
-// is bounded (MAX_ATTACHMENT_CACHE = 512) so a pathological burst of unique
-// payloads can't grow unbounded memory; 512 entries is far above the realistic
-// per-request batch size (default LIMIT 50, max 200). Because the cached
-// value is a plain object never mutated by callers, safe to share across
-// requests.
-//
-// NOTE: we only cache *non-null* parse results (the parsed array). Plain-text
-// rows return undefined on every call without a cache lookup — the vast
-// majority of messages have no attachments, so caching the undefined sentinel
-// would be a cache-miss tax for no benefit.
+/**
+ * Validate that `since` is a non-empty query parameter.
+ *
+ * Since is optional (omit → full recent history), but when supplied it must
+ * look like a valid message id before we do any DB work. An invalid `since`
+ * would otherwise be passed straight into `getMessagesSince()` and waste a
+ * prepared-statement round-trip only to return [] — and behave inconsistently
+ * with DELETE /messages/:id and other id-bearing routes, which reject garbage
+ * input up-front.
+ *
+ * @returns `{ error, status }` to use as an early return, or `undefined` when
+ *   `since` is absent or valid.
+ */
+function requireValidSinceQuery(
+  c: Context,
+): { error: string; status: number } | undefined {
+  const since = c.req.query("since");
+  if (since !== undefined) {
+    const bad = requireValidId(c, since, "since id");
+    if (bad) return { error: bad.r.statusText, status: 400 };
+  }
+  return undefined;
+}
+
+/**
+ * Validate that `before` is a non-empty query parameter.
+ *
+ * Same contract as `requireValidSinceQuery`: `before` is optional (omit →
+ * forward pagination), but when supplied it must look like a valid message id
+ * before the DB is consulted. This keeps the backward-pagination entry point
+ * consistent with the forward-pagination `since` path and with the id-bearing
+ * delete/reaction routes.
+ *
+ * @returns `{ error, status }` to use as an early return, or `undefined` when
+ *   `before` is absent or valid.
+ */
+function requireValidBeforeQuery(
+  c: Context,
+): { error: string; status: number } | undefined {
+  const before = c.req.query("before");
+  if (before !== undefined) {
+    const bad = requireValidId(c, before, "before id");
+    if (bad) return { error: bad.r.statusText, status: 400 };
+  }
+  return undefined;
+}
 
 const MAX_ATTACHMENT_CACHE = 512;
 const attachmentCache = new Map<string, MessageAttachment[]>();
@@ -225,17 +256,14 @@ messages.get("/", (c) => {
   const since = c.req.query("since");
   const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
-  // Validate both `since` and `before` before any DB call. Invalid ids would
-  // otherwise hit the database and silently return [] (wasted query) and behave
-  // inconsistently with DELETE /messages/:id, which rejects bad ids up-front.
-  if (since !== undefined) {
-    const bad = requireValidId(c, since, "since id");
-    if (bad) return bad.r;
-  }
-  if (before !== undefined) {
-    const bad = requireValidId(c, before, "before id");
-    if (bad) return bad.r;
-  }
+  // Validate `since`/`before` query params before any DB call. The dedicated
+  // helpers (requireValidSinceQuery / requireValidBeforeQuery) wrap the
+  // id-format check so the route reads like a single guard list; see their
+  // JSDoc for why invalid ids are rejected up-front rather than passed through.
+  const badSince = requireValidSinceQuery(c);
+  if (badSince) return jsonErr(c, badSince.error, badSince.status);
+  const badBefore = requireValidBeforeQuery(c);
+  if (badBefore) return jsonErr(c, badBefore.error, badBefore.status);
   // `before` (older history, scroll-up pagination) takes precedence over
   // `since`; they aren't combined in practice, but if both appear we serve the
   // backward page so the UI's "load earlier" never accidentally pulls newer.

@@ -70,15 +70,20 @@ rooms.post('/', requireJson, async (c) => {
   );
   if (!parsed.ok) return parsed.r;
   const slug = parsed.data.name;
-  const room = ensureRoom(slug, Date.now());
-  if (room.created) {
-    const r: Room = {
-      id: room.id,
-      slug: room.slug,
-      createdAt: room.created_at,
-      lastActivityAt: null,
+  const ensureResult = ensureRoom(slug, Date.now());
+  if (ensureResult.created) {
+    // Consistent with GET /rooms: newly-created rooms are empty, so their
+    // lastActivityAt is null (per the Room contract). Route through toRoom()
+    // instead of re-mapping fields inline — a single conversion site means
+    // the API shape stays in sync with the shared Room type as the schema
+    // evolves (matching the module-level guarantee).
+    const newRow: RoomRow = {
+      id: ensureResult.id,
+      slug: ensureResult.slug,
+      created_at: ensureResult.created_at,
+      last_activity_at: null,
     };
-    return c.json(r, 201);
+    return c.json(toRoom(newRow), 201);
   }
   // Room already existed — read back its authoritative lastActivityAt so the
   // response reflects the current state rather than a null placeholder.

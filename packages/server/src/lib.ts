@@ -85,6 +85,15 @@ export async function parseJsonBody<T>(
 export { parseBearer } from "@club/shared";
 
 /**
+ * Validate a room slug against the canonical `ROOM_SLUG_REGEX`.
+ *
+ * Pure (no Hono Context) so the check can be unit-tested in isolation.
+ */
+export function isValidRoomSlug(slug: string): boolean {
+  return ROOM_SLUG_REGEX.test(slug);
+}
+
+/**
  * Reject a request with a 400 error when the room slug is invalid.
  *
  * A room slug MUST match `ROOM_SLUG_REGEX` (`^[a-z0-9][a-z0-9-]{0,29}$`)
@@ -97,7 +106,7 @@ export function requireValidRoomSlug(
   c: Context,
   slug: string,
 ): { ok: false; r: Response } | undefined {
-  if (!ROOM_SLUG_REGEX.test(slug)) {
+  if (!isValidRoomSlug(slug)) {
     return { ok: false, r: jsonErr(c, "bad room slug") };
   }
   return undefined;

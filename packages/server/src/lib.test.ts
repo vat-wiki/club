@@ -1,7 +1,8 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { ROOM_SLUG_REGEX } from "@club/shared";
 import { describe, it, expect } from "vitest";
-import { jsonErr, parseLimit, parseBearer } from "./lib.js";
+import { jsonErr, parseLimit, parseBearer, isValidRoomSlug, requireValidRoomSlug } from "./lib.js";
 
 function buildApp(handler: (c: Context) => Response) {
   const app = new Hono();
@@ -129,5 +130,61 @@ describe("jsonErr", () => {
       expect(res.status).toBe(status);
       expect(await res.json()).toEqual({ error: "msg" });
     }
+  });
+});
+
+describe("requireValidRoomSlug", () => {
+  it("accepts valid room slugs", () => {
+    expect(requireValidRoomSlug({} as Context, "general")).toBeUndefined();
+    expect(requireValidRoomSlug({} as Context, "dev-tools")).toBeUndefined();
+    expect(requireValidRoomSlug({} as Context, "a")).toBeUndefined();
+    expect(requireValidRoomSlug({} as Context, "room123")).toBeUndefined();
+  });
+
+  it("accepts every ROOM_SLUG_REGEX token as a valid slug", () => {
+    const tokens = [
+      "a", "a-b-c", "room-1", "9abc", "general",
+      "short-", "a0b1c2d3e4f5g6h7i8j9k0l1m2n", // max 30 chars
+    ];
+    for (const t of tokens) {
+      expect(ROOM_SLUG_REGEX.test(t)).toBe(true);
+      expect(isValidRoomSlug(t)).toBe(true);
+      expect(requireValidRoomSlug({} as Context, t)).toBeUndefined();
+    }
+  });
+
+  it("rejects a room slug containing a newline (CRLF injection)", () => {
+    expect(isValidRoomSlug("room\n")).toBe(false);
+    expect(isValidRoomSlug("a\r\nb")).toBe(false);
+    expect(isValidRoomSlug("ok\nevent:hack")).toBe(false);
+  });
+
+  it("rejects a room slug containing a path separator", () => {
+    expect(isValidRoomSlug("room/slash")).toBe(false);
+    expect(isValidRoomSlug("room\\back")).toBe(false);
+  });
+
+  it("rejects a room slug containing traversal tokens", () => {
+    expect(isValidRoomSlug("../etc")).toBe(false);
+    expect(isValidRoomSlug("room..name")).toBe(false);
+  });
+
+  it("rejects an uppercase or empty room slug", () => {
+    expect(isValidRoomSlug("General")).toBe(false);
+    expect(isValidRoomSlug("")).toBe(false);
+    expect(isValidRoomSlug("_private")).toBe(false);
+    expect(isValidRoomSlug("--bad")).toBe(false);
+  });
+
+  it("the failure result is a Hono 400 JSON response", async () => {
+    const app = new Hono();
+    app.get("/", (c) => {
+      const bad = requireValidRoomSlug(c, "a\nb");
+      if (bad) return bad.r;
+      return c.text("ok");
+    });
+    const res = await app.request("/");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad room slug" });
   });
 });

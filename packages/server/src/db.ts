@@ -447,6 +447,28 @@ export function getMessageRoom(id: string): string | undefined {
   return messageRoomStmt.get(id)?.room;
 }
 
+// Read-back for the POST /messages hot path: inserts the row, then hands the
+// persisted copy to the route's `toMessage()` converter — the single source of
+// truth for Message denormalization. Without this read-back, the POST handler
+// has to hand-roll the response Message inline, drifting from list/search as
+// new fields land on the API contract.
+const messageByIdStmt = db.prepare<[string], MessageRow>(
+  `SELECT id, participant_id, author_name, content, created_at, attachments, reply_to_id, deleted, room\n FROM messages WHERE id = ?`
+);
+/**
+ * Read back a single message row by id.
+ *
+ * Intended for the POST /messages hot path, which inserts the row and then
+ * hands the persisted copy to `toMessage()` rather than reconstructing the
+ * API shape inline. The read-back is cheap (primary-key lookup) and keeps the
+ * response contract synchronized with list/search.
+ *
+ * @returns The message row, or `undefined` if the id was never persisted.
+ */
+export function getMessageById(id: string): MessageRow | undefined {
+  return messageByIdStmt.get(id);
+}
+
 const deleteStmt = db.prepare<[string, string]>(
   `UPDATE messages SET deleted = 1 WHERE id = ? AND participant_id = ? AND deleted = 0`
 );

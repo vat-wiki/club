@@ -62,6 +62,16 @@ export async function runRecover(input: RecoverInput, deps: RecoverDeps): Promis
   console.log(`try: club whoami`);
 }
 
+/**
+ * Build the `club recover` commander sub-command.
+ *
+ * Recovers an existing identity by callsign + one-time recovery code. The
+ * server reissues a fresh key (and a fresh recovery code), reusing the original
+ * id + name; the new key is written to config so subsequent `club` commands act
+ * as the recovered identity. Server URL resolution mirrors `club login`.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeRecoverCommand(): Command {
   return new Command("recover")
     .description("recover an identity by callsign + recovery code")

@@ -55,6 +55,16 @@ export async function runRead(
   if (msgs.length === 0) console.log("(no messages)");
 }
 
+/**
+ * Build the `club read` commander sub-command.
+ *
+ * Fetches and prints messages from the current room (one-shot). Supports
+ * pagination anchors (`--since` / `--before`) and a configurable `--limit`
+ * (1-500, default 50). Respects the default room from config unless `--room`
+ * is explicit.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeReadCommand(): Command {
   return new Command("read")
     .description("print recent messages (one-shot)")

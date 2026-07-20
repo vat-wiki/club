@@ -59,6 +59,15 @@ export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
   })();
 }
 
+/**
+ * Build the `club search` commander sub-command.
+ *
+ * Searches messages by content substring. Returns matching messages from all
+ * rooms (or scoped to a specific room with `--room`), newest first. The limit
+ * is clamped to [1, 100] with a default of 20.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeSearchCommand(): Command {
   return new Command("search")
     .description("search messages by content (newest first)")

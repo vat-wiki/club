@@ -54,6 +54,17 @@ export async function runEnter(input: EnterInput, deps: EnterDeps): Promise<Ente
   return { room };
 }
 
+/**
+ * Build the `club enter` commander sub-command.
+ *
+ * Switches the client's current/default room by writing the room into config,
+ * so subsequent `club send` / `club read` (without `--room`) target it. Building
+ * and entering are the SAME action in the open model — entering a room ensures
+ * it exists (POST /rooms is idempotent). The room slug is validated client-side
+ * so a typo is caught before any network call.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeEnterCommand(): Command {
   return new Command("enter")
     .description("switch to a room — sets it as the default for send/read (creates it if new)")

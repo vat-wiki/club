@@ -38,6 +38,15 @@ export async function runReact(
   console.log(`${opts.id} reactions: ${updated || "(none)"}`);
 }
 
+/**
+ * Build the `club react` commander sub-command.
+ *
+ * Adds or removes a reaction emoji on a message. If the emoji is already present
+ * (by the authenticated participant), it removes it; otherwise adds it. The
+ * reaction aggregate is broadcast to all clients in real-time.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeReactCommand(): Command {
   return new Command("react")
     .description("add or remove a reaction emoji on a message")

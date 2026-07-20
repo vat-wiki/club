@@ -25,6 +25,15 @@ export function formatRoomLine(room: Room, current: string): string {
   return `#${room.slug}${marker}${sys}`;
 }
 
+/**
+ * Build the `club rooms` commander sub-command.
+ *
+ * Lists every room (general first, then most-recently-active — the server's
+ * GET /rooms ordering). The current/default room (from `club enter`, in config)
+ * is marked with ` *` so the user can see where their next `club send` lands.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeRoomsCommand(): Command {
   return new Command("rooms")
     .description("list all rooms (current marked with *)")

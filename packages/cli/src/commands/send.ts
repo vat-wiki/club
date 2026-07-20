@@ -20,6 +20,17 @@ import { readStream } from "../stdin.js";
 // when one command definition is reused across processes.
 const collect = (v: string, acc: string[]) => [...acc, v];
 
+/**
+ * Build the `club send` commander sub-command.
+ *
+ * Accepts a literal text argument, or reads from stdin when piped / `--stdin`.
+ * Attach up to 8 images, videos, or documents via repeatable `--image` / `--video`
+ * / `--file <path>` flags, and optionally target a specific room with `--room`.
+ * Delegates the upload+send orchestration to `send-impl` so this action stays
+ * thin and unit-testable.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeSendCommand(): Command {
   return new Command("send")
     .description(

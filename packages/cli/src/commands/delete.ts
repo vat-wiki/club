@@ -30,6 +30,15 @@ export async function runDelete(
   console.log(`deleted ${opts.id}`);
 }
 
+/**
+ * Build the `club delete` commander sub-command.
+ *
+ * Soft-deletes (recalls) a message. Only the author may delete their own
+ * messages; the message stays in the database but is marked deleted, and
+ * clients show a "recalled" placeholder instead of the content.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeDeleteCommand(): Command {
   return new Command("delete")
     .description("delete (recall) a message — only your own messages")

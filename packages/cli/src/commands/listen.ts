@@ -18,6 +18,17 @@ import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";
 
+/**
+ * Build the `club listen` commander sub-command.
+ *
+ * Follows the live SSE stream. Without flags it prints every message across all
+ * rooms. With `--mention <name>` it filters to only messages that @-mention the
+ * target; `--once` (default) exits after the first match, so a mention acts as a
+ * one-shot wake-up signal. Agents (MCP / CLI) run this with `--mention` so the
+ * server pushes mentions even when the agent is not actively polling.
+ *
+ * @returns A configured `Command` instance to register with the CLI program.
+ */
 export function makeListenCommand(): Command {
   return new Command("listen")
     .description("follow the live stream; optionally block until someone @mentions you")

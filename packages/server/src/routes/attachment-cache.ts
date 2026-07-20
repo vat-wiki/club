@@ -1,5 +1,48 @@
 import type { MessageAttachment } from "@club/shared";
 
+// Allowed MIME values — must mirror the shared `AttachmentMime` union so the
+// server rejects a row whose mime is not in the agreed enum. Kept in sync with
+// shared/types.ts; if the enum grows, add the value here too.
+const ALLOWED_MIME = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/markdown",
+]);
+
+/**
+ * Type guard: validate one attachment object has the required fields with the
+ * correct JS types and an allowed mime.
+ *
+ * The server is the last line of defense: a rogue DB row (or a future direct
+ * write) could store junk in the `attachments` column. Parsing it as
+ * `MessageAttachment[]` without a guard would silently pass malformed data to
+ * SSE consumers and the web frontend. This function turns a plain JSON object
+ * into a typed attachment or rejects it.
+ *
+ * @param v - A parsed JSON value to test.
+ * @returns True if `v` is a valid `MessageAttachment`.
+ */
+function isAttachment(v: unknown): v is MessageAttachment {
+  if (v === null || typeof v !== "object") return false;
+  const a = v as Record<string, unknown>;
+  if (typeof a.id !== "string") return false;
+  if (typeof a.url !== "string") return false;
+  if (typeof a.mime !== "string" || !ALLOWED_MIME.has(a.mime)) return false;
+  if (typeof a.size !== "number") return false;
+  // Optional fields may be absent; if present they must have the right type.
+  if ("width" in a && typeof a.width !== "number") return false;
+  if ("height" in a && typeof a.height !== "number") return false;
+  if ("filename" in a && typeof a.filename !== "string") return false;
+  return true;
+}
+
 /**
  * In-memory LRU cache for parsed attachment payloads.
  *
@@ -37,10 +80,12 @@ export function parseAttachments(
     return cached;
   }
 
-  // Miss: parse once, cache only if the result is a real array.
+  // Miss: parse once, cache only if the result is a real array of valid
+  // attachments. The runtime guard (isAttachment) prevents malformed rows
+  // from poisoning the cache or leaking to SSE/SDK consumers.
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isAttachment)) {
       const arr = parsed as MessageAttachment[];
       cache.set(raw, arr);
       if (cache.size > MAX_CACHE_SIZE) {

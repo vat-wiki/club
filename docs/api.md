@@ -134,6 +134,26 @@ participant cannot probe another's inbox).
 | `404` | `{ "error": "mention not found" }` |
 | `409` | `{ "error": "mention already read" }` |
 
+### `POST /me/mentions/read`
+
+Bulk mark multiple mentions as read. Scoped to the authenticated participant.
+Mentions that are already read or belong to another participant are silently
+skipped — the caller only cares that the inbox is drained.
+
+**Request body**:
+```json
+{ "ids": ["01…", "02…"] }
+```
+
+**Response**
+| Status | Body |
+|---|---|
+| `200` | `Mention[]` — updated mentions that were actually marked (joined with
+  author + content, matching the single-ID route's shape) |
+| `400` | _(zod message)_ — body is not an array of strings |
+| `404` | `{ "error": "mention not found" }` — recipient has zero readable
+  mention rows (early-out for abuse) |
+
 ---
 
 ## 4. Messages

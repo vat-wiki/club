@@ -35,6 +35,27 @@ import {
   type UploadFileInput,
 } from "./transport.js";
 import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
+import { type FileFormatTag } from "./file-parser.js";
+
+/** Parse result returned by `ClubClient#readFileContent`. */
+export interface ParsedFile {
+  /** Parsed text content suitable for agent consumption. */
+  text: string;
+  /** Source format tag (closed union — see {@link FileFormatTag}). */
+  format: FileFormatTag;
+  /** MIME type reported by the server. */
+  mime: string;
+  /** Original filename if present. */
+  filename?: string;
+  /** Optional metadata (title, author, pages, sheets) when the parser provides it. */
+  metadata?: {
+    title?: string;
+    author?: string;
+    subject?: string;
+    pages?: number;
+    sheets?: string[];
+  };
+}
 
 // ── ClubClient ──────────────────────────────────────────────────────
 // A stateful handle over the transport functions: holds the connection
@@ -172,16 +193,10 @@ export class ClubClient {
   }
 
   /** GET /files/:id — fetch and parse a file attachment into readable text.
-   *  Supports: text/*, JSON, PDF, Word (.docx), Excel (.xlsx).
-   *  Returns parsed text content suitable for agent consumption.
+   *  Supports: text/*, JSON, PDF, Word (.docx), Excel (.xlsx). Returns a
+   *  `ParsedFile` with parsed text and format info for agent consumption.
    *  NOTE: Only available in @club/sdk/node (Node.js environment). */
-  async readFileContent(id: string): Promise<{
-    text: string;
-    format: string;
-    mime: string;
-    filename?: string;
-    metadata?: { title?: string; author?: string; subject?: string; pages?: number; sheets?: string[] };
-  }> {
+  async readFileContent(id: string): Promise<ParsedFile> {
     const { buffer, mime, filename } = await this.getFile(id);
     // Dynamic import of parser (only available in Node)
     const { parseFileContent } = await import("./file-parser.js");

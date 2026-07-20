@@ -29,18 +29,48 @@ const DOCUMENT_MIMES: readonly AttachmentMimeType[] = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
+// ── Format tags ─────────────────────────────────────────────────────
+//
+// Closed union of all `format` tags the parser may emit. Keeping this
+// literal union turns downstream branching on `format` into exhaustive
+// switching at the type level — adding a new parser variant requires
+// adding a tag here, and the compiler surfaces any branch that forgets it.
+
+/** Format tags emitted for text-based MIME types (decoded verbatim). */
+export type TextFormatTag =
+  | "text/plain"
+  | "text/html"
+  | "text/css"
+  | "text/csv"
+  | "text/xml"
+  | "text/markdown";
+
+/** Format tags emitted for structured documents (specialized parser). */
+export type DocumentFormatTag = "pdf" | "docx" | "xlsx";
+
+/** Format tags emitted when a document parser failed. */
+export type DocumentErrorFormatTag = "pdf-error" | "docx-error" | "xlsx-error";
+
+/** Full closed union of all `format` tags a parser may emit. */
+export type FileFormatTag =
+  | TextFormatTag
+  | "json"
+  | DocumentFormatTag
+  | DocumentErrorFormatTag
+  | (string & {}); // any accepted AttachmentMime surfaced verbatim for unrecognized binaries
+
 /**
  * Parsed file content suitable for agent consumption.
  *
  * `text` is the readable body (plain text, pretty-printed JSON, extracted
  * document text, or an error message for unparseable formats). `format` is a
- * short machine-readable tag (e.g. "pdf", "docx-error") so callers can
- * branch. `metadata` carries optional title/author/pages/sheets the parser
- * could recover.
+ * closed machine-readable tag so callers can branch exhaustively.
+ * `metadata` carries optional title/author/pages/sheets the parser could
+ * recover.
  */
 export type FileContent = {
   text: string;
-  format: string;
+  format: FileFormatTag;
   metadata?: {
     title?: string;
     author?: string;

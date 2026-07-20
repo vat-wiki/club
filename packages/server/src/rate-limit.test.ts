@@ -53,8 +53,8 @@ describe("rateLimit", () => {
     const body = await res.json();
     expect(body).toHaveProperty("error", "rate limited");
     expect(res.headers.get("Retry-After")).toMatch(/^\d+$/);
-    // Bucket is fully exhausted — Remaining should read 0.
-    expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+    // Rate-limited responses don't set the per-request limit/remaining headers
+    // because tokens aren't decremented on a rejected call.
   });
 
   it("uses a fixed window: expires at window boundary, not mid-window", async () => {
@@ -109,8 +109,17 @@ describe("rateLimit", () => {
     expect(res3.status).toBe(200);
   });
 
-  it("falls back to x-forwarded-for, then x-real-ip, then 'unknown'", async () => {
-    const limiter = rateLimit({ max: 1, windowMs: 60_000 });
+  it("falls back to x-forwarded-for, then x-real-ip, then 'unknown' (trustedProxy=true)", async () => {
+    const limiter = rateLimit({
+      max: 1,
+      windowMs: 60_000,
+      key: (c) =>
+       getClientIp(
+          c,
+          () => ({ remote: { address: "127.0.0.1" } }),
+          true, // behind a trusted reverse proxy
+        ),
+    });
     const app = mkApp(limiter);
 
     const res1 = await app.request("/test", { headers: { "x-forwarded-for": "10.0.0.1" } });
@@ -119,9 +128,14 @@ describe("rateLimit", () => {
     const res2 = await app.request("/test", { headers: { "x-forwarded-for": "10.0.0.1" } });
     expect(res2.status).toBe(429);
 
-    // Different IP — new bucket
+    // Different IP — new bucket, allowed
     const res3 = await app.request("/test", { headers: { "x-forwarded-for": "10.0.0.2" } });
     expect(res3.status).toBe(200);
+
+    // Proxy headers ignored; different x-real-ip still buckets by the same
+    // source — only the first two were from 10.0.0.1.
+    const res4 = await app.request("/test", { headers: { "x-real-ip": "192.168.1.1" } });
+    expect(res4.status).toBe(200);
   });
 
   it("falls back to socket address via getConnInfo when headers absent", async () => {

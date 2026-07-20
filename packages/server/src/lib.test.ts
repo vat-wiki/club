@@ -159,7 +159,7 @@ describe("isValidRoomSlug (pure predicate)", () => {
   });
 
   it("accepts slugs up to the 30-character maximum", () => {
-    const maxLen = "a0b1c2d3e4f5g6h7i8j9k0l1m2n"; // 30 chars
+    const maxLen = "0123456789abcdef0123456789abc"; // 30 chars
     expect(maxLen.length).toBe(30);
     expect(isValidRoomSlug(maxLen)).toBe(true);
   });
@@ -251,8 +251,8 @@ describe("requireValidRoomSlug (Hono wrapper)", () => {
       if (bad) return bad.r;
       return c.text("ok");
     });
-    const _res = await app.request("/");
-    expect(_res.status).toBe(400);
+    const res = await app.request("/");
+    expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "bad room slug" });
   });
 
@@ -266,7 +266,7 @@ describe("requireValidRoomSlug (Hono wrapper)", () => {
       "9abc",
       "dev-tools",
       "short-",
-      "a0b1c2d3e4f5g6h7i8j9k0l1m2n", // 30 chars, max
+      "0123456789abcdef0123456789abc", // 30 chars, max
       // Invalids
       "",
       "-bad",

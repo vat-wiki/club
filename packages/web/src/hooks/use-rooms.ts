@@ -1,22 +1,39 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ClubConn } from "@club/sdk";
-import type { Message, Room } from "@club/shared";
-import { mentionsSelf } from "@/lib/format";
-import { api } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ClubConn } from '@club/sdk';
+import type { Message, Room } from '@club/shared';
+import { mentionsSelf } from '@/lib/format';
+import { api } from '@/lib/api';
 
-// ── Multi-room state for the web client ──────────────────────────────
-//
-// Owns: the room list (GET /rooms), the current/focused room (persisted to
-// localStorage), per-room unread counts (client-side, PRD §5.2 — NOT persisted
-// across sessions; a persisted read-waterline is a future enhancement), and the
-// transient cross-room @mention toasts (PRD §5.5).
-//
-// The live SSE stream delivers events from ALL rooms (see use-message-stream);
-// this hook's `recordIncoming` routes them: a message in the focused room is
-// already on screen, so it only refreshes that room's activity sort; a message
-// in another room bumps its unread pill, and a @mention there also fires a toast.
+/**
+ * useRooms — multi-room state for the web client.
+ *
+ * Owns the room list (`GET /rooms`), the focused room (persisted to
+ * `localStorage`), per-room unread counts (client-side, NOT persisted across
+ * sessions — PRD §5.2), and transient cross-room @mention toasts (PRD §5.5).
+ *
+ * The live SSE stream delivers events from ALL rooms (see use-message-stream).
+ * This hook's `recordIncoming` routes them: a message in the focused room is
+ * already on screen so it only refreshes that room's activity sort; a message
+ * in another room bumps its unread pill, and a @mention there also fires a toast.
+ *
+ * Sort order: unread-first, then most-recently-active-first. The server's
+ * `lastActivityAt` is supplemented with live overrides from incoming SSE
+ * messages so the sort reflects real-time activity, not just the last poll.
+ *
+ * @param conn    - Active connection; `null` resets the room list and clears
+ *                  session-only state (unread, toasts). On re-login under a
+ *                  different identity the state is cleared so there's no leak.
+ * @param selfName - Current participant name; used to detect `@selfName`
+ *                   mentions in cross-room messages and fire toasts.
+ * @returns `{ rooms, sortedRooms, currentRoom, unread, toasts, loading,
+ *             switchRoom, createRoom, refreshRooms, recordIncoming,
+ *             dismissToast, dismissToastsForRoom }`.
+ * @example
+ * const { rooms, currentRoom, switchRoom, createRoom, unread, recordIncoming } =
+ *   useRooms(conn, me?.name);
+ */
 
-const ROOM_STORAGE_KEY = "club_room";
+const ROOM_STORAGE_KEY = 'club_room';
 
 function loadInitialRoom(): string {
   try {
@@ -26,7 +43,7 @@ function loadInitialRoom(): string {
   } catch {
     /* localStorage may be unavailable (private mode) */
   }
-  return "general";
+  return 'general';
 }
 
 export interface RoomUnread {
@@ -97,7 +114,7 @@ export function useRooms(conn: ClubConn | null, selfName?: string): UseRoomsResu
       // If the focused room vanished (can't happen this phase — rooms aren't
       // deletable — but guard anyway), fall back to general so the UI never
       // points at a room the server doesn't know.
-      setCurrentRoom((cur) => (list.some((r) => r.slug === cur) ? cur : "general"));
+      setCurrentRoom((cur) => (list.some((r) => r.slug === cur) ? cur : 'general'));
     } catch {
       /* transient — keep showing the stale list */
     } finally {
@@ -133,7 +150,7 @@ export function useRooms(conn: ClubConn | null, selfName?: string): UseRoomsResu
 
   const createRoom = useCallback(
     async (name: string): Promise<Room> => {
-      if (!conn) throw new Error("not connected");
+      if (!conn) throw new Error('not connected');
       const room = await api.createRoom(conn, name);
       // Merge into the list (idempotent: a duplicate slug returns the existing
       // room, so dedupe by slug to avoid a phantom duplicate row).
@@ -141,7 +158,7 @@ export function useRooms(conn: ClubConn | null, selfName?: string): UseRoomsResu
       switchRoom(room.slug);
       return room;
     },
-    [conn, switchRoom],
+    [conn, switchRoom]
   );
 
   const dismissToast = useCallback((id: string) => {
@@ -152,39 +169,36 @@ export function useRooms(conn: ClubConn | null, selfName?: string): UseRoomsResu
     setToasts((prev) => prev.filter((t) => t.room !== room));
   }, []);
 
-  const recordIncoming = useCallback(
-    (m: Message) => {
-      // Refresh the activity sort for whichever room this landed in.
-      activityOverrideRef.current = {
-        ...activityOverrideRef.current,
-        [m.room]: Math.max(activityOverrideRef.current[m.room] ?? 0, m.createdAt),
+  const recordIncoming = useCallback((m: Message) => {
+    // Refresh the activity sort for whichever room this landed in.
+    activityOverrideRef.current = {
+      ...activityOverrideRef.current,
+      [m.room]: Math.max(activityOverrideRef.current[m.room] ?? 0, m.createdAt),
+    };
+    if (m.room === currentRoomRef.current) return; // already on screen
+    const isMention = mentionsSelf(m.content, selfNameRef.current);
+    setUnread((prev) => {
+      const cur = prev[m.room] ?? { count: 0, mention: false };
+      return { ...prev, [m.room]: { count: cur.count + 1, mention: cur.mention || isMention } };
+    });
+    // A cross-room @mention fires a toast with a deep-link to the source.
+    if (isMention) {
+      const toast: MentionToast = {
+        id: `${m.id}-${m.room}`,
+        messageId: m.id,
+        room: m.room,
+        authorName: m.authorName,
+        content: m.content,
       };
-      if (m.room === currentRoomRef.current) return; // already on screen
-      const isMention = mentionsSelf(m.content, selfNameRef.current);
-      setUnread((prev) => {
-        const cur = prev[m.room] ?? { count: 0, mention: false };
-        return { ...prev, [m.room]: { count: cur.count + 1, mention: cur.mention || isMention } };
+      setToasts((prev) => {
+        // Avoid stacking duplicate toasts for the same message (the SSE may
+        // redeliver on reconnect catch-up). Keep at most a handful visible.
+        if (prev.some((t) => t.messageId === m.id)) return prev;
+        const next = [...prev, toast];
+        return next.length > 4 ? next.slice(next.length - 4) : next;
       });
-      // A cross-room @mention fires a toast with a deep-link to the source.
-      if (isMention) {
-        const toast: MentionToast = {
-          id: `${m.id}-${m.room}`,
-          messageId: m.id,
-          room: m.room,
-          authorName: m.authorName,
-          content: m.content,
-        };
-        setToasts((prev) => {
-          // Avoid stacking duplicate toasts for the same message (the SSE may
-          // redeliver on reconnect catch-up). Keep at most a handful visible.
-          if (prev.some((t) => t.messageId === m.id)) return prev;
-          const next = [...prev, toast];
-          return next.length > 4 ? next.slice(next.length - 4) : next;
-        });
-      }
-    },
-    [],
-  );
+    }
+  }, []);
 
   // Client-side sort: unread rooms first (most-recently-active first), then read
   // rooms (most-recently-active first). null lastActivityAt sorts as oldest.

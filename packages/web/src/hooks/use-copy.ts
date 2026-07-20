@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Copy text to the clipboard with a graceful fallback for non-secure contexts
 // (e.g. http on a non-localhost origin) or older browsers where
@@ -10,10 +10,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // clipboard-less environment still gets the text onto the clipboard instead of
 // a hard failure.
 
-export type CopyState = "idle" | "copying" | "copied" | "failed";
+export type CopyState = 'idle' | 'copying' | 'copied' | 'failed';
 
+/**
+ * useCopy — copy text to the clipboard with graceful fallback.
+ *
+ * Primary path uses the async Clipboard API (`navigator.clipboard.writeText`),
+ * which is only available in secure contexts (https or localhost). Falls back
+ * to a hidden `<textarea>` + `document.execCommand('copy')` for older or
+ * non-secure browsers so a clipboard-less environment still gets the text onto
+ * the clipboard instead of a hard failure.
+ *
+ * Returns a state machine (`CopyState`) the UI can drive an `aria-live`
+ * announcement off of: `idle` → `copying` → `copied` | `failed`. The
+ * `copied` / `failed` feedback is transient: it auto-resets to `idle` after
+ * `resetAfterMs` so a stale status doesn't linger across unrelated interactions.
+ *
+ * @param resetAfterMs - ms before `copied` / `failed` auto-resets. Default 2500.
+ * @returns `{ state, copy, reset }`. `copy(text)` resolves with whether the
+ *          write succeeded; `reset()` clears any pending status immediately.
+ * @example
+ * const { state, copy } = useCopy();
+ * void copy(message.content);
+ * // state === 'copied' for ~2.5s, then back to 'idle'
+ */
 export function useCopy(resetAfterMs = 2500) {
-  const [state, setState] = useState<CopyState>("idle");
+  const [state, setState] = useState<CopyState>('idle');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cancel any pending "auto reset" timer on unmount so we never setState on
@@ -26,25 +48,25 @@ export function useCopy(resetAfterMs = 2500) {
 
   const copy = useCallback(
     async (text: string): Promise<boolean> => {
-      setState("copying");
+      setState('copying');
       // Reset transient feedback after a beat so a stale "copied"/"failed"
       // doesn't linger across unrelated interactions.
       if (timer.current) clearTimeout(timer.current);
 
       const ok = await writeToClipboard(text);
-      setState(ok ? "copied" : "failed");
+      setState(ok ? 'copied' : 'failed');
 
       if (ok) {
-        timer.current = setTimeout(() => setState("idle"), resetAfterMs);
+        timer.current = setTimeout(() => setState('idle'), resetAfterMs);
       }
       return ok;
     },
-    [resetAfterMs],
+    [resetAfterMs]
   );
 
   const reset = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
-    setState("idle");
+    setState('idle');
   }, []);
 
   return { state, copy, reset };
@@ -64,18 +86,18 @@ async function writeToClipboard(text: string): Promise<boolean> {
   // Legacy fallback: a hidden textarea + execCommand. Still works in many
   // non-secure contexts where the async API is unavailable.
   try {
-    const ta = document.createElement("textarea");
+    const ta = document.createElement('textarea');
     ta.value = text;
-    ta.setAttribute("readonly", "");
+    ta.setAttribute('readonly', '');
     // Move it off-screen rather than hide it; some browsers refuse to copy
     // from a display:none element.
-    ta.style.position = "fixed";
-    ta.style.top = "0";
-    ta.style.left = "0";
-    ta.style.opacity = "0";
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    const ok = document.execCommand("copy");
+    const ok = document.execCommand('copy');
     document.body.removeChild(ta);
     return ok;
   } catch {

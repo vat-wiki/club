@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ClubClient, type ClubConn } from "@club/sdk";
-import type { AgentThinkingEvent, AgentIdleEvent, Message } from "@club/shared";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ClubClient, type ClubConn } from '@club/sdk';
+import type { AgentThinkingEvent, AgentIdleEvent, Message } from '@club/shared';
 
-type Status = "connecting" | "connected" | "lost";
+type Status = 'connecting' | 'connected' | 'lost';
 
 export interface UseMessageStreamOptions {
-  // Forwarded to ClubClient.stream so the typing indicator (P1-5) lights up
-  // from the same SSE subscription as the message feed. Stable via refs below.
+  /** Fired for `agent_thinking` SSE events — drives the typing indicator
+   * (PRD §5). Only events for the focused room are forwarded to this callback;
+   * other rooms are filtered inside the hook so the indicator never shows
+   * a participant thinking in a room the user isn't viewing. */
   onAgentThinking?: (e: AgentThinkingEvent) => void;
+  /** Fired for `agent_idle` SSE events — clears a participant from the typing
+   * indicator. Room-scoped like `onAgentThinking`. */
   onAgentIdle?: (e: AgentIdleEvent) => void;
   /** The room currently in focus. Only its messages are appended to the visible
    *  `messages` tail; other rooms' messages are routed to `onIncoming` for
@@ -20,24 +24,45 @@ export interface UseMessageStreamOptions {
   onIncoming?: (m: Message) => void;
 }
 
-// Live SSE subscription over the shared client. Reconnects with backoff when
-// the stream ends on its own; tears down on unmount/key change. Returns the
-// growing message tail (deduped by id) for the FOCUSED room plus a connection
-// status for the bar. The stream subscribes to all rooms so the client can track
-// unread across rooms; messages are filtered to the focused room for display.
-export function useMessageStream(
-  conn: ClubConn | null,
-  opts: UseMessageStreamOptions = {},
-) {
+/**
+ * useMessageStream — the live SSE subscription for the focused room's message
+ * tail, plus all-rooms event fan-out (unread, @mentions, presence, reactions,
+ * deletions, typing events).
+ *
+ * The stream connects to ALL rooms (no room filter) because the web client must
+ * track per-room unread counts and cross-room @mention toasts (PRD §5). Messages
+ * are filtered client-side to `currentRoom` for the visible list; everything
+ * else flows through `opts.onIncoming` / the dedicated event callbacks.
+ *
+ * Reconnection: when the stream closes on its own (network drop, server restart),
+ * the hook auto-reconnects with a 3s backoff. Switching rooms does NOT tear down
+ * the stream — `currentRoom` is read from a ref so display routing changes without
+ * a re-subscribe, which keeps presence/online roster stable across room switches.
+ *
+ * The returned `onlineIds` set is the roster's live presence: it is re-seeded from
+ * the server on (re)connect and cleared on room switches to avoid stale entries.
+ *
+ * @param conn    - Active connection; `null` disconnects (mount/unmount safe).
+ * @param opts    - Callbacks and focus config. See `UseMessageStreamOptions`.
+ * @returns `{ messages, status, setMessages, loadMore, loadingMore, onlineIds }`.
+ * @example
+ * const { messages, status, loadMore, onlineIds } = useMessageStream(conn, {
+ *   currentRoom,
+ *   onIncoming,
+ *   onAgentThinking: onThinking,
+ *   onAgentIdle: onIdle,
+ * });
+ */
+export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [status, setStatus] = useState<Status>("connecting");
+  const [status, setStatus] = useState<Status>('connecting');
   const [loadingMore, setLoadingMore] = useState(false);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
   // Latest room + callbacks via refs so the SSE effect deps stay on `conn`
   // (we drive our own reconnect) while still reading the freshest values.
-  const currentRoomRef = useRef(opts.currentRoom ?? "general");
-  currentRoomRef.current = opts.currentRoom ?? "general";
+  const currentRoomRef = useRef(opts.currentRoom ?? 'general');
+  currentRoomRef.current = opts.currentRoom ?? 'general';
   const incomingRef = useRef(opts.onIncoming);
   incomingRef.current = opts.onIncoming;
   const thinkingRef = useRef(opts.onAgentThinking);
@@ -53,7 +78,7 @@ export function useMessageStream(
 
     const connect = () => {
       if (stopped) return;
-      setStatus("connecting");
+      setStatus('connecting');
       sub = new ClubClient(conn).stream(
         (m) => {
           // Every message refreshes unread/activity tracking (all rooms).
@@ -73,7 +98,7 @@ export function useMessageStream(
           reconnect: false,
           onError: () => {
             if (stopped) return;
-            setStatus("lost");
+            setStatus('lost');
             reconnect = setTimeout(connect, 3000);
           },
           onAgentThinking: (e) => {
@@ -102,12 +127,12 @@ export function useMessageStream(
           onReaction: (e) => {
             if (e.room !== currentRoomRef.current) return;
             setMessages((prev) =>
-              prev.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m)),
+              prev.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m))
             );
           },
-        },
+        }
       );
-      setStatus("connected");
+      setStatus('connected');
     };
 
     hasMoreRef.current = true;
@@ -136,8 +161,10 @@ export function useMessageStream(
   // the UI from hammering the server once we've scrolled to the top of the room.
   const hasMoreRef = useRef(true);
 
-  // Load one page of older history (scroll-up pagination) for the focused room.
-  // Prepends anything new, de-duped by id. Returns whether it loaded anything.
+  /** Load one page of older history for the focused room (scroll-up pagination).
+   *  Prepend de-duped messages before the current tail. Does nothing if there
+   *  are no messages yet, the oldest is an optimistic echo, or history is
+   *  already exhausted (`hasMoreRef` exhausted on empty server response). */
   const loadMore = useCallback(async (): Promise<boolean> => {
     if (!conn || loadingMore) return false;
     const prev = messagesRef.current;
@@ -145,7 +172,7 @@ export function useMessageStream(
     const oldest = prev[0];
     // A pending optimistic echo has no server history before it; skip until it
     // resolves into a real id.
-    if (oldest.id.startsWith("optimist-")) return false;
+    if (oldest.id.startsWith('optimist-')) return false;
     if (!hasMoreRef.current) return false;
     setLoadingMore(true);
     try {

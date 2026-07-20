@@ -5,10 +5,9 @@
 // is marked with ` *` so a user can see where their next `club send` lands.
 
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk";
 import type { Room } from "@club/shared";
-import { defaultRoom, requireConfig } from "../config.js";
-import { withCatchExit } from "../catch-exit.js";
+import { defaultRoom } from "../config.js";
+import { withAuthClient } from "../client-factory.js";
 
 /**
  * Render one room line. Pure so the marker rule (current → ` *`, general system
@@ -27,10 +26,9 @@ export function formatRoomLine(room: Room, current: string): string {
 export function makeRoomsCommand(): Command {
   return new Command("rooms")
     .description("list all rooms (current marked with *)")
-    .action(withCatchExit(async () => {
-      const cfg = requireConfig();
-      const list = await new ClubClient(cfg).rooms();
-      const current = defaultRoom(cfg);
+    .action(withAuthClient(async (_, client) => {
+      const list = await client.rooms();
+      const current = defaultRoom(client);
       for (const r of list) console.log(formatRoomLine(r, current));
       if (list.length === 0) console.log("(no rooms)");
     }));

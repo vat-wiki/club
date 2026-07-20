@@ -16,6 +16,7 @@
 // `@typescript-eslint/require-await` lint noise while keeping the error
 // contract identical across all commands.
 
+import type { Command } from "commander";
 import { formatError } from "@club/sdk";
 
 /**
@@ -27,9 +28,9 @@ export function withCatchExit<
   T extends unknown[],
   R,
 >(
-  fn: (...args: T) => R | Promise<R>,
-): (...args: T) => Promise<R> {
-  return async (...args: T) => {
+  fn: (this: Command, ...args: T) => R | Promise<R>,
+): (this: Command, ...args: T) => Promise<R> {
+  return async (this: Command, ...args: T) => {
     try {
       return await Promise.resolve(fn(...args));
     } catch (err) {

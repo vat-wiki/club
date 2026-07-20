@@ -1,14 +1,11 @@
 import { Command } from "commander";
-import { ClubClient } from "@club/sdk";
-import { requireConfig } from "../config.js";
-import { withCatchExit } from "../catch-exit.js";
+import { withAuthClient } from "../client-factory.js";
 
 export function makeMembersCommand(): Command {
   return new Command("members")
     .description("list room members")
-    .action(withCatchExit(async () => {
-      const cfg = requireConfig();
-      const list = await new ClubClient(cfg).members();
+    .action(withAuthClient(async (_, client) => {
+      const list = await client.members();
       for (const p of list) {
         console.log(p.name);
       }

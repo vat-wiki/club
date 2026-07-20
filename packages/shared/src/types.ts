@@ -226,6 +226,17 @@ export const RoomSlug = z
 export type RoomSlugType = z.infer<typeof RoomSlug>;
 
 /**
+ * Request options for any server call that may be room-scoped.
+ *
+ * Kept as a named type so SDK/CLI callers and server route handlers agree on
+ * the room argument shape: omitting `room` defaults to `DEFAULT_ROOM` on the
+ * server, and when present the slug is validated against `RoomSlug`.
+ */
+export interface RoomScoped {
+  room?: RoomSlugType;
+}
+
+/**
  * One room in the list returned by GET /rooms.
  *
  * `lastActivityAt` is the created_at of the most recent message in the room
@@ -343,7 +354,8 @@ export interface ListMessagesQuery {
   before?: string; // message id — return messages BEFORE this one (older history; scroll-up pagination)
   limit?: number;
   // Room to scope to; omitted → "general" on the server (backward compatible).
-  room?: string;
+  // Typed as RoomSlugType so callers can't accidentally pass a non-canonical slug.
+  room?: RoomSlugType;
 }
 
 /** Generic error response shape returned by the API on any failure */

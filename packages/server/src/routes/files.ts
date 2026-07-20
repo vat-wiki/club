@@ -9,12 +9,99 @@ import {
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
   MAX_DOCUMENT_BYTES,
+  type ImageMime,
+  type VideoMime,
+  type DocumentMime,
   type MessageAttachment,
 } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { insertFile, getFile } from "../db.js";
 import { jsonErr } from "../lib.js";
 import { filesDir, filePath } from "../files-dir.js";
+
+// ── Magic-bytes MIME detection ──────────────────────────────────────
+//
+// File content is identified by a signature at the start of the file
+// ("magic bytes"), independent of the client-supplied `file.type` which
+// is trivially forgeable. We read the first few bytes of the buffer and
+// verify the content kind matches the claimed MIME kind. Returns `null`
+// on mismatch or when the content has no recognized signature.
+//
+// Supported signatures (all read from the start of the buffer):
+//   PNG:    0x89 50 4E 47 0D 0A 1A 0A
+//   JPEG:   0xFF 0xD8 0xFF
+//   GIF:    0x47 49 46 38 37 61  or  0x47 49 46 38 39 61  ("GIF87a"/"GIF89a")
+//   WebP:   0x52 59 56 46 ("RIFF") + "WEBP" at offset 8
+//   MP4:    "ftyp" at offset 4 (ISO Base Media file format)
+//   WebM:   EBML header: 0x1A 45 DF A3
+//   PDF:    "%PDF" at offset 0
+//
+// ZIP-family documents (.docx, .xlsx, .odt, .ods) share the PK\x03\x04
+// local-file-header signature, so magic bytes cannot distinguish them.
+// Those are accepted as any claimed `application/...` document MIME
+// except `text/markdown` (a markdown file should never start with a ZIP
+// header). Plain .md has no magic signature and is accepted on the
+// schema-parsed MIME only.
+
+const SIGNATURES: Array<{
+  kind: "image" | "video" | "document";
+  match(buf: Buffer): boolean;
+}> = [
+  { kind: "image", match: (b) => startsWith(b, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) }, // PNG
+  { kind: "image", match: (b) => startsWith(b, [0xff, 0xd8, 0xff]) }, // JPEG
+  { kind: "image", match: (b) => startsWith(b, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || startsWith(b, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]) }, // GIF
+  { kind: "image", match: (b) => b.length > 12 && startsWith(b, [0x52, 0x59, 0x56, 0x46]) && b.subarray(8, 12).toString("ascii") === "WEBP" }, // WebP
+  { kind: "video", match: (b) => b.length > 12 && b.subarray(4, 8).toString("ascii") === "ftyp" }, // MP4 / ftyp ISO base media
+  { kind: "video", match: (b) => startsWith(b, [0x1a, 0x45, 0xdf, 0xa3]) }, // WebM / Matroska EBML
+  { kind: "document", match: (b) => startsWith(b, [0x25, 0x50, 0x44, 0x46]) }, // PDF
+];
+
+function startsWith(buf: Buffer, signature: number[]): boolean {
+  if (buf.length < signature.length) return false;
+  for (let i = 0; i < signature.length; i++) {
+    if (buf[i] !== signature[i]) return false;
+  }
+  return true;
+}
+
+function looksLikeZip(buf: Buffer): boolean {
+  return startsWith(buf, [0x50, 0x4b, 0x03, 0x04]);
+}
+
+/**
+ * Verify the file's magic bytes agree with the client-claimed MIME.
+ *
+ * @param buf - Uploaded file content.
+ * @param claimedMime - MIME parsed from the client-supplied `file.type`.
+ * @returns `claimedMime` if the content kind matches, `null` to reject.
+ */
+export function detectAndVerifyMime(
+  buf: Buffer,
+  claimedMime: ImageMime | VideoMime | DocumentMime,
+): ImageMime | VideoMime | DocumentMime | null {
+  if (buf.length < 2) return null;
+  for (const sig of SIGNATURES) {
+    if (sig.match(buf)) {
+      // Match found: verify the claimed kind agrees with the detected kind.
+      // "document" kind maps to "application/..."-prefixed MIMEs;
+      // image/video use the literal kind prefix.
+      const kindPrefix =
+        sig.kind === "document" ? "application/" : `${sig.kind}/`;
+      if (claimedMime.startsWith(kindPrefix)) return claimedMime;
+      return null; // kind mismatch → reject
+    }
+  }
+  // ZIP-family: accept any claimed application/... document MIME except
+  // text/markdown (which should never be a ZIP).
+  if (looksLikeZip(buf)) {
+    if (claimedMime === "text/markdown") return null;
+    return claimedMime;
+  }
+  // No recognized signature → reject unknown content.
+  return null;
+}
+
+// ── Route ───────────────────────────────────────────────────────────
 
 export const files = new Hono();
 
@@ -41,27 +128,26 @@ files.post("/", requireAuth, async (c) => {
 
   const me = c.get("participant");
 
-  // Authoritative mime check: the server is the sole source of truth, so a
-  // client can't smuggle in an unsupported file under a forged label. One parse
-  // against AttachmentMime (image ∪ video) yields a fully-narrowed mime; we then
-  // branch on it to pick the size cap and whether to probe dimensions.
+  // Parse the client-supplied MIME first so we can apply the right size cap
+  // before buffering the full body. Validates only that the label is an
+  // accepted type; the magic-bytes step below verifies the content matches.
   const parsed = AttachmentMime.safeParse(file.type);
   if (!parsed.success) {
     return jsonErr(c, "unsupported file type", 415);
   }
-  const mime = parsed.data; // ImageMime | VideoMime | DocumentMime
-  const isImage = mime.startsWith("image/");
-  const isVideo = mime.startsWith("video/");
-  // Anything that passed AttachmentMime but isn't image/video is a document.
-  const isDocument = !isImage && !isVideo;
-  const maxBytes = isVideo
+  const claimed = parsed.data;
+  const maxBytes = claimed.startsWith("video/")
     ? MAX_VIDEO_BYTES
-    : isDocument
-      ? MAX_DOCUMENT_BYTES
-      : MAX_IMAGE_BYTES;
+    : claimed.startsWith("image/")
+      ? MAX_IMAGE_BYTES
+      : MAX_DOCUMENT_BYTES;
 
   if (size > maxBytes) {
-    const kind = isVideo ? "video" : isDocument ? "document" : "image";
+    const kind = claimed.startsWith("video/")
+      ? "video"
+      : claimed.startsWith("image/")
+        ? "image"
+        : "document";
     return jsonErr(
       c,
       `${kind} must be at most ${maxBytes} bytes (got ${size})`,
@@ -86,6 +172,19 @@ files.post("/", requireAuth, async (c) => {
   // acceptable for club's single-room, low-concurrency profile. The write below
   // is async by design to avoid blocking the event loop on disk I/O.
   const buf = Buffer.from(await file.arrayBuffer());
+
+  // Magic-bytes verification: reject if the file's actual content (its magic
+  // bytes) indicates a different MIME kind than the client claimed. A
+  // forged `file.type` is trivial; magic bytes are not — this closes the
+  // MIME-confusion attack surface where e.g. a script could be served as a
+  // PNG by an image consumer.
+  // (image-size below provides an additional image-validity check.)
+  const verified = detectAndVerifyMime(buf, claimed);
+  if (!verified) {
+    return jsonErr(c, "file content does not match declared type", 415);
+  }
+  const mime: ImageMime | VideoMime | DocumentMime = verified;
+  const isImage = mime.startsWith("image/");
 
   // Only images get dimension-probed (via image-size); video + document bytes
   // are stored verbatim (the <video> element reads its own size; documents

@@ -337,7 +337,7 @@ function MessageRow({
               </span>
             )}
           </div>
-          {!m.deleted && (onReact || (m.reactions && m.reactions.length > 0)) && (
+          {!m.deleted && (onReact ?? (false || (m.reactions && m.reactions.length > 0))) && (
             <div className={cn("mt-1 flex flex-wrap items-center gap-1", self && "justify-end")}>
               {m.reactions?.map((r) => (
                 <span
@@ -424,6 +424,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       });
     }
     return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- GROUP_GAP_MS is a stable numeric constant (300000), safe to omit
   }, [messages, me, locale, t]);
 
   const virtualizer = useVirtualizer({

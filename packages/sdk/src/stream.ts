@@ -2,6 +2,65 @@ import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, Messag
 import { jitteredBackoff, sleep } from "@club/shared";
 import { type ClubConn, listMessages, listRooms } from "./transport.js";
 
+// ── Runtime type guards for SSE payloads ─────────────────────────────
+// Bare JSON.parse() casts ("as T") give no safety against malformed or
+// spoofed server payloads. These guards narrow unknown → concrete types
+// at runtime so the type system and runtime agree, and malformed events
+// fail safely instead of corrupting downstream state (e.g. deliver()
+// crashing on m.id <= lastId with an untyped object).
+
+function isObj(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object";
+}
+
+function isAgentThinkingEvent(v: unknown): v is AgentThinkingEvent {
+  if (!isObj(v)) return false;
+  if (typeof v.participantId !== "string" || typeof v.name !== "string") return false;
+  return v.room === undefined || typeof v.room === "string";
+}
+
+function isAgentIdleEvent(v: unknown): v is AgentIdleEvent {
+  if (!isObj(v)) return false;
+  if (typeof v.participantId !== "string") return false;
+  return v.room === undefined || typeof v.room === "string";
+}
+
+function isPresenceEvent(v: unknown): v is PresenceEvent {
+  if (!isObj(v)) return false;
+  if (typeof v.participantId !== "string" || typeof v.name !== "string") return false;
+  if (typeof v.online !== "boolean") return false;
+  return true;
+}
+
+function isMessageDeletedEvent(v: unknown): v is MessageDeletedEvent {
+  if (!isObj(v)) return false;
+  return typeof v.id === "string" && typeof v.room === "string";
+}
+
+function isReaction(v: unknown): v is { emoji: string; count: number } {
+  return isObj(v) && typeof v.emoji === "string" && typeof v.count === "number";
+}
+
+function isMessageReactionEvent(v: unknown): v is MessageReactionEvent {
+  if (!isObj(v)) return false;
+  if (typeof v.messageId !== "string" || typeof v.room !== "string") return false;
+  if (!Array.isArray(v.reactions)) return false;
+  return v.reactions.every(isReaction);
+}
+
+function isMessage(v: unknown): v is Message {
+  if (!isObj(v)) return false;
+  if (typeof v.id !== "string" || typeof v.participantId !== "string") return false;
+  if (typeof v.authorName !== "string" || typeof v.content !== "string") return false;
+  if (typeof v.createdAt !== "number" || typeof v.room !== "string") return false;
+  if (v.attachments !== undefined && !Array.isArray(v.attachments)) return false;
+  if (v.replyToId !== undefined && typeof v.replyToId !== "string") return false;
+  if (v.deleted !== undefined && typeof v.deleted !== "boolean") return false;
+  if (v.reactions !== undefined && !Array.isArray(v.reactions)) return false;
+  if (v.status !== undefined && v.status !== "sending" && v.status !== "failed") return false;
+  return true;
+}
+
 // ── SSE streaming with reconnect + catch-up ─────────────────────────
 
 export interface StreamOptions {
@@ -156,22 +215,25 @@ export function streamMessages(
         if (payload === "") continue;
         try {
           const obj = JSON.parse(payload);
-          if (eventName === "agent_thinking") {
-            opts.onAgentThinking?.(obj as AgentThinkingEvent);
-          } else if (eventName === "agent_idle") {
-            opts.onAgentIdle?.(obj as AgentIdleEvent);
-          } else if (eventName === "presence") {
-            opts.onPresence?.(obj as PresenceEvent);
-          } else if (eventName === "message_deleted") {
-            opts.onMessageDeleted?.(obj as MessageDeletedEvent);
-          } else if (eventName === "message_reaction") {
-            opts.onReaction?.(obj as MessageReactionEvent);
-          } else if (eventName === "message") {
+          // Runtime type guard on every branch: narrow unknown → concrete type
+          // rather than casting blindly. Malformed payloads are silently dropped
+          // (forward-compatible, safe under a broken or hostile server).
+          if (eventName === "agent_thinking" && isAgentThinkingEvent(obj)) {
+            opts.onAgentThinking?.(obj);
+          } else if (eventName === "agent_idle" && isAgentIdleEvent(obj)) {
+            opts.onAgentIdle?.(obj);
+          } else if (eventName === "presence" && isPresenceEvent(obj)) {
+            opts.onPresence?.(obj);
+          } else if (eventName === "message_deleted" && isMessageDeletedEvent(obj)) {
+            opts.onMessageDeleted?.(obj);
+          } else if (eventName === "message_reaction" && isMessageReactionEvent(obj)) {
+            opts.onReaction?.(obj);
+          } else if (eventName === "message" && isMessage(obj)) {
             // The default SSE event (no `event:` line) — the original feed.
-            deliver(obj as Message);
+            deliver(obj);
           }
-          // Any other named event is ignored — forward-compatible with future
-          // events the client doesn't yet know about.
+          // Any other named event (or a type-mismatch) is ignored — forward-
+          // compatible with future events the client doesn't yet know about.
         } catch {
           /* ignore malformed */
         }

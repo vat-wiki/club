@@ -16,6 +16,7 @@ function makeMessage(id: string, content: string): Message {
     authorName: "n",
     content,
     createdAt: 1,
+    room: "general",
   };
 }
 
@@ -189,7 +190,9 @@ describe("streamMessages", () => {
 
     s.pushNamed("agent_thinking", { participantId: "p1", name: "rex" });
     s.pushNamed("agent_idle", { participantId: "p1" });
-    // a normal message still flows to onMessage, not to either callback
+    // a normal message still flows to onMessage, not to either callback; the
+    // fixture must now include `room` (added by guard validation above).
+    s.push(makeMessage("01", "hi"));
     s.push(makeMessage("01", "hi"));
 
     // Let the reader pump one microtask.

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MAX_IMAGE_BYTES } from "@club/shared";
-import { ClubApiError } from "./index.js";
+import { ClubApiError, isClubApiError } from "./index.js";
 import { assertAttachmentCount, uploadImageFile } from "./image-upload.js";
 
 // Boundary + magic-byte sniff tests that complement image-upload.test.ts. The
@@ -175,7 +175,7 @@ describe("uploadImageFile: byte-size boundary", () => {
         caught = e;
       }
       expect(caught).toBeInstanceOf(ClubApiError);
-      expect((caught as ClubApiError).status).toBe(413);
+      expect(isClubApiError(caught) ? caught.status : undefined).toBe(413);
       expect((caught as Error).message).toMatch(/bytes; max is/);
       // No upload was attempted — the client saves a doomed round trip.
       expect(fetchMock).not.toHaveBeenCalled();

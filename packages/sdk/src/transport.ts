@@ -14,6 +14,8 @@ import type {
 } from "@club/shared";
 import {
   ClubApiError,
+  type ClubApiErrorStatus,
+  NETWORK_ERROR_STATUS,
   formatError,
   shouldRetry,
   jitteredBackoff,
@@ -82,7 +84,7 @@ async function parseErrorFromResponse(res: Response): Promise<ClubApiError> {
   } catch {
     /* ignore non-JSON error bodies */
   }
-  return new ClubApiError(msg, res.status);
+  return new ClubApiError(msg, res.status as ClubApiErrorStatus);
 }
 
 async function check<T>(res: Response): Promise<T> {
@@ -101,7 +103,7 @@ function wrapErr(err: unknown): ClubApiError {
   if (err instanceof Error && err.name === "AbortError") {
     return new ClubApiError("request timeout", 408);
   }
-  return new ClubApiError(formatError(err), 0);
+  return new ClubApiError(formatError(err), NETWORK_ERROR_STATUS);
 }
 
 /**

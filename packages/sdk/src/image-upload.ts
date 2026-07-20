@@ -23,7 +23,7 @@ import {
   MAX_IMAGES_PER_MESSAGE,
   type MessageAttachment,
 } from "@club/shared";
-import { ClubApiError, formatError } from "./errors.js";
+import { ClubApiError, NETWORK_ERROR_STATUS, formatError } from "./errors.js";
 import { uploadFile, type ClubConn } from "./transport.js";
 
 // image-size reports the format as the lowercased extension (e.g. "jpg", not
@@ -79,7 +79,7 @@ export async function uploadImageFile(
     buf = await readFile(path);
   } catch (err) {
     // ENOENT / EACCES etc. — the underlying message already names the path.
-    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, 0);
+    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, NETWORK_ERROR_STATUS);
   }
 
   if (buf.byteLength > MAX_IMAGE_BYTES) {
@@ -126,7 +126,7 @@ export async function uploadVideoFile(
   try {
     buf = await readFile(path);
   } catch (err) {
-    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, 0);
+    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, NETWORK_ERROR_STATUS);
   }
 
   if (buf.byteLength > MAX_VIDEO_BYTES) {
@@ -179,7 +179,7 @@ export async function uploadDocumentFile(
   try {
     buf = await readFile(path);
   } catch (err) {
-    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, 0);
+    throw new ClubApiError(`could not read ${path}: ${formatError(err)}`, NETWORK_ERROR_STATUS);
   }
 
   const ext = path.split(".").pop()?.toLowerCase() ?? "";

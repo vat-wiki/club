@@ -8,7 +8,7 @@ import {
   type MessageAttachment,
   type UploadFileResponse,
 } from "@club/shared";
-import { ClubApiError, type ClubConn } from "@club/sdk";
+import { ClubApiError, NETWORK_ERROR_STATUS, type ClubApiErrorStatus, type ClubConn } from "@club/sdk";
 
 // The MIME whitelist is the single source of truth in @club/shared (ImageMime).
 // Pre-flight locally so a wrong-format pick is rejected before any bytes hit
@@ -164,7 +164,7 @@ export async function uploadImage(
     }
 
     const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      xhr.onerror = () => reject(new ClubApiError("network error", 0));
+      xhr.onerror = () => reject(new ClubApiError("network error", NETWORK_ERROR_STATUS));
       xhr.ontimeout = () => reject(new ClubApiError("upload timeout", 408));
       xhr.onabort = () => reject(new ClubApiError("upload timeout", 408));
       xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
@@ -179,7 +179,7 @@ export async function uploadImage(
       } catch {
         /* ignore non-JSON error bodies */
       }
-      throw new ClubApiError(msg, res.status);
+      throw new ClubApiError(msg, res.status as ClubApiErrorStatus);
     }
 
     return JSON.parse(res.body) as MessageAttachment;

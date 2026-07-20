@@ -330,14 +330,19 @@ messages.post("/:id/reactions", requireJson, async (c) => {
   );
   if (!parsed.ok) return parsed.r;
   const { emoji } = parsed.data;
+  // Security: any ASCII control character in the emoji value is a hard
+  // reject. Direct API callers (curl, SDK, MCP) bypass the CLI's
+  // sanitizeEmoji(); the server is the last line of defense.
+  // Rejection (rather than strip-and-accept) ensures an attacker can't
+  // smuggle control bytes into the DB by wrapping them in visible emoji;
+  // a payload that sanitizes to "hello" is still rejected because the raw
+  // value contained injected bytes (e.g. "hello\x00").
+  if (/[\x00-\x1f\x7f]/.test(emoji)) {
+    return jsonErr(c, "bad emoji");
+  }
   const trimmed = emoji.trim();
-  // Security: strip ASCII control characters (NUL, SOH, STX, ..., DEL) so
-  // control-char injection can't reach the DB through direct API calls
-  // (curl, SDK, MCP). The CLI client does the same in react.ts, but the
-  // server must be the last line of defense — it can't trust any caller.
-  const clean = trimmed.replace(/[\x00-\x1f\x7f]/g, "");
-  if (!clean) return jsonErr(c, "bad emoji");
-  const reactions = toggleReaction(id, me.id, clean);
+  if (!trimmed) return jsonErr(c, "bad emoji");
+  const reactions = toggleReaction(id, me.id, trimmed);
   const room = getMessageRoom(id) ?? DEFAULT_ROOM;
   broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room } satisfies MessageReactionEvent);
   return c.body(null, 204);

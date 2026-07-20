@@ -119,6 +119,23 @@ messages.post("/", requireJson, async (c) => {
   const parsed = await parseJsonBody(c, CreateMessageRequest, "bad request");
   if (!parsed.ok) return parsed.r;
   const { content, attachmentIds, replyToId, room } = parsed.data;
+  // Security: validate `replyToId` server-side. If the client supplies a
+  // replyToId that doesn't exist OR points to a message in a different room,
+  // we must reject it. Otherwise an attacker can reply-to-phantom-message
+  // (information leak / confusion vector) or reply across rooms, creating
+  // cross-room thread injection that confuses UI clients which assume a
+  // thread stays within its room. The format is already validated by the
+  // Zod schema (min 1, max 64), but existence + room-scope must be checked
+  // in the DB because the schema has no cross-row knowledge.
+  if (replyToId) {
+    const replyRoom = getMessageRoom(replyToId);
+    if (!replyRoom) {
+      return jsonErr(c, "reply target not found", 404);
+    }
+    if (replyRoom !== room) {
+      return jsonErr(c, "reply target not in room", 400);
+    }
+  }
   // Sanitize the message body once at ingestion. The sanitized copy is the
   // sole source of truth from here on — stored in DB and broadcast via SSE.
   // Stripping control characters protects the SSE JSON frame boundary and

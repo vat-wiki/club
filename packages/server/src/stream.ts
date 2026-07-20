@@ -1,22 +1,32 @@
-import type { SSEStreamingApi } from "hono/streaming";
-import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
+import type { SSEStreamingApi } from 'hono/streaming';
+import type {
+  Message,
+  AgentThinkingEvent,
+  AgentIdleEvent,
+  PresenceEvent,
+  MessageDeletedEvent,
+  MessageReactionEvent,
+} from '@club/shared';
+// Subscriber registered at SSE connect time. `rooms` scopes which room-scoped
+// events the stream receives (null = all rooms); `dead` marks a client whose
+// SSE write failed so the fan-out loop can drop it in a single pass.
+interface Subscriber {
+  stream: SSEStreamingApi;
+  participant: { id: string; name: string };
+  rooms: Set<string> | null; // null = all rooms
+  dead: boolean;
+}
 
 // Live SSE subscribers registered at connect time. The POST /messages route
 // pushes new messages here; subscribers are removed on abort. Each carries the
 // authed participant so presence (online/offline) can be broadcast on connect
 // and disconnect, and a `rooms` filter so the stream can be scoped to one or
 // more rooms (null = subscribed to all rooms).
-const subscribers = new Set<{
-  stream: SSEStreamingApi;
-  participant: { id: string; name: string };
-  rooms: Set<string> | null; // null = all rooms
-  dead: boolean;
-}>();
-
+const subscribers = new Set<Subscriber>();
 // Does a subscriber want events for `room`? `room === null` marks an unscoped
 // event (presence) that reaches every subscriber regardless of their filter —
 // presence stays global by design (PRD §8.7: no per-room presence).
-function wantsRoom(sub: { rooms: Set<string> | null }, room: string | null): boolean {
+function wantsRoom(sub: Subscriber, room: string | null): boolean {
   if (room === null) return true;
   if (sub.rooms === null) return true;
   return sub.rooms.has(room);
@@ -31,7 +41,7 @@ function wantsRoom(sub: { rooms: Set<string> | null }, room: string | null): boo
 export function addSubscriber(
   s: SSEStreamingApi,
   participant: { id: string; name: string },
-  rooms: Set<string> | null,
+  rooms: Set<string> | null
 ): () => void {
   const entry = { stream: s, participant, rooms, dead: false };
   subscribers.add(entry);
@@ -55,18 +65,18 @@ export function addSubscriber(
 // Push a named `presence` event (online/offline) to every live subscriber.
 // Presence is intentionally NOT room-scoped (room === null → all subscribers).
 export function broadcastPresence(e: PresenceEvent): void {
-  writeAll({ event: "presence", data: JSON.stringify(e) }, null);
+  writeAll({ event: 'presence', data: JSON.stringify(e) }, null);
 }
 
 // Push a named `message_deleted` event (recall). Clients mark the id recalled
 // rather than dropping the row, so replies/context still read coherently.
 export function broadcastDeleted(e: MessageDeletedEvent): void {
-  writeAll({ event: "message_deleted", data: JSON.stringify(e) }, e.room);
+  writeAll({ event: 'message_deleted', data: JSON.stringify(e) }, e.room);
 }
 
 // Push a named `message_reaction` event (refreshed aggregate after a toggle).
 export function broadcastReaction(e: MessageReactionEvent): void {
-  writeAll({ event: "message_reaction", data: JSON.stringify(e) }, e.room);
+  writeAll({ event: 'message_reaction', data: JSON.stringify(e) }, e.room);
 }
 
 // Push a `message` event (the default, unnamed event in SSE). Backwards
@@ -81,13 +91,13 @@ export function broadcast(msg: Message): void {
 // When `e.room` is present the event is scoped to that room's subscribers;
 // absent means an unscoped (legacy/global) report reaching everyone.
 export function broadcastAgentThinking(e: AgentThinkingEvent): void {
-  writeAll({ event: "agent_thinking", data: JSON.stringify(e) }, e.room ?? null);
+  writeAll({ event: 'agent_thinking', data: JSON.stringify(e) }, e.room ?? null);
 }
 
 // Push a named `agent_idle` event. `e.room` scopes the clear to the same room
 // the agent was thinking in; absent → unscoped (reaches everyone).
 export function broadcastAgentIdle(e: AgentIdleEvent): void {
-  writeAll({ event: "agent_idle", data: JSON.stringify(e) }, e.room ?? null);
+  writeAll({ event: 'agent_idle', data: JSON.stringify(e) }, e.room ?? null);
 }
 
 // Underlying fan-out: write one SSE frame to every live subscriber whose room
@@ -108,14 +118,9 @@ function writeAll(
     event?: string;
     data: string;
   },
-  room: string | null,
+  room: string | null
 ): void {
-  const dead: Array<{
-    stream: SSEStreamingApi;
-    participant: { id: string; name: string };
-    rooms: Set<string> | null;
-    dead: boolean;
-  }> = [];
+  const dead: Subscriber[] = [];
   for (const sub of subscribers) {
     if (sub.dead) continue;
     if (!wantsRoom(sub, room)) continue;
@@ -177,7 +182,7 @@ const thinking = new Map<string, ThinkingEntry>();
 export function markThinking(
   participantId: string,
   name: string,
-  room: string | null = null,
+  room: string | null = null
 ): boolean {
   const fresh = !thinking.has(participantId);
   thinking.set(participantId, {
@@ -225,19 +230,14 @@ function reapExpiredThinking(): void {
 // state. One timer does double duty (no need for a second scheduler).
 export const heartbeatInterval = setInterval(() => {
   if (subscribers.size === 0) return;
-  const dead: Array<{
-    stream: SSEStreamingApi;
-    participant: { id: string; name: string };
-    rooms: Set<string> | null;
-    dead: boolean;
-  }> = [];
+  const dead: Subscriber[] = [];
   for (const sub of subscribers) {
     if (sub.dead) {
       subscribers.delete(sub);
       continue;
     }
     void sub.stream
-      .writeSSE({ data: "" }) // empty data line doubles as a heartbeat comment-safe ping
+      .writeSSE({ data: '' }) // empty data line doubles as a heartbeat comment-safe ping
       .catch(() => {
         sub.dead = true;
         dead.push(sub);

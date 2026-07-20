@@ -263,7 +263,8 @@ messages.get("/", (c) => {
     : since
       ? getMessagesSince(since, room, limit).messages
       : getRecentMessages(room, limit);
-  const reactionsMap = getReactionsForMessages(rows.map((r) => r.id));
+  const messageIds = rows.map((r) => r.id);
+  const reactionsMap = getReactionsForMessages(messageIds);
   // Pre-fill missing message ids with empty reaction arrays so toMessage()
   // never triggers its per-row fallback query on the list hot path.
   for (const r of rows) reactionsMap.set(r.id, reactionsMap.get(r.id) ?? []);
@@ -288,7 +289,8 @@ messages.get("/search", (c) => {
   }
   const room = rawRoom ?? null;
   const rows = searchMessages(q, room ?? null, limit);
-  const reactionsMap = getReactionsForMessages(rows.map((r) => r.id));
+  const messageIds = rows.map((r) => r.id);
+  const reactionsMap = getReactionsForMessages(messageIds);
   // Pre-fill missing message ids with empty reaction arrays so toMessage()
   // never triggers its per-row fallback query on the search hot path.
   for (const r of rows) reactionsMap.set(r.id, reactionsMap.get(r.id) ?? []);

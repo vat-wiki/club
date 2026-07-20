@@ -23,35 +23,29 @@ function App({ cfg }: Props) {
   const clientRef = useRef<ClubClient | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const c = new ClubClient(cfg);
-        clientRef.current = c;
-        const [m, rs] = await Promise.all([c.me(), c.rooms()]);
-        setMe(m);
-        setRooms(rs);
-      } catch (err) {
-        setLines(["error: " + (err as Error).message]);
-      }
-    })().catch(() => { /* init errors surfaced via catch above */ });
+    const c = new ClubClient(cfg);
+    clientRef.current = c;
+    Promise.all([c.me(), c.rooms()]).then(
+      ([m, rs]) => { setMe(m); setRooms(rs); },
+      (err) => setLines(["error: " + (err as Error).message]),
+    );
   }, [cfg]);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const recent = await new ClubClient(cfg).messages({ limit: 50, room: currentRoom });
+    const c = new ClubClient(cfg);
+    c.messages({ limit: 50, room: currentRoom }).then(
+      (recent) => {
         if (!cancelled) {
           setMessages(recent);
           setLines(recent.map(formatMessage));
         }
-      } catch (err) {
+      },
+      (err) => {
         if (!cancelled) setLines(["error: " + (err as Error).message]);
-      }
-    })().catch(() => { /* room load errors surfaced via catch above */ });
-    return () => {
-      cancelled = true;
-    };
+      },
+    );
+    return () => { cancelled = true; };
   }, [cfg, currentRoom]);
 
   useEffect(() => {

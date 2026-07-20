@@ -1,3 +1,39 @@
+/**
+ * @module @club/sdk/stream
+ *
+ * Real-time message streaming via Server-Sent Events (SSE).
+ *
+ * `streamMessages()` opens a long-lived connection to `GET /messages/stream` and
+ * dispatches typed callbacks for incoming messages and lifecycle events
+ * (agent thinking, presence, deletions, reactions). When the connection drops it
+ * automatically reconnects with exponential jittered backoff, then fetches any
+ * messages missed during the outage via `GET /messages?since=<lastId>` —
+ * de-duplicating by ulid-based message id so overlap between the live buffer
+ * and the catch-up query is delivered exactly once.
+ *
+ * Room scope: pass a single `room` or a `rooms[]` array to subscribe to only
+ * those rooms; omit both for an all-rooms stream. Catch-up queries mirror the
+ * same scope so a multi-room client never silently drops from rooms it doesn't
+ * re-fetch.
+ *
+ * All callbacks are optional — subscribe only to the events you care about.
+ *
+ * @example
+ * ```ts
+ * import { streamMessages } from "@club/sdk";
+ * import { ClubClient } from "@club/sdk";
+ *
+ * const client = new ClubClient({ server: "https://club.example" });
+ * const { stop } = streamMessages(
+ *   client,        // a ClubConn-compatible connection
+ *   (m) => console.log("new:", m.id, m.content), // onMessage
+ *   { reconnect: true, onPresence, onError: (e) => console.warn(e) },
+ * );
+ * // later …
+ * stop(); // tears down the SSE connection and cancels reconnect
+ * ```
+ */
+
 import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
 import { jitteredBackoff, sleep } from "@club/shared";
 import { type ClubConn, listMessages, listRooms } from "./transport.js";
@@ -64,13 +100,36 @@ function isMessage(v: unknown): v is Message {
 // ── SSE streaming with reconnect + catch-up ─────────────────────────
 
 export interface StreamOptions {
-  /** Reconnect automatically when the stream drops (default true). */
+  /**
+   * Reconnect automatically when the stream drops (default true).
+   *
+   * When false, any network error terminates the stream immediately and fires
+   * `onError` one last time. Useful when the caller wants to drive its own
+   * retry logic.
+   */
   reconnect?: boolean;
-  /** Max reconnect attempts before giving up (default Infinity — keep trying). */
+  /**
+   * Max reconnect attempts before giving up (default Infinity — keep trying).
+   *
+   * Set to 1 to retry once then stop; set to 0 to give up immediately (equivalent
+   * to `reconnect: false` for errors after the first connection is established).
+   */
   maxReconnects?: number;
-  /** Base backoff ms for reconnect (default 500; exponential, jittered, capped 15s). */
+  /**
+   * Base backoff ms for reconnect (default 500; exponential, jittered, capped 15s).
+   *
+   * The actual delay grows as `min(base * 2^attempt, 15000)` with ±20% random
+   * jitter, so a persistent failure quickly settles at a slow retry cadence
+   * without hammering the server.
+   */
   backoffMs?: number;
-  /** Notified on stream errors and on each reconnect attempt. */
+  /**
+   * Notified on stream errors and on each reconnect attempt.
+   *
+   * Receives `Error` objects. Note that this is *also* called before each
+   * reconnect attempt, so callers should be prepared for repeated calls during
+   * a flaky network.
+   */
   onError?: (err: Error) => void;
   /** Fired for each `agent_thinking` event (P1-5). Omit to ignore. */
   onAgentThinking?: (e: AgentThinkingEvent) => void;
@@ -95,11 +154,41 @@ export interface StreamHandle {
 
 const RECONNECT_CAP_MS = 15_000;
 
-// Subscribe to /messages/stream. onMessage fires for each event. The stream
-// reconnects on drop and catches up on anything missed while disconnected
-// (fetched via GET /messages?since=<lastId>), de-duplicating by message id so
-// overlap between the live buffer and the catch-up query is delivered exactly
-// once. Returns a stop() handle.
+/** Subscribe to /messages/stream. onMessage fires for each event. The stream
+ * reconnects on drop and catches up on anything missed while disconnected
+ * (fetched via GET /messages?since=<lastId>), de-duplicating by message id so
+ * overlap between the live buffer and the catch-up query is delivered exactly
+ * once. Returns a stop() handle.
+ *
+ * @param c - A ClubConn-compatible connection (any object with `{ server, key }`).
+ * @param onMessage - Called with each new or catch-up message in chronological
+ *   order. Already-seen messages (id ≤ the highest id previously delivered)
+ *   are silently skipped.
+ * @param opts - Optional configuration. Defaults: `reconnect: true`,
+ *   `maxReconnects: Infinity`, `backoffMs: 500`.
+ * @returns A handle with a `stop()` method that aborts the current SSE
+ *   connection and cancels any pending reconnect.
+ *
+ * @throws {Error} When the server responds with an HTTP error or when the SSE
+ *   frame size exceeds 1 MB (broken or hostile server).
+ * @throws {AbortError} Propagated from the underlying fetch when `stop()`
+ *   aborts an in-flight request.
+ *
+ * @remarks
+ * The stream is subscribe-first: the SSE connection is opened *before*
+ * catch-up runs, so any messages broadcast during catch-up are already in
+ * the live buffer. The id-based de-dup in `deliver()` then collapses any
+ * overlap to exactly-once delivery.
+ *
+ * Catch-up for an all-rooms subscription is best-effort: if room enumeration
+ * fails the catch-up is skipped and the reopened live stream covers the gap.
+ *
+ * @example
+ * ```ts
+ * const { stop } = streamMessages(conn, (m) => render(m), { room: "general" });
+ * // later: stop();
+ * ```
+ */
 export function streamMessages(
   c: ClubConn,
   onMessage: (m: Message) => void,
@@ -155,6 +244,8 @@ export function streamMessages(
     }
   }
 
+  // Open the SSE connection and start reading frames. Throws on HTTP error
+  // and on frames larger than 1 MB (broken or hostile server).
   async function openStream(): Promise<void> {
     fetchController = new AbortController();
     // If stop() fires mid-connection, abort the in-flight fetch too.
@@ -242,6 +333,9 @@ export function streamMessages(
     if (!stopSignal.signal.aborted) throw new Error("stream ended");
   }
 
+  // Push a message to the onMessage callback if it's strictly newer than
+  // anything already seen. ulid ids are lexicographically monotonic, so a
+  // simple string comparison is a valid ordering.
   function deliver(m: Message): void {
     // De-dup: skip anything at or before the resume cursor (catch-up overlap).
     if (lastId !== undefined && m.id <= lastId) return;
@@ -249,6 +343,10 @@ export function streamMessages(
     onMessage(m);
   }
 
+  // Fetch any messages missed while the stream was disconnected, scoped to
+  // the same room filter as the SSE connection. For an all-rooms
+  // subscription the room list is enumerated best-effort; if that fails the
+  // catch-up is silently skipped (the reopened live stream covers the gap).
   async function catchUp(): Promise<void> {
     if (lastId === undefined) return; // nothing to resume from
     // Catch up the gap per subscribed room: GET /messages is single-room, so a

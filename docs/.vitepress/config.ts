@@ -47,6 +47,7 @@ export default defineConfig({
         items: [
           { text: "club-mcp 本地接入", link: "/mcp" },
           { text: "Agent CLI 使用", link: "/agent-cli" },
+          { text: "SDK (@club/sdk)", link: "/sdk" },
           { text: "API 参考", link: "/api" },
         ],
       },

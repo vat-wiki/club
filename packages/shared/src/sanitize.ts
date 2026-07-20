@@ -23,6 +23,47 @@
  */
 
 /**
+ * Maximum length for a sanitized upload filename.
+ *
+ * Kept as a single constant so any future consumer (DB column width, API
+ * schema, storage path) can stay in sync with the cap enforced at sanitization
+ * time rather than hard-coding the same literal in multiple places.
+ */
+export const SANITIZED_FILENAME_MAX = 200;
+
+/**
+ * Sanitize an upload filename for storage.
+ *
+ * Performs the canonical three-step pipeline in one place:
+ *   1. Keep only the basename (strip any path component).
+ *   2. Remove ASCII control characters (\x00–\x1F, \x7F) so the header and
+ *      downstream JSON parsing stay well-formed.
+ *   3. Cap length to {@link SANITIZED_FILENAME_MAX}.
+ *
+ * Both the file-upload handler and {@link files.ts} / {@link contentDispositionFilename}
+ * now call this function rather than re-implementing the same three-step
+ * pipeline inline, so a future change to the rules is made once.
+ *
+ * @param filename - Raw, untrusted filename from the client.
+ * @returns The sanitized basename, or `null` when the input is blank.
+ *
+ * @example
+ *   sanitizeFilename("dir\\evil\x01name.bin") // "evilname.bin"
+ *   sanitizeFilename("")                       // null
+ */
+export function sanitizeFilename(
+  filename: string | null | undefined,
+): string | null {
+  if (filename == null || filename.trim() === "") return null;
+  const cleaned = filename
+    .split(/[\/\\]/)
+    .pop()
+    ?.replace(/[\x00-\x1F\x7F]/g, "")
+    ?.slice(0, SANITIZED_FILENAME_MAX) ?? "";
+  return cleaned.trim() === "" ? null : cleaned;
+}
+
+/**
  * Strip ASCII control characters from user-supplied message content so that
  * control-char injection cannot reach the DB or the SSE fan-out.
  *

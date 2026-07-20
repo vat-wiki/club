@@ -14,6 +14,7 @@ import {
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
   type MessageAttachment,
+  sanitizeFilename,
   type VideoMime,
 } from "@club/shared";
 
@@ -36,16 +37,8 @@ import { jsonErr, requireValidId } from "../lib.js";
 export function contentDispositionFilename(
   filename: string | null | undefined,
 ): string | null {
-  if (filename == null || filename.trim() === "") return null;
-  // Defensive: keep only the basename and strip ASCII control chars
-  // (\x00–\x1F, \x7F) — these can break downstream parsing or trigger
-  // CRLF-style injection in debug/audit logs.
-  const cleaned = filename
-    .split(/[\/\\]/)
-    .pop()
-    ?.replace(/[\x00-\x1F\x7F]/g, "")
-    ?.slice(0, 200) ?? "";
-  if (cleaned.trim() === "") return null;
+  const cleaned = sanitizeFilename(filename);
+  if (cleaned == null) return null;
   // RFC 5987: filename*=UTF-8''<percent-encoded>
   const utf8Encoded = encodeURIComponent(cleaned)
     .replace(/!/g, "%21")
@@ -194,17 +187,10 @@ files.post("/", requireAuth, async (c) => {
   }
 
   // Original filename (display metadata only — the blob is stored under a
-  // random id). Defensive pipeline:
-  //   1. Keep only the basename (strip any path component).
-  //   2. Remove ASCII control characters (\x00–\x1F, \x7F) — these can break
-  //      downstream JSON parsing, HTML rendering, or trigger CRLF-style
-  //      injection in debug/audit logs.
-  //   3. Cap length to avoid unbounded BLOB growth.
-  const filename =
-    typeof file.name === "string" && file.name.trim().length > 0
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split() always returns a non-empty array for a non-empty string; the guard above guarantees we have one
-      ? file.name.split(/[\/\\]/).pop()!.replace(/[\x00-\x1F\x7F]/g, "").slice(0, 200)
-      : null;
+  // random id). Sanitized once via `sanitizeFilename` so the basename-only,
+  // no-control-char, length-capped rules live in a single shared function
+  // (also reused by `contentDispositionFilename`).
+  const filename = typeof file.name === "string" ? sanitizeFilename(file.name) : null;
 
   // Read once into a buffer. For video/document this can reach tens of MB —
   // acceptable for club's single-room, low-concurrency profile. The write below

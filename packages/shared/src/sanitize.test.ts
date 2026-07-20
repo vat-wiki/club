@@ -1,6 +1,10 @@
 import { describe, expect,it } from "vitest";
 
-import { sanitizeContent } from "./sanitize.js";
+import {
+  sanitizeContent,
+  SANITIZED_FILENAME_MAX,
+  sanitizeFilename,
+} from "./sanitize.js";
 
 describe("sanitizeContent", () => {
   it("strips NUL byte", () => {
@@ -55,5 +59,56 @@ describe("sanitizeContent", () => {
 
   it("works on empty string", () => {
     expect(sanitizeContent("")).toBe("");
+  });
+});
+
+describe("sanitizeFilename", () => {
+  it("keeps a plain basename as-is", () => {
+    expect(sanitizeFilename("photo.jpg")).toBe("photo.jpg");
+  });
+
+  it("strips a leading directory component (posix)", () => {
+    expect(sanitizeFilename("uploads/photo.jpg")).toBe("photo.jpg");
+  });
+
+  it("strips a leading directory component (windows)", () => {
+    expect(sanitizeFilename("C:\\temp\\photo.jpg")).toBe("photo.jpg");
+  });
+
+  it("strips control characters from the basename", () => {
+    expect(sanitizeFilename("evil\x01name.bin")).toBe("evilname.bin");
+    expect(sanitizeFilename("a\x00b.txt")).toBe("ab.txt");
+    expect(sanitizeFilename("x\x7fy.pdf")).toBe("xy.pdf");
+  });
+
+  it("caps the cleaned name at SANITIZED_FILENAME_MAX", () => {
+    const long = "a".repeat(SANITIZED_FILENAME_MAX + 50) + ".txt";
+    expect(sanitizeFilename(long).length).toBeLessThanOrEqual(
+      SANITIZED_FILENAME_MAX,
+    );
+  });
+
+  it("returns null for blank input", () => {
+    expect(sanitizeFilename("")).toBe(null);
+    expect(sanitizeFilename("   ")).toBe(null);
+    expect(sanitizeFilename(null)).toBe(null);
+    expect(sanitizeFilename(undefined)).toBe(null);
+  });
+
+  it("returns null when cleaning leaves nothing behind", () => {
+    expect(sanitizeFilename("\x00\x01\x1f")).toBe(null);
+  });
+
+  it("returns null for path-only input (no basename)", () => {
+    expect(sanitizeFilename("/")).toBe(null);
+    expect(sanitizeFilename("dir/")).toBe(null);
+  });
+
+  it("preserves Unicode / emoji in the basename", () => {
+    expect(sanitizeFilename("👋你好.png")).toBe("👋你好.png");
+  });
+
+  it("is a no-op for a normal filename (no trimming of spaces in name)", () => {
+    expect(sanitizeFilename("my file.txt")).toBe("my file.txt");
   });
 });

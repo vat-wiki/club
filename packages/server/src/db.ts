@@ -1003,6 +1003,39 @@ const roomBySlugStmt = db.prepare<
   { id: string; slug: string; created_at: number }
 >(`SELECT id, slug, created_at FROM rooms WHERE slug = ?`);
 
+// One-room variant of listRoomsStmt: fetch a single room's metadata plus its
+// last-activity timestamp in one query. Used by POST /rooms after a
+// already-existing slug is re-read. Replaces listRooms().find(slug), which
+// scans the entire rooms table with a LEFT JOIN + MAX aggregation for every
+// request — linear in room count and wasteful on the common path where the
+// room already exists. A targeted single-row query is O(1) with the
+// UNIQUE(slug) constraint.
+const roomBySlugWithActivityStmt = db.prepare<
+  [string],
+  RoomRow | undefined
+>(`
+  SELECT r.id, r.slug, r.created_at,
+         MAX(m.created_at) AS last_activity_at
+   FROM rooms r
+   LEFT JOIN messages m ON m.room = r.slug
+   WHERE r.slug = ?
+   GROUP BY r.id, r.slug, r.created_at
+`);
+
+/** Look up a single room by slug, including its last-activity timestamp.
+ *  Returns undefined when the slug is not in the registry.
+ *
+ *  Performance: a single-row targeted query using the UNIQUE(slug) constraint;
+ *  avoids the full-table scan + aggregation that listRooms().find(slug) would
+ *  require. Same output shape as listRooms() so toRoom() can handle both.
+ *
+ *  @param slug - Canonical room slug (validated by the caller).
+ *  @returns Room row with lastActivityAt, or undefined.
+ */
+export function getRoomBySlug(slug: string): RoomRow | undefined {
+  return roomBySlugWithActivityStmt.get(slug);
+}
+
 const insertRoomStmt = db.prepare(
   `INSERT OR IGNORE INTO rooms (id, slug, created_at) VALUES (?, ?, ?)`,
 );

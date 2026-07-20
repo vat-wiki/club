@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { CreateRoomRequest, type Room } from "@club/shared";
 import { requireAuth } from "../auth.js";
-import { listRooms, ensureRoom, type RoomRow } from "../db.js";
+import { listRooms, ensureRoom, getRoomBySlug, type RoomRow } from "../db.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { jsonErr, parseJsonBody } from "../lib.js";
 
@@ -51,9 +51,9 @@ rooms.post("/", requireJson, async (c) => {
     const r: Room = { id: room.id, slug: room.slug, createdAt: room.created_at, lastActivityAt: null };
     return c.json(r, 201);
   }
-  // Room already existed — re-read via listRooms so the response carries the
-  // authoritative lastActivityAt (non-null when the room already had messages).
-  const full = listRooms().find((r) => r.slug === slug);
+  // Room already existed — read back its authoritative lastActivityAt so the
+  // response reflects the current state rather than a null placeholder.
+  const full = getRoomBySlug(slug);
   if (!full) {
     // Slug collided between ensureRoom() and the re-read — extremely rare,
     // but avoid leaking internals; treat as server error rather than leaking

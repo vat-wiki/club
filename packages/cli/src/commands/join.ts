@@ -17,8 +17,9 @@
 
 import { Command } from "commander";
 
-import { ClubApiError,ClubClient } from "@club/sdk";
+import { ClubApiError, ClubClient } from "@club/sdk";
 import type { Participant } from "@club/shared";
+import { ParticipantNameRegex } from "@club/shared";
 
 import { withCatchExit } from "../catch-exit.js";
 import { saveConfig } from "../config.js";
@@ -54,6 +55,19 @@ export class JoinNameTakenError extends Error {
 }
 
 export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinResult> {
+  // Fail fast: the name shape is validated client-side against the shared
+  // regex (the same pattern the server uses in POST /participants), so
+  // obviously-invalid callsigns are rejected before any network call.
+  // The server still performs its own validation — this is purely a UX
+  // improvement (instant feedback vs. a 400 round-trip). See:
+  // packages/shared/src/types.ts  ParticipantName / ParticipantNameRegex.
+  if (!ParticipantNameRegex.test(input.name)) {
+    throw new Error(
+      `invalid callsign "${input.name}" — only letters, numbers, spaces,`
+        + ` hyphens, underscores, dots and apostrophes (1-40 chars);`
+        + ` no leading or trailing whitespace`,
+    );
+  }
   const server = input.server.replace(/\/$/, "");
   let res: JoinCreateResult;
   try {

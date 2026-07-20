@@ -440,7 +440,7 @@ export function getReactionsForMessage(messageId: string): { emoji: string; coun
  *  renders (a list of messages), so a one-time-allocated statement per batch
  *  size avoids repeated statement creation on the hot path.
  */
-const reactionsForMessagesCache = new Map<number, ReturnType<typeof db.prepare<[...string[]], { message_id: string; emoji: string; participant_id: string }>>>();
+const reactionsForMessagesCache = new Map<number, ReturnType<typeof db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>>>();
 
 export function getReactionsForMessages(
   messageIds: string[],
@@ -449,23 +449,24 @@ export function getReactionsForMessages(
   const placeholders = "?,".repeat(messageIds.length).slice(0, -1);
   let stmt = reactionsForMessagesCache.get(messageIds.length);
   if (!stmt) {
-    const sql = `SELECT message_id, emoji, participant_id FROM reactions WHERE message_id IN (${placeholders})`;
-    stmt = db.prepare<[...string[]], { message_id: string; emoji: string; participant_id: string }>(sql);
+    const sql =
+      `SELECT message_id, emoji, COUNT(*) AS count FROM reactions`
+      + ` WHERE message_id IN (${placeholders})`
+      + ` GROUP BY message_id, emoji`;
+    stmt = db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>(sql);
     reactionsForMessagesCache.set(messageIds.length, stmt);
   }
   const rows = stmt.all(...messageIds as [...string[]]);
-  const byMsg = new Map<string, Map<string, number>>();
-  for (const r of rows) {
-    let counts = byMsg.get(r.message_id);
-    if (!counts) {
-      counts = new Map<string, number>();
-      byMsg.set(r.message_id, counts);
-    }
-    counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
-  }
+  // Group aggregated rows by message_id, preserving insertion order of the
+  // returned rows (SQLite GROUP BY output order is stable for a given run).
   const out = new Map<string, { emoji: string; count: number }[]>();
-  for (const [msgId, counts] of byMsg) {
-    out.set(msgId, [...counts.entries()].map(([emoji, count]) => ({ emoji, count })));
+  for (const r of rows) {
+    let entry = out.get(r.message_id);
+    if (!entry) {
+      entry = [];
+      out.set(r.message_id, entry);
+    }
+    entry.push({ emoji: r.emoji, count: r.count });
   }
   return out;
 }

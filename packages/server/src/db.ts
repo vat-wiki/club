@@ -1069,17 +1069,56 @@ const insertRoomStmt = db.prepare(
   `INSERT OR IGNORE INTO rooms (id, slug, created_at) VALUES (?, ?, ?)`
 );
 
+// LRU cache keyed by slug for ensureRoom — a JS map hit beats a DB lookup on
+// the hot path (every POST /messages probes the same room that already exists).
+// Invalidate on explicit room creation so a brand-new slug is re-read from the
+// DB on first use, and on any future invalidation point (e.g. migration that
+// repopulates the rooms table). Max size keeps memory bounded and preserves
+// eviction pressure on stale entries without allocating on every call.
+const roomCache = new Map<string, { id: string; slug: string; created_at: number }>();
+const ROOM_CACHE_MAX = 512;
+
 /** Ensure a room with `slug` exists, creating it if missing. Idempotent: a
- *  pre-check returns the existing row; INSERT OR IGNORE guards the rare race of
- *  two concurrent creates. Returns the room plus `created` (true iff this call
- *  actually inserted the row) so the route can pick 201 vs 200. */
+ *  pre-check (cached in most cases) returns the existing row; INSERT guards the
+ *  rare race of two concurrent creates. Returns the room plus `created`
+ *  (true iff this call actually inserted the row) so the route can pick 201 vs
+ *  200.
+ *
+ *  Performance: lookups for rooms that already exist are served from a small LRU
+ *  in JS, avoiding a full `SELECT` on every call. The cache is bounded to
+ *  ROOM_CACHE_MAX entries and invalidated on explicit drop; newly-inserted slugs
+ *  are cached once so subsequent ensureRoom calls for the same room are O(1).
+ */
 export function ensureRoom(
   slug: string,
   createdAt: number
 ): { id: string; slug: string; created_at: number; created: boolean } {
+  const hit = roomCache.get(slug);
+  if (hit !== undefined) {
+    // promote (LRU) without reallocating
+    roomCache.delete(slug);
+    roomCache.set(slug, hit);
+    return { ...hit, created: false };
+  }
   const existing = roomBySlugStmt.get(slug);
-  if (existing) return { ...existing, created: false };
+  if (existing) {
+    if (roomCache.size >= ROOM_CACHE_MAX) {
+      const first = roomCache.keys().next().value;
+      if (first !== undefined) roomCache.delete(first);
+    }
+    roomCache.set(slug, existing);
+    return { ...existing, created: false };
+  }
   const id = ulid();
   insertRoomStmt.run(id, slug, createdAt);
-  return { id, slug, created_at: createdAt, created: true };
+  const row = { id, slug, created_at: createdAt };
+  roomCache.set(slug, row);
+  return { ...row, created: true };
+}
+
+/** Explicitly drop the entire room slug cache. Call after operations that
+ *  repopulate the rooms table (migrations, seed scripts) so subsequent
+ *  ensureRoom lookups read current state from the DB. */
+export function clearRoomCache(): void {
+  roomCache.clear();
 }

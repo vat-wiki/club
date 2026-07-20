@@ -11,7 +11,15 @@ import { randomUUID } from "node:crypto";
  *   - X-Content-Type-Options: prevents MIME-type sniffing.
  *   - X-Frame-Options: legacy framing protection (backup for CSP frame-ancestors).
  *   - Referrer-Policy: limits referrer information leakage.
- *   - Permissions-Policy: disables unnecessary browser features.
+ *   - Permissions-Policy: disables unnecessary browser features including
+ *     sensors (usb, serial, magnetometer, gyroscope, accelerometer) that a
+ *     chat SPA never uses.
+ *   - X-Permitted-Cross-Domain-Policies: none — blocks any Flash/SWF
+ *     cross-domain access (legacy hardening).
+ *   - X-Download-Options: noopen — prevents downloaded files from being
+ *     executed inline in older IE/Edge.
+ *   - X-Robots-Tag: noindex, nofollow, noarchive — keeps chat content out of
+ *     search engines.
  *   - Cache-Control / Pragma / Vary: prevents caching of authenticated API
  *     responses by browsers, CDNs, and reverse proxies; varies on
  *     Authorization so unauthenticated error pages are cached separately.
@@ -54,8 +62,12 @@ export const securityHeaders = createMiddleware(async (c, next) => {
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=()",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), magnetometer=(), gyroscope=(), accelerometer=()",
   );
+  c.header("X-Permitted-Cross-Domain-Policies", "none");
+  c.header("X-Download-Options", "noopen");
+  // Private chat app: prevent search-engine indexing and crawling of chat content.
+  c.header("X-Robots-Tag", "noindex, nofollow, noarchive");
   // Traceable per-request identifier for correlation across logs.
   c.header("X-Request-ID", randomUUID());
   // Disables speculative DNS prefetches that can leak navigation intent.

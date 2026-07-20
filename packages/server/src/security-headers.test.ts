@@ -129,4 +129,42 @@ describe("securityHeaders", () => {
     expect(res.headers.get("cross-origin-embedder-policy")).toBe("require-corp");
     expect(res.headers.get("cross-origin-opener-policy")).toBe("same-origin-origin-when-cross-origin");
   });
+
+  it("sets X-Permitted-Cross-Domain-Policies to none (Flash/SWF hardening)", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    expect(res.headers.get("x-permitted-cross-domain-policies")).toBe("none");
+  });
+
+  it("sets X-Download-Options to noopen (prevent inline execution of downloaded files)", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    expect(res.headers.get("x-download-options")).toBe("noopen");
+  });
+
+  it("sets X-Robots-Tag to prevent search-engine indexing", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    const tag = res.headers.get("x-robots-tag");
+    expect(tag).toContain("noindex");
+    expect(tag).toContain("nofollow");
+    expect(tag).toContain("noarchive");
+  });
+
+  it("Permissions-Policy includes usb and serial sensors", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    const pp = res.headers.get("permissions-policy") ?? "";
+    expect(pp).toMatch(/usb=\(\)/);
+    expect(pp).toMatch(/serial=\(\)/);
+    expect(pp).toMatch(/magnetometer=\(\)/);
+  });
 });

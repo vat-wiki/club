@@ -5,6 +5,7 @@ import {
   DEFAULT_ROOM,
   CreateMessageRequest,
   ToggleReactionRequest,
+  sanitizeContent,
   type Message,
   type MessageAttachment,
   type Reaction,
@@ -141,6 +142,11 @@ messages.post("/", requireJson, async (c) => {
   const parsed = await parseJsonBody<typeof CreateMessageRequest._output>(c, CreateMessageRequest, "bad request");
   if (!parsed.ok) return parsed.r;
   const { content, attachmentIds, replyToId, room } = parsed.data;
+  // Sanitize the message body once at ingestion. The sanitized copy is the
+  // sole source of truth from here on — stored in DB and broadcast via SSE.
+  // Stripping control characters protects the SSE JSON frame boundary and
+  // prevents invisible delimiters from reaching CLI/SDK/MCP consumers.
+  const cleanContent = sanitizeContent(content);
 
   // Attachments are rehydrated server-side from the requested ids; the server
   // is the sole source of truth for mime/width/height/size, so the client only
@@ -179,7 +185,9 @@ messages.post("/", requireJson, async (c) => {
   }
 
   // Cross-field rule: text OR image. Empty text with no images is rejected.
-  if (!content.trim() && attachments.length === 0) {
+  // Re-checked against cleanContent since sanitization can reduce a text-only
+  // payload to empty.
+  if (!cleanContent.trim() && attachments.length === 0) {
     return jsonErr(c, "content or attachment required");
   }
 
@@ -194,7 +202,7 @@ messages.post("/", requireJson, async (c) => {
   insertMessage(
     id,
     me.id,
-    content,
+    cleanContent,
     createdAt,
     attachments.length > 0 ? JSON.stringify(attachments) : null,
     replyToId ?? null,
@@ -210,7 +218,7 @@ messages.post("/", requireJson, async (c) => {
   // Each mention carries `room` so a cross-room @mention can deep-link the
   // recipient to the source room + message (MR11).
   const mentioned = extractMentionedParticipants(
-    content,
+    cleanContent,
     getAllParticipantNames(),
   );
   for (const m of mentioned) {
@@ -221,7 +229,7 @@ messages.post("/", requireJson, async (c) => {
     id,
     participantId: me.id,
     authorName: me.name,
-    content,
+    content: cleanContent,
     createdAt,
     room,
   };

@@ -10,6 +10,7 @@ import type {
   RecoverParticipantRequest,
   RecoverParticipantResponse,
   Room,
+  RoomSlugType,
   UploadFileResponse,
 } from "@club/shared";
 import {
@@ -210,7 +211,7 @@ export async function listMessages(
 export async function sendMessage(
   c: ClubConn,
   content: string,
-  opts: { attachmentIds?: string[]; replyToId?: string; room?: string; timeoutMs?: number } = {},
+  opts: { attachmentIds?: string[]; replyToId?: string; room?: RoomSlugType; timeoutMs?: number } = {},
 ): Promise<Message> {
   // Backward compatible: when no attachmentIds/replyToId/room are supplied the
   // body is just { content } exactly as before. With any, the body carries them.
@@ -520,7 +521,7 @@ export async function listRooms(c: ClubConn, opts: CallOpts = {}): Promise<Room[
 // existing slug returns that room without error. `name` is the canonical slug.
 export async function createRoom(
   c: ClubConn,
-  name: string,
+  name: RoomSlugType,
   opts: { timeoutMs?: number } = {},
 ): Promise<Room> {
   return request<Room>(c, "/rooms", { method: "POST", body: { name }, ...opts });

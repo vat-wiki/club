@@ -222,6 +222,9 @@ export const RoomSlug = z
     "room name must be 1-30 chars of [a-z0-9-], starting alphanumeric",
   );
 
+/** Room slug type — used by SDK/CLI callers who need the schema value as a TS type. */
+export type RoomSlugType = z.infer<typeof RoomSlug>;
+
 /**
  * One room in the list returned by GET /rooms.
  *

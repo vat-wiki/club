@@ -496,3 +496,119 @@ All errors follow the shared `ApiError` shape:
 ```json
 { "error": "<human-readable message>" }
 ```
+
+---
+
+## 13. Error Codes Reference
+
+Complete, programmatically-extracted list of every error the server can
+return. All route handlers funnel through `jsonErr()` in `lib.ts`, so the
+shape `{ "error": "<message>" }` is uniform; the status code plus message
+combination below is the contract to match on.
+
+### 13.1 HTTP status summary
+
+| Status | Meaning | Frequency in code |
+|---|---|---|
+| `204` | No-content success (recalls, reactions, think/idle) | route handlers, `c.body(null, 204)` |
+| `400` | Bad request / validation failure | most common — Zod rejects, cross-field rules, bad ids, bad emoji |
+| `401` | Authentication failure | missing/malformed header, invalid key, bad recovery code |
+| `403` | Forbidden (authorized but not allowed) | attaching another participant's file |
+| `404` | Not found | missing message, mention, file, or invalid id |
+| `409` | Conflict | name already taken, mention already read |
+| `413` | Payload too large | body exceeds configured limit (fast-path via `Content-Length` or slow-path stream) |
+| `415` | Unsupported media type | non-JSON body, disallowed MIME, type mismatch |
+| `416` | Range not satisfiable | bad `Range` header on `GET /files/:id` |
+| `422` | Unprocessable entity | server could not probe image dimensions |
+| `429` | Too many requests | rate-limit exceeded (global 120/min or key-issuance 10/min) |
+| `500` | Internal server error | internal DB/filestate inconsistencies (e.g. room metadata row missing) |
+
+### 13.2 Exhaustive message table (by source)
+
+**Auth middleware** (`auth.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `401` | `missing Authorization header` | Header absent or empty |
+| `401` | `invalid Authorization format (expected 'Bearer <token>')` | Header present but malformed |
+| `401` | `invalid key` | Key not found (hash not in DB) |
+
+**Body-size guard** (`body-size-guard.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `413` | `request body exceeds {maxBytes} bytes limit` | Declared `Content-Length` over cap (fast-path) or streamed bytes over cap (slow-path) |
+
+**Rate limiter** (`rate-limit.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `429` | `rate limited` | IP exceeded quota (includes `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` headers) |
+
+**Participants** (`routes/participants.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `401` | `invalid recovery code` | Wrong / already-consumed recovery code (uniform with name-not-found) |
+| `409` | `name "{name}" is taken` | Callsign already registered (key-issuance or recover) |
+
+**Me** (`routes/me.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `404` | `mention not found` | Mention id doesn't exist for the authenticated participant |
+| `409` | `mention already read` | Attempting to mark an already-read mention as read again |
+
+**Messages** (`routes/messages.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `400` | `attachment not found` | Referenced attachment id doesn't exist |
+| `400` | `bad message id` / `bad since id` / `bad before id` | Invalid id in path or query param |
+| `400` | `bad room slug` | Invalid room in query param |
+| `400` | `content or attachment required` | Empty text + no attachments |
+| `400` | `bad emoji` | Missing/empty emoji in reaction toggle |
+| `400` | `not found` | Message id not found (read, delete, reaction) |
+| `403` | `attachment not owned by sender` | Attaching another participant's file to a message |
+| `500` | `attachments unavailable` | Internal inconsistency (attachment metadata row missing) |
+
+**Files** (`routes/files.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `400` | `expected multipart form data` | Request not multipart |
+| `400` | `missing "file" field` | No file part in the multipart body |
+| `400` | `empty file` | Uploaded size ≤ 0 |
+| `400` | `not found` | Unknown file id |
+| `415` | `unsupported file type` | MIME not in the accepted list |
+| `415` | `file content does not match declared type` | MIME probing disagrees with declared type |
+| `422` | `could not read image dimensions` | Image file readable but no valid dimensions (e.g. truncated) |
+
+**Rooms** (`routes/rooms.ts`)
+
+| Status | Message | Trigger |
+|---|---|---|
+| `500` | `room not found` | Internal state (a room slug exists in index but no metadata row) |
+
+### 13.3 Response headers on special statuses
+
+| Header | When | Value |
+|---|---|---|
+| `Retry-After` | `429` | Seconds until the rate-limit window resets |
+| `X-RateLimit-Limit` | `429` and successful responses | Max requests per window |
+| `X-RateLimit-Remaining` | `429` and successful responses | Requests left in current window |
+| `Content-Disposition: attachment; filename="..."` | `GET /files/:id` | Filename for the download (document MIMEs) |
+| `Accept-Ranges: bytes` | `GET /files/:id` | Range requests supported |
+| `Content-Range: bytes {start}-{end}/{size}` | `206` on `GET /files/:id` | Partial content range |
+
+### 13.4 204 success paths (no body)
+
+These routes return `204 No Content` with an empty body on success — they
+should not be checked for JSON:
+
+| Endpoint | Condition |
+|---|---|
+| `DELETE /messages/:id` | Message found and owned by caller |
+| `POST /messages/:id/reactions` | Reaction toggled (added or removed) |
+| `POST /agents/thinking` | Status reported (may suppress broadcast if re-reported within TTL) |
+| `POST /agents/idle` | Status cleared |

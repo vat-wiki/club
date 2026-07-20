@@ -219,24 +219,9 @@ export const __test = { stopThinkingHeartbeat, THINKING_REFRESH_MS };
  * directly is impractical: it process.exit()s when CLUB_KEY is unset and binds
  * stdio at module top level).
  *
- * Generic in the tool name so the `args` shape is resolved to the matching
- * per-tool interface from types.ts rather than a raw `Record<string, unknown>`,
- * surfacing misspelled parameters at compile time instead of at runtime.
- *
- * Throws when the underlying client call fails; index.ts wraps the throw as an
- * `error: <msg>` tool result, preserving the original behavior.
- */
-/**
- * Route one MCP tool call to the matching client action and return the
- * human-readable text the tool should reply with. Extracted from index.ts so
- * the dispatcher — every tool's formatting, empty-result, missing-arg, and
- * error behavior — is unit-testable with a fake client (importing index.ts
- * directly is impractical: it process.exit()s when CLUB_KEY is unset and binds
- * stdio at module top level).
- *
  * Each case is annotated with `ArgsFor<"toolName">` so the compiler validates
  * that the accessed properties exist on the matching per-tool interface in
- * types.ts. Adding a new tool that forgets a required field is caught here.
+ * types.ts, surfacing misspelled parameters and missing fields at compile time.
  *
  * Throws when the underlying client call fails; index.ts wraps the throw as an
  * `error: <msg>` tool result, preserving the original behavior.

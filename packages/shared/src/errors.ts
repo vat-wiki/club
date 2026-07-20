@@ -38,13 +38,36 @@ export type NetworkFailureStatus = typeof NETWORK_ERROR_STATUS;
 export type ClubApiErrorStatus = HttpStatusCode | NetworkFailureStatus;
 
 /**
+ * Closed set of status codes that `ClubApiError` may carry at runtime.
+ * Mirrors {@link HttpStatusCode} exactly, plus the network-failure sentinel.
+ * Enumerated so the runtime guard can reject exotic codes (419, 452, 509,
+ * etc.) that fall inside the raw 100-511 HTTP range but are excluded from
+ * the type-level union. Any code not listed here throws a TypeError, keeping
+ * the runtime contract in sync with the type contract.
+ */
+const ALLOWED_CLUB_API_ERROR_STATUSES = new Set<ClubApiErrorStatus>([
+  NETWORK_ERROR_STATUS,
+  100, 101, 102, 103,
+  200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+  300, 301, 302, 303, 304, 305, 306, 307, 308,
+  400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410,
+  411, 412, 413, 414, 415, 416, 417, 418,
+  421, 422, 423, 424, 425, 426,
+  428, 429, 431,
+  451,
+  500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511,
+]);
+
+/**
  * Type guard: is a numeric status the network-failure sentinel?
  *
  * Enables clean discriminated-union branching on `ClubApiErrorStatus`
  * without manual `err.status === 0` comparisons scattered across callers:
  *
  * ```ts
- * if (isNetworkFailure(err.status)) {/* DNS/timeout branch *}*
+ * if (isNetworkFailure(err.status)) {
+ *   // DNS/timeout branch
+ * }
  * ```
  *
  * @param status - A `ClubApiErrorStatus` value.
@@ -60,10 +83,10 @@ export function isNetworkFailure(
  * Safely narrow a raw HTTP response status into `ClubApiErrorStatus`.
  *
  * Raw `res.status` is typed `number`; blindly casting `as ClubApiErrorStatus`
- * lets exotic codes (e.g. reverse-proxy 418, 452) slip past type checking
- * and poison downstream branching. This helper throws a typed error when the
- * code is unrecognised, so bugs surface during construction rather than
- * at the caller's branch.
+ * lets exotic codes (e.g. reverse-proxy 418, 452, 509) slip past type
+ * checking and poison downstream branching. This helper validates against the
+ * closed set of allowed codes, so unrecognised statuses surface as TypeErrors
+ * during construction rather than leaking into retry/backoff/toast branches.
  *
  * @param status - A raw HTTP status code from a Response.
  * @returns The narrowed status.
@@ -73,12 +96,13 @@ export function isNetworkFailure(
 export function parseHttpErrorStatus(status: number): ClubApiErrorStatus {
   // Network sentinel — not an HTTP code but always valid in our union.
   if (status === NETWORK_ERROR_STATUS) return status;
-  // Allow any code that's in the closed union.
+  // Validate against the closed set of allowed codes. A bare 100-511 range
+  // check would accept exotic codes excluded from HttpStatusCode (e.g. 419,
+  // 452, 509); reject those so the runtime contract matches the type contract.
   if (
     typeof status === "number" &&
     Number.isInteger(status) &&
-    status >= 100 &&
-    status <= 511
+    ALLOWED_CLUB_API_ERROR_STATUSES.has(status as ClubApiErrorStatus)
   ) {
     return status as ClubApiErrorStatus;
   }

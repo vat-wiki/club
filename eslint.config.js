@@ -96,11 +96,18 @@ export default [
   // registered here so the test-file relaxations above don't touch import
   // ordering (ordering in test files is still enforced).
 
-  // Web frontend — stricter console rule for browser code
+  // Web frontend — stricter console rule for browser code.
+  // `prefer-nullish-coalescing` is relaxed here because the web frontend
+  // uses many intentional boolean `||` / `&&` guards (disabled flags, aria-
+  // states, presence checks) where `??` would incorrectly treat `false` as
+  // a missing value. Keeping the rule active globally catches the genuine
+  // fallback-vs-OR confusion in server/CLI code; suppressing it per-package
+  // avoids littering the web package with per-site `eslint-disable` comments.
   {
     files: ["packages/web/src/**/*.{ts,tsx}"],
     rules: {
       "no-console": ["warn", { allow: ["warn", "error"] }],
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
     },
   },
 

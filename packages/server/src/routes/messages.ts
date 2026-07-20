@@ -26,8 +26,9 @@ import {
   getReactionsForMessage,
   getReactionsForMessages,
   getRecentMessages,
-  insertMention,
+  insertMentions,
   insertMessage,
+  type MentionInsert,
   type MessageRow,
   searchMessages,
   toggleReaction,
@@ -197,9 +198,15 @@ messages.post("/", requireJson, async (c) => {
     cleanContent,
     getAllParticipantNames(),
   );
-  for (const m of mentioned) {
-    insertMention(ulid(), id, m.id, me.id, room, createdAt);
-  }
+  const mentionRows: MentionInsert[] = mentioned.map((m) => ({
+    id: ulid(),
+    messageId: id,
+    participantId: m.id,
+    authorId: me.id,
+    room,
+    createdAt,
+  }));
+  if (mentionRows.length > 0) insertMentions(mentionRows);
 
   const msg: Message = {
     id,

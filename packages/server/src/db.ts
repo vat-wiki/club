@@ -732,6 +732,38 @@ export function insertMention(
   return insertMentionStmt.run(id, messageId, participantId, authorId, room, createdAt).changes > 0;
 }
 
+/** Batch-insert mention inbox rows inside a single transaction. Replaces the
+ *  per-row loop in POST /messages so a message mentioning N participants no
+ *  longer issues N prepared-statement round-trips.
+ *
+ *  @param rows - One entry per (mentioned participant, author) pair for a single message.
+ *  @returns Number of rows actually inserted (duplicates silently ignored by
+ *    UNIQUE(message_id, participant_id)).
+ */
+export interface MentionInsert {
+  id: string;
+  messageId: string;
+  participantId: string;
+  authorId: string;
+  room: string;
+  createdAt: number;
+}
+
+const insertMentionBatchTx = db.transaction((rows: MentionInsert[]) => {
+  let inserted = 0;
+  for (const r of rows) {
+    inserted += insertMentionStmt.run(
+      r.id, r.messageId, r.participantId, r.authorId, r.room, r.createdAt,
+    ).changes;
+  }
+  return inserted;
+});
+
+export function insertMentions(rows: MentionInsert[]): number {
+  if (rows.length === 0) return 0;
+  return insertMentionBatchTx(rows);
+}
+
 const unreadMentionsStmt = db.prepare<[string, number], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
            p.name AS author_name,

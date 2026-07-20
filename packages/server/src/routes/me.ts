@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Mention } from "@club/shared";
 import { MarkMentionsReadRequest } from "@club/shared";
 import { requireAuth } from "../auth.js";
-import { jsonErr, parseJsonBody } from "../lib.js";
+import { jsonErr, parseJsonBody, requireValidId } from "../lib.js";
 import {
   getUnreadMentions,
   getMentionById,
@@ -55,6 +55,8 @@ me.get("/mentions", (c) => {
 me.post("/mentions/:id/read", (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
+  const bad = requireValidId(c, id, "mention id");
+  if (bad) return bad.r;
   const row = getMentionById(id);
   // row is nullable; row?.participant_id coerces null/undefined to undefined,
   // so the !== me.id guard covers both "no row" and "wrong owner" in one check.

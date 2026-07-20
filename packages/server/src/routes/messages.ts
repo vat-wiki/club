@@ -5,8 +5,6 @@ import {
   DEFAULT_ROOM,
   CreateMessageRequest,
   ToggleReactionRequest,
-  MAX_IMAGES_PER_MESSAGE,
-  MAX_MESSAGE_CONTENT,
   type Message,
   type MessageAttachment,
   type Reaction,
@@ -32,7 +30,7 @@ import {
 import { requireAuth } from "../auth.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
-import { parseLimit, jsonErr, parseJsonBody, requireValidRoomSlug } from "../lib.js";
+import { parseLimit, jsonErr, parseJsonBody, requireValidRoomSlug, requireValidId } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
@@ -113,24 +111,13 @@ messages.post("/", requireJson, async (c) => {
   if (!parsed.ok) return parsed.r;
   const { content, attachmentIds, replyToId, room } = parsed.data;
 
-  // content length is already capped by zod (MAX_MESSAGE_CONTENT), but we keep
-  // a cheap server-side guard so malformed payloads are rejected deterministically
-  // even if the schema changes. The threshold mirrors the schema constant so the
-  // two can never drift.
-  if (content.length > MAX_MESSAGE_CONTENT) {
-    return jsonErr(c, `content exceeds maximum length of ${MAX_MESSAGE_CONTENT} characters`);
-  }
-
-  // Rehydrate attachments server-side from the requested ids. The server is the
-  // sole source of truth for mime/width/height/size, so the client only sends
-  // ids — dimensions can't be forged. We also enforce that every requested id
-  // exists AND belongs to the sender: a participant can only attach files it
-  // uploaded, never another participant's. attachment count is capped by
-  // MAX_IMAGES_PER_MESSAGE (shared server/client/MCP limit).
-  if (attachmentIds.length > MAX_IMAGES_PER_MESSAGE) {
-    return jsonErr(c, `too many attachments (max ${MAX_IMAGES_PER_MESSAGE})`);
-  }
-
+  // Attachments are rehydrated server-side from the requested ids; the server
+  // is the sole source of truth for mime/width/height/size, so the client only
+  // sends ids — dimensions can't be forged. We also enforce that every
+  // requested id exists AND belongs to the sender: a participant can only
+  // attach files it uploaded, never another participant's. The cap on count
+  // is already enforced by the Zod schema (MAX_IMAGES_PER_MESSAGE), so no
+  // separate server-side check is needed.
   let attachments: MessageAttachment[] = [];
   if (attachmentIds.length > 0) {
     try {
@@ -238,6 +225,17 @@ messages.get("/", (c) => {
   const since = c.req.query("since");
   const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
+  // Validate both `since` and `before` before any DB call. Invalid ids would
+  // otherwise hit the database and silently return [] (wasted query) and behave
+  // inconsistently with DELETE /messages/:id, which rejects bad ids up-front.
+  if (since !== undefined) {
+    const bad = requireValidId(c, since, "since id");
+    if (bad) return bad.r;
+  }
+  if (before !== undefined) {
+    const bad = requireValidId(c, before, "before id");
+    if (bad) return bad.r;
+  }
   // `before` (older history, scroll-up pagination) takes precedence over
   // `since`; they aren't combined in practice, but if both appear we serve the
   // backward page so the UI's "load earlier" never accidentally pulls newer.
@@ -287,6 +285,8 @@ messages.get("/search", (c) => {
 messages.delete("/:id", (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
+  const bad = requireValidId(c, id, "message id");
+  if (bad) return bad.r;
   const ok = deleteMessage(id, me.id);
   if (!ok) return jsonErr(c, "not found", 404);
   const room = getMessageRoom(id) ?? DEFAULT_ROOM;
@@ -300,6 +300,8 @@ messages.delete("/:id", (c) => {
 messages.post("/:id/reactions", requireJson, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
+  const bad = requireValidId(c, id, "message id");
+  if (bad) return bad.r;
   const parsed = await parseJsonBody<typeof ToggleReactionRequest._output>(
     c,
     ToggleReactionRequest,

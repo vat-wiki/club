@@ -16,7 +16,7 @@ import {
 } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { insertFile, getFile } from "../db.js";
-import { jsonErr } from "../lib.js";
+import { jsonErr, requireValidId } from "../lib.js";
 import { filesDir, filePath } from "../files-dir.js";
 
 /**
@@ -275,6 +275,8 @@ files.post("/", requireAuth, async (c) => {
 // and get the full body. Accept-Ranges is advertised unconditionally.
 files.get("/:id", async (c) => {
   const id = c.req.param("id");
+  const bad = requireValidId(c, id, "file id");
+  if (bad) return bad.r;
   const row = getFile(id);
   if (!row) return jsonErr(c, "not found", 404);
 

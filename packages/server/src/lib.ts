@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
+import { parseQueryLimit, ROOM_SLUG_REGEX, isValidId } from "@club/shared";
 
 /**
  * Send a `{ error: message }` JSON response with the given status. Centralises
@@ -97,6 +97,30 @@ export async function parseJsonBody<T>(
 }
 
 export { parseBearer } from "@club/shared";
+
+/**
+ * Reject a request with a 400 error when the id param fails format validation.
+ *
+ * Ids (ULIDs / base64url slugs) must be a safe token with no whitespace,
+ * path separators, or traversal sequences. Invalid ids are rejected before
+ * any DB or filesystem call so bogus input never reaches a prepared statement
+ * or the `filePath()` guard.
+ *
+ * @param c - The Hono request context.
+ * @param id - The id parameter to validate.
+ * @param kind - Human-readable noun for the error message (e.g. "message id").
+ * @returns A response on invalid input, or `undefined` when the id is valid.
+ */
+export function requireValidId(
+  c: Context,
+  id: string,
+  kind: string,
+): { ok: false; r: Response } | undefined {
+  if (!id || !isValidId(id)) {
+    return { ok: false, r: jsonErr(c, `bad ${kind}`) };
+  }
+  return undefined;
+}
 
 /**
  * Validate a room slug against the canonical `ROOM_SLUG_REGEX`.

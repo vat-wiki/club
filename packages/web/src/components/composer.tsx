@@ -310,7 +310,12 @@ export function Composer({
   // image (plan §1: text is optional so a bare screenshot sends). Any draft
   // still uploading blocks send (and the user is told why via the hint).
   const hasUploading = attachments.some((d) => d.status === "uploading");
-  const doneIds = attachments.filter((d) => d.status === "done" && d.remote).map((d) => d.remote!.id);
+  const doneIds = attachments
+    .filter(
+      (d): d is AttachmentDraft & { remote: { id: string } } =>
+        d.status === "done" && d.remote !== null && d.remote !== undefined,
+    )
+    .map((d) => d.remote.id);
   const canSend = (value.trim().length > 0 || doneIds.length > 0) && !hasUploading;
 
   // ── Typing indicator ───────────────────────────────────────────────
@@ -320,10 +325,14 @@ export function Composer({
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportTyping = useCallback(() => {
     if (!conn) return;
-    void api.thinking(conn, room).catch(() => {});
+    void api.thinking(conn, room).catch(() => {
+      // Thinking reports are best-effort presence; a failed report is harmless.
+    });
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => {
-      void api.idle(conn, room).catch(() => {});
+      void api.idle(conn, room).catch(() => {
+        // Idle report is best-effort presence; a failure is harmless.
+      });
       typingTimer.current = null;
     }, 2500);
   }, [conn, room]);
@@ -358,7 +367,9 @@ export function Composer({
       markSent();
       // Message landed — stop the typing indicator.
       if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (conn) void api.idle(conn, room).catch(() => {});
+      if (conn) void api.idle(conn, room).catch(() => {
+        // Idle report is best-effort presence; a failure is harmless.
+      });
     } catch {
       // Send failed: keep the text draft AND the image drafts so the user can
       // edit/redo without losing the (already-uploaded) images. Surface a
@@ -568,7 +579,12 @@ export function Composer({
           type="button"
           variant="ghost"
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || attachments.length >= MAX_IMAGES_PER_MESSAGE}
+          disabled={
+            // Boolean OR, not fallback — ESLint's prefer-nullish-coalescing
+            // flags any `a || b`, but here both operands are already booleans.
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+            disabled || attachments.length >= MAX_IMAGES_PER_MESSAGE
+          }
           aria-label={
             attachments.length > 0
               ? t("composer.attach.ariaCount", { count: attachments.length, max: MAX_IMAGES_PER_MESSAGE })
@@ -708,6 +724,8 @@ export function Composer({
               .filter(
                 (it) =>
                   it.kind === "file" &&
+                  // Boolean OR: both sides are booleans.
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                   (it.type.startsWith("image/") || it.type.startsWith("video/")),
               )
               .map((it) => it.getAsFile())
@@ -752,6 +770,8 @@ export function Composer({
         <Button
           type="submit"
           size="default"
+          // Boolean OR, not fallback — all operands are booleans.
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           disabled={disabled || sending || !canSend}
           data-testid="composer-send-button"
           // Match the textarea's min-height (48px mobile / 56px sm up) so the

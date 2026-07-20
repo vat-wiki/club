@@ -3,7 +3,7 @@ import { CreateRoomRequest, type Room } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { listRooms, ensureRoom, type RoomRow } from "../db.js";
 import { requireJson } from "../lib/json-content-type.js";
-import { jsonErr } from "../lib.js";
+import { jsonErr, parseJsonBody } from "../lib.js";
 
 // Open-topic rooms: every authed participant (human or agent, equally) can list
 // and create rooms. A room is a topic channel, NOT an access boundary — there
@@ -39,11 +39,12 @@ rooms.get("/", (c) => {
 // canonical slug, validated by CreateRoomRequest (regex ^[a-z0-9][a-z0-9-]{0,29}$).
 // "general" is seeded by the migration, so posting it just returns that row.
 rooms.post("/", requireJson, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = CreateRoomRequest.safeParse(body);
-  if (!parsed.success) {
-    return jsonErr(c, "bad request");
-  }
+  const parsed = await parseJsonBody<typeof CreateRoomRequest._output>(
+    c,
+    CreateRoomRequest,
+    "bad request",
+  );
+  if (!parsed.ok) return parsed.r;
   const slug = parsed.data.name;
   const room = ensureRoom(slug, Date.now());
   if (room.created) {

@@ -17,7 +17,7 @@ import {
 import { hashKey } from "../crypto.js";
 import { rateLimit } from "../rate-limit.js";
 import { requireJson } from "../lib/json-content-type.js";
-import { jsonErr } from "../lib.js";
+import { jsonErr, parseJsonBody } from "../lib.js";
 
 export const participants = new Hono();
 
@@ -64,10 +64,12 @@ function safeEqualHex(a: string, b: string): boolean {
 // POST /participants  { name } -> { key, recoverCode, participant }
 if (isTest) {
   participants.post("/", requireJson, async (c) => {
-    const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
-    if (!parsed.success) {
-      return jsonErr(c, "bad request");
-    }
+    const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
+      c,
+      CreateParticipantRequest,
+      "bad request",
+    );
+    if (!parsed.ok) return parsed.r;
     const { name } = parsed.data;
     if (getParticipantByName(name)) {
       return jsonErr(c, `name "${name}" is taken`, 409);
@@ -86,10 +88,12 @@ if (isTest) {
   });
 } else {
   participants.post("/", requireJson, ...(authLimiter ? [authLimiter] : []), async (c) => {
-    const parsed = CreateParticipantRequest.safeParse(await c.req.json().catch(() => ({})));
-    if (!parsed.success) {
-      return jsonErr(c, "bad request");
-    }
+    const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
+      c,
+      CreateParticipantRequest,
+      "bad request",
+    );
+    if (!parsed.ok) return parsed.r;
     const { name } = parsed.data;
     if (getParticipantByName(name)) {
       return jsonErr(c, `name "${name}" is taken`, 409);
@@ -118,14 +122,12 @@ if (isTest) {
 // exactly one active recovery code.
 if (isTest) {
   participants.post("/recover", requireJson, async (c) => {
-    const parsed = RecoverParticipantRequest.safeParse(
-      await c.req.json().catch(() => ({})),
+    const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
+      c,
+      RecoverParticipantRequest,
+      "bad request",
     );
-    if (!parsed.success) {
-      // Validation failure leaks nothing about name existence; treat as bad
-      // shape and return 400 with the generic message.
-      return jsonErr(c, "bad request");
-    }
+    if (!parsed.ok) return parsed.r;
     const { name, recoverCode } = parsed.data;
     const row = getParticipantForRecover(name);
 
@@ -157,14 +159,12 @@ if (isTest) {
   });
 } else {
   participants.post("/recover", requireJson, ...(authLimiter ? [authLimiter] : []), async (c) => {
-    const parsed = RecoverParticipantRequest.safeParse(
-      await c.req.json().catch(() => ({})),
+    const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
+      c,
+      RecoverParticipantRequest,
+      "bad request",
     );
-    if (!parsed.success) {
-      // Validation failure leaks nothing about name existence; treat as bad
-      // shape and return 400 with the generic message.
-      return jsonErr(c, "bad request");
-    }
+    if (!parsed.ok) return parsed.r;
     const { name, recoverCode } = parsed.data;
     const row = getParticipantForRecover(name);
 

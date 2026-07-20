@@ -8,7 +8,6 @@ import { formatMessage } from "@club/sdk";
 // Fetch and print messages. --since anchors to a message id (newer history),
 // --before goes older, --limit caps the response (1-500, default 50).
 // Respects the default room from config unless --room is explicit.
-
 import { withCatchExit } from "../catch-exit.js";
 import { defaultRoom, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";

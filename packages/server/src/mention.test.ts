@@ -1,7 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { extractMentionedParticipants, type NamedParticipant } from "./mention.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { extractMentionedParticipants, invalidateParticipantNameMap, type NamedParticipant } from "./mention.js";
 
 const P = (id: string, name: string): NamedParticipant => ({ id, name });
+
+// Reset the lazy cache between tests so roster snapshots don't leak across
+// test cases (the size-based rebuild check would otherwise skip a rebuild
+// when the cached map happened to match the previous test's roster size).
+beforeEach(invalidateParticipantNameMap);
 
 describe("extractMentionedParticipants", () => {
   it("matches a literal @mention", () => {
@@ -124,6 +129,28 @@ describe("extractMentionedParticipants", () => {
     expect(extractMentionedParticipants("@carol then @alice", roster)).toEqual([
       P("3", "carol"),
       P("1", "alice"),
+    ]);
+  });
+
+  it("rebounds the cache on a different roster (invalidation behaviour)", () => {
+    // First call seeds the cache.
+    expect(extractMentionedParticipants("@alice", [P("1", "alice")])).toEqual([
+      P("1", "alice"),
+    ]);
+    // Second call with a different roster (same size) must still match the
+    // new roster, not the one baked into the cache.
+    expect(extractMentionedParticipants("@bob", [P("2", "bob")])).toEqual([
+      P("2", "bob"),
+    ]);
+  });
+
+  it("respects invalidateParticipantNameMap for stale-data recovery", () => {
+    expect(extractMentionedParticipants("@alice", [P("1", "alice")])).toEqual([
+      P("1", "alice"),
+    ]);
+    invalidateParticipantNameMap();
+    expect(extractMentionedParticipants("@alice", [P("2", "alice")])).toEqual([
+      P("2", "alice"),
     ]);
   });
 });

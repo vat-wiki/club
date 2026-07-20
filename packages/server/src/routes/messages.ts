@@ -38,19 +38,48 @@ export const messages = new Hono();
 
 messages.use("*", requireAuth);
 
-// Parse the `attachments` JSON column into a MessageAttachment[], or omit it
-// entirely for plain-text rows (keeps the shape backward compatible — old rows
-// and rows with no images simply have no `attachments` key).
+// Performance: attachment JSON is immutable per message row. Across history,
+// search, and SSE fan-out the same raw string is re-parsed on every call. A
+// LRU cache keyed on the raw JSON string amortizes the parse cost: the first
+// call parses; subsequent calls (common — history renders re-request the same
+// rows as the user scrolls) return a reference to the cached array. The cache
+// is bounded (MAX_ATTACHMENT_CACHE = 512) so a pathological burst of unique
+// payloads can't grow unbounded memory; 512 entries is far above the realistic
+// per-request batch size (default LIMIT 50, max 200). Because the cached
+// value is a plain object never mutated by callers, safe to share across
+// requests.
+//
+// NOTE: we only cache *non-null* parse results (the parsed array). Plain-text
+// rows return undefined on every call without a cache lookup — the vast
+// majority of messages have no attachments, so caching the undefined sentinel
+// would be a cache-miss tax for no benefit.
+
+const MAX_ATTACHMENT_CACHE = 512;
+const attachmentCache = new Map<string, MessageAttachment[]>();
+
 function parseAttachments(raw: string | null): MessageAttachment[] | undefined {
+  // Fast path: null/empty → no attachments (no cache lookup needed).
   if (!raw) return undefined;
+  let cached = attachmentCache.get(raw);
+  if (cached !== undefined) return cached;
+
+  // Miss: parse once, cache only if the result is a real array.
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? (parsed as MessageAttachment[])
-      : undefined;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      cached = parsed as MessageAttachment[];
+      attachmentCache.set(raw, cached);
+      // Evict oldest entry when the cache is full to keep memory bounded.
+      if (attachmentCache.size > MAX_ATTACHMENT_CACHE) {
+        const firstKey = attachmentCache.keys().next().value;
+        if (firstKey !== undefined) attachmentCache.delete(firstKey);
+      }
+      return cached;
+    }
   } catch {
-    return undefined;
+    // Malformed JSON → treat as no attachments (matches legacy behavior).
   }
+  return undefined;
 }
 
 function toMessage(

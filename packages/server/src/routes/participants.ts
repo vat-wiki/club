@@ -18,6 +18,7 @@ import { hashKey } from "../crypto.js";
 import { rateLimit } from "../rate-limit.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { jsonErr, parseJsonBody } from "../lib.js";
+import { invalidateParticipantNameMap } from "../mention.js";
 
 export const participants = new Hono();
 
@@ -79,6 +80,7 @@ if (isTest) {
     const recoverCode = newRecoverCode();
     insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
     invalidateParticipantNamesCache();
+    invalidateParticipantNameMap();
     const participant: Participant = {
       id,
       name,
@@ -103,6 +105,7 @@ if (isTest) {
     const recoverCode = newRecoverCode();
     insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
     invalidateParticipantNamesCache();
+    invalidateParticipantNameMap();
     const participant: Participant = {
       id,
       name,
@@ -149,6 +152,7 @@ if (isTest) {
     updateParticipantKey(row.id, hashKey(newPlainKey));
     updateParticipantRecover(row.id, hashKey(newCode));
     invalidateParticipantNamesCache();
+    invalidateParticipantNameMap();
 
     const participant: Participant = {
       id: row.id,
@@ -186,8 +190,8 @@ if (isTest) {
     updateParticipantKey(row.id, hashKey(newPlainKey));
     updateParticipantRecover(row.id, hashKey(newCode));
 
-
     invalidateParticipantNamesCache();
+    invalidateParticipantNameMap();
     const participant: Participant = {
       id: row.id,
       name: row.name,

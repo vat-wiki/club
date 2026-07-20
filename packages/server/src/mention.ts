@@ -61,6 +61,15 @@ function collectCandidateNames(content: string): Set<string> {
   return candidates;
 }
 
+// Lazy cache of the name→participant Map. `extractMentionedParticipants` rebuilds
+// it whenever the caller presents a roster reference that differs from the one
+// the cache was built from. This is cheap: in production `getAllParticipantNames()`
+// returns a stable cached array per process lifetime (only rebuilt on mutation),
+// so the identity check hits on every message send after the first. On mutation
+// both the db cache and this module cache are invalidated synchronously before
+// any message can fire, so stale reads never happen.
+const _cache = { roster: null as readonly NamedParticipant[] | null, map: new Map<string, NamedParticipant>() };
+
 /**
  * Return the roster entries that `content` @-mentions.
  *
@@ -71,24 +80,31 @@ function collectCandidateNames(content: string): Set<string> {
  *
  * Pure and unit-tested; the caller (POST /messages) handles persistence.
  *
- * Performance: first collects candidate names from the content in one pass, then
- * looks up each candidate in a Map keyed by lower-cased name. This is O(content
- * length + number of @ occurrences) rather than O(participants × content length).
- * For typical room sizes (tens to low hundreds of participants) and typical
- * message lengths, this is several orders of magnitude cheaper than the naive
- * per-participant scan.
+ * Performance: the name→participant Map is built once per roster snapshot and
+ * lazily cached via roster-reference identity. On the message-send hot path the
+ * identity check succeeds every call (the caller's roster is stable), making
+ * each invocation O(content length + number of @ occurrences) — one pass over
+ * the content plus a Map lookup per candidate. No O(n_participants) Map rebuild
+ * per message send.
  */
 export function extractMentionedParticipants(
   content: string,
   roster: readonly NamedParticipant[],
 ): NamedParticipant[] {
-  // Build a Map keyed by lower-cased name → participant.
-  const byName = new Map<string, NamedParticipant>();
-  for (const p of roster) {
-    if (p.name && !byName.has(p.name.toLowerCase())) {
-      byName.set(p.name.toLowerCase(), p);
+  // Rebuild the cache only when the caller presents a different roster
+  // reference. In production the roster snapshot is stable between mutations,
+  // so this branch rarely fires on the hot path.
+  if (roster !== _cache.roster) {
+    _cache.roster = roster;
+    _cache.map = new Map<string, NamedParticipant>();
+    for (const p of roster) {
+      const lower = p.name?.toLowerCase();
+      if (lower && !_cache.map.has(lower)) {
+        _cache.map.set(lower, p);
+      }
     }
   }
+  const byName = _cache.map;
   const seen = new Set<string>();
   const out: NamedParticipant[] = [];
   for (const candidate of collectCandidateNames(content)) {
@@ -99,4 +115,15 @@ export function extractMentionedParticipants(
     }
   }
   return out;
+}
+
+/**
+ * Invalidate the cached name→participant Map so the next call to
+ * `extractMentionedParticipants` rebuilds it from the latest roster. Must be
+ * called synchronously after every participant mutation (create/credential
+ * rotation) — mirroring the `invalidateParticipantNamesCache` contract.
+ */
+export function invalidateParticipantNameMap(): void {
+  _cache.roster = null;
+  _cache.map.clear();
 }

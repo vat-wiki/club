@@ -40,4 +40,46 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
 }
 
 // parseBearer is now in @club/shared — re-export for backward compat.
+
+/**
+ * Parse a JSON request body through a Zod schema in one shot.
+ *
+ * Handles the common three-step pattern seen in every JSON-accepting route:
+ * catch a bad parse as `{}` so we don't leak internals, run Zod `safeParse`,
+ * and return a `jsonErr` response on schema rejection. Callers get the typed
+ * payload on success, or a `{ ok: false }` marker on failure.
+ *
+ * @example
+ * ```ts
+ * const parsed = await parseJsonBody(c, CreateMessageRequest, "bad request");
+ * if (!parsed.ok) return parsed.r;
+ * const { content, attachmentIds } = parsed.data;
+ * ```
+ *
+ * @returns On success `{ ok: true, data: T }`; on failure
+ * `{ ok: false, r: Response }` to use as an early-return from the route handler.
+ *
+ * @typeParam T - The output type of the Zod schema.
+ * @param c - The Hono request context.
+ * @param schema - Any Zod-like schema exposing `safeParse(input): { success: boolean; data?: unknown }`.
+ * @param errorMessage - The error message to include in the 400 JSON response.
+ * @param status - HTTP status for the error response (defaults to 400).
+ */
+export async function parseJsonBody<T>(
+  c: Context,
+  schema: { safeParse(input: unknown): { success: boolean; data?: unknown } },
+  errorMessage: string,
+  status: ContentfulStatusCode = 400,
+): Promise<
+  | { ok: true; data: T }
+  | { ok: false; r: Response }
+> {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = schema.safeParse(body) as { success: boolean; data?: T };
+  if (!parsed.success || parsed.data === undefined) {
+    return { ok: false, r: jsonErr(c, errorMessage, status) };
+  }
+  return { ok: true, data: parsed.data };
+}
+
 export { parseBearer } from "@club/shared";

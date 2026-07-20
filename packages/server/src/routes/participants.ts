@@ -9,6 +9,7 @@ import {
 import {
   getParticipantForRecover,
   getParticipantByName,
+  invalidateParticipantNamesCache,
   insertParticipant,
   updateParticipantKey,
   updateParticipantRecover,
@@ -75,6 +76,7 @@ if (isTest) {
     const plaintext = newKey();
     const recoverCode = newRecoverCode();
     insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
+    invalidateParticipantNamesCache();
     const participant: Participant = {
       id,
       name,
@@ -96,6 +98,7 @@ if (isTest) {
     const plaintext = newKey();
     const recoverCode = newRecoverCode();
     insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
+    invalidateParticipantNamesCache();
     const participant: Participant = {
       id,
       name,
@@ -143,6 +146,7 @@ if (isTest) {
     const newCode = newRecoverCode();
     updateParticipantKey(row.id, hashKey(newPlainKey));
     updateParticipantRecover(row.id, hashKey(newCode));
+    invalidateParticipantNamesCache();
 
     const participant: Participant = {
       id: row.id,
@@ -182,6 +186,8 @@ if (isTest) {
     updateParticipantKey(row.id, hashKey(newPlainKey));
     updateParticipantRecover(row.id, hashKey(newCode));
 
+
+    invalidateParticipantNamesCache();
     const participant: Participant = {
       id: row.id,
       name: row.name,

@@ -585,9 +585,45 @@ const allParticipantsStmt = db.prepare<
   { id: string; name: string }
 >(`SELECT id, name FROM participants`);
 
-/** Lightweight roster for mention parsing: every (id, name). */
+/**
+ * In-memory cache of the participant roster. The roster changes only when a
+ * participant is created or recovered — operations that are rare compared to
+ * message sends. Keeping a cached copy avoids a full table scan + fresh array
+ * allocation on every `POST /messages`, which calls this to compute the
+ * recipient set for @-mentions. Writes are invalidated synchronously at the
+ * mutation sites (insertParticipant / updateParticipantKey /
+ * updateParticipantRecover) so there is no window of observable staleness.
+ *
+ * @internal
+ */
+const participantNamesCache = new Map<string, { id: string; name: string }>();
+
+/**
+ * Lightweight roster for mention parsing: every (id, name).
+ *
+ * Performance: served from an in-memory cache on the hot path (message sends).
+ * Call {@link invalidateParticipantNamesCache} after any participant mutation.
+ */
 export function getAllParticipantNames(): { id: string; name: string }[] {
-  return allParticipantsStmt.all().map((r) => ({ id: r.id, name: r.name }));
+  // Populate cache on first call. In-memory maps preserve insertion order, so
+  // the list is stable within a process lifetime.
+  if (participantNamesCache.size === 0) {
+    const rows = allParticipantsStmt.all();
+    for (const r of rows) participantNamesCache.set(r.id, r);
+  }
+  return [...participantNamesCache.values()];
+}
+
+/**
+ * Invalidate the participant roster cache after a create or credential rotation.
+ * Next `getAllParticipantNames()` will re-read from the database.
+ *
+ * Must be called synchronously after every participant mutation (insert, key
+ * update, recover-code rotation) so the message-send hot path never sees stale
+ * data within the same event loop tick.
+ */
+export function invalidateParticipantNamesCache(): void {
+  participantNamesCache.clear();
 }
 
 const insertMentionStmt = db.prepare(

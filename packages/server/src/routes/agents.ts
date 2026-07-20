@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { AgentStatusRequest } from "@club/shared";
 import { requireAuth } from "../auth.js";
 import { requireJson } from "../lib/json-content-type.js";
-import { jsonErr } from "../lib.js";
+import { parseJsonBody } from "../lib.js";
 import {
   markThinking,
   markThinkingIdle,
@@ -43,12 +43,8 @@ agents.use("*", requireAuth);
 agents.post("/thinking", requireJson, async (c) => {
   const me = c.get("participant");
 
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = AgentStatusRequest.safeParse(body);
-  if (!parsed.success) {
-    return jsonErr(c, "bad request");
-  }
-
+  const parsed = await parseJsonBody<typeof AgentStatusRequest._output>(c, AgentStatusRequest, "bad request");
+  if (!parsed.ok) return parsed.r;
   const room = parsed.data.room ?? null;
   const fresh = markThinking(me.id, me.name, room);
   if (fresh) {
@@ -79,13 +75,7 @@ agents.post("/thinking", requireJson, async (c) => {
 agents.post("/idle", requireJson, async (c) => {
   const me = c.get("participant");
 
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = AgentStatusRequest.safeParse(body);
-  if (!parsed.success) {
-    return jsonErr(c, "bad request");
-  }
-
-  const entry = markThinkingIdle(me.id);
+  const entry = await Promise.resolve(markThinkingIdle(me.id));
   if (entry) {
     broadcastAgentIdle({
       participantId: me.id,

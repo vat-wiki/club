@@ -62,8 +62,9 @@ files.post("/", requireAuth, async (c) => {
 
   if (size > maxBytes) {
     const kind = isVideo ? "video" : isDocument ? "document" : "image";
-    return c.json(
-      { error: `${kind} must be at most ${maxBytes} bytes (got ${size})` },
+    return jsonErr(
+      c,
+      `${kind} must be at most ${maxBytes} bytes (got ${size})`,
       413,
     );
   }

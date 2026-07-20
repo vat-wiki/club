@@ -30,7 +30,7 @@ import {
 import { requireAuth } from "../auth.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
-import { parseLimit, jsonErr } from "../lib.js";
+import { parseLimit, jsonErr, parseJsonBody } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
@@ -78,11 +78,8 @@ function toMessage(
 // screenshot is the most common intent, forcing text would add friction). The
 // cross-field rule is enforced here, not in zod, because zod can't express it.
 messages.post("/", requireJson, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = CreateMessageRequest.safeParse(body);
-  if (!parsed.success) {
-    return jsonErr(c, "bad request");
-  }
+  const parsed = await parseJsonBody<typeof CreateMessageRequest._output>(c, CreateMessageRequest, "bad request");
+  if (!parsed.ok) return parsed.r;
   const { content, attachmentIds, replyToId, room } = parsed.data;
 
   // content length is already capped by zod (MAX_MESSAGE_CONTENT), but we keep

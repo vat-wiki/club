@@ -63,6 +63,16 @@ function safeEqualHex(a: string, b: string): boolean {
 }
 
 // POST /participants  { name } -> { key, recoverCode, participant }
+function buildParticipant(name: string) {
+  const id = ulid();
+  const plaintext = newKey();
+  const recoverCode = newRecoverCode();
+  insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
+  invalidateParticipantNamesCache();
+  invalidateParticipantNameMap();
+  return { key: plaintext, recoverCode, participant: { id, name, createdAt: Date.now() } as Participant };
+}
+
 if (isTest) {
   participants.post("/", requireJson, async (c) => {
     const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
@@ -71,48 +81,29 @@ if (isTest) {
       "bad request",
     );
     if (!parsed.ok) return parsed.r;
-    const { name } = parsed.data;
-    if (getParticipantByName(name)) {
-      return jsonErr(c, `name "${name}" is taken`, 409);
+    if (getParticipantByName(parsed.data.name)) {
+      return jsonErr(c, `name "${parsed.data.name}" is taken`, 409);
     }
-    const id = ulid();
-    const plaintext = newKey();
-    const recoverCode = newRecoverCode();
-    insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
-    invalidateParticipantNamesCache();
-    invalidateParticipantNameMap();
-    const participant: Participant = {
-      id,
-      name,
-      createdAt: Date.now(),
-    };
-    return c.json({ key: plaintext, recoverCode, participant }, 201);
+    return c.json(buildParticipant(parsed.data.name), 201);
   });
 } else {
-  participants.post("/", requireJson, ...(authLimiter ? [authLimiter] : []), async (c) => {
-    const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
-      c,
-      CreateParticipantRequest,
-      "bad request",
-    );
-    if (!parsed.ok) return parsed.r;
-    const { name } = parsed.data;
-    if (getParticipantByName(name)) {
-      return jsonErr(c, `name "${name}" is taken`, 409);
-    }
-    const id = ulid();
-    const plaintext = newKey();
-    const recoverCode = newRecoverCode();
-    insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
-    invalidateParticipantNamesCache();
-    invalidateParticipantNameMap();
-    const participant: Participant = {
-      id,
-      name,
-      createdAt: Date.now(),
-    };
-    return c.json({ key: plaintext, recoverCode, participant }, 201);
-  });
+  participants.post(
+    "/",
+    requireJson,
+    ...(authLimiter ? [authLimiter] : []),
+    async (c) => {
+      const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
+        c,
+        CreateParticipantRequest,
+        "bad request",
+      );
+      if (!parsed.ok) return parsed.r;
+      if (getParticipantByName(parsed.data.name)) {
+        return jsonErr(c, `name "${parsed.data.name}" is taken`, 409);
+      }
+      return c.json(buildParticipant(parsed.data.name), 201);
+    },
+  );
 }
 
 // POST /participants/recover  { name, recoverCode }
@@ -123,6 +114,37 @@ if (isTest) {
 // On success the recovery code is single-use: it is rotated to a brand-new one
 // (PRD §5.4 / §8.1 "换发新恢复码"), keeping each participant always armed with
 // exactly one active recovery code.
+function recoverParticipant(name: string, recoverCode: string) {
+  const row = getParticipantForRecover(name);
+
+  // Reject (uniformly) when the name is unknown OR no recovery code is armed
+  // OR the code doesn't match. Constant-time compare when there is a hash to
+  // compare against; the missing-name and missing-hash branches are folded
+  // into the same 401 so they are indistinguishable to a caller.
+  const matches =
+    !!row &&
+    !!row.recover_hash &&
+    safeEqualHex(hashKey(recoverCode), row.recover_hash);
+  if (!matches) {
+    return { ok: false } as const;
+  }
+
+  // Reissue both credentials, reusing the original id + name.
+  const newPlainKey = newKey();
+  const newCode = newRecoverCode();
+  updateParticipantKey(row.id, hashKey(newPlainKey));
+  updateParticipantRecover(row.id, hashKey(newCode));
+  invalidateParticipantNamesCache();
+  invalidateParticipantNameMap();
+
+  return {
+    ok: true as const,
+    key: newPlainKey,
+    recoverCode: newCode,
+    participant: { id: row.id, name: row.name, createdAt: row.created_at } as Participant,
+  };
+}
+
 if (isTest) {
   participants.post("/recover", requireJson, async (c) => {
     const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
@@ -131,72 +153,25 @@ if (isTest) {
       "bad request",
     );
     if (!parsed.ok) return parsed.r;
-    const { name, recoverCode } = parsed.data;
-    const row = getParticipantForRecover(name);
-
-    // Reject (uniformly) when the name is unknown OR no recovery code is armed
-    // OR the code doesn't match. Constant-time compare when there is a hash to
-    // compare against; the missing-name and missing-hash branches are folded
-    // into the same 401 so they are indistinguishable to a caller.
-    const matches =
-      !!row &&
-      !!row.recover_hash &&
-      safeEqualHex(hashKey(recoverCode), row.recover_hash);
-    if (!matches) {
-      return jsonErr(c, "invalid recovery code", 401);
-    }
-
-    // Reissue both credentials, reusing the original id + name.
-    const newPlainKey = newKey();
-    const newCode = newRecoverCode();
-    updateParticipantKey(row.id, hashKey(newPlainKey));
-    updateParticipantRecover(row.id, hashKey(newCode));
-    invalidateParticipantNamesCache();
-    invalidateParticipantNameMap();
-
-    const participant: Participant = {
-      id: row.id,
-      name: row.name,
-      createdAt: row.created_at,
-    };
-    return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);
+    const result = recoverParticipant(parsed.data.name, parsed.data.recoverCode);
+    if (!result.ok) return jsonErr(c, "invalid recovery code", 401);
+    return c.json(result, 200);
   });
 } else {
-  participants.post("/recover", requireJson, ...(authLimiter ? [authLimiter] : []), async (c) => {
-    const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
-      c,
-      RecoverParticipantRequest,
-      "bad request",
-    );
-    if (!parsed.ok) return parsed.r;
-    const { name, recoverCode } = parsed.data;
-    const row = getParticipantForRecover(name);
-
-    // Reject (uniformly) when the name is unknown OR no recovery code is armed
-    // OR the code doesn't match. Constant-time compare when there is a hash to
-    // compare against; the missing-name and missing-hash branches are folded
-    // into the same 401 so they are indistinguishable to a caller.
-    const matches =
-      !!row &&
-      !!row.recover_hash &&
-      safeEqualHex(hashKey(recoverCode), row.recover_hash);
-    if (!matches) {
-      return jsonErr(c, "invalid recovery code", 401);
-    }
-
-    // Reissue both credentials, reusing the original id + name.
-    const newPlainKey = newKey();
-    const newCode = newRecoverCode();
-    updateParticipantKey(row.id, hashKey(newPlainKey));
-    updateParticipantRecover(row.id, hashKey(newCode));
-
-    invalidateParticipantNamesCache();
-    invalidateParticipantNameMap();
-    const participant: Participant = {
-      id: row.id,
-      name: row.name,
-      createdAt: row.created_at,
-    };
-    return c.json({ key: newPlainKey, recoverCode: newCode, participant }, 200);
-  });
+  participants.post(
+    "/recover",
+    requireJson,
+    ...(authLimiter ? [authLimiter] : []),
+    async (c) => {
+      const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
+        c,
+        RecoverParticipantRequest,
+        "bad request",
+      );
+      if (!parsed.ok) return parsed.r;
+      const result = recoverParticipant(parsed.data.name, parsed.data.recoverCode);
+      if (!result.ok) return jsonErr(c, "invalid recovery code", 401);
+      return c.json(result, 200);
+    },
+  );
 }

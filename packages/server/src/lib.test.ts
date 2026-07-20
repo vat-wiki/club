@@ -382,7 +382,7 @@ describe("parseJsonBody", () => {
     expect(await res.json()).toEqual({ error: "missing name" });
   });
 
-  it("rejects non-JSON bodies with the error message (not a parse stack trace)", async () => {
+  it("rejects invalid JSON with a distinct 'invalid JSON' message", async () => {
     const app = withParseJsonBody(async (c) => {
       const parsed = await parseJsonBody(c, TestSchema, "bad request");
       if (!parsed.ok) return parsed.r;
@@ -394,10 +394,36 @@ describe("parseJsonBody", () => {
       body: "not json at all",
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "bad request" });
+    expect(await res.json()).toEqual({ error: "invalid JSON" });
   });
 
-  it("uses a custom status when provided", async () => {
+  it("distinguishes parse errors from schema rejections", async () => {
+    // Parse failure gets "invalid JSON"; schema failure gets the caller's
+    // message — so clients and audit logs can tell them apart.
+    const app = withParseJsonBody(async (c) => {
+      const parsed = await parseJsonBody(c, TestSchema, "missing name");
+      if (!parsed.ok) return parsed.r;
+      return c.json({ ok: true });
+    });
+    // Malformed JSON → "invalid JSON"
+    let res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "broken{",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid JSON" });
+    // Valid JSON but missing required field → caller's message
+    res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: 5 }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "missing name" });
+  });
+
+  it("rejects arrays (non-object input) with the error message", async () => {
     const app = withParseJsonBody(async (c) => {
       const parsed = await parseJsonBody(c, TestSchema, "unprocessable", 422);
       if (!parsed.ok) return parsed.r;
@@ -442,25 +468,24 @@ describe("parseJsonBody", () => {
     expect(await res.json()).toEqual({ error: "bad request" });
   });
 
-  it("returns a jsonErr-style { error } body on failure", async () => {
+  it("uses a custom status when provided", async () => {
     const app = withParseJsonBody(async (c) => {
-      const parsed = await parseJsonBody(c, TestSchema, "oops");
+      const parsed = await parseJsonBody(c, TestSchema, "unprocessable", 422);
       if (!parsed.ok) return parsed.r;
       return c.json({ ok: true });
     });
     const res = await app.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify({ name: "alice", count: "nope" }),
     });
-    const json = await res.json();
-    expect(json).toHaveProperty("error");
-    expect(Object.keys(json)).toEqual(["error"]);
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: "unprocessable" });
   });
 
-  it("accepts valid JSON on a no-Content-Type request (catch-all returns empty object)", async () => {
-    // When Content-Type is missing c.req.json() in Hono still tries to parse;
-    // this confirms parseJsonBody handles the catch() path correctly.
+  it("accepts valid JSON on a no-Content-Type request", async () => {
+    // Hono parses JSON bodies regardless of Content-Type in its test harness,
+    // so valid JSON with a missing header still succeeds via parseJsonBody.
     const app = withParseJsonBody(async (c) => {
       const parsed = await parseJsonBody(c, TestSchema, "bad request");
       if (!parsed.ok) return parsed.r;
@@ -471,14 +496,22 @@ describe("parseJsonBody", () => {
       headers: {},
       body: JSON.stringify({ name: "carol" }),
     });
-    // Behavior depends on Hono's JSON parsing with missing content-type;
-    // the important invariant is that parseJsonBody never throws — it always
-    // returns a resolved parse result either way.
-    if (res.status === 400) {
-      const json = await res.json();
-      expect(json).toHaveProperty("error");
-    } else {
-      expect(await res.json()).toHaveProperty("name");
-    }
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty("name");
+  });
+
+  it("rejects an empty body with 'invalid JSON'", async () => {
+    const app = withParseJsonBody(async (c) => {
+      const parsed = await parseJsonBody(c, TestSchema, "bad request");
+      if (!parsed.ok) return parsed.r;
+      return c.json({ ok: true });
+    });
+    const res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid JSON" });
   });
 });

@@ -45,9 +45,15 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
  * Parse a JSON request body through a Zod schema in one shot.
  *
  * Handles the common three-step pattern seen in every JSON-accepting route:
- * catch a bad parse as `{}` so we don't leak internals, run Zod `safeParse`,
- * and return a `jsonErr` response on schema rejection. Callers get the typed
- * payload on success, or a `{ ok: false }` marker on failure.
+ * parse the body, run Zod `safeParse`, and return a `jsonErr` response on
+ * either a parse failure or schema rejection. Callers get the typed payload
+ * on success, or a `{ ok: false }` marker on failure.
+ *
+ * JSON parse errors (malformed body, wrong Content-Type, truncated payload)
+ * are returned as an explicit parse-error response so clients and audit logs
+ * distinguish a truly empty `{}` body from a broken request. This avoids
+ * silently coercing garbage payloads into `{}`, which could bypass required-
+ * field validation or mask client bugs.
  *
  * @example
  * ```ts
@@ -62,7 +68,7 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
  * @typeParam T - The output type of the Zod schema.
  * @param c - The Hono request context.
  * @param schema - Any Zod-like schema exposing `safeParse(input): { success: boolean; data?: unknown }`.
- * @param errorMessage - The error message to include in the 400 JSON response.
+ * @param errorMessage - The error message to include on schema rejection.
  * @param status - HTTP status for the error response (defaults to 400).
  */
 export async function parseJsonBody<T>(
@@ -74,7 +80,15 @@ export async function parseJsonBody<T>(
   | { ok: true; data: T }
   | { ok: false; r: Response }
 > {
-  const body = await c.req.json().catch(() => ({}));
+  // Parse the body explicitly; reject malformed JSON with a distinct message
+  // rather than silently coercing to {} (which could bypass required-field
+  // validation and masks broken requests in audit logs).
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return { ok: false, r: jsonErr(c, "invalid JSON", status) };
+  }
   const parsed = schema.safeParse(body) as { success: boolean; data?: T };
   if (!parsed.success || parsed.data === undefined) {
     return { ok: false, r: jsonErr(c, errorMessage, status) };

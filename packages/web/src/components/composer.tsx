@@ -581,9 +581,6 @@ export function Composer({
           variant="ghost"
           onClick={() => fileInputRef.current?.click()}
           disabled={
-            // Boolean OR, not fallback — ESLint's prefer-nullish-coalescing
-            // flags any `a || b`, but here both operands are already booleans.
-            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
             disabled || attachments.length >= MAX_IMAGES_PER_MESSAGE
           }
           aria-label={
@@ -725,8 +722,6 @@ export function Composer({
               .filter(
                 (it) =>
                   it.kind === "file" &&
-                  // Boolean OR: both sides are booleans.
-                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                   (it.type.startsWith("image/") || it.type.startsWith("video/")),
               )
               .map((it) => it.getAsFile())
@@ -771,8 +766,6 @@ export function Composer({
         <Button
           type="submit"
           size="default"
-          // Boolean OR, not fallback — all operands are booleans.
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           disabled={disabled || sending || !canSend}
           data-testid="composer-send-button"
           // Match the textarea's min-height (48px mobile / 56px sm up) so the

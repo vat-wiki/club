@@ -189,7 +189,6 @@ export function AuthDialog({
                 // aria-invalid: boolean OR is intentional here — `nicknameBlocked` is
                 // already a boolean and `false` is a legitimate value we want to treat
                 // as falsy, unlike `??` which would not short-circuit on `false`.
-                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                 aria-invalid={nicknameBlocked || !!error}
                 aria-describedby={
                   nicknameBlocked ?? nicknameMessage ? nicknameErrorId : "name-hint"

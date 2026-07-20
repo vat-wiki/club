@@ -92,7 +92,11 @@ export function broadcastAgentIdle(e: AgentIdleEvent): void {
 
 // Underlying fan-out: write one SSE frame to every live subscriber whose room
 // filter matches `room` (null = unscoped event → everyone). Failures mark the
-// subscriber dead and drop it. Fire-and-forget per sub.
+// subscriber dead and drop it. Collect dead subscribers synchronously in a set
+// so the traversal of `subscribers` is not mutated concurrently; remove them
+// after the loop in one pass. This avoids a subtle race where a later iteration
+// would still see a subscriber that an earlier iteration's `.catch()` already
+// marked dead but not yet removed.
 function writeAll(
   frame: {
     event?: string;
@@ -100,17 +104,21 @@ function writeAll(
   },
   room: string | null,
 ): void {
+  const dead = new Set<{
+    stream: SSEStreamingApi;
+    participant: { id: string; name: string };
+    rooms: Set<string> | null;
+    dead: boolean;
+  }>();
   for (const sub of subscribers) {
     if (sub.dead) continue;
     if (!wantsRoom(sub, room)) continue;
-    // writeSSE returns a promise; fire-and-forget, drop on failure.
-    void sub.stream
-      .writeSSE(frame)
-      .catch(() => {
-        sub.dead = true;
-        subscribers.delete(sub);
-      });
+    void sub.stream.writeSSE(frame).catch(() => {
+      sub.dead = true;
+      dead.add(sub);
+    });
   }
+  for (const sub of dead) subscribers.delete(sub);
 }
 
 // ── Agent thinking presence (P1-5) ───────────────────────────────────
@@ -206,6 +214,13 @@ function reapExpiredThinking(): void {
 // Keep idle connections warm, surface dead ones, and reap expired thinking
 // state. One timer does double duty (no need for a second scheduler).
 export const heartbeatInterval = setInterval(() => {
+  if (subscribers.size === 0) return;
+  const dead = new Set<{
+    stream: SSEStreamingApi;
+    participant: { id: string; name: string };
+    rooms: Set<string> | null;
+    dead: boolean;
+  }>();
   for (const sub of subscribers) {
     if (sub.dead) {
       subscribers.delete(sub);
@@ -215,8 +230,9 @@ export const heartbeatInterval = setInterval(() => {
       .writeSSE({ data: "" }) // empty data line doubles as a heartbeat comment-safe ping
       .catch(() => {
         sub.dead = true;
-        subscribers.delete(sub);
+        dead.add(sub);
       });
   }
+  for (const sub of dead) subscribers.delete(sub);
   reapExpiredThinking();
 }, 15000).unref();

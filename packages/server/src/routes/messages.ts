@@ -36,11 +36,30 @@ import {
 import { jsonErr, parseJsonBody, parseLimit, requireValidId, requireValidRoomSlug } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
+import { rateLimit } from "../rate-limit.js";
 import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction, markThinkingIdle } from "../stream.js";
 
 export const messages = new Hono();
 
 messages.use("*", requireAuth);
+
+// Tighter limiter on write paths: POST /messages, POST /messages/:id/reactions,
+// DELETE /messages/:id. The global 120/min is fine for reads but generous
+// enough for abuse on writes (spam, reaction-flooding, recall-storming). 15/min
+// per IP keeps legitimate use unaffected while making scripted abuse impractical.
+// Disabled in test mode (NODE_ENV=test) so e2e suites don't hit the ceiling.
+const isTest = process.env.NODE_ENV === "test";
+const writeLimiter = isTest
+  ? undefined
+  : rateLimit({ max: 15, windowMs: 60_000 });
+
+// Typed identity middleware so the write-path guard can conditionally use
+// writeLimiter or a no-op at compile time (Hono's variadic overload needs a
+// value whose type is exactly MiddlewareHandler, which `??` + a lambda doesn't
+// satisfy).
+const identityMiddleware: import("hono").MiddlewareHandler = async (_, next) =>
+  next();
+const writeGuard: import("hono").MiddlewareHandler = writeLimiter ?? identityMiddleware;
 
 /**
  * Validate that `since` is a non-empty query parameter.
@@ -121,7 +140,7 @@ function toMessage(
 // content is optional iff at least one attachment is supplied (plan §1 — a bare
 // screenshot is the most common intent, forcing text would add friction). The
 // cross-field rule is enforced here, not in zod, because zod can't express it.
-messages.post("/", requireJson, async (c) => {
+messages.post("/", requireJson, writeGuard, async (c) => {
   const parsed = await parseJsonBody(c, CreateMessageRequest, "bad request");
   if (!parsed.ok) return parsed.r;
   const { content, attachmentIds, replyToId, room } = parsed.data;
@@ -328,7 +347,7 @@ messages.get("/search", (c) => {
 // message's room so the fan-out stays room-scoped (a client watching another
 // room never sees the recall). Soft-delete keeps the row, so the room is still
 // readable after the successful update.
-messages.delete("/:id", (c) => {
+messages.delete("/:id", writeGuard, (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const bad = requireValidId(c, id, "message id");
@@ -343,7 +362,7 @@ messages.delete("/:id", (c) => {
 // POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
 // `message_reaction` with the refreshed aggregate so all clients update. The
 // event carries the message's room so the fan-out stays room-scoped.
-messages.post("/:id/reactions", requireJson, async (c) => {
+messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const bad = requireValidId(c, id, "message id");

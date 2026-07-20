@@ -50,7 +50,11 @@ app.use("*", bodySizeGuard());
 // CORS: the chat UI, CLI, and MCP all hit this backend. Restrict origins
 // via ALLOWED_ORIGINS (comma-separated) when set; falls back to open "*"
 // for dev/internal LAN use (where TLS is typically not present).
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0 && s[0] !== "#") // reject comments and whitespace-only entries
+  .filter((s) => /^https?:\/\//.test(s)); // reject non-URL strings (prevents accidental wildcard "*" slip-in)
 const corsOpts = allowedOrigins.length > 0 ? { origin: allowedOrigins, credentials: true } : undefined;
 app.use("*", cors(corsOpts));
 

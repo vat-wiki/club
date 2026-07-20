@@ -37,9 +37,10 @@ export function _setNow(fn: () => number): void {
 }
 
 // Periodic cleanup of stale buckets to prevent memory leak.
+// Mutable ref kept alive across calls so callers can clear the interval.
 // `unref()` keeps the timer from blocking Node's event loop once all other
 // handles are idle (e.g. in tests or single-shot requests).
-_cleanupRef = setInterval(_cleanup, 120_000).unref();
+const _cleanupRef = setInterval(_cleanup, 120_000).unref();
 
 function _cleanup(): void {
   const now = _getNow();
@@ -54,9 +55,6 @@ function _cleanup(): void {
 export function _clearCleanup(): void {
   if (_cleanupRef) clearInterval(_cleanupRef);
 }
-
-// eslint-disable-next-line no-var -- mutable ref kept alive across calls
-var _cleanupRef: ReturnType<typeof setInterval> | undefined;
 
 // IPv4 / IPv6 (compressed) validation. Rejects anything that isn't a
 // well-formed IP so forged proxy headers can't poison the rate-limiter

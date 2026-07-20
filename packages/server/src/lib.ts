@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
+import { DEFAULT_ROOM, isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
 
 /**
  * Send a `{ error: message }` JSON response with the given status. Centralises
@@ -158,4 +158,31 @@ export function requireValidRoomSlug(
     return { ok: false, r: jsonErr(c, "bad room slug") };
   }
   return undefined;
+}
+
+/**
+ * Parse the `room` query parameter into a validated slug, defaulting to
+ * `DEFAULT_ROOM` when absent.
+ *
+ * Consolidates the repeated "trim, default-if-absent, validate, early-return"
+ * sequence seen in list/search/stream routes into a single guard so the route
+ * handler reads like a single line rather than four.
+ *
+ * @returns `{ ok: false, r }` on an invalid slug, or `{ ok: true, room: string }`
+ *   with the canonical slug (at least `DEFAULT_ROOM`).
+ *
+ * @example
+ * ```ts
+ * const roomOrErr = getRoomQuery(c);
+ * if (!roomOrErr.ok) return roomOrErr.r;
+ * const { room } = roomOrErr;
+ * ```
+ */
+export function getRoomQuery(
+  c: Context,
+): { ok: false; r: Response } | { ok: true; room: string } {
+  const raw = (c.req.query("room") ?? DEFAULT_ROOM).trim();
+  const bad = requireValidRoomSlug(c, raw);
+  if (bad) return { ok: false, r: bad.r };
+  return { ok: true, room: raw };
 }

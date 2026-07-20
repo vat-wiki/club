@@ -33,7 +33,7 @@ import {
   searchMessages,
   toggleReaction,
 } from "../db.js";
-import { jsonErr, parseJsonBody, parseLimit, requireValidId, requireValidRoomSlug } from "../lib.js";
+import { getRoomQuery, jsonErr, parseJsonBody, parseLimit, requireValidId, requireValidRoomSlug } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
 import { rateLimit } from "../rate-limit.js";
@@ -283,9 +283,9 @@ messages.post("/", requireJson, writeGuard, async (c) => {
 // (chronologic). `room` defaults to "general" for backward compatibility — an
 // old client that omits it sees the general history exactly as before.
 messages.get("/", (c) => {
-  const room = (c.req.query("room") ?? DEFAULT_ROOM).trim();
-  const bad = requireValidRoomSlug(c, room);
-  if (bad) return bad.r;
+  const roomOrErr = getRoomQuery(c);
+  if (!roomOrErr.ok) return roomOrErr.r;
+  const { room } = roomOrErr;
   const since = c.req.query("since");
   const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));

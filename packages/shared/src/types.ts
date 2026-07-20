@@ -378,6 +378,28 @@ export const AgentStatusRequest = z
   .strict();
 export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;
 
+/**
+ * Toggle a single emoji reaction on a message.
+ * Accepted on POST /messages/:id/reactions.
+ */
+export const ToggleReactionRequest = z
+  .object({
+    emoji: z.string().max(32),
+  })
+  .strict();
+export type ToggleReactionRequest = z.infer<typeof ToggleReactionRequest>;
+
+/**
+ * Batch-mark @-mentions as read.
+ * Accepted on POST /me/mentions/read. Empty `ids` is a no-op (200, []).
+ */
+export const MarkMentionsReadRequest = z
+  .object({
+    ids: z.array(z.string().min(1).max(64)),
+  })
+  .strict();
+export type MarkMentionsReadRequest = z.infer<typeof MarkMentionsReadRequest>;
+
 // ── Shared limit parsing ────────────────────────────────────────────
 //
 // `parseLimit` is the single source of truth for clamping a request-side

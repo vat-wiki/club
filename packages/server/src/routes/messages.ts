@@ -3,6 +3,7 @@ import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import {
   CreateMessageRequest,
+  ToggleReactionRequest,
   MAX_IMAGES_PER_MESSAGE,
   MAX_MESSAGE_CONTENT,
   type Message,
@@ -269,10 +270,16 @@ messages.delete("/:id", (c) => {
 messages.post("/:id/reactions", requireJson, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
-  const body = await c.req.json().catch(() => ({}));
-  const emoji = typeof body.emoji === "string" ? body.emoji.trim() : "";
-  if (!emoji || emoji.length > 32) return jsonErr(c, "bad emoji");
-  const reactions = toggleReaction(id, me.id, emoji);
+  const parsed = await parseJsonBody<typeof ToggleReactionRequest._output>(
+    c,
+    ToggleReactionRequest,
+    "bad emoji",
+  );
+  if (!parsed.ok) return parsed.r;
+  const { emoji } = parsed.data;
+  const trimmed = emoji.trim();
+  if (!trimmed) return jsonErr(c, "bad emoji");
+  const reactions = toggleReaction(id, me.id, trimmed);
   const room = getMessageRoom(id) ?? "general";
   broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room } satisfies MessageReactionEvent);
   return c.body(null, 204);

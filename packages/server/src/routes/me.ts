@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { Mention } from "@club/shared";
+import { MarkMentionsReadRequest } from "@club/shared";
 import { requireAuth } from "../auth.js";
-import { jsonErr } from "../lib.js";
+import { jsonErr, parseJsonBody } from "../lib.js";
 import {
   getUnreadMentions,
   getMentionById,
@@ -83,11 +84,13 @@ me.post("/mentions/:id/read", (c) => {
 // recipient has zero readable mention rows (early-out for abuse).
 me.post("/mentions/read", async (c) => {
   const me = c.get("participant");
-  const body = await c.req.json();
-  if (!Array.isArray(body?.ids)) {
-    return jsonErr(c, "ids must be an array", 400);
-  }
-  const ids = body.ids.filter((id: unknown) => typeof id === "string") as string[];
+  const parsed = await parseJsonBody<typeof MarkMentionsReadRequest._output>(
+    c,
+    MarkMentionsReadRequest,
+    "ids must be an array of strings",
+  );
+  if (!parsed.ok) return parsed.r;
+  const { ids } = parsed.data;
   if (ids.length === 0) {
     return c.json([] as Mention[]);
   }

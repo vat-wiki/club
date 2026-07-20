@@ -7,7 +7,7 @@
 export interface ReadableLike {
   /** True when stdin is an interactive terminal (i.e. nothing is piped in). */
   isTTY?: boolean;
-  setEncoding(encoding: string): void;
+  setEncoding(encoding: BufferEncoding | undefined): void;
   on(event: "data", listener: (chunk: Buffer) => void): void;
   on(event: "error", listener: (err: Error) => void): void;
   on(event: "end", listener: () => void): void;

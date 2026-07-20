@@ -2,10 +2,13 @@ import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
 import { defaultRoom, requireConfig } from "../config.js";
-import { readStream, type ReadableLike } from "../stdin.js";
+import { readStream } from "../stdin.js";
 import { runSend, type SendDeps } from "./send-impl.js";
 
 // Collect repeated flags into an array (commander coercion)
+// Collect repeated flags into an array (commander coercion). Spread-copy avoids
+// the shared-mutable-array pitfall that commander's default accumulator triggers
+// when one command definition is reused across processes.
 const collect = (v: string, acc: string[]) => [...acc, v];
 
 export function makeSendCommand(): Command {
@@ -53,7 +56,7 @@ export function makeSendCommand(): Command {
         const useStdin = opts.stdin ?? (!text.length && !process.stdin.isTTY);
         let content: string;
         if (useStdin) {
-          content = await readStream(process.stdin as unknown as ReadableLike);
+          content = await readStream(process.stdin);
         } else {
           content = text.join(" ");
         }

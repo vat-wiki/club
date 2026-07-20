@@ -11,6 +11,101 @@ import type {
 } from "@club/shared";
 import { uploadImage } from "@/lib/upload";
 
+// ── Shared types ────────────────────────────────────────────────────
+
+/** Optional upload progress callback signature */
+export type UploadProgressCb = (loaded: number, total: number) => void;
+
+/** Optional parameters for file uploads */
+export interface UploadOptions {
+  /** Request timeout in ms; defaults to the SDK's 15 000 ms. */
+  timeoutMs?: number;
+  /** Per-chunk progress callback. `loaded` / `total` are in bytes. */
+  onProgress?: UploadProgressCb;
+}
+
+// ── Facade interface ───────────────────────────────────────────────
+
+/**
+ * The thin API facade the web UI imports from. Every method is typed so the
+ * compiler catches mismatched calls (wrong arg order, missing required params,
+ * dropped return types) and callers get IDE autocomplete instead of guessing
+ * the shape of `@club/sdk`'s methods.
+ */
+export interface ClubApi {
+  /** GET /me — the participant the current key belongs to. */
+  me(c: ClubConn): Promise<Participant>;
+
+  /**
+   * GET /messages — recent history of a room.
+   * @param since - Return messages after this id; omit to get the recent batch.
+   * @param room  - Scope to one room (server defaults to "general" when omitted).
+   */
+  messages(c: ClubConn, since?: string, room?: string): Promise<Message[]>;
+
+  /**
+   * POST /messages — send a message.
+   * @param content     - Message text.
+   * @param attachmentIds - IDs of previously uploaded files (empty by default).
+   * @param replyToId   - Optional id of the message being replied to.
+   * @param room        - Target room; defaults to "general". A valid but
+   *                      non-existent room is auto-created (PRD §9.4).
+   */
+  send(
+    c: ClubConn,
+    content: string,
+    attachmentIds?: readonly string[],
+    replyToId?: string,
+    room?: string,
+  ): Promise<Message>;
+
+  /** GET /members — roster of the room. */
+  members(c: ClubConn): Promise<Participant[]>;
+
+  /** GET /rooms — every room, general first then most-recently-active first. */
+  rooms(c: ClubConn): Promise<Room[]>;
+
+  /**
+   * POST /rooms { name } — create/ensure a room exists (idempotent).
+   * @param name - Canonical room slug.
+   */
+  createRoom(c: ClubConn, name: string): Promise<Room>;
+
+  /**
+   * GET /messages/search — substring search, newest first.
+   * @param q    - Substring to search.
+   * @param room - Optional room scope; omit to search all rooms.
+   */
+  search(c: ClubConn, q: string, room?: string): Promise<Message[]>;
+
+  /** DELETE /messages/:id — soft-delete (recall) a message. */
+  deleteMessage(c: ClubConn, id: string): Promise<void>;
+
+  /** POST /messages/:id/reactions { emoji } — toggle a reaction. */
+  react(c: ClubConn, messageId: string, emoji: string): Promise<void>;
+
+  /**
+   * POST /agents/thinking — report "I'm typing / processing".
+   * `room` scopes the indicator to that room's stream (PRD §5.1).
+   */
+  thinking(c: ClubConn, room?: string): Promise<void>;
+
+  /** POST /agents/idle — stop the typing indicator. */
+  idle(c: ClubConn, room?: string): Promise<void>;
+
+  /**
+   * POST /files (multipart) — upload an image/video/document.
+   * The returned attachment `id` is later echoed via `send()`.
+   */
+  uploadFile(
+    c: ClubConn,
+    file: File,
+    opts?: UploadOptions,
+  ): Promise<UploadFileResponse>;
+}
+
+// ── Implementation ─────────────────────────────────────────────────
+
 // Thin facade over ClubClient so components import from one place. The real
 // HTTP/SSE logic lives in @club/sdk's ClubClient; this just constructs a client
 // per call from the connection the app holds.
@@ -18,17 +113,21 @@ function client(c: ClubConn): ClubClient {
   return new ClubClient(c);
 }
 
-export const api = {
+/**
+ * Default API facade with the standard room limit of 50 messages per batch.
+ *
+ * Pass a `ClubConn` as the first arg to every method; this avoids holding
+ * connection state at the module level and keeps the facade easily mockable
+ * in tests (each call constructs a fresh `ClubClient`).
+ */
+export const api: ClubApi = {
   me: (c: ClubConn): Promise<Participant> => client(c).me(),
+
   // `room` scopes history to a room (default "general" server-side when omitted).
   // `since` returns messages after an id; omitted here returns the recent batch.
   messages: (c: ClubConn, since?: string, room?: string): Promise<Message[]> =>
     client(c).messages({ since, room, limit: 50 }),
-  // content is optional IFF attachmentIds is non-empty (the server enforces the
-  // cross-field rule; see CreateMessageRequest in @club/shared). When there are
-  // no attachments we keep the original content-only body shape (unchanged path).
-  // `room` posts into a specific room (default "general"); posting into a valid
-  // but non-existent room auto-creates it (PRD §9.4 — build = enter).
+
   send: (
     c: ClubConn,
     content: string,
@@ -47,12 +146,10 @@ export const api = {
     }
     return client(c).send(content);
   },
+
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
-  // GET /rooms — every room, general first then most-recently-active first.
   rooms: (c: ClubConn): Promise<Room[]> => client(c).rooms(),
-  // POST /rooms { name } — create/ensure a room exists (idempotent).
   createRoom: (c: ClubConn, name: string): Promise<Room> => client(c).createRoom(name),
-  // `room` scopes the search to one room; omit to search across all rooms.
   search: (c: ClubConn, q: string, room?: string): Promise<Message[]> =>
     client(c).search(q, room ? { room } : undefined),
   deleteMessage: (c: ClubConn, id: string): Promise<void> =>
@@ -62,18 +159,13 @@ export const api = {
       method: "POST",
       body: { emoji },
     }),
-  // Report "I'm typing" / "I stopped" — drives the typing indicator for both
-  // humans (debounced while composing) and agents (while processing a mention).
-  // `room` scopes the indicator to that room's stream (PRD §5.1).
   thinking: (c: ClubConn, room?: string): Promise<void> =>
     client(c).reportAgentThinking(room),
   idle: (c: ClubConn, room?: string): Promise<void> => client(c).reportAgentIdle(room),
-  // multipart image upload — see lib/upload for why this bypasses the JSON
-  // transport. The returned attachment's `id` is later echoed in send().
   uploadFile: (
     c: ClubConn,
     file: File,
-    opts?: { timeoutMs?: number; onProgress?: (loaded: number, total: number) => void },
+    opts?: UploadOptions,
   ): Promise<UploadFileResponse> => uploadImage(c, file, opts),
 };
 
@@ -87,11 +179,18 @@ export async function createParticipant(
   return { key, recoverCode };
 }
 
-// Recover an existing identity by callsign + one-time recovery code. Calls
-// POST /participants/recover directly via the SDK's `request` helper instead of
-// ClubClient.recover — the SDK client method is being added in parallel by the
-// backend owner; going through `request` keeps us out of packages/sdk/src while
-// still using the shared contract types.
+/**
+ * Recover an existing identity by callsign + one-time recovery code.
+ *
+ * Calls POST /participants/recover directly via the SDK's `request` helper
+ * instead of `ClubClient.recover` — the SDK client method is being added in
+ * parallel by the backend owner; going through `request` keeps us out of
+ * `packages/sdk/src` while still using the shared contract types.
+ *
+ * @param server - Base URL of the club server.
+ * @param input  - `{ name, recoverCode }` payload.
+ * @returns Fresh `{ key, recoverCode, participant }` on success.
+ */
 export async function recoverParticipant(
   server: string,
   input: RecoverParticipantRequest,

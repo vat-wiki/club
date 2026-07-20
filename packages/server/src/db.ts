@@ -224,6 +224,19 @@ const migrations: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_messages_participant_id_id
            ON messages(participant_id, id);`,
   },
+  {
+    version: 13,
+    description:
+      "performance: covering (participant_id, id, deleted) index to eliminate table lookup in deleteMessage ownership check",
+    // v12's (participant_id, id) index routes the WHERE to a single B-tree leaf,
+    // but `deleted = 0` still requires a rowid → table row fetch (a "keyset" index
+    // only avoids the scan, not the rowid hop). Adding `deleted` as the third column
+    // makes the index covering: the DELETE can be resolved entirely inside the
+    // B-tree, saving one page read per recall. The added column is tiny (INTEGER
+    // flag) and matches the existing `deleted INTEGER NOT NULL DEFAULT 0` column.
+    sql: `CREATE INDEX IF NOT EXISTS idx_messages_participant_id_id_deleted
+           ON messages(participant_id, id, deleted);`,
+  },
 ];
 
 db.exec(`

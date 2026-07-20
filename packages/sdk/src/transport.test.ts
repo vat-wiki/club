@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await -- test-only mock fetch implementations; await is not reachable on these synchronous stubs */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
 import {
@@ -10,6 +11,7 @@ import {
   getFile,
   listMentions,
   markMentionRead,
+  markMentionsRead,
   recoverParticipant,
   reportAgentThinking,
   reportAgentIdle,
@@ -358,6 +360,23 @@ describe("markMentionRead", () => {
 
     const mention = await markMentionRead({ server: "http://x", key: "k" }, "ment1");
     expect(mention.read).toBe(true);
+  });
+});
+
+describe("markMentionsRead", () => {
+  it("POSTs /me/mentions/read with an ids array body", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/me/mentions/read");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({ ids: ["m1", "m2"] });
+      return jsonRes([{ id: "m1", read: true }, { id: "m2", read: true }]);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const out = await markMentionsRead({ server: "http://x", key: "k" }, ["m1", "m2"]);
+    expect(out.length).toBe(2);
+    expect(out[0].id).toBe("m1");
+    expect(out[1].id).toBe("m2");
   });
 });
 

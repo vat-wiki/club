@@ -17,6 +17,10 @@ import { randomUUID } from "node:crypto";
  *     Authorization so unauthenticated error pages are cached separately.
  *   - X-Request-ID: per-request UUID for tracing/debugging in logs.
  *   - X-DNS-Prefetch-Control: disables speculative DNS lookups that leak intent.
+ *   - Cross-Origin headers (CORP / COEP / COOP): isolate the web app from
+ *     foreign origins, enabling Origin-Clean headers (cross-origin read
+ *     blocking) and narrowing Spectre-style side-channel surface on the
+ *     chat SPA's SSE/WebSocket data plane.
  *
  * Cache-Control: no-store, no-cache, must-revalidate is applied globally as a
  * safe default. Static assets served by serveStatic() (web app) and the
@@ -56,6 +60,14 @@ export const securityHeaders = createMiddleware(async (c, next) => {
   c.header("X-Request-ID", randomUUID());
   // Disables speculative DNS prefetches that can leak navigation intent.
   c.header("X-DNS-Prefetch-Control", "off");
+  // Cross-Origin isolation: CORP same-origin + COEP require-corp + COOP
+  // same-origin-origin-when-cross-origin. Together they enable Origin-Clean
+  // headers (read blocking for cross-origin fetch/XHR/XMLHttpRequest) and
+  // reduce Spectre-style side-channel surface on the chat SPA's SSE/WebSocket
+  // data plane, where user messages and mentions are streamed.
+  c.header("Cross-Origin-Resource-Policy", "same-origin");
+  c.header("Cross-Origin-Embedder-Policy", "require-corp");
+  c.header("Cross-Origin-Opener-Policy", "same-origin-origin-when-cross-origin");
   // Defensive cache control for API responses: prevent browsers, CDNs, and
   // reverse proxies from storing sensitive data (messages, mentions, participant
   // info, SSE frames). Static assets served by serveStatic() and

@@ -5,7 +5,7 @@ import { requireConfig } from "../config.js";
 import type { Mention } from "@club/shared";
 import { withCatchExit } from "../catch-exit.js";
 
-function formatMention(m: Mention): string {
+export function formatMention(m: Mention): string {
   return formatMessage({
     id: m.messageId,
     participantId: m.authorId,
@@ -16,6 +16,33 @@ function formatMention(m: Mention): string {
   });
 }
 
+export interface MentionDeps {
+  mentions: () => Promise<Mention[]>;
+  markMentionsRead: (ids: string[]) => Promise<Mention[]>;
+}
+
+export async function runMentions(
+  opts: { read?: boolean },
+  deps: MentionDeps,
+): Promise<void> {
+  const list = await deps.mentions();
+  if (list.length === 0) {
+    console.log("(no unread mentions)");
+    return;
+  }
+  for (const m of list) console.log(formatMention(m));
+  if (opts.read) {
+    try {
+      await deps.markMentionsRead(list.map((m) => m.id));
+      console.log(`(marked ${list.length} read)`);
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status !== 409) throw err;
+      console.log(`(already read)`);
+    }
+  }
+}
+
 export function makeMentionsCommand(): Command {
   return new Command("mentions")
     .description("show your unread @-mentions; --read to mark them read")
@@ -23,22 +50,9 @@ export function makeMentionsCommand(): Command {
     .action(withCatchExit(async (opts: { read?: boolean }) => {
       const cfg = requireConfig();
       const client = new ClubClient(cfg);
-      const list = await client.mentions();
-      if (list.length === 0) {
-        console.log("(no unread mentions)");
-        return;
-      }
-      for (const m of list) console.log(formatMention(m));
-      if (opts.read) {
-        for (const m of list) {
-          try {
-            await client.markMentionRead(m.id);
-          } catch (err) {
-            const status = (err as { status?: number }).status;
-            if (status !== 409) throw err;
-          }
-        }
-        console.log(`(marked ${list.length} read)`);
-      }
+      return runMentions(opts, {
+        mentions: () => client.mentions(),
+        markMentionsRead: (ids) => client.markMentionsRead(ids),
+      });
     }));
 }

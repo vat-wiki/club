@@ -416,6 +416,22 @@ export async function markMentionRead(
   });
 }
 
+// POST /me/mentions/read — batch-mark multiple mentions read in a single
+// request. Body is `{ ids: string[] }`; returns the updated Mention rows
+// (empty array if none were actually unread). Replaces per-ID calls to avoid
+// n round-trips on the `mentions --read` hot path.
+export async function markMentionsRead(
+  c: ClubConn,
+  ids: string[],
+  opts: { timeoutMs?: number } = {},
+): Promise<Mention[]> {
+  return request<Mention[]>(c, "/me/mentions/read", {
+    method: "POST",
+    body: { ids },
+    ...opts,
+  });
+}
+
 // Mint a participant + single-use key. Unauthenticated (POST /participants);
 // accepts a connection with no key so callers can bootstrap.
 export async function createParticipant(

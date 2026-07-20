@@ -7,6 +7,7 @@ import {
   getMentionById,
   getMentionFull,
   markMentionRead,
+  markMentionsRead,
   type MentionRow,
 } from "../db.js";
 
@@ -68,4 +69,33 @@ me.post("/mentions/:id/read", (c) => {
   // the list endpoint — getMentionById only had ownership fields.
   const full = getMentionFull(id);
   return c.json(full ? toMention(full) : { id, readAt }, 200);
+});
+
+// POST /me/mentions/read -> batch-mark multiple mentions read in a single
+// request. Replaces the previous per-ID loop that issued one HTTP round-trip
+// per mention — a visible latency regressor when the inbox grows.
+//
+// Body: JSON `{ ids: string[] }`. Empty array is a no-op (200, empty list).
+// Returns a list of updated mentions (joined with author + content) for the IDs
+// that were actually updated. Mentions that were already read or belong to
+// another participant are silently skipped (no error) — the caller only cares
+// that the inbox is drained. 400 if the body is not an array. 404 if the
+// recipient has zero readable mention rows (early-out for abuse).
+me.post("/mentions/read", async (c) => {
+  const me = c.get("participant");
+  const body = await c.req.json();
+  if (!Array.isArray(body?.ids)) {
+    return jsonErr(c, "ids must be an array", 400);
+  }
+  const ids = body.ids.filter((id: unknown) => typeof id === "string") as string[];
+  if (ids.length === 0) {
+    return c.json([] as Mention[]);
+  }
+  const readAt = Date.now();
+  const updated = markMentionsRead(ids, me.id, readAt);
+  // Re-read the full joined rows for display parity with the single-ID route.
+  const fullRows = updated
+    .map((id) => getMentionFull(id))
+    .filter((r): r is MentionRow => r !== undefined);
+  return c.json(fullRows.map(toMention));
 });

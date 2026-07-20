@@ -237,3 +237,87 @@ describe("POST /me/mentions/:id/read", () => {
     expect((await second.json()).error).toMatch(/already read/);
   });
 });
+
+describe("POST /me/mentions/read (batch mark-read)", () => {
+  it("rejects unauthenticated requests", async () => {
+    const res = await app.request("/me/mentions/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: ["x"] }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("marks multiple mentions read in one call", async () => {
+    const alice = await mintKey("inbox-alice-12");
+    const bob = await mintKey("inbox-bob-12");
+    await send(bob, "@inbox-alice-12 first");
+    await send(bob, "@inbox-alice-12 second");
+    await send(bob, "@inbox-alice-12 third");
+
+    const list = await (await app.request("/me/mentions", auth(alice))).json();
+    expect(list).toHaveLength(3);
+    const ids = list.map((m) => m.id);
+
+    const res = await app.request("/me/mentions/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids }),
+      ...auth(alice),
+    });
+    expect(res.status).toBe(200);
+    const marked = await res.json();
+    expect(marked.length).toBe(3);
+    // Inbox is now drained.
+    const after = await (await app.request("/me/mentions", auth(alice))).json();
+    expect(after).toEqual([]);
+  });
+
+  it("skips already-read ids and only returns the newly-read rows", async () => {
+    const alice = await mintKey("inbox-alice-13");
+    const bob = await mintKey("inbox-bob-13");
+    await send(bob, "@inbox-alice-13 one");
+    await send(bob, "@inbox-alice-13 two");
+
+    const list = await (await app.request("/me/mentions", auth(alice))).json();
+    const [m1, m2] = list;
+
+    // Mark m1 first.
+    await app.request(`/me/mentions/${m1.id}/read`, { method: "POST", ...auth(alice) });
+
+    // Batch read with m1 (already read) + m2 (unread).
+    const res = await app.request("/me/mentions/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: [m1.id, m2.id] }),
+      ...auth(alice),
+    });
+    const marked = await res.json();
+    // Only m2 was newly read; m1 is excluded from the body.
+    expect(marked).toHaveLength(1);
+    expect(marked[0].id).toBe(m2.id);
+  });
+
+  it("400 when the body is not an array", async () => {
+    const alice = await mintKey("inbox-alice-14");
+    const res = await app.request("/me/mentions/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wrong: "field" }),
+      ...auth(alice),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("200 [] for an empty ids array", async () => {
+    const alice = await mintKey("inbox-alice-15");
+    const res = await app.request("/me/mentions/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: [] }),
+      ...auth(alice),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
+});

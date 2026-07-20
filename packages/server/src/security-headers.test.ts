@@ -119,4 +119,14 @@ describe("securityHeaders", () => {
     const res = await app.request("/asset");
     expect(res.headers.get("cache-control")).toBe("public, immutable, max-age=31536000");
   });
+
+  it("sets cross-origin isolation headers (CORP / COEP / COOP)", async () => {
+    const app = new Hono();
+    app.use("*", securityHeaders);
+    app.get("/", (c) => c.json({ ok: true }));
+    const res = await app.request("/");
+    expect(res.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+    expect(res.headers.get("cross-origin-embedder-policy")).toBe("require-corp");
+    expect(res.headers.get("cross-origin-opener-policy")).toBe("same-origin-origin-when-cross-origin");
+  });
 });

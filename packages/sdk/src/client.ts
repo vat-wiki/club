@@ -24,6 +24,7 @@ import {
   listMessages,
   listRooms as listRoomsFn,
   markMentionRead,
+  markMentionsRead,
   recoverParticipant as recoverParticipantFn,
   reportAgentThinking as reportAgentThinkingFn,
   reportAgentIdle as reportAgentIdleFn,
@@ -104,6 +105,12 @@ export class ClubClient {
   /** POST /me/mentions/:id/read — mark one mention as read. */
   markMentionRead(id: string): Promise<Mention> {
     return markMentionRead(this.conn(), id, { timeoutMs: this.timeoutMs });
+  }
+
+  /** POST /me/mentions/read — batch-mark mentions as read in a single request.
+   *  Returns the updated Mention rows for the IDs that were actually unread. */
+  markMentionsRead(ids: string[]): Promise<Mention[]> {
+    return markMentionsRead(this.conn(), ids, { timeoutMs: this.timeoutMs });
   }
 
   /** GET /messages — recent history of a room; `since` returns messages after

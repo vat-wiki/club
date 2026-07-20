@@ -5,7 +5,7 @@
 // is marked with ` *` so a user can see where their next `club send` lands.
 
 import { Command } from "commander";
-import type { Room } from "@club/shared";
+import { DEFAULT_ROOM, type Room } from "@club/shared";
 import { defaultRoom } from "../config.js";
 import { withAuthClient } from "../client-factory.js";
 
@@ -19,7 +19,7 @@ import { withAuthClient } from "../client-factory.js";
  */
 export function formatRoomLine(room: Room, current: string): string {
   const marker = room.slug === current ? " *" : "";
-  const sys = room.slug === "general" ? " (system)" : "";
+  const sys = room.slug === DEFAULT_ROOM ? " (system)" : "";
   return `#${room.slug}${marker}${sys}`;
 }
 

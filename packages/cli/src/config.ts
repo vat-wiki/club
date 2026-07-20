@@ -2,16 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
+import { DEFAULT_ROOM } from "@club/shared";
 
 export interface ClubConfig {
   server: string;
   key: string;
-  /** Current/default room slug written by `club enter`. Absent → "general". */
+  /** Current/default room slug written by `club enter`. Absent → `DEFAULT_ROOM`. */
   room?: string;
 }
-
-// The system room — always exists, the default when no room is chosen.
-export const DEFAULT_ROOM = "general";
 
 // Validates the on-disk config shape. server/key must be non-empty strings.
 const ConfigSchema = z.object({
@@ -22,7 +20,7 @@ const ConfigSchema = z.object({
 
 /**
  * Resolve the effective default room for a config: the room `club enter` wrote,
- * falling back to "general" when unset.
+ * falling back to `DEFAULT_ROOM` when unset.
  */
 export function defaultRoom(cfg: { room?: string } | null): string {
   const r = cfg?.room?.trim();

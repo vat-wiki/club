@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import {
+  DEFAULT_ROOM,
   CreateMessageRequest,
   ToggleReactionRequest,
   MAX_IMAGES_PER_MESSAGE,
@@ -231,7 +232,7 @@ messages.post("/", requireJson, async (c) => {
 // (chronologic). `room` defaults to "general" for backward compatibility — an
 // old client that omits it sees the general history exactly as before.
 messages.get("/", (c) => {
-  const room = (c.req.query("room") ?? "general").trim();
+  const room = (c.req.query("room") ?? DEFAULT_ROOM).trim();
   const bad = requireValidRoomSlug(c, room);
   if (bad) return bad.r;
   const since = c.req.query("since");
@@ -288,7 +289,7 @@ messages.delete("/:id", (c) => {
   const id = c.req.param("id");
   const ok = deleteMessage(id, me.id);
   if (!ok) return jsonErr(c, "not found", 404);
-  const room = getMessageRoom(id) ?? "general";
+  const room = getMessageRoom(id) ?? DEFAULT_ROOM;
   broadcastDeleted({ id, room });
   return c.body(null, 204);
 });
@@ -309,7 +310,7 @@ messages.post("/:id/reactions", requireJson, async (c) => {
   const trimmed = emoji.trim();
   if (!trimmed) return jsonErr(c, "bad emoji");
   const reactions = toggleReaction(id, me.id, trimmed);
-  const room = getMessageRoom(id) ?? "general";
+  const room = getMessageRoom(id) ?? DEFAULT_ROOM;
   broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room } satisfies MessageReactionEvent);
   return c.body(null, 204);
 });

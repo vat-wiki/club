@@ -253,6 +253,18 @@ export interface RecoverParticipantResponse {
   participant: Participant;
 }
 
+// ── Domain constants ─────────────────────────────────────────────────
+// Shared across CLI, SDK, and server so the default/system room slug never
+// drifts between packages. Kept in `types.ts` so it lives next to the room-
+// related type definitions.
+
+/** Canonical slug of the system/default room. Seeded by the migration; the
+ *   value every client, route, and command falls back to when no room is
+ *   chosen.
+ * @see https://club-docs/rooms/#general
+ */
+export const DEFAULT_ROOM = "general";
+
 // ── Content limits ─────────────────────────────────────────────────────
 // Shared constants so client pre-flight checks and server validation never drift.
 
@@ -282,10 +294,11 @@ export const CreateMessageRequest = z.object({
   content: z.string().max(MAX_MESSAGE_CONTENT).default(""),
   attachmentIds: z.array(z.string().min(1).max(64)).max(MAX_IMAGES_PER_MESSAGE).default([]),
   replyToId: z.string().min(1).max(64).optional(),
-  // Room to post into; defaults to "general" for backward compatibility. Must
-  // be a valid slug; posting to a non-existent (but valid) room auto-creates it
-  // (PRD §9.4) — "build" and "enter" are the same action in the open model.
-  room: RoomSlug.default("general"),
+  // Room to post into; defaults to the shared `DEFAULT_ROOM` slug for
+  // backward compatibility. Must be a valid slug; posting to a non-existent
+  // (but valid) room auto-creates it (PRD §9.4) — "build" and "enter" are
+  // the same action in the open model.
+  room: RoomSlug.default(DEFAULT_ROOM),
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 

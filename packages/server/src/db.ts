@@ -1,23 +1,23 @@
-import Database from "better-sqlite3";
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { ulid } from "ulid";
-import { escapeLike } from "@club/shared";
+import Database from 'better-sqlite3';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { ulid } from 'ulid';
+import { escapeLike, type Reaction } from '@club/shared';
 
-const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), "club.db");
+const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 
 // Ensure the parent dir exists (hidden ENV var to relocate the sqlite file).
 if (!existsSync(dirname(dbPath))) mkdirSync(dirname(dbPath), { recursive: true });
 
 export const db: Database.Database = new Database(dbPath);
-db.pragma("journal_mode = WAL");
+db.pragma('journal_mode = WAL');
 // Codify what is currently better-sqlite3's compile-time default
 // (DEFAULT_FOREIGN_KEYS): foreign-key enforcement ON. The messages/files →
 // participants FKs rely on this. Without the explicit pragma, a future
 // better-sqlite3 build that drops that flag would silently stop enforcing
 // them. No-op today (the default already enables it); explicit for
 // upgrade-safety and to document intent.
-db.pragma("foreign_keys = ON");
+db.pragma('foreign_keys = ON');
 
 // Baseline schema: participants + messages, created with CREATE TABLE IF NOT
 // EXISTS since the very first release. We keep this as-is (idempotent) rather
@@ -63,7 +63,7 @@ type Migration = { version: number; description: string; sql: string };
 const migrations: Migration[] = [
   {
     version: 1,
-    description: "mentions table (per-participant @-mention inbox)",
+    description: 'mentions table (per-participant @-mention inbox)',
     // One row per (message, mentioned participant). UNIQUE(message_id,
     // participant_id) prevents duplicate inbox entries if a message @-mentions
     // the same participant twice in its text. read_at is NULL until the
@@ -85,7 +85,7 @@ const migrations: Migration[] = [
   },
   {
     version: 2,
-    description: "identity recovery: per-participant recover_hash",
+    description: 'identity recovery: per-participant recover_hash',
     // nullable recover_hash: NULL means the participant has no recovery code
     // set yet (pre-recovery-deployment participants, or a freshly rotated code
     // whose plaintext has already been returned once). sha256(plaintext
@@ -96,7 +96,7 @@ const migrations: Migration[] = [
   },
   {
     version: 3,
-    description: "image attachments on messages + uploaded-file metadata",
+    description: 'image attachments on messages + uploaded-file metadata',
     // `attachments` is a JSON column (NULL/empty = no images) rather than a
     // separate table: attachments are never queried independently — they're
     // always read alongside their message — so a join table would be entity
@@ -119,17 +119,17 @@ const migrations: Migration[] = [
   },
   {
     version: 4,
-    description: "message reply-to (threaded quotes)",
+    description: 'message reply-to (threaded quotes)',
     sql: `ALTER TABLE messages ADD COLUMN reply_to_id TEXT;`,
   },
   {
     version: 5,
-    description: "soft-delete (recall) flag on messages",
+    description: 'soft-delete (recall) flag on messages',
     sql: `ALTER TABLE messages ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;`,
   },
   {
     version: 6,
-    description: "emoji reactions on messages",
+    description: 'emoji reactions on messages',
     sql: `
       CREATE TABLE IF NOT EXISTS reactions (
         message_id     TEXT NOT NULL REFERENCES messages(id),
@@ -141,7 +141,7 @@ const migrations: Migration[] = [
   },
   {
     version: 7,
-    description: "multi-room: rooms table, messages.room, mentions.room, general seed",
+    description: 'multi-room: rooms table, messages.room, mentions.room, general seed',
     // Open-topic rooms. `rooms` holds the canonical slug registry; `messages`
     // and `mentions` get a `room` column defaulting to "general" so existing
     // rows backfill in place (zero data loss, no backfill script — NF1). An
@@ -164,12 +164,12 @@ const migrations: Migration[] = [
   },
   {
     version: 8,
-    description: "filename on uploaded files (document attachments show it)",
+    description: 'filename on uploaded files (document attachments show it)',
     sql: `ALTER TABLE files ADD COLUMN filename TEXT;`,
   },
   {
     version: 9,
-    description: "drop participant.kind (category-blind: human/agent distinction removed)",
+    description: 'drop participant.kind (category-blind: human/agent distinction removed)',
     // club no longer classifies participants into human/agent — see
     // .pd-docs/requirements/category-blind.md. The column is dropped; every
     // prepared statement has stopped selecting it. BASELINE_SCHEMA still creates
@@ -181,7 +181,7 @@ const migrations: Migration[] = [
   },
   {
     version: 10,
-    description: "index reactions on message_id for lookups and fan-out",
+    description: 'index reactions on message_id for lookups and fan-out',
     // `getReactionsForMessage`, `getReactionsForMessages`, and `toggleReaction`
     // all query `reactions` by `message_id`. Without this index every read does a
     // full table scan — linear in total reaction count. As the room ages the
@@ -195,7 +195,7 @@ const migrations: Migration[] = [
   {
     version: 11,
     description:
-      "performance: participants lookup indexes (key_hash, name) + compound (room, created_at) index",
+      'performance: participants lookup indexes (key_hash, name) + compound (room, created_at) index',
     // Better-sqlite3 prepared statements in db.ts issue single-row lookups by
     // key_hash and name on every auth + mention-parse path. Without a secondary
     // index on those columns each lookup is a full-table scan (linear in
@@ -214,7 +214,7 @@ const migrations: Migration[] = [
   {
     version: 12,
     description:
-      "performance: composite (participant_id, id) index for deleteMessage ownership check",
+      'performance: composite (participant_id, id) index for deleteMessage ownership check',
     // `deleteMessage` issues `UPDATE ... WHERE id = ? AND participant_id = ? AND deleted = 0`
     // to verify the sender owns the message before recall. Without a covering index
     // on (participant_id, id) the ownership check scans the entire messages table,
@@ -227,7 +227,7 @@ const migrations: Migration[] = [
   {
     version: 13,
     description:
-      "performance: covering (participant_id, id, deleted) index to eliminate table lookup in deleteMessage ownership check",
+      'performance: covering (participant_id, id, deleted) index to eliminate table lookup in deleteMessage ownership check',
     // v12's (participant_id, id) index routes the WHERE to a single B-tree leaf,
     // but `deleted = 0` still requires a rowid → table row fetch (a "keyset" index
     // only avoids the scan, not the rowid hop). Adding `deleted` as the third column
@@ -250,10 +250,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 // (atomic DDL+version bump). `maxVersion` is a test seam letting a caller build
 // a db at an older schema (e.g. v6) and then drive the upgrade; production
 // leaves it at the default (Infinity → apply everything pending).
-export function runMigrations(
-  database: Database.Database,
-  maxVersion = Infinity,
-): void {
+export function runMigrations(database: Database.Database, maxVersion = Infinity): void {
   try {
     database.exec(`
       CREATE TABLE IF NOT EXISTS schema_version (
@@ -261,14 +258,12 @@ export function runMigrations(
       );
     `);
     // Seed the version row at 0 the first time (baseline schema above is "v0").
-    database
-      .prepare(`INSERT OR IGNORE INTO schema_version (version) VALUES (0)`)
-      .run();
+    database.prepare(`INSERT OR IGNORE INTO schema_version (version) VALUES (0)`).run();
 
     const currentVersion = (
-      database
-        .prepare<[], { version: number }>(`SELECT version FROM schema_version`)
-        .get() ?? { version: 0 }
+      database.prepare<[], { version: number }>(`SELECT version FROM schema_version`).get() ?? {
+        version: 0,
+      }
     ).version;
 
     for (const m of migrations) {
@@ -309,12 +304,12 @@ export interface MessageRow {
 // one edit rather than hunting six prepared statements for stale aliases.
 // Consumers compose it with their own WHERE / ORDER BY / LIMIT clauses.
 const messageProjectionSql =
-  "SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, " +
-  "       p.id AS participant_id, p.name AS author_name FROM messages m JOIN participants p ON p.id = m.participant_id";
+  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, ' +
+  '       p.id AS participant_id, p.name AS author_name FROM messages m JOIN participants p ON p.id = m.participant_id';
 
 const insertMessageStmt = db.prepare(
   `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
 
 /**
@@ -337,13 +332,13 @@ export function insertMessage(
   createdAt: number,
   attachments: string | null,
   replyToId: string | null,
-  room: string,
+  room: string
 ): void {
   insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
 
 const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; created_at: number }>(
-  `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`,
+  `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`
 );
 
 /** All participants, newest first. Used by the room-member list endpoint. */
@@ -352,19 +347,19 @@ export function getAllParticipants(): { id: string; name: string; created_at: nu
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`
 );
 
 const recentStmt = db.prepare<[string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 const sinceStmt = db.prepare<[string], { rowid: number }>(
-  `SELECT rowid FROM messages WHERE id = ?`,
+  `SELECT rowid FROM messages WHERE id = ?`
 );
 
 const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`
 );
 
 /** Messages with `rowid > rowid` in the given room, newest first. Backs the
@@ -395,7 +390,7 @@ export function getRecentMessages(room: string, limit: number): MessageRow[] {
 export function getMessagesSince(
   sinceId: string,
   room: string,
-  limit: number,
+  limit: number
 ): { rowid: number; messages: MessageRow[] } {
   const row = sinceStmt.get(sinceId);
   if (!row) return { rowid: 0, messages: [] as MessageRow[] };
@@ -403,7 +398,7 @@ export function getMessagesSince(
 }
 
 const beforeStmt = db.prepare<[number, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 /** Messages older than `beforeId`, chronologic (oldest→newest within the page).
@@ -418,11 +413,11 @@ export function getMessagesBeforeId(beforeId: string, room: string, limit: numbe
 }
 
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' ORDER BY m.rowid DESC LIMIT ?`
 );
 
 const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`,
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 /** Messages whose content contains `q` (substring via LIKE), newest first.
@@ -444,14 +439,14 @@ export function searchMessages(q: string, room: string | null, limit: number): M
  * @param id - ULID message id.
  */
 const messageRoomStmt = db.prepare<[string], { room: string }>(
-  `SELECT room FROM messages WHERE id = ?`,
+  `SELECT room FROM messages WHERE id = ?`
 );
 export function getMessageRoom(id: string): string | undefined {
   return messageRoomStmt.get(id)?.room;
 }
 
 const deleteStmt = db.prepare<[string, string]>(
-  `UPDATE messages SET deleted = 1 WHERE id = ? AND participant_id = ? AND deleted = 0`,
+  `UPDATE messages SET deleted = 1 WHERE id = ? AND participant_id = ? AND deleted = 0`
 );
 
 /** Soft-delete (recall) a message. Only the author may (participant_id check).
@@ -462,21 +457,21 @@ export function deleteMessage(id: string, participantId: string): boolean {
 }
 
 const removeReactionStmt = db.prepare<[string, string, string]>(
-  `DELETE FROM reactions WHERE message_id = ? AND participant_id = ? AND emoji = ?`,
+  `DELETE FROM reactions WHERE message_id = ? AND participant_id = ? AND emoji = ?`
 );
 const addReactionStmt = db.prepare<[string, string, string]>(
-  `INSERT OR IGNORE INTO reactions (message_id, participant_id, emoji) VALUES (?, ?, ?)`,
+  `INSERT OR IGNORE INTO reactions (message_id, participant_id, emoji) VALUES (?, ?, ?)`
 );
 const reactionsForMsgStmt = db.prepare<[string], { emoji: string; participant_id: string }>(
-  `SELECT emoji, participant_id FROM reactions WHERE message_id = ?`,
+  `SELECT emoji, participant_id FROM reactions WHERE message_id = ?`
 );
 
 /** Aggregate reactions on a message (emoji → count). */
-export function getReactionsForMessage(messageId: string): { emoji: string; count: number }[] {
+export function getReactionsForMessage(messageId: string): Reaction[] {
   const rows = reactionsForMsgStmt.all(messageId);
   const counts = new Map<string, number>();
   for (const r of rows) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
-  return [...counts.entries()].map(([emoji, count]) => ({ emoji, count }));
+  return [...counts.entries()].map(([emoji, count]): Reaction => ({ emoji, count }));
 }
 
 /** Batch-fetch reactions for multiple messages in a single query.
@@ -487,40 +482,45 @@ export function getReactionsForMessage(messageId: string): { emoji: string; coun
  *  renders (a list of messages), so a one-time-allocated statement per batch
  *  size avoids repeated statement creation on the hot path.
  */
-const reactionsForMessagesCache = new Map<number, ReturnType<typeof db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>>>();
+const reactionsForMessagesCache = new Map<
+  number,
+  ReturnType<typeof db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>>
+>();
 
-export function getReactionsForMessages(
-  messageIds: string[],
-): Map<string, { emoji: string; count: number }[]> {
+export function getReactionsForMessages(messageIds: string[]): Map<string, Reaction[]> {
   if (messageIds.length === 0) return new Map();
-  const placeholders = "?,".repeat(messageIds.length).slice(0, -1);
+  const placeholders = '?,'.repeat(messageIds.length).slice(0, -1);
   let stmt = reactionsForMessagesCache.get(messageIds.length);
   if (!stmt) {
     const sql =
-      `SELECT message_id, emoji, COUNT(*) AS count FROM reactions`
-      + ` WHERE message_id IN (${placeholders})`
-      + ` GROUP BY message_id, emoji`;
+      `SELECT message_id, emoji, COUNT(*) AS count FROM reactions` +
+      ` WHERE message_id IN (${placeholders})` +
+      ` GROUP BY message_id, emoji`;
     stmt = db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>(sql);
     reactionsForMessagesCache.set(messageIds.length, stmt);
   }
-  const rows = stmt.all(...messageIds as [...string[]]);
+  const rows = stmt.all(...(messageIds as [...string[]]));
   // Group aggregated rows by message_id, preserving insertion order of the
   // returned rows (SQLite GROUP BY output order is stable for a given run).
-  const out = new Map<string, { emoji: string; count: number }[]>();
+  const out = new Map<string, Reaction[]>();
   for (const r of rows) {
     let entry = out.get(r.message_id);
     if (!entry) {
       entry = [];
       out.set(r.message_id, entry);
     }
-    entry.push({ emoji: r.emoji, count: r.count });
+    entry.push({ emoji: r.emoji, count: r.count } satisfies Reaction);
   }
   return out;
 }
 
 /** Toggle a reaction (remove if present, add if absent). Returns the refreshed
  *  aggregate so the caller can broadcast it. */
-export function toggleReaction(messageId: string, participantId: string, emoji: string): { emoji: string; count: number }[] {
+export function toggleReaction(
+  messageId: string,
+  participantId: string,
+  emoji: string
+): Reaction[] {
   const removed = removeReactionStmt.run(messageId, participantId, emoji).changes > 0;
   if (!removed) addReactionStmt.run(messageId, participantId, emoji);
   return getReactionsForMessage(messageId);
@@ -532,10 +532,9 @@ export interface ParticipantRow {
   created_at: number;
 }
 
-const participantByKeyHashStmt = db.prepare<
-  [string],
-  ParticipantRow | undefined
->(`SELECT id, name, created_at FROM participants WHERE key_hash = ?`);
+const participantByKeyHashStmt = db.prepare<[string], ParticipantRow | undefined>(
+  `SELECT id, name, created_at FROM participants WHERE key_hash = ?`
+);
 
 /** Participant row looked up by hashed key (auth path). Returns undefined if
  *  no participant matches the key. */
@@ -543,10 +542,9 @@ export function getParticipantByKeyHash(hash: string): ParticipantRow | undefine
   return participantByKeyHashStmt.get(hash);
 }
 
-const participantByNameStmt = db.prepare<
-  [string],
-  ParticipantRow | undefined
->(`SELECT id, name, created_at FROM participants WHERE name = ?`);
+const participantByNameStmt = db.prepare<[string], ParticipantRow | undefined>(
+  `SELECT id, name, created_at FROM participants WHERE name = ?`
+);
 
 /** Participant row looked up by callsign. Returns undefined if the name
  *  doesn't exist. */
@@ -556,7 +554,7 @@ export function getParticipantByName(name: string): ParticipantRow | undefined {
 
 const insertParticipantStmt = db.prepare(
   `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
-   VALUES (?, ?, ?, ?, ?)`,
+   VALUES (?, ?, ?, ?, ?)`
 );
 
 /** Insert a new participant (idempotent at the row level — only called from
@@ -574,7 +572,7 @@ export function insertParticipant(
   name: string,
   keyHash: string,
   recoverHash: string,
-  createdAt: number,
+  createdAt: number
 ): void {
   insertParticipantStmt.run(id, name, keyHash, recoverHash, createdAt);
 }
@@ -594,10 +592,9 @@ export interface ParticipantRecoverRow {
   recover_hash: string | null;
 }
 
-const getParticipantForRecoverStmt = db.prepare<
-  [string],
-  ParticipantRecoverRow
->(`SELECT id, name, created_at, recover_hash FROM participants WHERE name = ?`);
+const getParticipantForRecoverStmt = db.prepare<[string], ParticipantRecoverRow>(
+  `SELECT id, name, created_at, recover_hash FROM participants WHERE name = ?`
+);
 
 /** A participant row including recover_hash, looked up by callsign (for the
  *  recovery endpoint). Returns undefined if the name doesn't exist. */
@@ -605,9 +602,7 @@ export function getParticipantForRecover(name: string): ParticipantRecoverRow | 
   return getParticipantForRecoverStmt.get(name);
 }
 
-const updateParticipantKeyStmt = db.prepare(
-  `UPDATE participants SET key_hash = ? WHERE id = ?`,
-);
+const updateParticipantKeyStmt = db.prepare(`UPDATE participants SET key_hash = ? WHERE id = ?`);
 
 /** Rotate the participant's key (recovery flow). Idempotent at the row level. */
 export function updateParticipantKey(id: string, newKeyHash: string): void {
@@ -615,7 +610,7 @@ export function updateParticipantKey(id: string, newKeyHash: string): void {
 }
 
 const updateParticipantRecoverStmt = db.prepare(
-  `UPDATE participants SET recover_hash = ? WHERE id = ?`,
+  `UPDATE participants SET recover_hash = ? WHERE id = ?`
 );
 
 /** Set the participant's recover_hash. Pass null to clear (invalidate) it,
@@ -638,10 +633,9 @@ export interface MentionRow {
   room: string; // room the mentioning message was posted in (deep-link source)
 }
 
-const allParticipantsStmt = db.prepare<
-  [],
-  { id: string; name: string }
->(`SELECT id, name FROM participants`);
+const allParticipantsStmt = db.prepare<[], { id: string; name: string }>(
+  `SELECT id, name FROM participants`
+);
 
 /**
  * In-memory cache of the participant roster. The roster changes only when a
@@ -661,14 +655,19 @@ const participantNamesCache = new Map<string, { id: string; name: string }>();
 // reference between mutations keeps that comparison happy on every message send
 // (O(0) — no Map rebuild, no allocation). A fresh `[...map.values()]` on each
 // call would blow the identity check and pay the rebuild cost per message.
-const participantNamesRef = { current: Object.freeze([] as readonly { id: string; name: string }[]) };
+const participantNamesRef = {
+  current: Object.freeze([] as readonly { id: string; name: string }[]),
+};
 
 function _buildSnapshot(): readonly { id: string; name: string }[] {
   if (participantNamesCache.size === 0) {
     const rows = allParticipantsStmt.all();
     for (const r of rows) participantNamesCache.set(r.id, r);
   }
-  return Object.freeze([...participantNamesCache.values()]) as readonly { id: string; name: string }[];
+  return Object.freeze([...participantNamesCache.values()]) as readonly {
+    id: string;
+    name: string;
+  }[];
 }
 
 /**
@@ -703,7 +702,7 @@ export function invalidateParticipantNamesCache(): void {
 const insertMentionStmt = db.prepare(
   `INSERT OR IGNORE INTO mentions
      (id, message_id, participant_id, author_id, room, read_at, created_at)
-   VALUES (?, ?, ?, ?, ?, NULL, ?)`,
+   VALUES (?, ?, ?, ?, ?, NULL, ?)`
 );
 
 /**
@@ -718,10 +717,9 @@ export function insertMention(
   participantId: string,
   authorId: string,
   room: string,
-  createdAt: number,
+  createdAt: number
 ): boolean {
-  return insertMentionStmt.run(id, messageId, participantId, authorId, room, createdAt)
-    .changes > 0;
+  return insertMentionStmt.run(id, messageId, participantId, authorId, room, createdAt).changes > 0;
 }
 
 const unreadMentionsStmt = db.prepare<[string, number], MentionRow>(
@@ -733,7 +731,7 @@ const unreadMentionsStmt = db.prepare<[string, number], MentionRow>(
     JOIN messages m ON m.id = mn.message_id
     JOIN participants p ON p.id = mn.author_id
     WHERE mn.participant_id = ? AND mn.read_at IS NULL
-    ORDER BY m.created_at ASC LIMIT ?`,
+    ORDER BY m.created_at ASC LIMIT ?`
 );
 
 /** Unread mentions for `participantId`, oldest first, capped at `limit`. */
@@ -768,7 +766,7 @@ const mentionFullStmt = db.prepare<[string], MentionRow>(
    FROM mentions mn
    JOIN messages m ON m.id = mn.message_id
    JOIN participants p ON p.id = mn.author_id
-   WHERE mn.id = ?`,
+   WHERE mn.id = ?`
 );
 
 /** A single mention, fully joined (author + message content) for display. */
@@ -776,9 +774,7 @@ export function getMentionFull(id: string): MentionRow | undefined {
   return mentionFullStmt.get(id);
 }
 
-const markReadStmt = db.prepare(
-  `UPDATE mentions SET read_at = ? WHERE id = ? AND read_at IS NULL`,
-);
+const markReadStmt = db.prepare(`UPDATE mentions SET read_at = ? WHERE id = ? AND read_at IS NULL`);
 
 /**
  * Mark one mention read. Returns whether a row was actually updated (false if
@@ -811,13 +807,9 @@ const markReadBatchCache = new Map<
  * @param readAt - Timestamp (epoch ms) to set as read time.
  * @returns Subset of `ids` that were actually updated.
  */
-export function markMentionsRead(
-  ids: string[],
-  ownerId: string,
-  readAt: number,
-): string[] {
+export function markMentionsRead(ids: string[], ownerId: string, readAt: number): string[] {
   if (ids.length === 0) return [];
-  const placeholders = "?,".repeat(ids.length).slice(0, -1);
+  const placeholders = '?,'.repeat(ids.length).slice(0, -1);
   let stmt = markReadBatchCache.get(ids.length);
   if (!stmt) {
     const sql = `UPDATE mentions SET read_at = ? WHERE participant_id = ? AND read_at IS NULL AND id IN (${placeholders})`;
@@ -858,7 +850,7 @@ export interface FileRow {
 
 const insertFileStmt = db.prepare(
   `INSERT INTO files (id, participant_id, mime, width, height, size, created_at, filename)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 );
 
 /** Persist a file metadata row after a successful upload.
@@ -874,13 +866,13 @@ export function insertFile(f: FileRow): void {
     f.height,
     f.size,
     f.created_at,
-    f.filename,
+    f.filename
   );
 }
 
 const fileByIdStmt = db.prepare<[string], FileRow>(
   `SELECT id, participant_id, mime, width, height, size, created_at, filename
-   FROM files WHERE id = ?`,
+   FROM files WHERE id = ?`
 );
 
 /** Retrieve a file metadata row by its public id. Returns `undefined` when
@@ -925,19 +917,18 @@ export function getFilesByIds(ids: string[]): FileRow[] {
   if (ids.length > 100) {
     // Defensive: a message shouldn't reference this many files. This protects
     // against pathological abuse while staying far above legitimate limits.
-    throw new Error("too many file ids requested (max 100)");
+    throw new Error('too many file ids requested (max 100)');
   }
-  const placeholders = "?,".repeat(ids.length).slice(0, -1);
+  const placeholders = '?,'.repeat(ids.length).slice(0, -1);
   let stmt = fileGetByIdsCache.get(ids.length);
   if (!stmt) {
-    const sql =
-      `SELECT id, participant_id, mime, width, height, size, created_at, filename
+    const sql = `SELECT id, participant_id, mime, width, height, size, created_at, filename
        FROM files WHERE id IN (${placeholders})`;
     stmt = db.prepare<[...string[]], FileRow>(sql);
     fileGetByIdsCache.set(ids.length, stmt);
   }
   const byId = new Map<string, FileRow>();
-  const rows = stmt.all(...ids as [...string[]]);
+  const rows = stmt.all(...(ids as [...string[]]));
   for (const row of rows) {
     byId.set(row.id, row);
   }
@@ -984,7 +975,7 @@ const listRoomsStmt = db.prepare<[], RoomRow>(
    FROM rooms r
    LEFT JOIN messages m ON m.room = r.slug
    GROUP BY r.id, r.slug, r.created_at
-   ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`,
+   ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`
 );
 /** All rooms with their last-activity timestamp in one scan. `general` sorts
  * first, then most-recently-active first, then empty rooms (NULL activity)
@@ -998,10 +989,9 @@ export function listRooms(): RoomRow[] {
   return listRoomsStmt.all();
 }
 
-const roomBySlugStmt = db.prepare<
-  [string],
-  { id: string; slug: string; created_at: number }
->(`SELECT id, slug, created_at FROM rooms WHERE slug = ?`);
+const roomBySlugStmt = db.prepare<[string], { id: string; slug: string; created_at: number }>(
+  `SELECT id, slug, created_at FROM rooms WHERE slug = ?`
+);
 
 // One-room variant of listRoomsStmt: fetch a single room's metadata plus its
 // last-activity timestamp in one query. Used by POST /rooms after a
@@ -1010,10 +1000,7 @@ const roomBySlugStmt = db.prepare<
 // request — linear in room count and wasteful on the common path where the
 // room already exists. A targeted single-row query is O(1) with the
 // UNIQUE(slug) constraint.
-const roomBySlugWithActivityStmt = db.prepare<
-  [string],
-  RoomRow | undefined
->(`
+const roomBySlugWithActivityStmt = db.prepare<[string], RoomRow | undefined>(`
   SELECT r.id, r.slug, r.created_at,
          MAX(m.created_at) AS last_activity_at
    FROM rooms r
@@ -1037,7 +1024,7 @@ export function getRoomBySlug(slug: string): RoomRow | undefined {
 }
 
 const insertRoomStmt = db.prepare(
-  `INSERT OR IGNORE INTO rooms (id, slug, created_at) VALUES (?, ?, ?)`,
+  `INSERT OR IGNORE INTO rooms (id, slug, created_at) VALUES (?, ?, ?)`
 );
 
 /** Ensure a room with `slug` exists, creating it if missing. Idempotent: a
@@ -1046,7 +1033,7 @@ const insertRoomStmt = db.prepare(
  *  actually inserted the row) so the route can pick 201 vs 200. */
 export function ensureRoom(
   slug: string,
-  createdAt: number,
+  createdAt: number
 ): { id: string; slug: string; created_at: number; created: boolean } {
   const existing = roomBySlugStmt.get(slug);
   if (existing) return { ...existing, created: false };

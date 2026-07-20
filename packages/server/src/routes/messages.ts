@@ -139,7 +139,7 @@ function toMessage(
 // screenshot is the most common intent, forcing text would add friction). The
 // cross-field rule is enforced here, not in zod, because zod can't express it.
 messages.post("/", requireJson, async (c) => {
-  const parsed = await parseJsonBody<typeof CreateMessageRequest._output>(c, CreateMessageRequest, "bad request");
+  const parsed = await parseJsonBody(c, CreateMessageRequest, "bad request");
   if (!parsed.ok) return parsed.r;
   const { content, attachmentIds, replyToId, room } = parsed.data;
   // Sanitize the message body once at ingestion. The sanitized copy is the
@@ -338,7 +338,7 @@ messages.post("/:id/reactions", requireJson, async (c) => {
   const id = c.req.param("id");
   const bad = requireValidId(c, id, "message id");
   if (bad) return bad.r;
-  const parsed = await parseJsonBody<typeof ToggleReactionRequest._output>(
+  const parsed = await parseJsonBody(
     c,
     ToggleReactionRequest,
     "bad emoji",

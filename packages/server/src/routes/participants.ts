@@ -75,7 +75,7 @@ function buildParticipant(name: string) {
 
 if (isTest) {
   participants.post("/", requireJson, async (c) => {
-    const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
+    const parsed = await parseJsonBody(
       c,
       CreateParticipantRequest,
       "bad request",
@@ -92,7 +92,7 @@ if (isTest) {
     requireJson,
     ...(authLimiter ? [authLimiter] : []),
     async (c) => {
-      const parsed = await parseJsonBody<typeof CreateParticipantRequest._output>(
+      const parsed = await parseJsonBody(
         c,
         CreateParticipantRequest,
         "bad request",
@@ -147,7 +147,7 @@ function recoverParticipant(name: string, recoverCode: string) {
 
 if (isTest) {
   participants.post("/recover", requireJson, async (c) => {
-    const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
+    const parsed = await parseJsonBody(
       c,
       RecoverParticipantRequest,
       "bad request",
@@ -163,7 +163,7 @@ if (isTest) {
     requireJson,
     ...(authLimiter ? [authLimiter] : []),
     async (c) => {
-      const parsed = await parseJsonBody<typeof RecoverParticipantRequest._output>(
+      const parsed = await parseJsonBody(
         c,
         RecoverParticipantRequest,
         "bad request",

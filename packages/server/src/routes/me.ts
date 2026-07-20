@@ -86,7 +86,7 @@ me.post("/mentions/:id/read", (c) => {
 // recipient has zero readable mention rows (early-out for abuse).
 me.post("/mentions/read", async (c) => {
   const me = c.get("participant");
-  const parsed = await parseJsonBody<typeof MarkMentionsReadRequest._output>(
+  const parsed = await parseJsonBody(
     c,
     MarkMentionsReadRequest,
     "ids must be an array of strings",

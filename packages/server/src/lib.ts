@@ -55,6 +55,13 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
  * silently coercing garbage payloads into `{}`, which could bypass required-
  * field validation or mask client bugs.
  *
+ * The output type `T` is resolved from the schema's own `_output`, so the
+ * function signature is type-safe with respect to Zod's declared shape rather
+ * than relying on a caller-supplied type argument. Callers now pass the
+ * schema without a generic: `parseJsonBody(c, CreateMessageRequest, ...)`
+ * — removing the `typeof Schema._output` boilerplate and the previous
+ * free-form `T` that could mismatch Zod's actual output.
+ *
  * @example
  * ```ts
  * const parsed = await parseJsonBody(c, CreateMessageRequest, "bad request");
@@ -65,15 +72,15 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
  * @returns On success `{ ok: true, data: T }`; on failure
  * `{ ok: false, r: Response }` to use as an early-return from the route handler.
  *
- * @typeParam T - The output type of the Zod schema.
+ * @typeParam T - The output type of the Zod schema (inferred from `_output`).
  * @param c - The Hono request context.
- * @param schema - Any Zod-like schema exposing `safeParse(input): { success: boolean; data?: unknown }`.
+ * @param schema - A Zod-like schema exposing `_output` and `safeParse(input): { success, data? }`.
  * @param errorMessage - The error message to include on schema rejection.
  * @param status - HTTP status for the error response (defaults to 400).
  */
 export async function parseJsonBody<T>(
   c: Context,
-  schema: { safeParse(input: unknown): { success: boolean; data?: unknown } },
+  schema: { _output: T; safeParse(input: unknown): { success: boolean; data?: unknown } },
   errorMessage: string,
   status: ContentfulStatusCode = 400,
 ): Promise<
@@ -89,11 +96,13 @@ export async function parseJsonBody<T>(
   } catch {
     return { ok: false, r: jsonErr(c, "invalid JSON", status) };
   }
-  const parsed = schema.safeParse(body) as { success: boolean; data?: T };
+  const parsed = schema.safeParse(body);
   if (!parsed.success || parsed.data === undefined) {
     return { ok: false, r: jsonErr(c, errorMessage, status) };
   }
-  return { ok: true, data: parsed.data };
+  // safeParse's data is narrowed by `parsed.success` only when the schema's
+  // output type is carried on `T`; cast is safe here because `success` is true.
+  return { ok: true, data: parsed.data as T };
 }
 
 export { parseBearer } from "@club/shared";

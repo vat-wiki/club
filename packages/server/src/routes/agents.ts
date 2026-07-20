@@ -43,7 +43,7 @@ agents.use("*", requireAuth);
 agents.post("/thinking", requireJson, async (c) => {
   const me = c.get("participant");
 
-  const parsed = await parseJsonBody<typeof AgentStatusRequest._output>(c, AgentStatusRequest, "bad request");
+  const parsed = await parseJsonBody(c, AgentStatusRequest, "bad request");
   if (!parsed.ok) return parsed.r;
   const room = parsed.data.room ?? null;
   const fresh = markThinking(me.id, me.name, room);

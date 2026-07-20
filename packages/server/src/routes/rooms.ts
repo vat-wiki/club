@@ -61,7 +61,7 @@ rooms.get('/', (c) => {
  * "general" is seeded by the migration, so posting it just returns that row.
  */
 rooms.post('/', requireJson, async (c) => {
-  const parsed = await parseJsonBody<typeof CreateRoomRequest._output>(
+  const parsed = await parseJsonBody(
     c,
     CreateRoomRequest,
     'bad request'

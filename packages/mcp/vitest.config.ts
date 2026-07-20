@@ -1,11 +1,7 @@
-import { defineConfig } from "vitest/config";
+import { vitestBase } from "../../vitest.base.js";
 
-export default defineConfig({
-  test: {
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "json", "html"],
-      exclude: ["**/*.test.*", "**/test/**", "dist/**", "node_modules/**"],
-    },
-  },
-});
+/**
+ * Per-package Vitest config — extends the shared base and can be extended
+ * later for package-specific overrides (e.g. test globals, reporters).
+ */
+export default vitestBase;

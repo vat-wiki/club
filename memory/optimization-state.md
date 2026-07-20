@@ -1,16 +1,15 @@
 # Optimization State — 2026-07-20
 
-## Direction: 安全性 (Security)
-Fix incorrect Content-Disposition placement in files.ts + commit related security tests.
-
-## Uncommitted changes (wip):
-- files.ts: Content-Disposition header added at route level (WRONG — applies to 201 POST response too)
-- lib.test.ts: +182 lines parseJsonBody tests
-- lib/json-content-type.test.ts: new, requireJson middleware tests (100 lines)
-- routes/files.mime.test.ts: new, detectAndVerifyMime tests (100 lines)
-
-## Fix needed:
-Move Content-Disposition to only the GET /:id handler body, not the route level.
+## Latest: 安全性 (Security) — Content-Disposition header
+Added `Content-Disposition: attachment` with RFC 5987 `filename*` to the
+GET `/files/:id` endpoint so "Save As…" uses the original upload filename
+instead of the random id. New pure function `contentDispositionFilename()`
+with 8 unit tests. tsc 0 error, server 282 pass (9 pre-existing fail, no
+new regression).
 
 ## Previous commits (skip):
-- 性能, 文档, 最佳实践, 代码质量, 安全性(headers), 测试覆盖, 类型定义, 重构 — all done
+- 重构, 测试覆盖, 最佳实践, 代码质量, 文档, 性能, 类型定义, 安全性(headers) — all done
+- security(Content-Disposition) — just committed this session
+
+## Uncommitted changes:
+- (none)

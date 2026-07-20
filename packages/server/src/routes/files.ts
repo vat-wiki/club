@@ -19,6 +19,41 @@ import { insertFile, getFile } from "../db.js";
 import { jsonErr } from "../lib.js";
 import { filesDir, filePath } from "../files-dir.js";
 
+/**
+ * Build a safe `Content-Disposition: attachment` header value from the
+ * original upload filename. Strips path separators, control characters,
+ * and caps length so the header is well-formed and predictable.
+ *
+ * Uses RFC 5987 `filename*=UTF-8''...` for non-ASCII filenames so that
+ * browsers (and proxies) always recover the correct bytes.
+ *
+ * @param filename - Optional original upload filename. Returns null if
+ *   blank, and callers should simply omit the header in that case.
+ */
+export function contentDispositionFilename(
+  filename: string | null | undefined,
+): string | null {
+  if (filename == null || filename.trim() === "") return null;
+  // Defensive: keep only the basename and strip ASCII control chars
+  // (\x00–\x1F, \x7F) — these can break downstream parsing or trigger
+  // CRLF-style injection in debug/audit logs.
+  const cleaned = filename
+    .split(/[\/\\]/)
+    .pop()
+    ?.replace(/[\x00-\x1F\x7F]/g, "")
+    ?.slice(0, 200) ?? "";
+  if (cleaned.trim() === "") return null;
+  // RFC 5987: filename*=UTF-8''<percent-encoded>
+  const utf8Encoded = encodeURIComponent(cleaned)
+    .replace(/!/g, "%21")
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+  // ASCII fallback in quotes for legacy clients
+  const asciiSafe = cleaned.replace(/[\\"]/g, (m) => "\\" + m);
+  return `attachment; filename="${asciiSafe}"; filename*=UTF-8''${utf8Encoded}`;
+}
+
 // ── Magic-bytes MIME detection ──────────────────────────────────────
 //
 // File content is identified by a signature at the start of the file
@@ -251,6 +286,11 @@ files.get("/:id", async (c) => {
   c.header("Content-Type", row.mime);
   c.header("Accept-Ranges", "bytes");
   c.header("Cache-Control", "public, immutable, max-age=31536000");
+  // Restore the original upload filename in Content-Disposition so
+  // "Save As…" uses a human-readable name rather than the random id.
+  // Skipped when no filename was stored (upload predates this field).
+  const disposition = contentDispositionFilename(row.filename ?? null);
+  if (disposition) c.header("Content-Disposition", disposition);
 
   const range = c.req.header("range");
   if (range) {

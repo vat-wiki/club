@@ -5,6 +5,7 @@ import {
   CreateMessageRequest,
   MAX_IMAGES_PER_MESSAGE,
   MAX_MESSAGE_CONTENT,
+  ROOM_SLUG_REGEX,
   type Message,
   type MessageAttachment,
   type Reaction,
@@ -30,7 +31,7 @@ import {
 import { requireAuth } from "../auth.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
-import { parseLimit, jsonErr, parseJsonBody } from "../lib.js";
+import { parseLimit, jsonErr, parseJsonBody, requireValidRoomSlug } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
 
 export const messages = new Hono();
@@ -201,7 +202,9 @@ messages.post("/", requireJson, async (c) => {
 // (chronologic). `room` defaults to "general" for backward compatibility — an
 // old client that omits it sees the general history exactly as before.
 messages.get("/", (c) => {
-  const room = c.req.query("room") ?? "general";
+  const room = (c.req.query("room") ?? "general").trim();
+  const bad = requireValidRoomSlug(c, room);
+  if (bad) return bad.r;
   const since = c.req.query("since");
   const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
@@ -228,7 +231,12 @@ messages.get("/search", (c) => {
   if (!raw) return c.json([]);
   const q = raw.length > SEARCH_QUERY_MAX ? raw.slice(0, SEARCH_QUERY_MAX) : raw;
   const limit = parseLimit(c.req.query("limit"));
-  const room = c.req.query("room");
+  const rawRoom = c.req.query("room")?.trim();
+  if (rawRoom !== undefined) {
+    const bad = requireValidRoomSlug(c, rawRoom);
+    if (bad) return bad.r;
+  }
+  const room = rawRoom ?? null;
   const rows = searchMessages(q, room ?? null, limit);
   const reactionsMap = getReactionsForMessages(rows.map((r) => r.id));
   return c.json(rows.map((r) => toMessage(r, reactionsMap)));
@@ -275,14 +283,25 @@ messages.get("/stream", (c) => {
   // Parse the room filter into a Set (or null = all rooms). An explicit but
   // empty filter (e.g. `?rooms=` with no valid slugs) is treated as "all",
   // matching the forgiving spirit of the single-room `?room=` default.
-  const roomParam = c.req.query("room");
-  const roomsParam = c.req.query("rooms");
+  const roomParam = c.req.query("room")?.trim();
+  const roomsParam = c.req.query("rooms")?.trim();
+  // Validate every supplied room slug before wiring it into the SSE
+  // fan-out. Invalid slugs (containing newlines, slashes, etc.) would
+  // otherwise be injected verbatim into `addSubscriber`'s Set and could
+  // break SSE framing. The POST /rooms contract is ROOM_SLUG_REGEX.
+  if (roomParam !== undefined) {
+    const bad = requireValidRoomSlug(c, roomParam);
+    if (bad) return bad.r;
+  }
   let roomSet: Set<string> | null = null;
   if (roomParam !== undefined || roomsParam !== undefined) {
     const names = (roomsParam ?? roomParam ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    if (names.some((n) => !ROOM_SLUG_REGEX.test(n))) {
+      return jsonErr(c, "bad room slug");
+    }
     roomSet = names.length > 0 ? new Set(names) : null;
   }
   return streamSSE(c, async (stream) => {

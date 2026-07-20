@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { parseQueryLimit } from "@club/shared";
+import { parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
 
 /**
  * Send a `{ error: message }` JSON response with the given status. Centralises
@@ -83,3 +83,22 @@ export async function parseJsonBody<T>(
 }
 
 export { parseBearer } from "@club/shared";
+
+/**
+ * Reject a request with a 400 error when the room slug is invalid.
+ *
+ * A room slug MUST match `ROOM_SLUG_REGEX` (`^[a-z0-9][a-z0-9-]{0,29}$`)
+ * — the same contract that POST /rooms enforces. Arbitrary query-param values
+ * must be rejected rather than passed through, because room slugs end up in
+ * SSE `room` fan-out and untrusted characters (notably newlines) enable CRLF
+ * injection into the SSE wire format.
+ */
+export function requireValidRoomSlug(
+  c: Context,
+  slug: string,
+): { ok: false; r: Response } | undefined {
+  if (!ROOM_SLUG_REGEX.test(slug)) {
+    return { ok: false, r: jsonErr(c, "bad room slug") };
+  }
+  return undefined;
+}

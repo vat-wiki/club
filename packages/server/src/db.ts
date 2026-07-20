@@ -474,42 +474,50 @@ export function getReactionsForMessage(messageId: string): Reaction[] {
   return [...counts.entries()].map(([emoji, count]): Reaction => ({ emoji, count }));
 }
 
-/** Batch-fetch reactions for multiple messages in a single query.
- *  Returns a Map<message_id, Reaction[]> keyed by the ids that had reactions.
+/**
+ * Batch-fetch reactions for multiple messages, chunked to avoid exceeding
+ * SQLite's 32,767 parameter limit and to bound individual statement size.
+ * Returns a Map<message_id, Reaction[]> keyed by the ids that had reactions.
  *
- *  Performance: the SELECT statement is cached per placeholder count rather
- *  than recreated per call. Reactions are queried frequently during history
- *  renders (a list of messages), so a one-time-allocated statement per batch
- *  size avoids repeated statement creation on the hot path.
+ * Performance: each chunk uses a fixed-arity prepared statement cached by
+ * chunk size. Reactions are queried frequently during history renders, so
+ * fixed-arity statements are prepared once and reused. Chunking guarantees
+ * O(messages / chunk) index seeks instead of one unbounded scan, and prevents
+ * SQL length blow-up when a room's history page contains hundreds of messages.
  */
-const reactionsForMessagesCache = new Map<
+const REACTIONS_BATCH_SIZE = 50;
+const reactionsBatchCache = new Map<
   number,
   ReturnType<typeof db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>>
 >();
-
-export function getReactionsForMessages(messageIds: string[]): Map<string, Reaction[]> {
-  if (messageIds.length === 0) return new Map();
-  const placeholders = '?,'.repeat(messageIds.length).slice(0, -1);
-  let stmt = reactionsForMessagesCache.get(messageIds.length);
+function reactionsBatchStmt(n: number) {
+  let stmt = reactionsBatchCache.get(n);
   if (!stmt) {
+    const placeholders = '?,'.repeat(n).slice(0, -1);
     const sql =
       `SELECT message_id, emoji, COUNT(*) AS count FROM reactions` +
       ` WHERE message_id IN (${placeholders})` +
       ` GROUP BY message_id, emoji`;
     stmt = db.prepare<[...string[]], { message_id: string; emoji: string; count: number }>(sql);
-    reactionsForMessagesCache.set(messageIds.length, stmt);
+    reactionsBatchCache.set(n, stmt);
   }
-  const rows = stmt.all(...(messageIds as [...string[]]));
-  // Group aggregated rows by message_id, preserving insertion order of the
-  // returned rows (SQLite GROUP BY output order is stable for a given run).
+  return stmt;
+}
+
+export function getReactionsForMessages(messageIds: string[]): Map<string, Reaction[]> {
   const out = new Map<string, Reaction[]>();
-  for (const r of rows) {
-    let entry = out.get(r.message_id);
-    if (!entry) {
-      entry = [];
-      out.set(r.message_id, entry);
+  for (let i = 0; i < messageIds.length; i += REACTIONS_BATCH_SIZE) {
+    const batch = messageIds.slice(i, i + REACTIONS_BATCH_SIZE);
+    const stmt = reactionsBatchStmt(batch.length);
+    const rows = stmt.all(...(batch as [...string[]]));
+    for (const r of rows) {
+      let entry = out.get(r.message_id);
+      if (!entry) {
+        entry = [];
+        out.set(r.message_id, entry);
+      }
+      entry.push({ emoji: r.emoji, count: r.count } satisfies Reaction);
     }
-    entry.push({ emoji: r.emoji, count: r.count } satisfies Reaction);
   }
   return out;
 }

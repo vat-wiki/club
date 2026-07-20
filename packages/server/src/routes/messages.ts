@@ -5,7 +5,6 @@ import {
   CreateMessageRequest,
   MAX_IMAGES_PER_MESSAGE,
   MAX_MESSAGE_CONTENT,
-  ROOM_SLUG_REGEX,
   type Message,
   type MessageAttachment,
   type Reaction,
@@ -288,7 +287,8 @@ messages.get("/stream", (c) => {
   // Validate every supplied room slug before wiring it into the SSE
   // fan-out. Invalid slugs (containing newlines, slashes, etc.) would
   // otherwise be injected verbatim into `addSubscriber`'s Set and could
-  // break SSE framing. The POST /rooms contract is ROOM_SLUG_REGEX.
+  // break SSE framing. Each split name is validated through the same
+  // centralized `requireValidRoomSlug` validator used by POST /rooms.
   if (roomParam !== undefined) {
     const bad = requireValidRoomSlug(c, roomParam);
     if (bad) return bad.r;
@@ -299,8 +299,9 @@ messages.get("/stream", (c) => {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    if (names.some((n) => !ROOM_SLUG_REGEX.test(n))) {
-      return jsonErr(c, "bad room slug");
+    for (const n of names) {
+      const bad = requireValidRoomSlug(c, n);
+      if (bad) return bad.r;
     }
     roomSet = names.length > 0 ? new Set(names) : null;
   }

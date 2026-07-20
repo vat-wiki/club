@@ -13,6 +13,7 @@ import {
   ToggleReactionRequest,
 } from "@club/shared";
 
+import { parseAttachments } from "./attachment-cache.js";
 import { requireAuth } from "../auth.js";
 import {
   deleteMessage,
@@ -34,7 +35,7 @@ import {
 import { jsonErr, parseJsonBody, parseLimit, requireValidId,requireValidRoomSlug } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
-import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction,markThinkingIdle } from "../stream.js";
+import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction, markThinkingIdle } from "../stream.js";
 
 export const messages = new Hono();
 
@@ -87,41 +88,6 @@ function requireValidBeforeQuery(
   return undefined;
 }
 
-const MAX_ATTACHMENT_CACHE = 512;
-const attachmentCache = new Map<string, MessageAttachment[]>();
-
-function parseAttachments(raw: string | null): MessageAttachment[] | undefined {
-  // Fast path: null/empty → no attachments (no cache lookup needed).
-  if (!raw) return undefined;
-  // Promote on hit (Map preserves insertion order). Re-insert so the key moves
-  // to the tail = most-recently-used, making the eviction step below a true LRU
-  // rather than FIFO. Without this, a hot attachment JSON string that was
-  // inserted long ago gets evicted before rarely-read newer entries.
-  const cached = attachmentCache.get(raw);
-  if (cached !== undefined) {
-    attachmentCache.delete(raw);
-    attachmentCache.set(raw, cached);
-    return cached;
-  }
-
-  // Miss: parse once, cache only if the result is a real array.
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const arr = parsed as MessageAttachment[];
-      attachmentCache.set(raw, arr);
-      // Evict the least-recently-used entry (Map's first key) to keep memory bounded.
-      if (attachmentCache.size > MAX_ATTACHMENT_CACHE) {
-        const firstKey = attachmentCache.keys().next().value;
-        if (firstKey !== undefined) attachmentCache.delete(firstKey);
-      }
-      return arr;
-    }
-  } catch {
-    // Malformed JSON → treat as no attachments (matches legacy behavior).
-  }
-  return undefined;
-}
 
 function toMessage(
   r: MessageRow,

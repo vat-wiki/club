@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import type { MessageAttachment } from "@club/shared";
+import { beforeEach,describe, expect, it, vi } from "vitest";
+
 import type { ClubConn } from "@club/sdk";
+import type { MessageAttachment } from "@club/shared";
 
 // The composer drives uploads through @/lib/api.uploadFile. We mock that module
 // so tests don't hit XHR/fetch, and we can resolve/reject uploads at will.
@@ -10,8 +11,9 @@ vi.mock("@/lib/api", () => ({
   api: { uploadFile: (...args: unknown[]) => uploadFileMock(...args), thinking: vi.fn().mockResolvedValue(undefined), idle: vi.fn().mockResolvedValue(undefined) },
 }));
 
-import { Composer } from "./composer";
 import { renderWithI18n } from "@/test/i18n-wrap";
+
+import { Composer } from "./composer";
 
 const conn: ClubConn = { server: "http://x", key: "club_human_test" };
 

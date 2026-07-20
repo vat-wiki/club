@@ -1,23 +1,26 @@
-import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
+
+import { Hono } from "hono";
 import { imageSize } from "image-size";
+
 import {
   AttachmentMime,
+  type DocumentMime,
+  type ImageMime,
+  MAX_DOCUMENT_BYTES,
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
-  MAX_DOCUMENT_BYTES,
-  type ImageMime,
-  type VideoMime,
-  type DocumentMime,
   type MessageAttachment,
+  type VideoMime,
 } from "@club/shared";
+
 import { requireAuth } from "../auth.js";
-import { insertFile, getFile } from "../db.js";
+import { getFile,insertFile } from "../db.js";
+import { filePath,filesDir } from "../files-dir.js";
 import { jsonErr, requireValidId } from "../lib.js";
-import { filesDir, filePath } from "../files-dir.js";
 
 /**
  * Build a safe `Content-Disposition: attachment` header value from the

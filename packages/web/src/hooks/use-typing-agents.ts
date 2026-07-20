@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
-import type { AgentThinkingEvent, AgentIdleEvent } from "@club/shared";
 import type { TypingAgent } from "@/components/typing-indicator";
+import { useCallback, useState } from "react";
+
+import type { AgentIdleEvent,AgentThinkingEvent } from "@club/shared";
 
 /**
  * useTypingAgents — the single integration point for the typing indicator (P1-5).

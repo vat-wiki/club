@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect,it } from "vitest";
+
 import type { Room } from "@club/shared";
+
 import { formatRoomLine } from "./rooms.js";
 
 function makeRoom(slug: string, lastActivityAt: number | null = null): Room {

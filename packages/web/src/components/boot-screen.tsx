@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, RefreshCw, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, RefreshCw, RotateCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type BootStatus = "loading" | "error";
 

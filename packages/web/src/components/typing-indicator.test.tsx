@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { renderWithI18n } from "@/test/i18n-wrap";
 import { TypingIndicator } from "@/components/typing-indicator";
+import { renderWithI18n } from "@/test/i18n-wrap";
+import { describe, expect,it } from "vitest";
 
 describe("TypingIndicator", () => {
   it("renders nothing when no agents are thinking", () => {

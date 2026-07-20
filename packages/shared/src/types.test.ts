@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ParticipantName } from "./types";
 
 describe("ParticipantName schema", () => {

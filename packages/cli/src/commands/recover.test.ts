@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach,describe, expect, it, vi } from "vitest";
+
 import {
-  runRecover,
   type RecoverDeps,
   type RecoverResult,
+  runRecover,
 } from "./recover.js";
 
 const fixtureResult: RecoverResult = {

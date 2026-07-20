@@ -1,8 +1,9 @@
+import { api } from '@/lib/api';
+import { mentionsSelf } from '@/lib/format';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import type { ClubConn } from '@club/sdk';
 import type { Message, Room } from '@club/shared';
-import { mentionsSelf } from '@/lib/format';
-import { api } from '@/lib/api';
 
 /**
  * useRooms — multi-room state for the web client.

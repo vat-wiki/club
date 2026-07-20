@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect,it } from "vitest";
+
 import type { Participant } from "@club/shared";
+
 import {
   applyMention,
   detectMention,

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Languages } from "lucide-react";
-import { createPortal } from "react-dom";
-import { LANGS, LANG_LABEL, useI18n, type Lang } from "@/lib/i18n";
+import { type Lang,LANG_LABEL, LANGS, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Languages } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Compact language switcher for the topbar. A single icon button that opens a
 // small dropdown with the available languages, each labelled in its own

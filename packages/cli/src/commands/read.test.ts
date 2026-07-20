@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { afterEach,describe, expect, it, vi } from "vitest";
+
 import type { ClubClient, Message } from "@club/sdk";
-import { runRead, type ReadDeps } from "./read.js";
+
+import { type ReadDeps,runRead } from "./read.js";
 
 const MSG1: Message = {
   id: "msg_1",

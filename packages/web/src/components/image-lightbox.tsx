@@ -1,6 +1,6 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription,DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface LightboxImage {
   src: string;

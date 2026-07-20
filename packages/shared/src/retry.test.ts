@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shouldRetry, computeBackoff, jitteredBackoff, sleep } from "./retry.js";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
+import { computeBackoff, jitteredBackoff, shouldRetry, sleep } from "./retry.js";
 
 // ── shouldRetry ───────────────────────────────────────────────────────
 

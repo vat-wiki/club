@@ -1,9 +1,11 @@
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
-import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
+import { uploadDocumentFile,uploadImageFile, uploadVideoFile } from "@club/sdk/node";
+
+import { runSend, type SendDeps } from "./send-impl.js";
 import { defaultRoom, requireConfig } from "../config.js";
 import { readStream } from "../stdin.js";
-import { runSend, type SendDeps } from "./send-impl.js";
 
 // Collect repeated flags into an array (commander coercion)
 // Collect repeated flags into an array (commander coercion). Spread-copy avoids

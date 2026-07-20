@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseConfig, configPath, saveConfig, loadConfig, defaultRoom, DEFAULT_ROOM } from "./config.js";
+
+import { afterEach,beforeEach, describe, expect, it } from "vitest";
+
+import { configPath, DEFAULT_ROOM,defaultRoom, loadConfig, parseConfig, saveConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {

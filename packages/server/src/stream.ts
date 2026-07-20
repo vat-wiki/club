@@ -1,11 +1,12 @@
 import type { SSEStreamingApi } from 'hono/streaming';
+
 import type {
-  Message,
-  AgentThinkingEvent,
   AgentIdleEvent,
-  PresenceEvent,
+  AgentThinkingEvent,
+  Message,
   MessageDeletedEvent,
   MessageReactionEvent,
+  PresenceEvent,
 } from '@club/shared';
 // Subscriber registered at SSE connect time. `rooms` scopes which room-scoped
 // events the stream receives (null = all rooms); `dead` marks a client whose

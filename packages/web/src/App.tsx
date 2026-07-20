@@ -1,24 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ImageMime, Message, Participant } from "@club/shared";
-import type { ClubConn } from "@club/sdk";
-import { loadConn, saveConn, saveRecoverCode, clearConn, API_URL, getKey } from "@/lib/auth";
-import { api } from "@/lib/api";
-import { useMessageStream } from "@/hooks/use-message-stream";
-import { useRooms, type MentionToast } from "@/hooks/use-rooms";
-import { useVisualViewportHeight } from "@/hooks/use-visual-viewport-height";
-import { useI18n } from "@/lib/i18n";
-import { Topbar } from "@/components/topbar";
-import { Roster } from "@/components/roster";
-import { MessageList, type MessageListHandle } from "@/components/message-list";
-import { SearchBar } from "@/components/search-bar";
-import { Composer } from "@/components/composer";
-import { AuthDialog } from "@/components/auth-dialog";
-import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
-import { BootScreen } from "@/components/boot-screen";
-import { TypingIndicator } from "@/components/typing-indicator";
-import { MentionToasts } from "@/components/mention-toast";
 import { AccountCreatedToast } from "@/components/account-created-toast";
+import { AuthDialog } from "@/components/auth-dialog";
+import { BootScreen } from "@/components/boot-screen";
+import { Composer } from "@/components/composer";
+import { MentionToasts } from "@/components/mention-toast";
+import { MessageList, type MessageListHandle } from "@/components/message-list";
+import { Roster } from "@/components/roster";
+import { SearchBar } from "@/components/search-bar";
+import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
+import { Topbar } from "@/components/topbar";
+import { TypingIndicator } from "@/components/typing-indicator";
+import { useMessageStream } from "@/hooks/use-message-stream";
+import { type MentionToast,useRooms } from "@/hooks/use-rooms";
 import { useTypingAgents } from "@/hooks/use-typing-agents";
+import { useVisualViewportHeight } from "@/hooks/use-visual-viewport-height";
+import { api } from "@/lib/api";
+import { API_URL, clearConn, getKey,loadConn, saveConn, saveRecoverCode } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import type { ClubConn } from "@club/sdk";
+import type { ImageMime, Message, Participant } from "@club/shared";
 
 export default function App() {
   const { t } = useI18n();

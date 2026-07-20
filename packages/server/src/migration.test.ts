@@ -1,9 +1,10 @@
-import { describe, it, expect, afterAll } from "vitest";
-import Database from "better-sqlite3";
+import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+
+import Database from "better-sqlite3";
+import { afterAll,describe, expect, it } from "vitest";
 
 // MR1 — data model + migration. We stand up a pre-room ("v6") db on an
 // isolated connection (independent of the CLUB_DB singleton the route tests

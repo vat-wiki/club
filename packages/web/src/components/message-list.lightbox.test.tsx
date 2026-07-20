@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { renderWithI18n } from "@/test/i18n-wrap";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, expect,it } from "vitest";
+
 import type { Message, MessageAttachment, Participant } from "@club/shared";
 
-import { renderWithI18n } from "@/test/i18n-wrap";
 import { MessageList } from "./message-list";
 
 // Lightbox interaction coverage: open/close, keyboard activation (Enter/Space),

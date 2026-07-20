@@ -5,9 +5,11 @@
 // deleted, and clients will show a "recalled" placeholder instead of the content.
 
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
-import { requireConfig } from "../config.js";
+
 import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 export interface DeleteDeps {
   /** Simulate the SDK's `ClubClient.deleteMessage(id)` method. */

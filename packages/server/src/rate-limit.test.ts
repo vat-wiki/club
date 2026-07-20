@@ -1,6 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
 import { Hono } from "hono";
-import { rateLimit, getClientIp, _getNow, _setNow, _clearCleanup } from "./rate-limit.js";
+import { afterEach,describe, expect, it } from "vitest";
+
+import { _clearCleanup,_getNow, _setNow, getClientIp, rateLimit } from "./rate-limit.js";
 
 // Each test creates its own Hono instance so route registration is isolated.
 // The rate-limit middleware uses module-level state (`buckets`), so tests use

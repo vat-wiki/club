@@ -5,9 +5,11 @@
 // is marked with ` *` so a user can see where their next `club send` lands.
 
 import { Command } from "commander";
+
 import { DEFAULT_ROOM, type Room } from "@club/shared";
-import { defaultRoom } from "../config.js";
+
 import { withAuthClient } from "../client-factory.js";
+import { defaultRoom } from "../config.js";
 
 /**
  * Render one room line. Pure so the marker rule (current → ` *`, general system

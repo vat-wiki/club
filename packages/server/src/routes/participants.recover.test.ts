@@ -1,9 +1,10 @@
-import { describe, it, expect, afterAll, beforeEach } from "vitest";
+import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
+
+import { afterAll, beforeEach,describe, expect, it } from "vitest";
 
 // Point the SQLite DB at a unique temp file BEFORE any module that transitively
 // imports db.ts is evaluated. db.ts reads CLUB_DB at import time.

@@ -12,10 +12,12 @@
 // generic 400.
 
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
-import { ROOM_SLUG_REGEX, type Room } from "@club/shared";
-import { requireConfig, saveConfig, type ClubConfig } from "../config.js";
+import { type Room,ROOM_SLUG_REGEX } from "@club/shared";
+
 import { withCatchExit } from "../catch-exit.js";
+import { type ClubConfig,requireConfig, saveConfig } from "../config.js";
 
 export interface EnterDeps {
   /** Ensure a room exists (idempotent create). Throws on HTTP failure. */

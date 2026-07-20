@@ -7,6 +7,6 @@
 //
 // Node consumers (cli, mcp) should import from "@club/sdk/node".
 
-export * from "./index.js";
-export * from "./image-upload.js";
 export * from "./file-parser.js";
+export * from "./image-upload.js";
+export * from "./index.js";

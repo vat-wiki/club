@@ -1,38 +1,40 @@
-import { Hono, type Context } from "hono";
+import { type Context,Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
+
 import {
-  DEFAULT_ROOM,
   CreateMessageRequest,
-  ToggleReactionRequest,
-  sanitizeContent,
+  DEFAULT_ROOM,
   type Message,
   type MessageAttachment,
-  type Reaction,
   type MessageReactionEvent,
+  type Reaction,
+  sanitizeContent,
+  ToggleReactionRequest,
 } from "@club/shared";
+
+import { requireAuth } from "../auth.js";
 import {
-  getRecentMessages,
-  getMessagesSince,
-  getMessagesBeforeId,
-  searchMessages,
   deleteMessage,
+  ensureRoom,
+  getAllParticipantNames,
+  getFilesByIds,
+ getMessageRoom,
+  getMessagesBeforeId,
+  getMessagesSince,
   getReactionsForMessage,
   getReactionsForMessages,
-  toggleReaction,
-  insertMessage,
-  getFilesByIds,
-  getAllParticipantNames,
+  getRecentMessages,
   insertMention,
-  ensureRoom,
- getMessageRoom,
+  insertMessage,
   type MessageRow,
+  searchMessages,
+  toggleReaction,
 } from "../db.js";
-import { requireAuth } from "../auth.js";
+import { jsonErr, parseJsonBody, parseLimit, requireValidId,requireValidRoomSlug } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
-import { addSubscriber, broadcast, markThinkingIdle, broadcastAgentIdle, broadcastDeleted, broadcastReaction } from "../stream.js";
-import { parseLimit, jsonErr, parseJsonBody, requireValidRoomSlug, requireValidId } from "../lib.js";
 import { extractMentionedParticipants } from "../mention.js";
+import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction,markThinkingIdle } from "../stream.js";
 
 export const messages = new Hono();
 

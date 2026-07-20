@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { Participant, Room } from "@club/shared";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ClubApiError } from "@club/sdk";
-import { runInfo, roomDisplayLabel, type InfoDeps } from "./info.js";
+import type { Participant, Room } from "@club/shared";
+
+import { type InfoDeps,roomDisplayLabel, runInfo } from "./info.js";
 
 const fixtureMe: Participant = { id: "p1", name: "alice", createdAt: 0 };
 const fixtureRooms: Room[] = [

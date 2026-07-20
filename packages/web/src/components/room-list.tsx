@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Hash, Plus } from "lucide-react";
-import { ROOM_SLUG_REGEX, type Room } from "@club/shared";
+import type { RoomUnread } from "@/hooks/use-rooms";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { RoomUnread } from "@/hooks/use-rooms";
+import { Hash, Plus } from "lucide-react";
+import { type KeyboardEvent,useEffect, useRef, useState } from "react";
+
+import { type Room,ROOM_SLUG_REGEX } from "@club/shared";
 
 // One room row. The whole row is a <button> (keyboard-operable, focusable) so
 // switching rooms works with Tab + Enter/Space and gets a native focus ring.

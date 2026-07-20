@@ -5,10 +5,12 @@
 // broadcast to all clients in real-time.
 
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
 import type { Reaction } from "@club/shared";
-import { requireConfig } from "../config.js";
+
 import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 /**
  * Strip ASCII control characters from an emoji string.

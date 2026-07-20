@@ -11,14 +11,17 @@ import type {
   Room,
   UploadFileResponse,
 } from "@club/shared";
+
+import { type FileFormatTag } from "./file-parser.js";
+import { type StreamHandle, streamMessages, type StreamOptions } from "./stream.js";
 import {
   type CallOpts,
   type ClubConn,
   createParticipant as createParticipantFn,
   createRoom as createRoomFn,
   deleteMessage as deleteMessageFn,
-  getMe,
   getFile,
+  getMe,
   listMembers,
   listMentions,
   listMessages,
@@ -26,16 +29,14 @@ import {
   markMentionRead,
   markMentionsRead,
   recoverParticipant as recoverParticipantFn,
-  reportAgentThinking as reportAgentThinkingFn,
   reportAgentIdle as reportAgentIdleFn,
+  reportAgentThinking as reportAgentThinkingFn,
   searchMessages as searchMessagesFn,
   sendMessage,
   toggleMessageReaction as toggleMessageReactionFn,
   uploadFile,
   type UploadFileInput,
 } from "./transport.js";
-import { streamMessages, type StreamHandle, type StreamOptions } from "./stream.js";
-import { type FileFormatTag } from "./file-parser.js";
 
 /** Parse result returned by `ClubClient#readFileContent`. */
 export interface ParsedFile {

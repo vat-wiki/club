@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+
 import {
   ClubApiError,
-  NETWORK_ERROR_STATUS,
   formatError,
   isClubApiError,
   isNetworkFailure,
+  NETWORK_ERROR_STATUS,
   parseHttpErrorStatus,
 } from "./errors";
 

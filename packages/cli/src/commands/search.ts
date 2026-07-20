@@ -4,11 +4,13 @@
 // (or scoped to a specific room with --room), newest first.
 
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
 import { DEFAULT_ROOM, type Message } from "@club/shared";
-import { requireConfig } from "../config.js";
+
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 const SEARCH_LIMIT_DEFAULT = 20;
 const SEARCH_LIMIT_MAX = 100;

@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { isValidId, ID_REGEX } from "./id.js";
+import { describe, expect,it } from "vitest";
+
+import { ID_REGEX,isValidId } from "./id.js";
 
 describe("ID_REGEX shape", () => {
   it("matches a valid ULID", () => {

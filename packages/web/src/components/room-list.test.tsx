@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { renderWithI18n } from "@/test/i18n-wrap";
 import { fireEvent, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
 import type { Room } from "@club/shared";
 
-import { renderWithI18n } from "@/test/i18n-wrap";
 import { RoomList } from "./room-list";
 
 const rooms: Room[] = [

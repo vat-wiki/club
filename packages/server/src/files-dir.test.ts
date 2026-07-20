@@ -1,7 +1,9 @@
-import { describe, it, expect, afterAll } from "vitest";
-import { filesDir, filePath } from "./files-dir.js";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync,mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+
+import { afterAll,describe, expect, it } from "vitest";
+
+import { filePath,filesDir } from "./files-dir.js";
 
 describe("files-dir", () => {
   const safeTestDir = resolve(__dirname, "..", "test-fixture", "files");

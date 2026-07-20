@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { sanitizeEmoji, runReact, type ReactDeps } from "./react.js";
+import { describe, expect, it, vi } from "vitest";
+
+import { type ReactDeps,runReact, sanitizeEmoji } from "./react.js";
 
 describe("sanitizeEmoji", () => {
   it("strips NUL character", () => {

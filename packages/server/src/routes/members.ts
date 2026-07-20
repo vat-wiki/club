@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+
 import type { Participant } from "@club/shared";
-import { getAllParticipants } from "../db.js";
+
 import { requireAuth } from "../auth.js";
+import { getAllParticipants } from "../db.js";
 
 export const members = new Hono();
 members.use("*", requireAuth);

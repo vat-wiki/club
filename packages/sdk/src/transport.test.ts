@@ -1,23 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
+
 import {
-  getMe,
-  listMessages,
-  sendMessage,
-  uploadFile,
   createParticipant,
-  searchMessages,
+  createRoom,
+  deleteMessage,
   getFile,
+  getMe,
   listMentions,
+  listMessages,
+  listRooms,
   markMentionRead,
   markMentionsRead,
   recoverParticipant,
-  reportAgentThinking,
   reportAgentIdle,
-  listRooms,
-  createRoom,
-  deleteMessage,
+  reportAgentThinking,
+  searchMessages,
+  sendMessage,
   toggleMessageReaction,
+  uploadFile,
 } from "./transport.js";
 
 const realFetch = globalThis.fetch;

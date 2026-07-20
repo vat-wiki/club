@@ -1,8 +1,10 @@
 import { createMiddleware } from "hono/factory";
+
 import type { Participant } from "@club/shared";
 import { parseBearer } from "@club/shared";
-import { getParticipantByKeyHash } from "./db.js";
+
 import { hashKey } from "./crypto.js";
+import { getParticipantByKeyHash } from "./db.js";
 import { jsonErr } from "./lib.js";
 
 /**

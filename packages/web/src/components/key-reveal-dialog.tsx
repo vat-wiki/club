@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { AlertTriangle, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,9 +6,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { useCopy } from "@/hooks/use-copy";
 import { useT } from "@/lib/i18n";
+import { AlertTriangle, Check,Copy } from "lucide-react";
+import { useEffect } from "react";
 
 // Shown right after a brand-new identity is minted. The app has NOT persisted
 // the key yet — it only does so once the user clicks "I've saved it". This is

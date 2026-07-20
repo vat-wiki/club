@@ -1,8 +1,9 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+
+import { afterAll,describe, expect, it } from "vitest";
 
 // Boundary + security tests for the image pipeline. These complement the happy
 // path in images.e2e.test.ts and the per-route files by pinning the exact

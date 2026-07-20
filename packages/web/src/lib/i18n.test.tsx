@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { I18nProvider, useI18n, LANGS, LANG_LABEL, DICTS } from "./i18n";
+import { act,fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach,describe, expect, it } from "vitest";
+
+import { DICTS,I18nProvider, LANG_LABEL, LANGS, useI18n } from "./i18n";
 
 // The dictionary is hand-maintained, so guard against the easy regressions:
 //  - every zh key has an en translation (and vice versa), so switching

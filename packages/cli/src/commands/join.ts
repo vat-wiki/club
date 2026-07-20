@@ -16,10 +16,12 @@
 // server's `name "X" is taken` verbatim.
 
 import { Command } from "commander";
-import { ClubClient, ClubApiError } from "@club/sdk";
-import { saveConfig } from "../config.js";
+
+import { ClubApiError,ClubClient } from "@club/sdk";
 import type { Participant } from "@club/shared";
+
 import { withCatchExit } from "../catch-exit.js";
+import { saveConfig } from "../config.js";
 
 export interface JoinCreateResult {
   key: string;

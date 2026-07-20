@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { runCat, type CatDeps } from "./cat.js";
+import { afterEach,describe, expect, it, vi } from "vitest";
+
+import { type CatDeps,runCat } from "./cat.js";
 
 const SERVER = "https://club.example.com";
 const ID = "file_abc123";

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { loadConn, saveConn, saveRecoverCode, getRecoverCode, clearConn, getKey, API_URL } from "./auth.js";
+
+import { API_URL,clearConn, getKey, getRecoverCode, loadConn, saveConn, saveRecoverCode } from "./auth.js";
 
 afterEach(() => {
   localStorage.clear();

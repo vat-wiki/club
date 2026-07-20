@@ -1,8 +1,10 @@
-import { describe, it, expect, afterAll } from "vitest";
-import Database from "better-sqlite3";
-import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import Database from "better-sqlite3";
+import { afterAll,describe, expect, it } from "vitest";
+
 import { escapeLike } from "@club/shared";
 
 /** Build an isolated temp SQLite db with known messages so we can

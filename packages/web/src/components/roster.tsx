@@ -1,10 +1,11 @@
-import type { Participant, Room } from "@club/shared";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
 import { Avatar } from "@/components/avatar";
 import { RoomList } from "@/components/room-list";
+import { Separator } from "@/components/ui/separator";
 import type { RoomUnread } from "@/hooks/use-rooms";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+
+import type { Participant, Room } from "@club/shared";
 
 function Row({ p, self, online }: { p: Participant; self: boolean; online: boolean }) {
   const t = useT();

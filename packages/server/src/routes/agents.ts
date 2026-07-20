@@ -1,13 +1,15 @@
 import { Hono } from "hono";
+
 import { AgentStatusRequest } from "@club/shared";
+
 import { requireAuth } from "../auth.js";
-import { requireJson } from "../lib/json-content-type.js";
 import { parseJsonBody } from "../lib.js";
+import { requireJson } from "../lib/json-content-type.js";
 import {
+  broadcastAgentIdle,
+  broadcastAgentThinking,
   markThinking,
   markThinkingIdle,
-  broadcastAgentThinking,
-  broadcastAgentIdle,
 } from "../stream.js";
 
 // ── Agent Presence & Typing Indicators ─────────────────────────────────

@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { act,renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { ClubConn } from "@club/sdk";
 import type { Message } from "@club/shared";
 
@@ -13,6 +14,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { api } from "@/lib/api";
+
 import { useRooms } from "./use-rooms";
 
 const conn: ClubConn = { server: "http://x", key: "club_human_test" };

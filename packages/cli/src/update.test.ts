@@ -1,14 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
-  compareVersions,
-  isNewer,
-  CURRENT_VERSION,
-  updateCachePath,
-  fetchLatestVersion,
   checkForUpdate,
+  compareVersions,
+  CURRENT_VERSION,
+  fetchLatestVersion,
+  isNewer,
+  updateCachePath,
 } from "./update.js";
 
 // Each test gets a fresh temp dir for the cache, selected via CLUB_CONFIG (same mechanism

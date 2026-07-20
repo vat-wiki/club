@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach,describe, expect, it } from "vitest";
+
 import { extractMentionedParticipants, invalidateParticipantNameMap, type NamedParticipant } from "./mention.js";
 
 const P = (id: string, name: string): NamedParticipant => ({ id, name });

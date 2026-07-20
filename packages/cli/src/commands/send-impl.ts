@@ -7,8 +7,8 @@
 // here) keeps this module dependent only on shape — the test fakes them; the
 // action wires the real SDK functions.
 
-import { type Message } from "@club/shared";
 import { assertAttachmentCount, type ClubConn } from "@club/sdk/node";
+import { type Message } from "@club/shared";
 
 export interface SendDeps {
   /** Upload one local image path → attachment id. Throws on any pre-flight failure. */

@@ -1,14 +1,13 @@
+import { formatMessage } from "@club/sdk";
 import { assertAttachmentCount } from "@club/sdk/node";
-
 // Pure input-coercion helpers used by the MCP tool dispatcher.
 //
 // Kept side-effect-free and in their own module so they can be unit-tested in
 // isolation: the server entry (index.ts) has top-level stdio side effects
 // (resolveConn → process.exit, server.connect) that make importing it directly
 // impractical from a test.
+import { mentionMatches, type Message, type MessageAttachment,type Participant, type Room } from "@club/shared";
 
-import { mentionMatches, type Message, type Participant, type Room, type MessageAttachment } from "@club/shared";
-import { formatMessage } from "@club/sdk";
 import type { ArgsFor } from "./types.js";
 
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
@@ -108,24 +107,21 @@ export function listenForMatch(
         throw new Error("unsubscribe called without prior subscription");
       },
     };
-    // eslint-disable-next-line prefer-const
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const finish = () => {
+    function finish() {
       if (settled) return;
       settled = true;
       handle.stop();
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
       resolve(matched);
-    };
+    }
+
+    const timer = setTimeout(finish, timeoutMs);
 
     handle = subscribe((m) => {
       if (!matchesMention(m.content, mention)) return;
       matched.push(m);
       finish();
     });
-
-    timer = setTimeout(finish, timeoutMs);
   });
 }
 

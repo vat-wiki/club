@@ -1,8 +1,9 @@
-import { Users } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RosterSections } from "@/components/roster";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { useT } from "@/lib/i18n";
+import { Users } from "lucide-react";
+
 import type { Participant } from "@club/shared";
 
 // Mobile-only roster: on small screens the desktop aside is hidden, so this

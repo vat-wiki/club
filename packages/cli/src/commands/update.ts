@@ -1,11 +1,12 @@
 import { Command } from "commander";
+
+import { withCatchExit } from "../catch-exit.js";
 import {
   CURRENT_VERSION,
   fetchLatestVersion,
   isNewer,
   runSelfUpdate,
 } from "../update.js";
-import { withCatchExit } from "../catch-exit.js";
 
 /** Inputs for `runUpdate`. */
 export interface UpdateInput {

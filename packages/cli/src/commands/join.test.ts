@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect,it } from "vitest";
+
 import { ClubApiError } from "@club/sdk";
-import { runJoin, renderJoinSuccess, JoinNameTakenError } from "./join.js";
 import type { Participant } from "@club/shared";
+
+import { JoinNameTakenError,renderJoinSuccess, runJoin } from "./join.js";
 
 // Fakes for the two deps runJoin depends on. `calls` records every interaction
 // so we can assert order + arguments; `saved` captures the last write.

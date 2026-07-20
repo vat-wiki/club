@@ -1,6 +1,6 @@
-import { createMiddleware } from "hono/factory";
-
 import { randomUUID } from "node:crypto";
+
+import { createMiddleware } from "hono/factory";
 
 /**
  * Security response headers middleware.

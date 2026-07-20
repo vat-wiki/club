@@ -9,9 +9,9 @@
 // kept off this entry to avoid pulling fs into the browser bundle — Node
 // consumers (cli, mcp) import it from the `@club/sdk/node` subpath instead.
 
-export * from "@club/shared";
-export * from "./errors.js";
-export * from "./transport.js";
-export * from "./stream.js";
-export * from "./format.js";
 export * from "./client.js";
+export * from "./errors.js";
+export * from "./format.js";
+export * from "./stream.js";
+export * from "./transport.js";
+export * from "@club/shared";

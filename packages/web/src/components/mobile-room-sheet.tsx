@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RoomList } from "@/components/room-list";
-import { useT } from "@/lib/i18n";
-import type { Room } from "@club/shared";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { RoomUnread } from "@/hooks/use-rooms";
+import { useT } from "@/lib/i18n";
+import { type ReactNode,useState } from "react";
+
+import type { Room } from "@club/shared";
 
 // Mobile room selector: on small screens the desktop sidebar is hidden, so the
 // topbar's room badge opens this bottom sheet with the ROOMS list + new-room

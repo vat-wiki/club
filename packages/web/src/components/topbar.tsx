@@ -1,15 +1,16 @@
-import { useState } from "react";
-import { ChevronDown, LogOut, Radio } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { MobileRoster } from "@/components/mobile-roster";
-import { MobileRoomSheet } from "@/components/mobile-room-sheet";
-import { MobileTopbarMenu } from "@/components/mobile-topbar-menu";
-import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { MobileRoomSheet } from "@/components/mobile-room-sheet";
+import { MobileRoster } from "@/components/mobile-roster";
+import { MobileTopbarMenu } from "@/components/mobile-topbar-menu";
+import { Button } from "@/components/ui/button";
+import { ViewKeyDialog } from "@/components/view-key-dialog";
+import type { RoomUnread } from "@/hooks/use-rooms";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ChevronDown, LogOut, Radio } from "lucide-react";
+import { useState } from "react";
+
 import type { Participant, Room } from "@club/shared";
-import type { RoomUnread } from "@/hooks/use-rooms";
 
 export type Status = "connecting" | "connected" | "lost";
 

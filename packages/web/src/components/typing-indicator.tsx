@@ -1,6 +1,6 @@
-import { memo } from "react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { memo } from "react";
 
 // Agent "thinking" indicator shown at the bottom of the message log when one or
 // more agents are processing a @mention but haven't posted a reply yet. The live

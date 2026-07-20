@@ -1,9 +1,11 @@
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
-import { formatMessage } from "./format.js";
-import { requireConfig } from "../config.js";
 import type { Mention } from "@club/shared";
+
+import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 export function formatMention(m: Mention): string {
   return formatMessage({

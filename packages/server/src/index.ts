@@ -1,23 +1,25 @@
-import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
-import { getConnInfo } from "@hono/node-server/conninfo";
-import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { participants } from "./routes/participants.js";
-import { messages } from "./routes/messages.js";
-import { members } from "./routes/members.js";
-import { me } from "./routes/me.js";
-import { files } from "./routes/files.js";
-import { agents } from "./routes/agents.js";
-import { rooms } from "./routes/rooms.js";
-import { rateLimit, getClientIp } from "./rate-limit.js";
+import { fileURLToPath } from "node:url";
+
+import { serve } from "@hono/node-server";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+
 import { bodySizeGuard } from "./body-size-guard.js";
-import { heartbeatInterval } from "./stream.js";
+import { getClientIp,rateLimit } from "./rate-limit.js";
+import { agents } from "./routes/agents.js";
+import { files } from "./routes/files.js";
+import { me } from "./routes/me.js";
+import { members } from "./routes/members.js";
+import { messages } from "./routes/messages.js";
+import { participants } from "./routes/participants.js";
+import { rooms } from "./routes/rooms.js";
 import { securityHeaders } from "./security-headers.js";
+import { heartbeatInterval } from "./stream.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const joinHtmlPath = resolve(__dirname, "public", "join.html");

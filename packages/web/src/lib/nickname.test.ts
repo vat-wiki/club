@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { validateNickname, isBlockingIssue, NICKNAME_RULE } from "@/lib/nickname";
+import { isBlockingIssue, NICKNAME_RULE,validateNickname } from "@/lib/nickname";
+import { describe, expect,it } from "vitest";
 
 describe("validateNickname", () => {
   it("flags empty / whitespace-only names as empty after trim", () => {

@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ClubApiError } from "@club/sdk";
-import { formatMention, runMentions, type MentionDeps } from "./mentions.js";
 import type { Mention } from "@club/shared";
+
+import { formatMention, type MentionDeps,runMentions } from "./mentions.js";
 
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});

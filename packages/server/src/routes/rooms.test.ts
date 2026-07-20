@@ -1,9 +1,10 @@
-import { describe, it, expect, afterAll, vi } from "vitest";
-import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+
+import { Hono } from "hono";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 // Multi-room acceptance: MR2 (backward compat), MR3 (parity/open access),
 // MR4 (topic isolation), MR5 (room lifecycle), MR6 server face (GET /rooms),

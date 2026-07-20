@@ -3,9 +3,11 @@
 // Display current session info and useful stats.
 
 import { Command } from "commander";
+
 import type { Participant, Room } from "@club/shared";
-import { defaultRoom } from "../config.js";
+
 import { withAuthClient } from "../client-factory.js";
+import { defaultRoom } from "../config.js";
 
 export interface InfoDeps {
   /** Simulate `ClubClient.me()`. */

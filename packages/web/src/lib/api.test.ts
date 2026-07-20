@@ -54,9 +54,10 @@ vi.mock("./upload", () => ({
 
 // Import the api facade once. Because the SDK mocks above are hoisted,
 // every call to `new ClubClient(...)` in api.ts gets a stub.
-import { api, createParticipant, recoverParticipant } from "./api";
 import type { ClubConn } from "@club/sdk";
 import * as sdk from "@club/sdk";
+
+import { api, createParticipant, recoverParticipant } from "./api";
 
 const conn: ClubConn = { server: "https://example.club", key: "k" };
 const Client = sdk.ClubClient as any;

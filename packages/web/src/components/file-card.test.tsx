@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
-import type { MessageAttachment } from "@club/shared";
 import { renderWithI18n } from "@/test/i18n-wrap";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach,describe, expect, it, vi } from "vitest";
+
+import type { MessageAttachment } from "@club/shared";
+
 import { FileCard } from "./file-card";
 
 // Markdown attachment preview coverage: the preview affordance appears for a

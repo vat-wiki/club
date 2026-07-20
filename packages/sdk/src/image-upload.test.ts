@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ClubApiError } from "./index.js";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   assertAttachmentCount,
+  uploadDocumentFile,
   uploadImageFile,
   uploadVideoFile,
-  uploadDocumentFile,
 } from "./image-upload.js";
+import { ClubApiError } from "./index.js";
 
 // A minimal 1x1 PNG — real magic bytes so image-size sniffs type:"png". This is
 // the canonical smallest valid PNG (8-byte signature + IHDR + IDAT + IEND).

@@ -1,5 +1,4 @@
-import { useRef, useState } from "react";
-import { LifeBuoy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,10 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { recoverParticipant } from "@/lib/api";
 import { API_URL } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
+import { LifeBuoy } from "lucide-react";
+import { useRef, useState } from "react";
 
 // Recover an existing identity by nickname + one-time recovery code. Reached
 // from the AuthDialog paste path as a *secondary* entry (not a third main

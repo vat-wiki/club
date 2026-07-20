@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { Search, X } from "lucide-react";
-import type { Message } from "@club/shared";
 import { api } from "@/lib/api";
-import type { ClubConn } from "@club/sdk";
 import { useT } from "@/lib/i18n";
+import { Search, X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import type { ClubConn } from "@club/sdk";
+import type { Message } from "@club/shared";
 
 // Inline message search: debounced query against GET /messages/search, results
 // in a dropdown below the input. Scoped to the current room (the focused

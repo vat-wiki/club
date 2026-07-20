@@ -1,16 +1,18 @@
 import { Hono } from "hono";
+
 import type { Mention } from "@club/shared";
 import { MarkMentionsReadRequest } from "@club/shared";
+
 import { requireAuth } from "../auth.js";
-import { jsonErr, parseJsonBody, requireValidId } from "../lib.js";
 import {
-  getUnreadMentions,
   getMentionById,
   getMentionFull,
+  getUnreadMentions,
   markMentionRead,
   markMentionsRead,
   type MentionRow,
 } from "../db.js";
+import { jsonErr, parseJsonBody, requireValidId } from "../lib.js";
 
 export const me = new Hono();
 me.use("*", requireAuth);

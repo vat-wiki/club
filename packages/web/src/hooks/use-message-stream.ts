@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+
 import { ClubClient, type ClubConn } from '@club/sdk';
-import type { AgentThinkingEvent, AgentIdleEvent, Message } from '@club/shared';
+import type { AgentIdleEvent, AgentThinkingEvent, Message } from '@club/shared';
 
 type Status = 'connecting' | 'connected' | 'lost';
 

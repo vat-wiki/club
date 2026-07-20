@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { saveConfig } from "../config.js";
+
 import { withCatchExit } from "../catch-exit.js";
+import { saveConfig } from "../config.js";
 
 /**
  * Shape of the current configuration on disk.

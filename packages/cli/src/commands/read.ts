@@ -1,9 +1,11 @@
-import type { ClubClient, Message } from "@club/sdk";
 import { Command } from "commander";
+
+import type { ClubClient, Message } from "@club/sdk";
 import { formatMessage } from "@club/sdk";
+
+import { withCatchExit } from "../catch-exit.js";
 import { defaultRoom, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";
-import { withCatchExit } from "../catch-exit.js";
 
 export interface ReadOpts {
   /** Only messages after this message id. */

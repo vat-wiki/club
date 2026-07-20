@@ -9,9 +9,11 @@
 // stored in the existing config, else the local default.
 
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
-import { loadConfig, saveConfig } from "../config.js";
+
 import { withCatchExit } from "../catch-exit.js";
+import { loadConfig, saveConfig } from "../config.js";
 
 /** Persisted config shape; matches what saveConfig expects. */
 export interface RecoverConfig {

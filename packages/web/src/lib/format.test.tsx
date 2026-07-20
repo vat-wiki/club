@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { fmtTime, fmtDay, renderContent, mentionsSelf } from "./format";
+import { describe, expect,it } from "vitest";
+
+import { fmtDay, fmtTime, mentionsSelf,renderContent } from "./format";
 
 describe("fmtDay", () => {
   it("labels today as '今天'", () => {

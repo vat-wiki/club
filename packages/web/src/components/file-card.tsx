@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import { Download, File, FileBox, FileSpreadsheet, FileText, Loader2, X } from "lucide-react";
-import type { MessageAttachment } from "@club/shared";
-import { humanBytes } from "@/lib/upload";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
-
 // The preview libraries' styles. Small (~24KB combined, mostly excel) and
 // loaded eagerly so they're ready when a user opens a preview; the heavier JS
 // (pdf.js / docx-parser / x-spreadsheet) loads on demand via dynamic import.
 import "@js-preview/docx/lib/index.css";
 import "@js-preview/excel/lib/index.css";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useT } from "@/lib/i18n";
+import { humanBytes } from "@/lib/upload";
+import { cn } from "@/lib/utils";
+import DOMPurify from "dompurify";
+import { Download, File, FileBox, FileSpreadsheet, FileText, Loader2, X } from "lucide-react";
+import { marked } from "marked";
+import { useEffect, useRef, useState } from "react";
+
+import type { MessageAttachment } from "@club/shared";
 
 function resolveUrl(url: string): string {
   if (typeof window === "undefined") return url;

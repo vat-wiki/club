@@ -3,10 +3,12 @@
 // Show the participant details for the currently logged-in key.
 
 import { Command } from "commander";
-import type { Participant } from "@club/shared";
+
 import { ClubClient } from "@club/sdk";
-import { requireConfig } from "../config.js";
+import type { Participant } from "@club/shared";
+
 import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 export interface WhoamiDeps {
   /** Simulate the SDK's `ClubClient.me()` method. */

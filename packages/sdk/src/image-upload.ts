@@ -12,19 +12,22 @@
 
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
+
 import imageSize from "image-size";
+
 import {
-  ImageMime,
-  VideoMime,
   DocumentMime,
-  MAX_IMAGE_BYTES,
-  MAX_VIDEO_BYTES,
+  ImageMime,
   MAX_DOCUMENT_BYTES,
+  MAX_IMAGE_BYTES,
   MAX_IMAGES_PER_MESSAGE,
+  MAX_VIDEO_BYTES,
   type MessageAttachment,
+  VideoMime,
 } from "@club/shared";
-import { ClubApiError, NETWORK_ERROR_STATUS, formatError } from "./errors.js";
-import { uploadFile, type ClubConn } from "./transport.js";
+
+import { ClubApiError, formatError,NETWORK_ERROR_STATUS } from "./errors.js";
+import { type ClubConn,uploadFile } from "./transport.js";
 
 // image-size reports the format as the lowercased extension (e.g. "jpg", not
 // "jpeg"); map it back to the MIME the server's ImageMime enum expects.

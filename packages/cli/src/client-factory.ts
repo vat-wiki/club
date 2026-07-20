@@ -6,10 +6,12 @@
 // per-command options, etc.) a single edit.
 
 import type { Command } from "commander";
-import type { ClubConfig } from "./config.js";
+
 import { ClubClient } from "@club/sdk";
-import { requireConfig } from "./config.js";
+
 import { withCatchExit } from "./catch-exit.js";
+import type { ClubConfig } from "./config.js";
+import { requireConfig } from "./config.js";
 
 /**
  * Wrap an action so it receives a ready `ClubClient` **and** the current config

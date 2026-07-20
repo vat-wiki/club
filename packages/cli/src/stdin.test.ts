@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { readStream, type ReadableLike } from "./stdin.js";
+import { describe, expect,it } from "vitest";
+
+import { type ReadableLike,readStream } from "./stdin.js";
 
 // A minimal hand-driven fake of a readable stream.
 function fakeStream(

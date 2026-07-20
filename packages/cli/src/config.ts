@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+
 import { z } from "zod";
+
 import { DEFAULT_ROOM } from "@club/shared";
 
 export interface ClubConfig {

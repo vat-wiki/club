@@ -1,13 +1,14 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import type { Message, MessageAttachment, Participant } from "@club/shared";
-import { fmtTime, fmtTimePrecise, fmtDay, renderContent, mentionsSelf } from "@/lib/format";
+import { Avatar } from "@/components/avatar";
+import { FileCard } from "@/components/file-card";
+import { ImageLightbox } from "@/components/image-lightbox";
+import { fmtDay, fmtTime, fmtTimePrecise, mentionsSelf,renderContent } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ImageLightbox } from "@/components/image-lightbox";
-import { FileCard } from "@/components/file-card";
-import { Avatar } from "@/components/avatar";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+
+import type { Message, MessageAttachment, Participant } from "@club/shared";
 
 type Status = "connecting" | "connected" | "lost";
 

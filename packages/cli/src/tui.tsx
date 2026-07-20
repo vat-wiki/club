@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef } from "react";
-import { render, useInput, useApp, Box, Text } from "ink";
-import type { Message, Participant, Room } from "@club/shared";
+import { Box, render, Text,useApp, useInput } from "ink";
+import { useEffect, useRef,useState } from "react";
+
 import { ClubClient } from "@club/sdk";
-import { defaultRoom, type ClubConfig } from "./config.js";
+import type { Message, Participant, Room } from "@club/shared";
+
 import { formatMessage } from "./commands/format.js";
+import { type ClubConfig,defaultRoom } from "./config.js";
 
 interface Props {
   cfg: ClubConfig;

@@ -17,6 +17,7 @@
 // contract identical across all commands.
 
 import type { Command } from "commander";
+
 import { formatError } from "@club/sdk";
 
 /**

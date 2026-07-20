@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { AlertTriangle, Paperclip, Send } from "lucide-react";
-import type { Participant, Message } from "@club/shared";
-import { MAX_IMAGES_PER_MESSAGE } from "@club/shared";
-import type { ClubConn } from "@club/sdk";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { type AttachmentDraft,MediaPreviewChip } from "@/components/media-preview-chip";
 import { MentionPopup } from "@/components/mention-popup";
-import { MediaPreviewChip, type AttachmentDraft } from "@/components/media-preview-chip";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import {
   applyMention,
   detectMention,
@@ -18,10 +13,16 @@ import {
 } from "@/lib/mention";
 import {
   extractAttachmentFiles,
-  validateMediaFile,
   type RejectReason,
+  validateMediaFile,
 } from "@/lib/upload";
-import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { AlertTriangle, Paperclip, Send } from "lucide-react";
+import { type KeyboardEvent,useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type { ClubConn } from "@club/sdk";
+import type { Message,Participant } from "@club/shared";
+import { MAX_IMAGES_PER_MESSAGE } from "@club/shared";
 
 export function Composer({
   onSend,

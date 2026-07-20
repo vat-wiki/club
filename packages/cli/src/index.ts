@@ -1,25 +1,26 @@
 import { Command } from "commander";
-import pkg from "../package.json" with { type: "json" };
-import { loadConfig } from "./config.js";
-import { makeLoginCommand } from "./commands/login.js";
-import { makeJoinCommand } from "./commands/join.js";
-import { makeWhoamiCommand } from "./commands/whoami.js";
-import { makeSendCommand } from "./commands/send.js";
-import { makeReadCommand } from "./commands/read.js";
-import { makeMembersCommand } from "./commands/members.js";
-import { makeListenCommand } from "./commands/listen.js";
-import { makeMentionsCommand } from "./commands/mentions.js";
-import { makeRecoverCommand } from "./commands/recover.js";
-import { makeRoomsCommand } from "./commands/rooms.js";
+
+import { makeCatCommand } from "./commands/cat.js";
+import { makeDeleteCommand } from "./commands/delete.js";
 import { makeEnterCommand } from "./commands/enter.js";
 import { makeInfoCommand } from "./commands/info.js";
-import { makeDeleteCommand } from "./commands/delete.js";
+import { makeJoinCommand } from "./commands/join.js";
+import { makeListenCommand } from "./commands/listen.js";
+import { makeLoginCommand } from "./commands/login.js";
+import { makeMembersCommand } from "./commands/members.js";
+import { makeMentionsCommand } from "./commands/mentions.js";
 import { makeReactCommand } from "./commands/react.js";
+import { makeReadCommand } from "./commands/read.js";
+import { makeRecoverCommand } from "./commands/recover.js";
+import { makeRoomsCommand } from "./commands/rooms.js";
 import { makeSearchCommand } from "./commands/search.js";
-import { makeCatCommand } from "./commands/cat.js";
+import { makeSendCommand } from "./commands/send.js";
 import { makeUpdateCommand } from "./commands/update.js";
+import { makeWhoamiCommand } from "./commands/whoami.js";
+import { loadConfig } from "./config.js";
 import { runTui } from "./tui.js";
 import { autoUpdateAndRelaunch, checkForUpdate, isDevRun } from "./update.js";
+import pkg from "../package.json" with { type: "json" };
 
 // Top-level error handler — uniform "error: <msg>" output for all commands.
 // Each command's action throws; this wrapper catches and formats consistently.

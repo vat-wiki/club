@@ -1,6 +1,7 @@
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
+import importSort from "eslint-plugin-simple-import-sort";
 // Top-level ignore for flat config — must come first
 export default [
   {
@@ -26,6 +27,7 @@ export default [
     plugins: {
       "@typescript-eslint": tsPlugin,
       "react-hooks": reactHooks,
+      "simple-import-sort": importSort,
     },
     rules: {
       // --- Core ---
@@ -69,8 +71,30 @@ export default [
       // --- Security ---
       "no-eval": "error",
       "no-implied-eval": "error",
+
+      // --- Import ordering ---
+      // Enforce a consistent, readable import order across the monorepo so
+      // that unrelated changes don't churn the same file. The groups are:
+      //   [0] Node.js built-in modules (fs, path, crypto, url, child_process …)
+      //   [1] Packages (react, commander, hono, ulid …)
+      //   [2] Custom packages scoped under "@club/" (@club/shared, @club/sdk …)
+      //   [3] Internal absolute imports (paths starting with "./" or "../")
+      //   [4] Type-only imports (import type …)
+      // eslint-plugin-simple-import-sort is safe to auto-fix; it never moves
+      // the module specifiers, only reorders the import declarations.
+      "simple-import-sort/imports": [
+        "error",
+        {
+          groups: [["^node:"], ["^"], ["^@club/"], ["^\\./", "^\.\\./"], ["^"], ["^[.]$"]],
+        },
+      ],
+      "simple-import-sort/exports": "error",
     },
   },
+
+  // simple-import-sort applies to the same set of files as the core block,
+  // registered here so the test-file relaxations above don't touch import
+  // ordering (ordering in test files is still enforced).
 
   // Web frontend — stricter console rule for browser code
   {

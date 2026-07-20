@@ -8,11 +8,12 @@
 // Philosophy: every step is best-effort and fails open. A flaky network, missing global
 // write permission, or a non-global install must never block the user's real command.
 
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { spawn } from "node:child_process";
-import pkg from "../package.json" with { type: "json" };
+
 import { configPath } from "./config.js";
+import pkg from "../package.json" with { type: "json" };
 
 // The published package lives at `club-cli` on npm (bin: `club`).
 const REGISTRY_URL = "https://registry.npmjs.org/club-cli/latest";

@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect,it } from "vitest";
+
 import type { Room } from "@club/shared";
+
 import { runEnter } from "./enter.js";
 import type { ClubConfig } from "../config.js";
 

@@ -1,16 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Message, Participant, Room } from "@club/shared";
+
 import {
-  str,
-  num,
-  clampLimit,
-  resolveRoom,
-  matchesMention,
-  listenForMatch,
-  dispatchTool,
-  strArray,
   __test,
+  clampLimit,
   type DispatchClient,
+  dispatchTool,
+  listenForMatch,
+  matchesMention,
+  num,
+  resolveRoom,
+  str,
+  strArray,
 } from "./helpers.js";
 
 describe("str", () => {

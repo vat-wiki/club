@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach,describe, expect, it, vi } from "vitest";
+
 import type { Message } from "@club/shared";
+
 import { runSearch, type SearchDeps } from "./search.js";
 
 const baseMessage: Omit<Message, "id" | "createdAt"> = {

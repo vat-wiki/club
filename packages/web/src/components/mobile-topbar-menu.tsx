@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Check, ChevronDown, Copy, Key, LogOut, MoreVertical, Radio, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useCopy } from "@/hooks/use-copy";
-import { LANGS, LANG_LABEL, useI18n } from "@/lib/i18n";
+import { LANG_LABEL, LANGS, useI18n } from "@/lib/i18n";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Check, ChevronDown, Copy, Key, LogOut, MoreVertical, Radio, Users } from "lucide-react";
+import { useState } from "react";
+
 import type { Participant } from "@club/shared";
+
 import type { Status as TopbarStatus } from "./topbar";
 
 // Re-export the Status type for callers that need it.

@@ -34,8 +34,9 @@
  * ```
  */
 
-import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
+import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
 import { jitteredBackoff, sleep } from "@club/shared";
+
 import { type ClubConn, listMessages, listRooms } from "./transport.js";
 
 // ── Runtime type guards for SSE payloads ─────────────────────────────

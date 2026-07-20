@@ -4,6 +4,7 @@
 // Supports: text, JSON, PDF, Word (.docx), Excel (.xlsx), markdown
 
 import { type AttachmentMime as AttachmentMimeType } from "@club/shared";
+
 import { formatError } from "./errors.js";
 
 /** Map of accepted text-based MIME types for direct decoding. */

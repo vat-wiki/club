@@ -1,4 +1,5 @@
 import { Command } from "commander";
+
 import { withAuthClient } from "../client-factory.js";
 
 export function makeMembersCommand(): Command {

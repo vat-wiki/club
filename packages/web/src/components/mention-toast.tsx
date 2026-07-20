@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
-import type { MentionToast } from "@/hooks/use-rooms";
 import { Avatar } from "@/components/avatar";
+import type { MentionToast } from "@/hooks/use-rooms";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 // A single cross-room @mention toast. Slides in from the bottom, auto-dismisses
 // after ~6s, and pauses on hover/focus so keyboard + pointer users both get a

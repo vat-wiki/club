@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Copy, Check, X } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { Check, Copy, Download, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Non-blocking toast shown after successful account creation.

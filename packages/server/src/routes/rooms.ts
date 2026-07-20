@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
+
 import { CreateRoomRequest, type Room } from '@club/shared';
+
 import { requireAuth } from '../auth.js';
-import { listRooms, ensureRoom, getRoomBySlug, type RoomRow } from '../db.js';
-import { requireJson } from '../lib/json-content-type.js';
+import { ensureRoom, getRoomBySlug, listRooms, type RoomRow } from '../db.js';
 import { jsonErr, parseJsonBody } from '../lib.js';
+import { requireJson } from '../lib/json-content-type.js';
 
 /**
  * @module rooms

@@ -1,8 +1,10 @@
-import type { Participant } from "@club/shared";
-import { beforeEach, describe, it, expect, vi } from "vitest";
-import { Hono } from "hono";
 import type { Context } from "hono";
-import { requireAuth, hashKey } from "./auth.js";
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { Participant } from "@club/shared";
+
+import { hashKey,requireAuth } from "./auth.js";
 // We need to swap the imported getParticipantByKeyHash so we can drive
 // success-vs-401 cases without a real DB. The middleware re-exports hashKey
 // and calls getParticipantByKeyHash internally, so we patch both the

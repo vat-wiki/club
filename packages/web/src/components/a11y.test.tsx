@@ -1,26 +1,27 @@
-import { describe, it, expect } from "vitest";
+import type { MentionToast } from "@/hooks/use-rooms";
+import { withI18n } from "@/test/i18n-wrap";
 import { render } from "@testing-library/react";
-import * as axe from "axe-core";
 import type { AxeResults, RunOptions } from "axe-core";
+import * as axe from "axe-core";
 import type { ReactNode } from "react";
+import { describe, expect,it } from "vitest";
+
 import type { Message, Participant } from "@club/shared";
 
-import { Composer } from "./composer";
-import { Roster } from "./roster";
-import { Topbar } from "./topbar";
-import { MessageList } from "./message-list";
 import { AuthDialog } from "./auth-dialog";
-import { MobileRoster } from "./mobile-roster";
-import { KeyRevealDialog } from "./key-reveal-dialog";
-import { RecoverDialog } from "./recover-dialog";
-import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
-import { ViewKeyDialog } from "./view-key-dialog";
 import { BootScreen } from "./boot-screen";
-import { TypingIndicator } from "./typing-indicator";
-import { RoomList } from "./room-list";
+import { Composer } from "./composer";
+import { KeyRevealDialog } from "./key-reveal-dialog";
 import { MentionToasts } from "./mention-toast";
-import { withI18n } from "@/test/i18n-wrap";
-import type { MentionToast } from "@/hooks/use-rooms";
+import { MessageList } from "./message-list";
+import { MobileRoster } from "./mobile-roster";
+import { RecoverDialog } from "./recover-dialog";
+import { RoomList } from "./room-list";
+import { Roster } from "./roster";
+import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
+import { Topbar } from "./topbar";
+import { TypingIndicator } from "./typing-indicator";
+import { ViewKeyDialog } from "./view-key-dialog";
 
 const TEST_KEY = "club_human_test_0123456789abcdef";
 

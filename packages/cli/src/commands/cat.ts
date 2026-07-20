@@ -8,9 +8,10 @@
 // --meta to inspect metadata (format, mime, filename) as JSON.
 
 import { Command } from "commander";
+
+import type { ClubClient, ParsedFile } from "@club/sdk";
+
 import { withAuthClient } from "../client-factory.js";
-import type { ClubClient } from "@club/sdk";
-import type { ParsedFile } from "@club/sdk/client.js";
 
 /**
  * Options parsed for `club cat`.

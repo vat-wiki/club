@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import * as Stream from "./stream.js";
 
 describe("thinking state management", () => {

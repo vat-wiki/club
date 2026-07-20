@@ -1,4 +1,4 @@
-import { LogOut, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,9 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { useCopy } from "@/hooks/use-copy";
 import { useT } from "@/lib/i18n";
+import { Check,Copy, LogOut } from "lucide-react";
 
 // Confirmation shown before sign-out. clearConn wipes the key from this
 // machine, so we give the user one last chance to copy it. Without this, a

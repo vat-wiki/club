@@ -1,24 +1,27 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+
 import { Hono } from "hono";
 import { ulid } from "ulid";
+
 import {
   CreateParticipantRequest,
-  RecoverParticipantRequest,
   type Participant,
+  RecoverParticipantRequest,
 } from "@club/shared";
+
+import { hashKey } from "../crypto.js";
 import {
-  getParticipantForRecover,
   getParticipantByName,
-  invalidateParticipantNamesCache,
+  getParticipantForRecover,
   insertParticipant,
+  invalidateParticipantNamesCache,
   updateParticipantKey,
   updateParticipantRecover,
 } from "../db.js";
-import { hashKey } from "../crypto.js";
-import { rateLimit } from "../rate-limit.js";
-import { requireJson } from "../lib/json-content-type.js";
 import { jsonErr, parseJsonBody } from "../lib.js";
+import { requireJson } from "../lib/json-content-type.js";
 import { invalidateParticipantNameMap } from "../mention.js";
+import { rateLimit } from "../rate-limit.js";
 
 export const participants = new Hono();
 

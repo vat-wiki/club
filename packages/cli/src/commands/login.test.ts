@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { runLogin, type LoginDeps } from "./login.js";
+import { afterEach,describe, expect, it, vi } from "vitest";
+
+import { type LoginDeps,runLogin } from "./login.js";
 
 function makeDeps(): LoginDeps & { saved: { server: string; key: string }[] } {
   const saved: { server: string; key: string }[] = [];

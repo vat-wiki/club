@@ -1,14 +1,14 @@
+import { ClubApiError, type ClubConn,NETWORK_ERROR_STATUS, parseHttpErrorStatus } from '@club/sdk';
 import {
-  ImageMime,
-  VideoMime,
   DocumentMime,
+  ImageMime,
+  MAX_DOCUMENT_BYTES,
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
-  MAX_DOCUMENT_BYTES,
   type MessageAttachment,
   type UploadFileResponse,
+  VideoMime,
 } from '@club/shared';
-import { ClubApiError, NETWORK_ERROR_STATUS, parseHttpErrorStatus, type ClubConn } from '@club/sdk';
 
 /**
  * upload.ts — client-side media validation + multipart file upload for the

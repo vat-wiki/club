@@ -1,9 +1,11 @@
+import { renderWithI18n } from "@/test/i18n-wrap";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { MentionPopup } from "./mention-popup";
+
 import type { Participant } from "@club/shared";
-import { renderWithI18n } from "@/test/i18n-wrap";
+
+import { MentionPopup } from "./mention-popup";
 
 function makeMembers(count: number): Participant[] {
   return Array.from({ length: count }, (_, i) => ({

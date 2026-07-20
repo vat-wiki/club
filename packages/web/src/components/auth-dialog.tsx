@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { RecoverDialog } from "@/components/recover-dialog";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { api, createParticipant } from "@/lib/api";
 import { API_URL } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
-import { LanguageSwitcher } from "@/components/language-switcher";
-import { RecoverDialog } from "@/components/recover-dialog";
-import { validateNickname, isBlockingIssue, NICKNAME_RULE } from "@/lib/nickname";
+import { isBlockingIssue, NICKNAME_RULE,validateNickname } from "@/lib/nickname";
+import { AlertTriangle } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 
 type Mode = "create" | "paste";
 

@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { formatMessage } from "./format.js";
+import { describe, expect,it } from "vitest";
+
 import type { Message } from "@club/shared";
+
+import { formatMessage } from "./format.js";
 
 function base(content: string, extra: Partial<Message> = {}): Message {
   return {

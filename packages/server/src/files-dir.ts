@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
 import { realpath as realpathNative } from "node:fs/promises";
+import { resolve } from "node:path";
 
 /**
  * Directory where uploaded images are written to disk.

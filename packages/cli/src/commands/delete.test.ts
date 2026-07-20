@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { runDelete, type DeleteDeps } from "./delete.js";
+import { afterEach,describe, expect, it, vi } from "vitest";
+
+import { type DeleteDeps,runDelete } from "./delete.js";
 
 describe("runDelete", () => {
   afterEach(() => {

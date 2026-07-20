@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { MAX_IMAGE_BYTES } from "@club/shared";
-import { ClubApiError, isClubApiError } from "./index.js";
+
 import { assertAttachmentCount, uploadImageFile } from "./image-upload.js";
+import { ClubApiError, isClubApiError } from "./index.js";
 
 // Boundary + magic-byte sniff tests that complement image-upload.test.ts. The
 // headline behavior under test: uploadImageFile decides the mime from the

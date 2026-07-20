@@ -1,5 +1,5 @@
-import { AlertTriangle, FileText, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, FileText, Loader2, X } from "lucide-react";
 
 // A draft attachment: a chosen image OR video working its way through upload.
 // Lived entirely in Composer state until sent; the server only ever sees the

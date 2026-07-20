@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Key, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,10 +7,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { useCopy } from "@/hooks/use-copy";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Check,Copy, Key } from "lucide-react";
+import { useState } from "react";
 
 // Lets an already-signed-in user view + copy their own login key at any time.
 // The key lives in localStorage (club_key); this is the "I skipped saving it

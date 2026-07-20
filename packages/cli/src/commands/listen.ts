@@ -1,9 +1,11 @@
 import { Command } from "commander";
+
 import { ClubClient } from "@club/sdk";
 import { mentionMatches, type Message } from "@club/shared";
-import { requireConfig } from "../config.js";
+
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 export function makeListenCommand(): Command {
   return new Command("listen")

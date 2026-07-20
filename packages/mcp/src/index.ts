@@ -4,9 +4,11 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+
 import { ClubClient, formatError } from "@club/sdk";
-import { uploadImageFile, uploadVideoFile, uploadDocumentFile } from "@club/sdk/node";
-import { dispatchTool, type DispatchClient } from "./helpers.js";
+import { uploadDocumentFile,uploadImageFile, uploadVideoFile } from "@club/sdk/node";
+
+import { type DispatchClient,dispatchTool } from "./helpers.js";
 import type { ToolArgs } from "./types.js";
 
 // ── Connection config ────────────────────────────────────────────────

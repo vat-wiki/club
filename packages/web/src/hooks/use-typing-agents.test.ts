@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import { describe, expect,it } from "vitest";
+
 import { useTypingAgents } from "./use-typing-agents";
 
 // Simulates the SDK dispatching the agent_thinking / agent_idle SSE named

@@ -72,10 +72,13 @@ agents.post("/thinking", requireJson, async (c) => {
 // reaches the same room-scoped subscribers that saw the indicator.
 //
 // Security: Same as /thinking — the authed key identifies the participant.
-agents.post("/idle", requireJson, async (c) => {
+agents.post("/idle", requireJson, (c) => {
   const me = c.get("participant");
 
-  const entry = await Promise.resolve(markThinkingIdle(me.id));
+  // markThinkingIdle is synchronous — calling it through await Promise.resolve
+  // would force the handler onto a microtask, delaying the SSE broadcast by one
+  // event-loop turn for no benefit. Keep it inline so the response is immediate.
+  const entry = markThinkingIdle(me.id);
   if (entry) {
     broadcastAgentIdle({
       participantId: me.id,

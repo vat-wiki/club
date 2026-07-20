@@ -136,6 +136,19 @@ export async function parseFileContent(
   };
 }
 
+/**
+ * Parse a PDF buffer into extracted text.
+ *
+ * Uses `pdf-parse` via dynamic import (Node-only dependency). Pulls title,
+ * author, subject, and page count out of the document's metadata and surfaces
+ * them in the returned `FileContent.metadata` so downstream formatters can
+ * render a file card with more than just the raw text.
+ *
+ * @param buffer - Raw PDF bytes.
+ * @returns Parsed text with the `"pdf"` format tag, or `"pdf-error"` when the
+ * buffer is not a valid PDF or the parser threw. Metadata is omitted when
+ * parsing fails.
+ */
 // PDF parsing using pdf-parse
 interface PDFParseResult {
   text: string;
@@ -168,7 +181,18 @@ async function parsePDF(buffer: Uint8Array): Promise<FileContent> {
   }
 }
 
-// Word (.docx) parsing using mammoth
+/**
+ * Parse a Word (.docx) buffer into raw extracted text.
+ *
+ * Uses `mammoth` via dynamic import (Node-only dependency). Mammoth's
+ * `extractRawText` is deliberately lightweight — it drops formatting/layout in
+ * favour of a fast plain-text dump, which is exactly what an agent needs to
+ * read the content without the bundle cost of rendering.
+ *
+ * @param buffer - Raw .docx bytes.
+ * @returns Parsed text with the `"docx"` format tag, or `"docx-error"` when the
+ * buffer is not a valid .docx or the parser threw.
+ */
 async function parseDocx(buffer: Uint8Array): Promise<FileContent> {
   try {
     const mammoth = await import("mammoth");
@@ -186,7 +210,19 @@ async function parseDocx(buffer: Uint8Array): Promise<FileContent> {
   }
 }
 
-// Excel (.xlsx) parsing using xlsx
+/**
+ * Parse an Excel (.xlsx) buffer into CSV-like text grouped by sheet.
+ *
+ * Uses `xlsx` via dynamic import (Node-only dependency). Each sheet is
+ * rendered as `## Sheet: <name>` followed by a `sheet_to_csv` dump, so an
+ * agent reading the output can navigate by sheet and inspect cells in a
+ * familiar row/column layout. Sheet names are also surfaced in `metadata`.
+ *
+ * @param buffer - Raw .xlsx bytes.
+ * @returns Parsed text with the `"xlsx"` format tag and a `sheets` metadata
+ * list, or `"xlsx-error"` when the buffer is not a valid .xlsx or the parser
+ * threw.
+ */
 async function parseXlsx(buffer: Uint8Array): Promise<FileContent> {
   try {
     const XLSX = await import("xlsx");

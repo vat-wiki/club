@@ -60,19 +60,19 @@ export async function runSend(
   // Images, videos, and documents all share one per-message cap.
   assertAttachmentCount([...images, ...videos, ...documents]);
 
-  const attachmentIds: string[] = [];
-  for (const p of images) {
-    const att = await deps.uploadImage(conn, p);
-    attachmentIds.push(att.id);
-  }
-  for (const p of videos) {
-    const att = await deps.uploadVideo(conn, p);
-    attachmentIds.push(att.id);
-  }
-  for (const p of documents) {
-    const att = await deps.uploadDocument(conn, p);
-    attachmentIds.push(att.id);
-  }
+  // Unified upload loop: each attachment "type" is a typed list paired with the
+  // uploader that handles it. Adding a new type only requires appending an entry
+  // to this array rather than duplicating the loop body below.
+  const batches: Array<{
+    paths: string[];
+    upload: (conn: ClubConn, path: string) => Promise<{ id: string }>;
+  }> = [
+    { paths: images, upload: deps.uploadImage },
+    { paths: videos, upload: deps.uploadVideo },
+    { paths: documents, upload: deps.uploadDocument },
+  ];
+
+  const attachmentIds = await uploadAll(conn, batches);
 
   await deps.send(
     content,
@@ -80,4 +80,28 @@ export async function runSend(
     input.room,
   );
   return { attachmentIds };
+}
+
+/** Upload every path in each batch via its paired uploader, in order.
+ *  Errors (missing file, bad type, oversize, network) propagate straight to the
+ *  caller; partial uploads can leave uploaded ids still valid — callers decide
+ *  whether to retry or surface the error.
+ *
+ *  Separated from runSend so the per-type upload loop lives in one place and
+ *  new attachment types are a one-line addition to runSend's batches array.
+ */
+async function uploadAll(
+  conn: ClubConn,
+  batches: Array<{
+    paths: string[];
+    upload: (conn: ClubConn, path: string) => Promise<{ id: string }>;
+  }>,
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (const { paths, upload } of batches) {
+    for (const p of paths) {
+      ids.push((await upload(conn, p)).id);
+    }
+  }
+  return ids;
 }

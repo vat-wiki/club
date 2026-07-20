@@ -159,7 +159,7 @@ describe("isValidRoomSlug (pure predicate)", () => {
   });
 
   it("accepts slugs up to the 30-character maximum", () => {
-    const maxLen = "0123456789abcdef0123456789abc"; // 30 chars
+    const maxLen = "0123456789abcdef0123456789abcd"; // 30 chars
     expect(maxLen.length).toBe(30);
     expect(isValidRoomSlug(maxLen)).toBe(true);
   });
@@ -266,7 +266,7 @@ describe("requireValidRoomSlug (Hono wrapper)", () => {
       "9abc",
       "dev-tools",
       "short-",
-      "0123456789abcdef0123456789abc", // 30 chars, max
+      "0123456789abcdef0123456789abcd", // 30 chars, max
       // Invalids
       "",
       "-bad",

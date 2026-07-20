@@ -26,9 +26,9 @@ export function formatRoomLine(room: Room, current: string): string {
 export function makeRoomsCommand(): Command {
   return new Command("rooms")
     .description("list all rooms (current marked with *)")
-    .action(withAuthClient(async (_, client) => {
+    .action(withAuthClient(async (cfg, _args, client) => {
       const list = await client.rooms();
-      const current = defaultRoom(client);
+      const current = defaultRoom(cfg);
       for (const r of list) console.log(formatRoomLine(r, current));
       if (list.length === 0) console.log("(no rooms)");
     }));

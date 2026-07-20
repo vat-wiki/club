@@ -26,7 +26,7 @@ export function makeCatCommand(): Command {
     .option("--content", "parse and output file content (for text documents)")
     .option("--raw", "output raw base64 (for binary files)")
     .option("--meta", "output file metadata as JSON")
-    .action(withAuthClient(async ([id, opts], client) => {
+    .action(withAuthClient(async (_cfg, [id, opts], client) => {
       const { content, raw, meta } = opts as CatOpts;
       const url = `${client.server}/files/${id}`;
 

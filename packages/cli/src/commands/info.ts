@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import type { Participant, Room } from "@club/shared";
+import { defaultRoom } from "../config.js";
 import { withAuthClient } from "../client-factory.js";
 
 export interface InfoDeps {
@@ -64,12 +65,10 @@ export function roomDisplayLabel(room: Room, now = Date.now()): string {
 export function makeInfoCommand(): Command {
   return new Command("info")
     .description("show current session info")
-    .action(withAuthClient(async (cfg, client) => {
-      // defaultRoom() returns the first room by insertion order, which is
-      // "general" for a fresh server — the canonical current room.
-      const currentRoom =
-        (await client.rooms()).sort((a, b) => a.createdAt - b.createdAt)[0]?.slug ??
-        "general";
+    .action(withAuthClient(async (cfg, _args, client) => {
+      // defaultRoom() falls back to "general" when the config room is unset;
+      // this is the canonical current room for a fresh login.
+      const currentRoom = defaultRoom(cfg);
 
       return runInfo(
         { server: cfg.server, currentRoom },

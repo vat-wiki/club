@@ -126,13 +126,12 @@ function toMessage(
   if (attachments) msg.attachments = attachments;
   if (r.reply_to_id) msg.replyToId = r.reply_to_id;
   if (r.deleted) msg.deleted = true;
-  // reactionsMap is only supplied on the batched list/search paths, where
-  // every message id was passed to getReactionsForMessages(). Keys that have
-  // no reactions are simply absent from the map; toMessage must distinguish
-  // "absent (maybe empty)" from "map not supplied at all" to preserve the
-  // existing per-row fallback for single-message routes.
-  const reactions =
-    reactionsMap?.has(r.id) ? (reactionsMap.get(r.id) ?? []) : getReactionsForMessage(r.id);
+  // Batched list/search paths pre-fetched reactions via getReactionsForMessages().
+  // Keys absent from the map have no reactions (empty); when the map is
+  // omitted, fall back to the per-message query. The `?? []` guard keeps
+  // the expression single-line while preserving the existing "absent key =
+  // empty, no map = query DB" contract.
+  const reactions = reactionsMap?.get(r.id) ?? getReactionsForMessage(r.id);
   if (reactions.length) msg.reactions = reactions as Reaction[];
   return msg;
 }

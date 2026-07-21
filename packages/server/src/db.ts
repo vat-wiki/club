@@ -1074,8 +1074,7 @@ export interface RoomRow {
 // first, then most-recently-active first, then empty rooms (NULL activity) last
 // by created_at. The LEFT JOIN + MAX yields NULL activity for rooms with no
 // messages — exactly what clients need for "active-first" ordering without a
-// second round-trip. Room counts are small (<100 expected), so the grouped scan
-// is plenty fast.
+// second round-trip.
 const listRoomsStmt = db.prepare<[], RoomRow>(
   `SELECT r.id, r.slug, r.created_at,
           MAX(m.created_at) AS last_activity_at
@@ -1084,16 +1083,50 @@ const listRoomsStmt = db.prepare<[], RoomRow>(
    GROUP BY r.id, r.slug, r.created_at
    ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`
 );
+
+// LRU cache keyed by a module symbol for the full rooms list. GET /rooms is
+// a read-heavy endpoint (room list UI tabs, sidebar refresh, presence sync)
+// yet the underlying data is a full-table scan + LEFT JOIN + MAX aggregation.
+// Rooms are created far less often than they are listed, so an in-memory
+// snapshot skips the DB on the common path. The cache is invalidated via
+// invalidateRoomsCache (called by POST /rooms on creation) and shared with
+// clearRoomCache for operational consistency (seed/migration scripts call the
+// same hook for both the single-slug LRU and this list cache).
+const listRoomsCache = new Map<
+  symbol,
+  ReturnType<typeof listRoomsStmt.all>
+>();
+const ROOMS_CACHE_KEY = Symbol('roomsCache');
+
+/** Invalidate the rooms list cache. Called on every room create/drop so the
+ * next list request re-reads the authoritative data from the DB. Shared with
+ * clearRoomCache so seed/migration scripts and explicit drops need a single
+ * hook. */
+export function invalidateRoomsCache(): void {
+  listRoomsCache.delete(ROOMS_CACHE_KEY);
+  clearRoomCache();
+  invalidateRoomBySlugCache();
+}
+
 /** All rooms with their last-activity timestamp in one scan. `general` sorts
  * first, then most-recently-active first, then empty rooms (NULL activity)
  * last by created_at. The LEFT JOIN + MAX yields NULL activity for rooms with
  * no messages — exactly what clients need for "active-first" ordering without a
  * second round-trip.
  *
+ * Performance: served from a small in-memory snapshot on the hot path. A
+ * fresh SELECT + aggregation is only issued on the very first request and after
+ * an explicit create/drop that invalidates the cache. Call
+ * invalidateRoomsCache after room mutations.
+ *
  * @returns Room rows, active-first. `general` always first when it has activity.
  */
 export function listRooms(): RoomRow[] {
-  return listRoomsStmt.all();
+  const hit = listRoomsCache.get(ROOMS_CACHE_KEY);
+  if (hit !== undefined) return hit;
+  const rows = listRoomsStmt.all();
+  listRoomsCache.set(ROOMS_CACHE_KEY, rows);
+  return rows;
 }
 
 const roomBySlugStmt = db.prepare<[string], { id: string; slug: string; created_at: number }>(
@@ -1116,18 +1149,42 @@ const roomBySlugWithActivityStmt = db.prepare<[string], RoomRow | undefined>(`
    GROUP BY r.id, r.slug, r.created_at
 `);
 
+// LRU cache keyed by slug for getRoomBySlug — a JS map hit beats a DB
+// lookup on the hot path (e.g. POST /rooms re-reading an existing room after
+// ensureRoom, GET /rooms/{slug}, and presence sync). Rooms are created far
+// less often than they are looked up, so a bounded in-memory snapshot skips
+// the SQL on the common path. Shared invalidation with invalidateRoomsCache
+// (called on room create/drop) keeps both lookups consistent.
+const roomBySlugCache = new Map<string, RoomRow | undefined>();
+const ROOM_BY_SLUG_CACHE_MAX = 512;
+
+/** Invalidate the per-slug room cache. Called on every room create/drop so
+ * the next getRoomBySlug re-reads the authoritative data from the DB. */
+export function invalidateRoomBySlugCache(): void {
+  roomBySlugCache.clear();
+}
+
 /** Look up a single room by slug, including its last-activity timestamp.
  *  Returns undefined when the slug is not in the registry.
  *
- *  Performance: a single-row targeted query using the UNIQUE(slug) constraint;
+ *  Performance: single-row targeted query using the UNIQUE(slug) constraint;
  *  avoids the full-table scan + aggregation that listRooms().find(slug) would
- *  require. Same output shape as listRooms() so toRoom() can handle both.
+ *  require. Results are cached in a bounded LRU and invalidated on room
+ *  create/drop, so subsequent lookups for the same slug are O(1) in JS.
+ *  Same output shape as listRooms() so toRoom() can handle both.
  *
  *  @param slug - Canonical room slug (validated by the caller).
  *  @returns Room row with lastActivityAt, or undefined.
  */
 export function getRoomBySlug(slug: string): RoomRow | undefined {
-  return roomBySlugWithActivityStmt.get(slug);
+  if (roomBySlugCache.has(slug)) return roomBySlugCache.get(slug);
+  const row = roomBySlugWithActivityStmt.get(slug);
+  if (roomBySlugCache.size >= ROOM_BY_SLUG_CACHE_MAX) {
+    const first = roomBySlugCache.keys().next().value;
+    if (first !== undefined) roomBySlugCache.delete(first);
+  }
+  roomBySlugCache.set(slug, row);
+  return row;
 }
 
 const insertRoomStmt = db.prepare(

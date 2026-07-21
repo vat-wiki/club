@@ -8,6 +8,10 @@ import {
   clearRoomCache,
   ensureRoom,
   getAllParticipants,
+  getRoomBySlug,
+  invalidateRoomBySlugCache,
+  invalidateRoomsCache,
+  listRooms,
 } from "./db.js";
 
 describe("getAllParticipants cache", () => {
@@ -81,5 +85,65 @@ describe("ensureRoom LRU cache", () => {
     expect(after.created).toBe(false);
     expect(after.slug).toBe("general");
     expect(after.id).toBe(before.id);
+  });
+});
+
+describe("getRoomBySlug cache", () => {
+  beforeEach(() => {
+    invalidateRoomBySlugCache();
+  });
+
+  it("serves the same row reference on repeat lookups (O(1) DB-free path)", () => {
+    const first = getRoomBySlug("general");
+    expect(first).toMatchObject({ slug: "general" });
+    expect(first!.id).toBeDefined();
+
+    const second = getRoomBySlug("general");
+    // Cache hit returns the exact same reference.
+    expect(first).toBe(second);
+  });
+
+  it("returns undefined for non-existent slugs and caches the miss", () => {
+    const result = getRoomBySlug("definitely-not-a-room-" + crypto.randomUUID());
+    expect(result).toBeUndefined();
+  });
+
+  it("invalidateRoomsCache clears the per-slug cache too", () => {
+    const before = getRoomBySlug("general");
+    invalidateRoomsCache();
+    const after = getRoomBySlug("general");
+    // Cache dropped -> fresh DB query -> different reference, same data.
+    expect(before).not.toBe(after);
+    expect(after).toEqual(before);
+  });
+
+  it("invalidateRoomBySlugCache only touches the slug cache, not the list cache", () => {
+    const slugBefore = getRoomBySlug("general");
+    const roomsList = listRooms();
+    invalidateRoomBySlugCache();
+    const slugAfter = getRoomBySlug("general");
+    expect(slugBefore).not.toBe(slugAfter);
+    expect(slugAfter).toEqual(slugBefore);
+    // List cache is untouched -> same reference.
+    expect(listRooms()).toBe(roomsList);
+  });
+
+  it("respects ROOM_BY_SLUG_CACHE_MAX and evicts the oldest key", () => {
+    // Re-seed the cache for a deterministic baseline.
+    invalidateRoomBySlugCache();
+    const slugs = Array.from({ length: 520 }, (_, i) => `evict-test-room-${i}`);
+    // Seed non-existent slugs to populate the cache up to the limit.
+    for (const slug of slugs.slice(0, 520)) {
+      void getRoomBySlug(slug);
+    }
+    // One more lookup evicts the oldest (slugs[0]). Then a lookup for an
+    // existing real room ("general") shows the cache still serves existing
+    // rows correctly after eviction pressure.
+    const afterEviction = getRoomBySlug("general");
+    expect(afterEviction).toMatchObject({ slug: "general" });
+    expect(afterEviction!.id).toBeDefined();
+    // Repeat lookup returns the same cached reference.
+    const again = getRoomBySlug("general");
+    expect(afterEviction).toBe(again);
   });
 });

@@ -1,3 +1,47 @@
+/**
+ * @module @club/server/db
+ *
+ * SQLite data-access layer for the club backend. All read/write paths —
+ * messages, participants, rooms, reactions, mentions, files — flow through the
+ * exported functions in this module. HTTP routes, CLI, and MCP only import from
+ * here; no caller should reach into `db` directly.
+ *
+ * Conventions:
+ *
+ * - **Single shared projection.** Every messages query composes from
+ *   {@link messageProjectionSql}, so adding a column to the SELECT requires
+ *   one edit rather than hunting six prepared statements.
+ * - **Cursor by rowid.** Pagination uses the monotonic SQLite `rowid` rather
+ *   than the ULID `id`, so history walks stay correct even when clocks skew.
+ *   ULID → rowid resolution is itself cached in {@link sinceStmt}.
+ * - **Soft-delete.** `messages.deleted` is a 1/0 flag; recalled messages stay
+ *   in the table and are filtered at the query layer. Row-level auth (the
+ *   caller must be the author) guards the recall path.
+ * - **Cache invalidate hooks.** Frequent-read tables (participants, rooms)
+ *   are cached in JS. Callers that mutate those tables must call the
+ *   corresponding `invalidate*Cache` function immediately after the write.
+ * - **Idempotent writes.** `insertParticipant`, `ensureRoom`, key/recover
+ *   rotations use `INSERT OR REPLACE` / `UPDATE WHERE EXISTS` so retry-safe
+ *   callers (recovery flows) can't double-create rows.
+ *
+ * Schema lives in {@link BASELINE_SCHEMA} (v0) and the `migrations` array
+ * (v1–v11). {@link runMigrations} walks the chain on module load. Exported
+ * for migration tests that stand up a fresh connection.
+ *
+ * Row interfaces ({@link MessageRow}, {@link ParticipantRow},
+ * {@link ParticipantRecoverRow}, {@link MentionRow}, {@link MentionByIdRow},
+ * {@link MentionInsert}, {@link FileRow}, {@link RoomRow}) mirror the SQLite
+ * column set exactly so callers never carry implicit shape knowledge.
+ *
+ * @example
+ * ```ts
+ * import { insertMessage, getMessagesSince, getAllParticipants } from "./db.js";
+ *
+ * insertMessage(id, authorId, "hi", Date.now(), null, null, "general");
+ * const { rowid, messages } = getMessagesSince(lastId, "general", 50);
+ * ```
+ */
+
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
@@ -288,6 +332,18 @@ runMigrations(db);
 // Order messages by insertion time. We keep a rowid so 'since' cursor can use
 // a monotonic sequence rather than the (sortable but ulid) id comparison,
 // which would be fragile if clocks skew. Rowid is simplest & always-increasing.
+/**
+ * Joined view of a `messages` row with its author's name from `participants`.
+ *
+ * Every message query returns this shape so routes share one projection and
+ * don't silently diverge when columns are added.
+ *
+ * @property rowid - Monotonic SQLite rowid; the canonical pagination cursor.
+ * @property attachments - JSON-encoded `MessageAttachment[]`; `null`/`""` means none.
+ * @property reply_to_id - ULID of the replied-to message, or `null`.
+ * @property deleted - `1` if recalled (soft-deleted), otherwise `0`.
+ * @property room - Canonical room slug; `"general"` for backfilled pre-multi-room rows.
+ */
 export interface MessageRow {
   id: string;
   content: string;
@@ -695,6 +751,20 @@ export function updateParticipantRecover(id: string, newHash: string | null): vo
 
 // ── Mentions (per-participant @-mention inbox) ──────────────────────
 
+/**
+ * DB row for a mention inbox entry. Populated when a message containing an
+ * `@<name>` mention is inserted; the server writes one row per unique
+ * (`message_id`, `participant_id`) pair so each @-mention is delivered once.
+ *
+ * @property id - ULID of this mention row (the inbox cursor).
+ * @property message_id - ULID of the source message.
+ * @property participant_id - ID of the participant who was @-mentioned (inbox owner).
+ * @property author_id - ID of the message author.
+ * @property content - The message body (stored so the inbox can render context
+ *   even after the message is recalled).
+ * @property read_at - Epoch-ms when the owner marked this read; `null` = unread.
+ * @property room - Room slug of the source message (deep-link source).
+ */
 export interface MentionRow {
   id: string;
   message_id: string;
@@ -805,6 +875,20 @@ export function insertMention(
  *  @returns Number of rows actually inserted (duplicates silently ignored by
  *    UNIQUE(message_id, participant_id)).
  */
+/**
+ * Row shape for the batch-mention insert used when a new message is written.
+ * Caller-assembles these from the mention parser's output and passes them to
+ * {@link insertMentions}; the fields map directly onto the `mentions` table
+ * columns (without the DB `rowid`), so the prepared statement's positional
+ * bind order matches the column order.
+ *
+ * @property id - ULID of this mention row.
+ * @property messageId - ULID of the source message.
+ * @property participantId - ID of the participant being @-mentioned.
+ * @property authorId - ID of the message author.
+ * @property room - Room slug of the source message.
+ * @property createdAt - Epoch-ms timestamp of the source message.
+ */
 export interface MentionInsert {
   id: string;
   messageId: string;
@@ -851,9 +935,15 @@ const mentionByIdStmt = db.prepare<
   { id: string; participant_id: string; read_at: number | null }
 >(`SELECT id, participant_id, read_at FROM mentions WHERE id = ?`);
 
-/** Lightweight mention ownership lookup by id (for PATCH /me/mentions/:id/read).
- *  Only the fields the caller needs are selected. Returns undefined when the id
- *  is unknown. */
+/**
+ * Lightweight mention ownership lookup by id (for PATCH /me/mentions/:id/read).
+ * Only the fields the caller needs are selected, so the ownership check is a
+ * single-column comparison. Returns `undefined` when the id is unknown.
+ *
+ * The full mention (including message content and author) is resolved by
+ * {@link getMentionFull}; this row is intentionally lean because it's the hot
+ * path in the bulk-read endpoint.
+ */
 export interface MentionByIdRow {
   id: string;
   participant_id: string;
@@ -941,9 +1031,21 @@ export function markMentionsRead(ids: string[], ownerId: string, readAt: number)
 
 // ── Uploaded files (image metadata) ──────────────────────────────────
 
-// The DB row for an uploaded image. `id` doubles as the public /files/{id}
-// path; `participant_id` is the uploader, checked at POST /messages time so a
-// sender can only attach files it uploaded (not another participant's).
+/**
+ * DB row for an uploaded image / video / document. `id` doubles as the public
+ * `/files/{id}` path; `participant_id` is the uploader, checked at
+ * `POST /messages` time so a sender can only attach files it uploaded (not
+ * another participant's). Metadata (`width`, `height`, `size`, `filename`) is
+ * filled by the upload handler (server-side probe); clients can't supply them.
+ *
+ * @property id - ULID file id (public, non-guessable).
+ * @property participant_id - ID of the uploading participant.
+ * @property mime - MIME type detected server-side.
+ * @property width - Image width in px, or `null` for non-images.
+ * @property height - Image height in px, or `null` for non-images.
+ * @property size - File size in bytes.
+ * @property filename - Original filename if supplied, or `null`.
+ */
 export interface FileRow {
   id: string;
   participant_id: string;
@@ -1062,6 +1164,18 @@ export function getFilesByIds(ids: string[]): FileRow[] {
 // POST /messages ensures the room exists first). `general` is the seeded system
 // row and is always present.
 
+/**
+ * DB row for a chat room. `general` is the seeded system row and is always
+ * present. New rooms are created by `POST /rooms` or
+ * {@link ensureRoom} (called by `POST /messages` if the target room doesn't
+ * exist yet).
+ *
+ * @property id - ULID room id.
+ * @property slug - Public key (URL-safe, lower-case, `^[a-z0-9][a-z0-9-]{0,29}$`).
+ * @property created_at - Epoch-ms creation timestamp.
+ * @property last_activity_at - Epoch-ms of the most recent message in this room;
+ *   `null` for empty rooms. Drives "active-first" room ordering.
+ */
 export interface RoomRow {
   id: string;
   slug: string;

@@ -3,7 +3,45 @@ import { beforeEach, describe, expect, it } from "vitest";
 // Requiring this module instantiates the DB connection and the room LRU cache.
 // We can't easily replace the underlying stmt from here, but we can observe
 // DB-interaction through the DB module itself.
-import { clearRoomCache, ensureRoom } from "./db.js";
+import {
+  clearParticipantsCache,
+  clearRoomCache,
+  ensureRoom,
+  getAllParticipants,
+} from "./db.js";
+
+describe("getAllParticipants cache", () => {
+  beforeEach(() => {
+    clearParticipantsCache();
+  });
+
+  it("returns participant rows from the DB on the first call", () => {
+    const rows = getAllParticipants();
+    expect(Array.isArray(rows)).toBe(true);
+    // The production DB has at least a few seeded participants; assert each row
+    // has the expected shape.
+    for (const r of rows) {
+      expect(typeof r.id).toBe("string");
+      expect(typeof r.name).toBe("string");
+      expect(typeof r.created_at).toBe("number");
+    }
+  });
+
+  it("serves the same cached array on repeat calls", () => {
+    const first = getAllParticipants();
+    const second = getAllParticipants();
+    expect(first).toBe(second);
+  });
+
+  it("clearParticipantsCache forces a DB re-read (different array ref)", () => {
+    const first = getAllParticipants();
+    clearParticipantsCache();
+    const after = getAllParticipants();
+    // Cache was dropped, so a fresh DB query produces a different array ref.
+    expect(first).not.toBe(after);
+    expect(after).toEqual(first);
+  });
+});
 
 describe("ensureRoom LRU cache", () => {
   beforeEach(() => {

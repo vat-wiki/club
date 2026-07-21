@@ -343,9 +343,32 @@ const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; cre
   `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`
 );
 
-/** All participants, newest first. Used by the room-member list endpoint. */
+// Cache the prepared-statement result (the full participants table) so frequent
+// roster polls skip the DB.
+const participantsRowsCache = new Map<
+  symbol,
+  ReturnType<typeof allParticipantsSelectStmt.all>
+>();
+const PARTICIPANTS_CACHE_KEY = Symbol('participantsCache');
+
+/** All participants, newest first. Used by the room-member list endpoint.
+ *
+ * Performance: serves from a small LRU in JS so frequent roster polls
+ * (presence-aware UI clients) skip the DB. The cache is invalidated via
+ * {@link invalidateParticipantNamesCache}, which is already called on every
+ * participant mutation (create / delete / recover) in the participant route.
+ */
 export function getAllParticipants(): { id: string; name: string; created_at: number }[] {
-  return allParticipantsSelectStmt.all();
+  const hit = participantsRowsCache.get(PARTICIPANTS_CACHE_KEY);
+  if (hit !== undefined) return hit;
+  const rows = allParticipantsSelectStmt.all();
+  participantsRowsCache.set(PARTICIPANTS_CACHE_KEY, rows);
+  return rows;
+}
+
+/** Explicitly drop the entire participants list cache. Useful in tests. */
+export function clearParticipantsCache(): void {
+  participantsRowsCache.delete(PARTICIPANTS_CACHE_KEY);
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(
@@ -739,6 +762,7 @@ export function getAllParticipantNames(): readonly { id: string; name: string }[
  */
 export function invalidateParticipantNamesCache(): void {
   participantNamesCache.clear();
+  participantsRowsCache.delete(PARTICIPANTS_CACHE_KEY);
   // Build a fresh frozen snapshot so the next call returns a new array ref,
   // triggering the caller's identity-based cache rebuild.
   participantNamesRef.current = _buildSnapshot();

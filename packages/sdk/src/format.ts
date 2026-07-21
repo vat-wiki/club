@@ -1,8 +1,8 @@
 import type { Message, MessageAttachment } from "@club/shared";
 import type {
+  DocumentMime,
   ImageMime,
   VideoMime,
-  DocumentMime,
 } from "@club/shared";
 
 // ── Type-level discriminated attachment union ─────────────────────

@@ -34,7 +34,7 @@ class MockStream implements StreamHandle {
   onPresence: (e: PresenceEvent) => void = () => {};
   onMessageDeleted: (e: { id: string; room: string }) => void = () => {};
   onReaction: (e: { messageId: string; room: string; reactions: Array<{ emoji: string; count: number }> }) => void = () => {};
-  onError: (err: unknown) => void = () => {};
+  onError: (err: Error) => void = () => {};
 }
 
 let mockMessagesResult: Message[] = [];
@@ -327,7 +327,7 @@ describe("useMessageStream", () => {
         mockStream?.onMessage(m1);
       });
       // Fire the first loadMore, then the second before the first settles.
-      let during: boolean;
+      let during!: boolean;
       await act(async () => {
         const p1 = result.current.loadMore();
         const p2 = result.current.loadMore();

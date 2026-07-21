@@ -14,6 +14,8 @@
   "dependencies": {
     "@club/sdk": "*",
     "@club/shared": "*",
+    "@floating-ui/react-dom": "^2.1.9",
+    "@floating-ui/react-dom-interactions": "^0.13.3",
     "@js-preview/docx": "^1.6.4",
     "@js-preview/excel": "^1.7.14",
     "@js-preview/pdf": "^2.0.10",

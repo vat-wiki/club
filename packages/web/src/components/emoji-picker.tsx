@@ -6,9 +6,8 @@ import {
   flip,
   offset,
   shift,
-  useFloating,
 } from "@floating-ui/react-dom";
-import { ClickAwayListener } from "@floating-ui/react-dom-interactions";
+import { useDismiss, useFloating, useInteractions } from "@floating-ui/react-dom-interactions";
 import { Smile } from "lucide-react";
 import * as React from "react";
 
@@ -71,7 +70,12 @@ export function EmojiPicker({
     return map;
   }, [reactions]);
 
-  const { refs, floatingStyles, context } = useFloating({
+  const arrowRef = React.useRef<HTMLDivElement>(null);
+
+  // v2 floating-ui API: useFloating from react-dom-interactions provides
+  // open/onOpenChange support, context for useDismiss, refs, and top-level
+  // reference()/floating() setter functions.
+  const { context, x, y, strategy, reference, floating } = useFloating({
     open,
     onOpenChange: setOpen,
     placement: "top-start",
@@ -84,7 +88,28 @@ export function EmojiPicker({
     whileElementsMounted: autoUpdate,
   });
 
-  const arrowRef = React.useRef<HTMLDivElement>(null);
+  // Bridge floating-ui's generic setter functions to element-specific refs.
+  const triggerRef = React.useCallback(
+    (node: HTMLDivElement | null) => reference(node as unknown as HTMLElement),
+    [reference],
+  );
+  const panelRef = React.useCallback(
+    (node: HTMLDivElement | null) => floating(node),
+    [floating],
+  );
+
+  // Build floating styles from positioning values (v2 API doesn't provide
+  // floatingStyles directly).
+  const floatingStyles: React.CSSProperties = {
+    position: strategy,
+    top: y ?? 0,
+    left: x ?? 0,
+    transform: strategy === "fixed" ? `translate(-50%, -50%)` : undefined,
+  };
+
+  // Use the interactions API for click-away dismiss (replaces ClickAwayListener).
+  const dismiss = useDismiss(context, { outsidePress: true });
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
 
   // Hover open after a short delay so it's not annoying on scroll; instant
   // close on leave. We use the trigger's mouseEnter/mouseLeave so the panel
@@ -117,90 +142,90 @@ export function EmojiPicker({
   React.useEffect(() => () => { if (openTimerRef.current) clearTimeout(openTimerRef.current); }, []);
 
   return (
-    <ClickAwayListener onClickAway={close}>
-      <>
-        {/* Trigger — invisible by default; becomes visible on open-pending (a
-            150ms pre-light) so the hover affordance feels immediate. */}
-        <div
-          ref={refs.setReference}
-          onMouseEnter={scheduleOpen}
-          onMouseLeave={cancelOpen}
-          className="group/msg relative"
+    <>
+      {/* Trigger — invisible by default; becomes visible on open-pending (a
+          150ms pre-light) so the hover affordance feels immediate. */}
+      <div
+        ref={triggerRef}
+        onMouseEnter={scheduleOpen}
+        onMouseLeave={cancelOpen}
+        {...getReferenceProps()}
+        className="group/msg relative"
+      >
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          data-testid="react-trigger"
+          // The smiley only appears on hover (and when open) so it never
+          // competes with the message content.
+          className="inline-flex items-center justify-center rounded-md px-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100"
         >
+          {children ?? <Smile className="h-3.5 w-3.5 text-muted-foreground/70" />}
+        </span>
+        {/* Fallback: if the panel is open, keep the trigger visible so it can
+            still be hovered as part of the open region. */}
+        {openPending && (
           <span
-            role="button"
-            tabIndex={0}
-            aria-label={ariaLabel}
-            aria-expanded={open}
-            data-testid="react-trigger"
-            // The smiley only appears on hover (and when open) so it never
-            // competes with the message content.
-            className="inline-flex items-center justify-center rounded-md px-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100"
+            className="pointer-events-none absolute top-0 left-0 inline-flex items-center justify-center rounded-md px-0.5 opacity-100"
+            aria-hidden
           >
             {children ?? <Smile className="h-3.5 w-3.5 text-muted-foreground/70" />}
           </span>
-          {/* Fallback: if the panel is open, keep the trigger visible so it can
-              still be hovered as part of the open region. */}
-          {openPending && (
-            <span
-              className="pointer-events-none absolute top-0 left-0 inline-flex items-center justify-center rounded-md px-0.5 opacity-100"
-              aria-hidden
-            >
-              {children ?? <Smile className="h-3.5 w-3.5 text-muted-foreground/70" />}
-            </span>
-          )}
-        </div>
-
-        {open && (
-          <div
-            ref={refs.setFloating}
-            style={floatingStyles}
-            // The floating element is also part of the hover region: hovering
-            // the panel itself keeps it open.
-            onMouseEnter={scheduleOpen}
-            onMouseLeave={close}
-            role="toolbar"
-            aria-label={ariaLabel}
-            data-testid="emoji-picker"
-            className={cn(
-              "z-50 flex w-auto overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-pop)]",
-            )}
-          >
-            {REACTION_EMOJIS.map((emoji) => {
-              const already = reactionMap[emoji] ?? 0;
-              return (
-                <button
-                  key={emoji}
-                  type="button"
-                  aria-label={`${emoji}（${t("msg.react")}）${already > 0 ? `（${already}）` : ""}`}
-                  data-testid={`react-emoji-${emoji}`}
-                  className={cn(
-                    "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-lg transition-colors",
-                    already > 0
-                      ? "bg-accent font-bold"
-                      : "hover:bg-accent active:bg-accent/80",
-                  )}
-                  onClick={() => handlePick(emoji)}
-                >
-                  {emoji}
-                </button>
-              );
-            })}
-            {/* Floating-ui arrow for depth cue; sits on the panel's border side
-                facing the trigger. */}
-            <div
-              ref={arrowRef}
-              className="z-[-1] h-2 w-2 rotate-45 bg-card transition-transform duration-200 ease-out"
-              style={{
-                transformOrigin: "0 0",
-                ...(context.placement?.startsWith("top")
-                  ? { transform: "translateY(8px)", borderTop: "1px solid var(--border)" }
-                  : { transform: "translateY(-8px)", borderBottom: "1px solid var(--border)" }),
-              }}
-            />
-          </div>
         )}
-      </>
-    </ClickAwayListener>
+      </div>
+
+      {open && (
+        <div
+          ref={panelRef}
+          style={floatingStyles}
+          // The floating element is also part of the hover region: hovering
+          // the panel itself keeps it open.
+          onMouseEnter={scheduleOpen}
+          onMouseLeave={close}
+          role="toolbar"
+          aria-label={ariaLabel}
+          data-testid="emoji-picker"
+          {...getFloatingProps()}
+          className={cn(
+            "z-50 flex w-auto overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-pop)]",
+          )}
+        >
+          {REACTION_EMOJIS.map((emoji) => {
+            const already = reactionMap[emoji] ?? 0;
+            return (
+              <button
+                key={emoji}
+                type="button"
+                aria-label={`${emoji}（${t("msg.react")}）${already > 0 ? `（${already}）` : ""}`}
+                data-testid={`react-emoji-${emoji}`}
+                className={cn(
+                  "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-lg transition-colors",
+                  already > 0
+                    ? "bg-accent font-bold"
+                    : "hover:bg-accent active:bg-accent/80",
+                )}
+                onClick={() => handlePick(emoji)}
+              >
+                {emoji}
+              </button>
+            );
+          })}
+          {/* Floating-ui arrow for depth cue; sits on the panel's border side
+              facing the trigger. */}
+          <div
+            ref={arrowRef}
+            className="z-[-1] h-2 w-2 rotate-45 bg-card transition-transform duration-200 ease-out"
+            style={{
+              transformOrigin: "0 0",
+              ...(context.placement?.startsWith("top")
+                ? { transform: "translateY(8px)", borderTop: "1px solid var(--border)" }
+                : { transform: "translateY(-8px)", borderBottom: "1px solid var(--border)" }),
+            }}
+          />
+        </div>
+      )}
+    </>
   );
 }

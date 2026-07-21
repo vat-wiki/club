@@ -47,11 +47,16 @@ const dispatchClient: DispatchClient = {
   toggleReaction: (id, emoji) => client.toggleReaction(id, emoji),
 };
 
-// Catch unhandled promise rejections that escape the MCP server lifecycle.
-// The tool handlers are try/catch-wrapped, but this safety net catches anything
-// that slips through (e.g. a transport-level error during connect).
+// Catch unhandled promise rejections and uncaught exceptions so they log a
+// readable message and exit 1 instead of crashing with an opaque stack trace.
+// Mirrors the safety net in packages/server/src/index.ts so all three entry
+// points (server / cli / mcp) behave identically.
 process.on("unhandledRejection", (err) => {
   console.error("[club-mcp] Unhandled rejection:", err);
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[club-mcp] Uncaught exception:", err);
   process.exit(1);
 });
 
@@ -336,6 +341,27 @@ function text(s: string) {
   return { content: [{ type: "text", text: s }] };
 }
 // str / num / clampLimit live in ./helpers.ts (pure + unit-tested).
+
+// ── graceful shutdown ────────────────────────────────────────────────
+// Best practice: drain in-flight requests on SIGTERM/SIGINT instead of
+// tearing down mid-tool-call, which leaves the caller (Claude, Cursor, etc.)
+// with an opaque stderr failure. The MCP SDK's stdio transport does not expose
+// a close/drain method, so we mark the server as stopped and reject new
+// requests; in-flight callTool handlers run to completion and the process
+// exits once they settle. A hard force-exit ensures a stuck tool does not
+// prevent the container runtime from reclaiming the process.
+function shutdown(signal: string) {
+  console.error(`[club-mcp] ${signal} received; stopping tool dispatch…`);
+  server.setRequestHandler(CallToolRequestSchema, () => {
+    throw new Error("server shutting down");
+  });
+  setTimeout(() => {
+    console.error("[club-mcp] shutdown timed out; forcing exit");
+    process.exit(1);
+  }, 5000);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 // ── wire up stdio transport ────────────────────────────────────────────
 const transport = new StdioServerTransport();

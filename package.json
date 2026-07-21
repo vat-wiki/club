@@ -28,8 +28,7 @@
   },
   "lint-staged": {
     "packages/**/*.{ts,tsx}": [
-      "npm run lint:fix -- --quiet",
-      "eslint --max-warnings 0"
+      "eslint --max-warnings 0 --fix"
     ]
   },
   "engines": {

@@ -5,8 +5,8 @@ import type { ClubConn } from "@club/sdk";
 import type { MessageAttachment } from "@club/shared";
 
 // Composer input-path coverage that complements composer.test.tsx: paste
-// (mixed text+image, image-only), drop (image, non-image ignored), the
-// MAX_IMAGES_PER_MESSAGE client-side cap, and revokeObjectURL lifecycle on send
+// (mixed text+image, image-only), drop (image, document, non-attachment ignored),
+// the MAX_IMAGES_PER_MESSAGE client-side cap, and revokeObjectURL lifecycle on send
 // + remove. These exercise the onPaste/onDrop/addFiles paths the existing file
 // doesn't reach (it only drives the hidden file input via fireEvent.change).
 
@@ -132,7 +132,37 @@ describe("Composer — drop", () => {
     expect(screen.getByTestId("composer-attachments")).toBeTruthy();
   });
 
-  it("ignores a dropped non-image file (no chip, no upload)", () => {
+  it("accepts a dropped PDF document and uploads it", async () => {
+    uploadFileMock.mockResolvedValue(
+      { id: "d1", url: "/files/d1", mime: "application/pdf", filename: "doc.pdf", size: 1024 },
+    );
+    const { container } = renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
+    const dropZone = container.querySelector(
+      '[class*="focus-within:border-agent"]',
+    ) as HTMLElement;
+    const pdf = new File([new Uint8Array(100)], "doc.pdf", { type: "application/pdf" });
+    fireEvent.drop(dropZone, dropEvent([pdf]));
+    await waitFor(() => expect(uploadFileMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("composer-attachments")).toBeTruthy();
+  });
+
+  it("accepts a dropped DOCX / XLSX / Markdown document and uploads it", async () => {
+    uploadFileMock.mockResolvedValue(
+      { id: "d2", url: "/files/d2", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename: "doc.docx", size: 1024 },
+    );
+    const { container } = renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
+    const dropZone = container.querySelector(
+      '[class*="focus-within:border-agent"]',
+    ) as HTMLElement;
+    const docx = new File([new Uint8Array(100)], "doc.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const xlsx = new File([new Uint8Array(100)], "s.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const md = new File([new Uint8Array(100)], "readme.md", { type: "text/markdown" });
+    fireEvent.drop(dropZone, dropEvent([docx, xlsx, md]));
+    await waitFor(() => expect(uploadFileMock).toHaveBeenCalledTimes(3));
+    expect(screen.getByTestId("composer-attachments")).toBeTruthy();
+  });
+
+  it("ignores a dropped non-attachment file (no chip, no upload)", () => {
     const { container } = renderWithI18n(<Composer onSend={async () => {}} conn={conn} />);
     const dropZone = container.querySelector(
       '[class*="focus-within:border-agent"]',

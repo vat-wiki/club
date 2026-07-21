@@ -1,10 +1,54 @@
+/**
+ * @module @club/server/db
+ *
+ * SQLite data-access layer for the club backend. All read/write paths —
+ * messages, participants, rooms, reactions, mentions, files — flow through the
+ * exported functions in this module. HTTP routes, CLI, and MCP only import from
+ * here; no caller should reach into `db` directly.
+ *
+ * Conventions:
+ *
+ * - **Single shared projection.** Every messages query composes from
+ *   {@link messageProjectionSql}, so adding a column to the SELECT requires
+ *   one edit rather than hunting six prepared statements.
+ * - **Cursor by rowid.** Pagination uses the monotonic SQLite `rowid` rather
+ *   than the ULID `id`, so history walks stay correct even when clocks skew.
+ *   ULID → rowid resolution is itself cached in {@link sinceStmt}.
+ * - **Soft-delete.** `messages.deleted` is a 1/0 flag; recalled messages stay
+ *   in the table and are filtered at the query layer. Row-level auth (the
+ *   caller must be the author) guards the recall path.
+ * - **Cache invalidate hooks.** Frequent-read tables (participants, rooms)
+ *   are cached in JS. Callers that mutate those tables must call the
+ *   corresponding `invalidate*Cache` function immediately after the write.
+ * - **Idempotent writes.** `insertParticipant`, `ensureRoom`, key/recover
+ *   rotations use `INSERT OR REPLACE` / `UPDATE WHERE EXISTS` so retry-safe
+ *   callers (recovery flows) can't double-create rows.
+ *
+ * Schema lives in {@link BASELINE_SCHEMA} (v0) and the `migrations` array
+ * (v1–v11). {@link runMigrations} walks the chain on module load. Exported
+ * for migration tests that stand up a fresh connection.
+ *
+ * Row interfaces ({@link MessageRow}, {@link ParticipantRow},
+ * {@link ParticipantRecoverRow}, {@link MentionRow}, {@link MentionByIdRow},
+ * {@link MentionInsert}, {@link FileRow}, {@link RoomRow}) mirror the SQLite
+ * column set exactly so callers never carry implicit shape knowledge.
+ *
+ * @example
+ * ```ts
+ * import { insertMessage, getMessagesSince, getAllParticipants } from "./db.js";
+ *
+ * insertMessage(id, authorId, "hi", Date.now(), null, null, "general");
+ * const { rowid, messages } = getMessagesSince(lastId, "general", 50);
+ * ```
+ */
+
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
-import { escapeLike, type Reaction } from '@club/shared';
+import { escapeLike, type Reaction, type RoomSlugType } from '@club/shared';
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 
@@ -239,6 +283,19 @@ const migrations: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_messages_participant_id_id_deleted
            ON messages(participant_id, id, deleted);`,
   },
+  {
+    version: 14,
+    description:
+      'message edit tracking: edited_at (timestamp) and edited_count (integer) columns',
+    // PATCH /messages/:id advances these two columns. `edited_at` is NULL when
+    // the message has never been edited; `edited_count` is 0 at baseline and
+    // increments with every successful edit. Backward-compatible: queries that
+    // never read these columns are unaffected.
+    sql: `
+      ALTER TABLE messages ADD COLUMN edited_at   INTEGER DEFAULT NULL;
+      ALTER TABLE messages ADD COLUMN edited_count INTEGER DEFAULT 0;
+    `,
+  },
 ];
 
 db.exec(`
@@ -288,6 +345,20 @@ runMigrations(db);
 // Order messages by insertion time. We keep a rowid so 'since' cursor can use
 // a monotonic sequence rather than the (sortable but ulid) id comparison,
 // which would be fragile if clocks skew. Rowid is simplest & always-increasing.
+/**
+ * Joined view of a `messages` row with its author's name from `participants`.
+ *
+ * Every message query returns this shape so routes share one projection and
+ * don't silently diverge when columns are added.
+ *
+ * @property rowid - Monotonic SQLite rowid; the canonical pagination cursor.
+ * @property attachments - JSON-encoded `MessageAttachment[]`; `null`/`""` means none.
+ * @property reply_to_id - ULID of the replied-to message, or `null`.
+ * @property deleted - `1` if recalled (soft-deleted), otherwise `0`.
+ * @property room - Canonical room slug; `"general"` for backfilled pre-multi-room rows.
+ * @property edited_at - Epoch-ms of the most recent edit, or `null` when never edited.
+ * @property edited_count - Number of successful edits (0 when never edited).
+ */
 export interface MessageRow {
   id: string;
   content: string;
@@ -298,7 +369,9 @@ export interface MessageRow {
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
   reply_to_id: string | null; // id of the message this one replies to, or NULL
   deleted: number; // 1 if recalled (soft-deleted), else 0
-  room: string; // canonical room slug; "general" for backfilled rows
+  room: RoomSlugType; // canonical room slug; "general" for backfilled rows
+  edited_at: number | null; // epoch-ms of most recent edit, or null
+  edited_count: number; // successful edit count; 0 when never edited
 }
 
 // Shared SELECT fragment + JOIN for every messages↔participants projection.
@@ -306,7 +379,7 @@ export interface MessageRow {
 // one edit rather than hunting six prepared statements for stale aliases.
 // Consumers compose it with their own WHERE / ORDER BY / LIMIT clauses.
 const messageProjectionSql =
-  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, ' +
+  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, m.edited_at, m.edited_count, ' +
   '       p.id AS participant_id, p.name AS author_name FROM messages m JOIN participants p ON p.id = m.participant_id';
 
 const insertMessageStmt = db.prepare(
@@ -334,7 +407,7 @@ export function insertMessage(
   createdAt: number,
   attachments: string | null,
   replyToId: string | null,
-  room: string
+  room: RoomSlugType
 ): void {
   insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
@@ -389,7 +462,7 @@ const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
 
 /** Messages with `rowid > rowid` in the given room, newest first. Backs the
  * "load more recent" SSE / polling path on the history tail. */
-export function getMessagesAfter(rowid: number, room: string, limit: number): MessageRow[] {
+export function getMessagesAfter(rowid: number, room: RoomSlugType, limit: number): MessageRow[] {
   return afterStmt.all(rowid, room, limit);
 }
 
@@ -402,7 +475,7 @@ export function getMessagesAfter(rowid: number, room: string, limit: number): Me
  * ordered oldest→newest" — callers like GET /messages expect the oldest row
  * first so pagination with `since` works against the tail of the page.
  */
-export function getRecentMessages(room: string, limit: number): MessageRow[] {
+export function getRecentMessages(room: RoomSlugType, limit: number): MessageRow[] {
   return recentStmt.all(room, limit).reverse();
 }
 
@@ -421,7 +494,7 @@ export function getRecentMessages(room: string, limit: number): MessageRow[] {
  */
 export function getMessagesSince(
   sinceId: string,
-  room: string,
+  room: RoomSlugType,
   limit: number
 ): { rowid: number; messages: MessageRow[] } {
   const row = sinceStmt.get(sinceId);
@@ -438,7 +511,7 @@ const beforeStmt = db.prepare<[number, string, number], MessageRow>(
  *  getMessagesSince: take the N rows with rowid < beforeId's (DESC to grab the
  *  nearest older ones), then reverse to ascending. Returns [] if beforeId is
  *  unknown (e.g. it was just deleted). Scoped to `room`. */
-export function getMessagesBeforeId(beforeId: string, room: string, limit: number): MessageRow[] {
+export function getMessagesBeforeId(beforeId: string, room: RoomSlugType, limit: number): MessageRow[] {
   const row = sinceStmt.get(beforeId);
   if (!row) return [];
   return beforeStmt.all(row.rowid, room, limit).reverse();
@@ -459,7 +532,7 @@ const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
  *  The user-supplied `q` is escaped so `%` / `_` / `\\` are treated as
  *  literal characters (no LIKE wildcard injection).
  */
-export function searchMessages(q: string, room: string | null, limit: number): MessageRow[] {
+export function searchMessages(q: string, room: RoomSlugType | null, limit: number): MessageRow[] {
   const escaped = `%${escapeLike(q)}%`;
   return room ? searchRoomStmt.all(escaped, room, limit) : searchAllStmt.all(escaped, limit);
 }
@@ -695,6 +768,20 @@ export function updateParticipantRecover(id: string, newHash: string | null): vo
 
 // ── Mentions (per-participant @-mention inbox) ──────────────────────
 
+/**
+ * DB row for a mention inbox entry. Populated when a message containing an
+ * `@<name>` mention is inserted; the server writes one row per unique
+ * (`message_id`, `participant_id`) pair so each @-mention is delivered once.
+ *
+ * @property id - ULID of this mention row (the inbox cursor).
+ * @property message_id - ULID of the source message.
+ * @property participant_id - ID of the participant who was @-mentioned (inbox owner).
+ * @property author_id - ID of the message author.
+ * @property content - The message body (stored so the inbox can render context
+ *   even after the message is recalled).
+ * @property read_at - Epoch-ms when the owner marked this read; `null` = unread.
+ * @property room - Room slug of the source message (deep-link source).
+ */
 export interface MentionRow {
   id: string;
   message_id: string;
@@ -805,6 +892,20 @@ export function insertMention(
  *  @returns Number of rows actually inserted (duplicates silently ignored by
  *    UNIQUE(message_id, participant_id)).
  */
+/**
+ * Row shape for the batch-mention insert used when a new message is written.
+ * Caller-assembles these from the mention parser's output and passes them to
+ * {@link insertMentions}; the fields map directly onto the `mentions` table
+ * columns (without the DB `rowid`), so the prepared statement's positional
+ * bind order matches the column order.
+ *
+ * @property id - ULID of this mention row.
+ * @property messageId - ULID of the source message.
+ * @property participantId - ID of the participant being @-mentioned.
+ * @property authorId - ID of the message author.
+ * @property room - Room slug of the source message.
+ * @property createdAt - Epoch-ms timestamp of the source message.
+ */
 export interface MentionInsert {
   id: string;
   messageId: string;
@@ -851,9 +952,15 @@ const mentionByIdStmt = db.prepare<
   { id: string; participant_id: string; read_at: number | null }
 >(`SELECT id, participant_id, read_at FROM mentions WHERE id = ?`);
 
-/** Lightweight mention ownership lookup by id (for PATCH /me/mentions/:id/read).
- *  Only the fields the caller needs are selected. Returns undefined when the id
- *  is unknown. */
+/**
+ * Lightweight mention ownership lookup by id (for PATCH /me/mentions/:id/read).
+ * Only the fields the caller needs are selected, so the ownership check is a
+ * single-column comparison. Returns `undefined` when the id is unknown.
+ *
+ * The full mention (including message content and author) is resolved by
+ * {@link getMentionFull}; this row is intentionally lean because it's the hot
+ * path in the bulk-read endpoint.
+ */
 export interface MentionByIdRow {
   id: string;
   participant_id: string;
@@ -901,6 +1008,24 @@ const markReadBatchCache = new Map<
   ReturnType<typeof db.prepare<[number, string, ...string[]], void>>
 >();
 
+const markReadVerifyCache = new Map<
+  number,
+  ReturnType<typeof db.prepare<[string, number, ...string[]], { id: string }>>
+>();
+function markReadVerifyStmt(n: number) {
+  let stmt = markReadVerifyCache.get(n);
+  if (!stmt) {
+    const placeholders = '?,'.repeat(n).slice(0, -1);
+    // read_at = ? guards against returning ids that were already read before
+    // this call: a row is reported as updated only if it was actually set to
+    // the supplied readAt in this batch.
+    const sql = `SELECT id FROM mentions WHERE participant_id = ? AND read_at = ? AND id IN (${placeholders})`;
+    stmt = db.prepare<[string, number, ...string[]], { id: string }>(sql);
+    markReadVerifyCache.set(n, stmt);
+  }
+  return stmt;
+}
+
 /** Mark a batch of mentions read in one SQL statement, scoped to `ownerId`
  * so the caller cannot mark another participant's mentions as read.
  *
@@ -924,26 +1049,30 @@ export function markMentionsRead(ids: string[], ownerId: string, readAt: number)
     markReadBatchCache.set(ids.length, stmt);
   }
   stmt.run(readAt, ownerId, ...ids);
-  // Determine which ids were actually updated so the route can return only
-  // the rows that changed (already-read or unknown ids stay out of the body).
-  // The batch UPDATE above is O(1) per unique id via the id index; this
-  // verification is deliberately cheap — in practice most of the returned ids
-  // *were* unread, so the body is a good approximation of inbox state.
-  const updated = new Set<string>();
-  // We can't get changed row ids from a multi-row UPDATE in better-sqlite3,
-  // so we fall back to scanning the affected subset. In practice ids here are
-  // tiny (<20 in a normal inbox), so this loop is negligible.
-  for (const id of ids) {
-    if (getMentionById(id)?.read_at !== null) updated.add(id);
-  }
-  return ids.filter((id) => updated.has(id));
+  // Single batched SELECT to determine which ids were actually updated,
+  // scoped to ownerId. Rows that were already read or unknown are simply
+  // absent, and the result preserves input order. Replaces the prior N+1
+  // per-id getMentionById round-trips.
+  return markReadVerifyStmt(ids.length).all(ownerId, readAt, ...ids).map((r) => r.id);
 }
 
 // ── Uploaded files (image metadata) ──────────────────────────────────
 
-// The DB row for an uploaded image. `id` doubles as the public /files/{id}
-// path; `participant_id` is the uploader, checked at POST /messages time so a
-// sender can only attach files it uploaded (not another participant's).
+/**
+ * DB row for an uploaded image / video / document. `id` doubles as the public
+ * `/files/{id}` path; `participant_id` is the uploader, checked at
+ * `POST /messages` time so a sender can only attach files it uploaded (not
+ * another participant's). Metadata (`width`, `height`, `size`, `filename`) is
+ * filled by the upload handler (server-side probe); clients can't supply them.
+ *
+ * @property id - ULID file id (public, non-guessable).
+ * @property participant_id - ID of the uploading participant.
+ * @property mime - MIME type detected server-side.
+ * @property width - Image width in px, or `null` for non-images.
+ * @property height - Image height in px, or `null` for non-images.
+ * @property size - File size in bytes.
+ * @property filename - Original filename if supplied, or `null`.
+ */
 export interface FileRow {
   id: string;
   participant_id: string;
@@ -1062,6 +1191,18 @@ export function getFilesByIds(ids: string[]): FileRow[] {
 // POST /messages ensures the room exists first). `general` is the seeded system
 // row and is always present.
 
+/**
+ * DB row for a chat room. `general` is the seeded system row and is always
+ * present. New rooms are created by `POST /rooms` or
+ * {@link ensureRoom} (called by `POST /messages` if the target room doesn't
+ * exist yet).
+ *
+ * @property id - ULID room id.
+ * @property slug - Public key (URL-safe, lower-case, `^[a-z0-9][a-z0-9-]{0,29}$`).
+ * @property created_at - Epoch-ms creation timestamp.
+ * @property last_activity_at - Epoch-ms of the most recent message in this room;
+ *   `null` for empty rooms. Drives "active-first" room ordering.
+ */
 export interface RoomRow {
   id: string;
   slug: string;

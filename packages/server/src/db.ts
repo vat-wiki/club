@@ -393,8 +393,15 @@ export function getMessagesAfter(rowid: number, room: string, limit: number): Me
   return afterStmt.all(rowid, room, limit);
 }
 
-/** Most recent messages in the given room, newest first. Backs the initial
- * history fetch when a client opens a room for the first time. */
+/** Most recent messages in the given room, **oldest first** within the page. Backs the initial
+ * history fetch when a client opens a room for the first time.
+ *
+ * Note the ordering: the DB query returns rows newest-first (DESC on rowid),
+ * but the result is reversed so consumers (and the list/search routes) receive
+ * messages in chronological order. The contract is "get the N most recent rows,
+ * ordered oldest→newest" — callers like GET /messages expect the oldest row
+ * first so pagination with `since` works against the tail of the page.
+ */
 export function getRecentMessages(room: string, limit: number): MessageRow[] {
   return recentStmt.all(room, limit).reverse();
 }
@@ -470,13 +477,12 @@ export function getMessageRoom(id: string): string | undefined {
   return messageRoomStmt.get(id)?.room;
 }
 
-// Read-back for the POST /messages hot path: inserts the row, then hands the
-// persisted copy to the route's `toMessage()` converter — the single source of
-// truth for Message denormalization. Without this read-back, the POST handler
-// has to hand-roll the response Message inline, drifting from list/search as
-// new fields land on the API contract.
+// Reuses messageProjectionSql so the persisted-read-back contract stays in
+// sync with list/search — a future column added to the shared projection is
+// automatically present here too, rather than needing a separate edit that
+// could be missed.
 const messageByIdStmt = db.prepare<[string], MessageRow>(
-  `SELECT id, participant_id, author_name, content, created_at, attachments, reply_to_id, deleted, room\n FROM messages WHERE id = ?`
+  `${messageProjectionSql} WHERE m.id = ?`
 );
 /**
  * Read back a single message row by id.

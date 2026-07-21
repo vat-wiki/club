@@ -1008,6 +1008,24 @@ const markReadBatchCache = new Map<
   ReturnType<typeof db.prepare<[number, string, ...string[]], void>>
 >();
 
+const markReadVerifyCache = new Map<
+  number,
+  ReturnType<typeof db.prepare<[string, number, ...string[]], { id: string }>>
+>();
+function markReadVerifyStmt(n: number) {
+  let stmt = markReadVerifyCache.get(n);
+  if (!stmt) {
+    const placeholders = '?,'.repeat(n).slice(0, -1);
+    // read_at = ? guards against returning ids that were already read before
+    // this call: a row is reported as updated only if it was actually set to
+    // the supplied readAt in this batch.
+    const sql = `SELECT id FROM mentions WHERE participant_id = ? AND read_at = ? AND id IN (${placeholders})`;
+    stmt = db.prepare<[string, number, ...string[]], { id: string }>(sql);
+    markReadVerifyCache.set(n, stmt);
+  }
+  return stmt;
+}
+
 /** Mark a batch of mentions read in one SQL statement, scoped to `ownerId`
  * so the caller cannot mark another participant's mentions as read.
  *
@@ -1031,19 +1049,11 @@ export function markMentionsRead(ids: string[], ownerId: string, readAt: number)
     markReadBatchCache.set(ids.length, stmt);
   }
   stmt.run(readAt, ownerId, ...ids);
-  // Determine which ids were actually updated so the route can return only
-  // the rows that changed (already-read or unknown ids stay out of the body).
-  // The batch UPDATE above is O(1) per unique id via the id index; this
-  // verification is deliberately cheap — in practice most of the returned ids
-  // *were* unread, so the body is a good approximation of inbox state.
-  const updated = new Set<string>();
-  // We can't get changed row ids from a multi-row UPDATE in better-sqlite3,
-  // so we fall back to scanning the affected subset. In practice ids here are
-  // tiny (<20 in a normal inbox), so this loop is negligible.
-  for (const id of ids) {
-    if (getMentionById(id)?.read_at !== null) updated.add(id);
-  }
-  return ids.filter((id) => updated.has(id));
+  // Single batched SELECT to determine which ids were actually updated,
+  // scoped to ownerId. Rows that were already read or unknown are simply
+  // absent, and the result preserves input order. Replaces the prior N+1
+  // per-id getMentionById round-trips.
+  return markReadVerifyStmt(ids.length).all(ownerId, readAt, ...ids).map((r) => r.id);
 }
 
 // ── Uploaded files (image metadata) ──────────────────────────────────

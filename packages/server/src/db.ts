@@ -474,10 +474,17 @@ const deleteStmt = db.prepare<[string, string]>(
 );
 
 /** Soft-delete (recall) a message. Only the author may (participant_id check).
- *  Returns whether a row was actually updated — false means not found, not
- *  yours, or already recalled. */
-export function deleteMessage(id: string, participantId: string): boolean {
-  return deleteStmt.run(id, participantId).changes > 0;
+ *  Returns `{ ok: boolean, room: string | undefined }`. The room is returned
+ *  so the caller can scope the SSE `message_deleted` broadcast without a
+ *  second `SELECT room FROM messages` round-trip.
+ *
+ *  @returns ok is false when the row was not found, not owned by the caller,
+ *    or already recalled; room is always populated on success.
+ */
+export function deleteMessage(id: string, participantId: string): { ok: boolean; room: string | undefined } {
+  const room = getMessageRoom(id);
+  const ok = deleteStmt.run(id, participantId).changes > 0;
+  return { ok, room };
 }
 
 const removeReactionStmt = db.prepare<[string, string, string]>(
@@ -547,15 +554,21 @@ export function getReactionsForMessages(messageIds: string[]): Map<string, React
 }
 
 /** Toggle a reaction (remove if present, add if absent). Returns the refreshed
- *  aggregate so the caller can broadcast it. */
+ *  aggregate along with the message's room, so the caller can scope the SSE
+ *  `message_reaction` broadcast without a second `SELECT room FROM messages`
+ *  round-trip on the hot path.
+ *
+ *  @returns `{ reactions, room }` — room is always populated for a known id.
+ */
 export function toggleReaction(
   messageId: string,
   participantId: string,
   emoji: string
-): Reaction[] {
+): { reactions: Reaction[]; room: string | undefined } {
+  const room = getMessageRoom(messageId);
   const removed = removeReactionStmt.run(messageId, participantId, emoji).changes > 0;
   if (!removed) addReactionStmt.run(messageId, participantId, emoji);
-  return getReactionsForMessage(messageId);
+  return { reactions: getReactionsForMessage(messageId), room };
 }
 
 export interface ParticipantRow {

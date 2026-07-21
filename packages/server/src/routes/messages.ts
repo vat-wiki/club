@@ -352,10 +352,9 @@ messages.delete("/:id", writeGuard, (c) => {
   const id = c.req.param("id");
   const bad = requireValidId(c, id, "message id");
   if (bad) return bad.r;
-  const ok = deleteMessage(id, me.id);
+  const { ok, room } = deleteMessage(id, me.id);
   if (!ok) return jsonErr(c, "not found", 404);
-  const room = getMessageRoom(id) ?? DEFAULT_ROOM;
-  broadcastDeleted({ id, room });
+  broadcastDeleted({ id, room: room ?? DEFAULT_ROOM });
   return c.body(null, 204);
 });
 
@@ -386,9 +385,8 @@ messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   }
   const trimmed = emoji.trim();
   if (!trimmed) return jsonErr(c, "bad emoji");
-  const reactions = toggleReaction(id, me.id, trimmed);
-  const room = getMessageRoom(id) ?? DEFAULT_ROOM;
-  broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room } satisfies MessageReactionEvent);
+  const { reactions, room } = toggleReaction(id, me.id, trimmed);
+  broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room: room ?? DEFAULT_ROOM } satisfies MessageReactionEvent);
   return c.body(null, 204);
 });
 

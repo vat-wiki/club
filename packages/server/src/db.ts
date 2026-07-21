@@ -283,6 +283,19 @@ const migrations: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_messages_participant_id_id_deleted
            ON messages(participant_id, id, deleted);`,
   },
+  {
+    version: 14,
+    description:
+      'message edit tracking: edited_at (timestamp) and edited_count (integer) columns',
+    // PATCH /messages/:id advances these two columns. `edited_at` is NULL when
+    // the message has never been edited; `edited_count` is 0 at baseline and
+    // increments with every successful edit. Backward-compatible: queries that
+    // never read these columns are unaffected.
+    sql: `
+      ALTER TABLE messages ADD COLUMN edited_at   INTEGER DEFAULT NULL;
+      ALTER TABLE messages ADD COLUMN edited_count INTEGER DEFAULT 0;
+    `,
+  },
 ];
 
 db.exec(`
@@ -343,6 +356,8 @@ runMigrations(db);
  * @property reply_to_id - ULID of the replied-to message, or `null`.
  * @property deleted - `1` if recalled (soft-deleted), otherwise `0`.
  * @property room - Canonical room slug; `"general"` for backfilled pre-multi-room rows.
+ * @property edited_at - Epoch-ms of the most recent edit, or `null` when never edited.
+ * @property edited_count - Number of successful edits (0 when never edited).
  */
 export interface MessageRow {
   id: string;
@@ -355,6 +370,8 @@ export interface MessageRow {
   reply_to_id: string | null; // id of the message this one replies to, or NULL
   deleted: number; // 1 if recalled (soft-deleted), else 0
   room: RoomSlugType; // canonical room slug; "general" for backfilled rows
+  edited_at: number | null; // epoch-ms of most recent edit, or null
+  edited_count: number; // successful edit count; 0 when never edited
 }
 
 // Shared SELECT fragment + JOIN for every messages↔participants projection.
@@ -362,7 +379,7 @@ export interface MessageRow {
 // one edit rather than hunting six prepared statements for stale aliases.
 // Consumers compose it with their own WHERE / ORDER BY / LIMIT clauses.
 const messageProjectionSql =
-  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, ' +
+  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, m.edited_at, m.edited_count, ' +
   '       p.id AS participant_id, p.name AS author_name FROM messages m JOIN participants p ON p.id = m.participant_id';
 
 const insertMessageStmt = db.prepare(

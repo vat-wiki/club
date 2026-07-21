@@ -11,6 +11,7 @@ import { Command } from "commander";
 
 import { withCatchExit } from "../catch-exit.js";
 import { saveConfig } from "../config.js";
+import { stripTrailingSlash } from "../url.js";
 
 /**
  * Shape of the current configuration on disk.
@@ -55,7 +56,7 @@ export function makeLoginCommand(): Command {
     .option("-s, --server <url>", "server base url", "http://localhost:6200")
     .action(
       withCatchExit((key: string, opts: { server: string }) => {
-        const server = opts.server.replace(/\/$/, "");
+        const server = stripTrailingSlash(opts.server);
         return runLogin({ key, server }, { saveConfig });
       }),
     );

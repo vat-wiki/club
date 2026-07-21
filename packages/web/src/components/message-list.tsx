@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/avatar";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { FileCard } from "@/components/file-card";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { fmtDay, fmtTime, fmtTimePrecise, mentionsSelf,renderContent,sanitizeDisplayString } from "@/lib/format";
@@ -160,10 +161,6 @@ type MessageListProps = {
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
-// separators are first-class items so the virtualizer spaces them independently
-// of message rows (the row no longer renders its own DayRule).
-// The fixed emoji palette offered on each message (keeps the UI simple; the
-// contract allows any short string).
 const REACTION_EMOJIS = ["👍", "❤️", "😂"] as const;
 
 type Item =
@@ -223,6 +220,7 @@ function MessageRow({
   // the exact time without hovering. The inline header timestamp stays HH:MM.
   const preciseTime = fmtTimePrecise(m.createdAt, locale);
   const sentAtLabel = t("msg.sentAt", { time: preciseTime });
+  const showPicker = !grouped && !m.deleted && !!onReact;
   // Bubble + alignment scheme (the standard chat-app mental model):
   //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
   //   - others: left-aligned, body in a raised-surface bubble (bg-card)
@@ -259,6 +257,9 @@ function MessageRow({
               (opacity-0) but kept for column alignment — the header above already
               names the author, so a repeat would be noise. */}
           <Avatar name={m.authorName} className={cn("h-6 w-6 text-[10px]", grouped && "opacity-0")} />
+          {showPicker && (
+            <EmojiPicker messageId={m.id} reactions={m.reactions} onReact={onReact} />
+          )}
         </div>
         <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
           {/* Header (author + HH:MM) only on the FIRST row of a run. */}

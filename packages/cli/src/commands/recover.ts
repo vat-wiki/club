@@ -14,6 +14,7 @@ import { ClubClient } from "@club/sdk";
 
 import { withCatchExit } from "../catch-exit.js";
 import { loadConfig, saveConfig } from "../config.js";
+import { stripTrailingSlash } from "../url.js";
 
 /** Persisted config shape; matches what saveConfig expects. */
 export interface RecoverConfig {
@@ -81,7 +82,7 @@ export function makeRecoverCommand(): Command {
     .action(
       withCatchExit(async (name: string, code: string, opts: { server: string }) => {
         const existing = loadConfig();
-        const server = (existing?.server ?? opts.server).replace(/\/$/, "");
+        const server = stripTrailingSlash(existing?.server ?? opts.server);
         const client = new ClubClient({ server });
         return runRecover(
           { name, recoverCode: code, server },

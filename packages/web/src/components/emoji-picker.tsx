@@ -1,18 +1,16 @@
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ClickAwayListener } from "@floating-ui/react-dom-interactions";
 import {
   arrow,
   autoUpdate,
   flip,
-  floating,
   offset,
   shift,
   useFloating,
 } from "@floating-ui/react-dom";
+import { ClickAwayListener } from "@floating-ui/react-dom-interactions";
 import { Smile } from "lucide-react";
 import * as React from "react";
-
-import { useT } from "@/lib/i18n";
 
 /** Quick-pick emoji palette offered on each message. Kept small and fixed so
  * the picker is a snappy hover panel, not a scrollable catalogue. */

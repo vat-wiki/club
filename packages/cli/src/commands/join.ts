@@ -23,6 +23,7 @@ import { ParticipantNameRegex } from "@club/shared";
 
 import { withCatchExit } from "../catch-exit.js";
 import { saveConfig } from "../config.js";
+import { stripTrailingSlash } from "../url.js";
 
 export interface JoinCreateResult {
   key: string;
@@ -68,7 +69,7 @@ export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinRes
         + ` no leading or trailing whitespace`,
     );
   }
-  const server = input.server.replace(/\/$/, "");
+  const server = stripTrailingSlash(input.server);
   let res: JoinCreateResult;
   try {
     res = await deps.createParticipant({ name: input.name });
@@ -102,7 +103,7 @@ export function makeJoinCommand(): Command {
     .argument("<name>", "your callsign (1-40 chars)")
     .option("-s, --server <url>", "server base url", "http://localhost:6200")
     .action(withCatchExit(async (name: string, opts: { server: string }) => {
-      const server = opts.server.replace(/\/$/, "");
+      const server = stripTrailingSlash(opts.server);
       const client = new ClubClient({ server });
       const { participant, recoverCode } = await runJoin(
         { name, server },

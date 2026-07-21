@@ -37,7 +37,7 @@ export interface Message {
   // Canonical room slug this message belongs to. Every message lives in exactly
   // one room; the default/system room is "general". Old clients/requests that
   // omit room land here, so the field is always present on server-sourced rows.
-  room: string;
+  room: RoomSlugType;
   // Images attached to the message; absent/empty = a plain text message
   // (backward compatible — old clients/rows simply have none). MVP scope: an
   // image is a *shareable/displayable* carrier, symmetric for humans and agents
@@ -149,7 +149,7 @@ export interface Mention {
   readAt: number | null;
   // The room the mentioning message was posted in, so a cross-room @mention can
   // deep-link the recipient straight to that room + message. Always present.
-  room: string;
+  room: RoomSlugType;
 }
 
 // ── API request/response shapes ─────────────────────────────────────
@@ -246,7 +246,7 @@ export interface RoomScoped {
  */
 export interface Room {
   id: string;
-  slug: string;
+  slug: RoomSlugType;
   createdAt: number;
   lastActivityAt: number | null;
 }
@@ -389,7 +389,7 @@ export interface ApiError {
 export interface AgentThinkingEvent {
   participantId: string;
   name: string;
-  room?: string;
+  room?: RoomSlugType;
 }
 
 /**
@@ -402,7 +402,7 @@ export interface AgentThinkingEvent {
  */
 export interface AgentIdleEvent {
   participantId: string;
-  room?: string;
+  room?: RoomSlugType;
 }
 
 /**
@@ -429,7 +429,7 @@ export interface PresenceEvent {
  */
 export interface MessageDeletedEvent {
   id: string;
-  room: string;
+  room: RoomSlugType;
 }
 
 /** One emoji reaction aggregate on a message */
@@ -448,7 +448,7 @@ export interface Reaction {
 export interface MessageReactionEvent {
   messageId: string;
   reactions: Reaction[];
-  room: string;
+  room: RoomSlugType;
 }
 
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its

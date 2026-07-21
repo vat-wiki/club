@@ -143,7 +143,8 @@ files.post("/", requireAuth, async (c) => {
   let body: Record<string, unknown>;
   try {
     body = await c.req.parseBody();
-  } catch {
+  } catch (err) {
+    console.error("[club server] multipart parseBody failed:", err);
     return jsonErr(c, "expected multipart form data");
   }
 
@@ -220,9 +221,10 @@ files.post("/", requireAuth, async (c) => {
       const dim = imageSize(buf);
       width = typeof dim.width === "number" ? dim.width : undefined;
       height = typeof dim.height === "number" ? dim.height : undefined;
-    } catch {
+    } catch (err) {
       // Malformed image header — reject rather than store something clients
-      // can't render.
+      // can't render. Log for operator visibility.
+      console.error("[club server] could not read image dimensions:", err);
       return jsonErr(c, "could not read image dimensions", 422);
     }
   }

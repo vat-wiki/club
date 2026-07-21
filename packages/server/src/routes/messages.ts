@@ -196,9 +196,10 @@ messages.post("/", requireJson, writeGuard, async (c) => {
         size: r.size,
         ...(r.filename ? { filename: r.filename } : {}),
       }));
-    } catch {
+    } catch (err) {
       // DB errors and input violations (e.g. too many ids) must not leak
-      // internal diagnostics to the caller.
+      // internal diagnostics to the caller. Log for operator visibility.
+      console.error("[club server] message attachments unavailable:", err);
       return jsonErr(c, "attachments unavailable", 500);
     }
   }

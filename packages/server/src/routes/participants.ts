@@ -5,16 +5,20 @@ import { ulid } from "ulid";
 
 import {
   CreateParticipantRequest,
+  DeleteAccountRequest,
   type Participant,
   RecoverParticipantRequest,
+  RotateKeyRequest,
 } from "@club/shared";
 
 import { hashKey } from "../crypto.js";
 import {
+  getParticipantByKeyHash,
   getParticipantByName,
   getParticipantForRecover,
   insertParticipant,
   invalidateParticipantNamesCache,
+  softDeleteParticipantMessages,
   updateParticipantKey,
   updateParticipantRecover,
 } from "../db.js";
@@ -163,3 +167,66 @@ participants.post(
     return c.json(result, 200);
   },
 );
+
+// POST /participants/:id/rotate-key { password } -> { key, recoverCode }
+// Rotates the authenticated participant's key AND reissues a fresh one-time
+// recovery code. The caller must present the current key in the Authorization
+// header AND send it again as `password` in the body, so the browser cannot
+// be silently used to rotate a key without the logged-in session's active key.
+// Plaintext key + recovery code returned exactly once; never persisted.
+participants.post("/:id/rotate-key", requireJson, async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  if (id !== me.id) return jsonErr(c, "not found", 404);
+  const parsed = await parseJsonBody(c, RotateKeyRequest, "bad request");
+  if (!parsed.ok) return parsed.r;
+  // Body password must match the key the client authenticated with — constant
+  // time so the wrong-password path leaks no information about account
+  // existence.
+  const presentedHash = hashKey(parsed.data.password);
+  const currentRow = getParticipantByKeyHash(presentedHash);
+  if (currentRow?.id !== me.id) {
+    return jsonErr(c, "invalid password", 403);
+  }
+  const newPlainKey = newKey();
+  const newCode = newRecoverCode();
+  updateParticipantKey(me.id, hashKey(newPlainKey));
+  updateParticipantRecover(me.id, hashKey(newCode));
+  invalidateParticipantNamesCache();
+  invalidateParticipantNameMap();
+  return c.json({ key: newPlainKey, recoverCode: newCode }, 200);
+});
+
+// DELETE /participants/:id { password, recoverCode } -> 204
+// Permanently deletes the authenticated participant. Requires the current key
+// (Authorization header) PLUS the current recovery code in the body, giving a
+// high-stakes operation a second factor. Soft-deletes the participant's key
+// hash and recovery hash, and soft-deletes all authored messages so history
+// stays intact.
+participants.delete("/:id", requireJson, async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  if (id !== me.id) return jsonErr(c, "not found", 404);
+  const parsed = await parseJsonBody(c, DeleteAccountRequest, "bad request");
+  if (!parsed.ok) return parsed.r;
+  // First factor: password must match the authenticated key.
+  const keyOk = (() => {
+    const currentRow = getParticipantByKeyHash(hashKey(parsed.data.password));
+    return currentRow?.id === me.id;
+  })();
+  if (!keyOk) return jsonErr(c, "invalid password", 403);
+  // Second factor: recovery code must match the current recover_hash.
+  const row = getParticipantForRecover(me.name);
+  if (!row?.recover_hash) return jsonErr(c, "invalid recovery code", 403);
+  if (!safeEqualHex(hashKey(parsed.data.recoverCode), row.recover_hash)) {
+    return jsonErr(c, "invalid recovery code", 403);
+  }
+  // Revoke both credentials.
+  updateParticipantKey(me.id, "");
+  updateParticipantRecover(me.id, null);
+  // Soft-delete authored content so the participant leaves no traces.
+  softDeleteParticipantMessages(me.id);
+  invalidateParticipantNamesCache();
+  invalidateParticipantNameMap();
+  return c.body(null, 204);
+});

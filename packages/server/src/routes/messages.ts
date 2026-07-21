@@ -5,6 +5,7 @@ import { ulid } from "ulid";
 import {
   CreateMessageRequest,
   DEFAULT_ROOM,
+  EditMessageRequest,
   isValidId,
   type Message,
   type MessageAttachment,
@@ -21,7 +22,8 @@ import {
   ensureRoom,
   getAllParticipantNames,
   getFilesByIds,
- getMessageRoom,
+  getMessageById,
+  getMessageRoom,
   getMessagesBeforeId,
   getMessagesSince,
   getReactionsForMessage,
@@ -33,6 +35,7 @@ import {
   type MessageRow,
   searchMessages,
   toggleReaction,
+  updateMessage,
 } from "../db.js";
 import { getRoomQuery, jsonErr, parseJsonBody, parseLimit, requireValidId, requireValidRoomSlug } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
@@ -361,6 +364,35 @@ messages.delete("/:id", writeGuard, (c) => {
   if (!ok) return jsonErr(c, "not found", 404);
   broadcastDeleted({ id, room: room ?? DEFAULT_ROOM });
   return c.body(null, 204);
+});
+
+// PATCH /messages/:id { content } -> Message (edit).
+// Only the author may edit (enforced in updateMessage). Returns the updated
+// message on success; returns 404 when the message is unknown, not owned by the
+// caller, or already recalled. Content is re-sanitized at edit time so a
+// previously-sanitized message can't later be edited into something that
+// violates the control-character policy.
+messages.patch("/:id", requireJson, writeGuard, async (c) => {
+  const me = c.get("participant");
+  const id = c.req.param("id");
+  const bad = requireValidId(c, id, "message id");
+  if (bad) return bad.r;
+  const parsed = await parseJsonBody(c, EditMessageRequest, "bad content");
+  if (!parsed.ok) return parsed.r;
+  const { content } = parsed.data;
+  const cleanContent = sanitizeContent(content);
+  if (!cleanContent.trim()) {
+    return jsonErr(c, "content required");
+  }
+  const { ok } = updateMessage(id, me.id, cleanContent);
+  if (!ok) return jsonErr(c, "not found", 404);
+  const row = getMessageById(id);
+  if (!row) return jsonErr(c, "not found", 500);
+  const msg: Message = toMessage(row);
+  // SSE stream carries no native `message_edited` event yet; clients will
+  // pick up the change on their next history poll or when the author's SSE
+  // page lands and refreshes the room history. TODO: broadcast edited event.
+  return c.json(msg, 200);
 });
 
 // POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts

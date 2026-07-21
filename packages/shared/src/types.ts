@@ -293,6 +293,34 @@ export interface RecoverParticipantResponse {
   participant: Participant;
 }
 
+// Rotate an existing participant's key. The caller verifies their identity by
+// presenting the current key (the Authorization header) — the body carries a
+// `password` field that must match the key they authenticated with. On success
+// the old key is invalidated and a fresh key + fresh recovery code are issued
+// (mirrors the recovery flow so the participant is always re-armed).
+/** Request body for POST /participants/:id/rotate-key — rotate credential */
+export const RotateKeyRequest = z.object({
+  password: z.string().min(1),
+});
+export type RotateKeyRequest = z.infer<typeof RotateKeyRequest>;
+
+/** Response from POST /participants/:id/rotate-key */
+export interface RotateKeyResponse {
+  key: string;
+  recoverCode: string;
+}
+
+// Delete an existing participant. Requires the current key (Authorization
+// header) plus the recovery code in the body — two-factor on the high-stakes
+// path. Soft-deletes the participant row, revokes the key, and soft-deletes
+// all authored messages so room history stays intact.
+/** Request body for DELETE /participants/:id — delete account */
+export const DeleteAccountRequest = z.object({
+  password: z.string().min(1),
+  recoverCode: z.string().min(1),
+});
+export type DeleteAccountRequest = z.infer<typeof DeleteAccountRequest>;
+
 // ── Domain constants ─────────────────────────────────────────────────
 // Shared across CLI, SDK, and server so the default/system room slug never
 // drifts between packages. Kept in `types.ts` so it lives next to the room-
@@ -342,9 +370,13 @@ export const CreateMessageRequest = z.object({
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 
+/** Request body for PATCH /messages/:id — edit a message */
+export const EditMessageRequest = z.object({
+  content: z.string().max(MAX_MESSAGE_CONTENT),
+});
+export type EditMessageRequest = z.infer<typeof EditMessageRequest>;
+
 // POST /files (multipart, field "file") returns a single attachment descriptor;
-// the client then references its `id` in a later POST /messages. Structurally a
-// MessageAttachment — declared separately only to name the response shape.
 /** Response from POST /files — a newly uploaded attachment */
 export type UploadFileResponse = MessageAttachment;
 

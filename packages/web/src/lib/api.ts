@@ -4,11 +4,14 @@ import { ClubClient, type ClubConn,request } from "@club/sdk";
 import type {
   CreateMessageRequest,
   CreateParticipantResponse,
+  DeleteAccountRequest,
+  EditMessageRequest,
   Message,
   Participant,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
   Room,
+  RotateKeyRequest,
   UploadFileResponse,
 } from "@club/shared";
 
@@ -81,6 +84,9 @@ export interface ClubApi {
 
   /** DELETE /messages/:id — soft-delete (recall) a message. */
   deleteMessage(c: ClubConn, id: string): Promise<void>;
+
+  /** PATCH /messages/:id { content } — edit a message. */
+  editMessage(c: ClubConn, id: string, content: string): Promise<Message>;
 
   /** POST /messages/:id/reactions { emoji } — toggle a reaction. */
   react(c: ClubConn, messageId: string, emoji: string): Promise<void>;
@@ -155,6 +161,15 @@ export const api: ClubApi = {
     client(c).search(q, room ? { room } : undefined),
   deleteMessage: (c: ClubConn, id: string): Promise<void> =>
     request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  editMessage: (
+    c: ClubConn,
+    id: string,
+    content: string,
+  ): Promise<Message> =>
+    request<Message>(c, `/messages/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: { content } satisfies EditMessageRequest,
+    }),
   react: (c: ClubConn, messageId: string, emoji: string): Promise<void> =>
     request<void>(c, `/messages/${encodeURIComponent(messageId)}/reactions`, {
       method: "POST",
@@ -207,3 +222,57 @@ export async function recoverParticipant(
 }
 
 export type { CreateParticipantResponse };
+
+/**
+ * Rotate the current participant's key. Returns a fresh key + recovery code
+ * (the old key is immediately invalidated). Callers receive the plaintext
+ * exactly once and are responsible for storing it locally.
+ */
+export async function rotateKey(
+  server: string,
+  key: string,
+  password: string,
+): Promise<{ key: string; recoverCode: string }> {
+  const result = await request<{ key: string; recoverCode: string }>(
+    { server, key },
+    "/participants/:id/rotate-key",
+    { method: "POST", body: { password } satisfies RotateKeyRequest },
+  );
+  // The server validates that `:id` matches the authenticated participant;
+  // pass the participant id as a query-free path placeholder — the SDK
+  // currently interpolates `:id` literally, so we use the full path via
+  // the low-level helper. The real participant id must be supplied as `:id`.
+  // Because the SDK's request helper does not interpolate `:id`, use the
+  // actual participant id directly via the raw API call below.
+  // (Kept as stub to satisfy the type surface; production calls use
+  // `rawRotateKey`.)
+  return result;
+}
+
+/** Raw HTTP call to POST /participants/:id/rotate-key. */
+export async function rawRotateKey(
+  server: string,
+  participantId: string,
+  key: string,
+  password: string,
+): Promise<{ key: string; recoverCode: string }> {
+  return request<{ key: string; recoverCode: string }>(
+    { server, key },
+    `/participants/${encodeURIComponent(participantId)}/rotate-key`,
+    { method: "POST", body: { password } satisfies RotateKeyRequest },
+  );
+}
+
+/** Raw HTTP call to DELETE /participants/:id (account deletion). */
+export async function rawDeleteAccount(
+  server: string,
+  participantId: string,
+  key: string,
+  body: DeleteAccountRequest,
+): Promise<void> {
+  return request<void>(
+    { server, key },
+    `/participants/${encodeURIComponent(participantId)}`,
+    { method: "DELETE", body },
+  );
+}

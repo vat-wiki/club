@@ -589,6 +589,30 @@ export function deleteMessage(id: string, participantId: string): { ok: boolean;
   return { ok, room };
 }
 
+const updateMessageStmt = db.prepare<[string, number, string, string]>(
+  `UPDATE messages SET content = ?, edited_at = ?, edited_count = edited_count + 1
+   WHERE id = ? AND participant_id = ? AND deleted = 0`
+);
+
+/**
+ * Update a message's content, recording the edit.
+ *
+ * Only the author may edit (`participant_id` check). Returns `{ ok: boolean,
+ * room: string | undefined }` so the caller can scope the SSE fan-out.
+ *
+ * @returns `ok` is false when the row was not found, not owned by the caller,
+ *   or already recalled; `room` is always populated on success.
+ */
+export function updateMessage(
+  id: string,
+  participantId: string,
+  content: string,
+): { ok: boolean; room: string | undefined } {
+  const room = getMessageRoom(id);
+  const ok = updateMessageStmt.run(content, Date.now(), id, participantId).changes > 0;
+  return { ok, room };
+}
+
 const removeReactionStmt = db.prepare<[string, string, string]>(
   `DELETE FROM reactions WHERE message_id = ? AND participant_id = ? AND emoji = ?`
 );
@@ -764,6 +788,27 @@ const updateParticipantRecoverStmt = db.prepare(
  *  or a sha256 hex string to arm a new recovery code. */
 export function updateParticipantRecover(id: string, newHash: string | null): void {
   updateParticipantRecoverStmt.run(newHash, id);
+}
+
+// ── Account deletion ──────────────────────────────────────────────────
+
+/**
+ * Soft-delete every message authored by a participant, plus any mentions
+ * associated with them, so the participant's content vanishes from history
+ * without destroying room integrity.
+ *
+ * @returns the number of messages removed.
+ */
+export function softDeleteParticipantMessages(participantId: string): number {
+  // Remove mentions authored by the participant.
+  db.prepare(`DELETE FROM mentions WHERE author_id = ?`).run(participantId);
+  // Remove reactions from the participant.
+  db.prepare(`DELETE FROM reactions WHERE participant_id = ?`).run(participantId);
+  // Soft-delete messages authored by the participant.
+  const changes = db.prepare(
+    `UPDATE messages SET deleted = 1, content = '' WHERE participant_id = ?`
+  ).run(participantId).changes;
+  return Number(changes);
 }
 
 // ── Mentions (per-participant @-mention inbox) ──────────────────────

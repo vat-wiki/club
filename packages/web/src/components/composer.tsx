@@ -540,6 +540,26 @@ export function Composer({
         edge is already a clear, AA-compliant focus indicator (≥3:1 on the
         adjacent chrome), so a glow would be over-design.
       */}
+      {/* Reply quote bar sits ABOVE the input bar so it spans the full width
+          and isn't horizontally squeezed to the textarea column. */}
+      {replyTo && (
+        <div className="flex items-center gap-2 border-b border-border/60 px-3 py-1.5 text-xs">
+          <span className="min-w-0 truncate text-muted-foreground">
+            {t("msg.replyingTo", { name: replyTo.authorName })}
+            <span className="ml-1 text-foreground/80">
+              {replyTo.content.slice(0, 80) || "…"}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onReplyClear}
+            aria-label={t("msg.reply")}
+            className="ml-auto flex-none rounded p-0.5 text-muted-foreground hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div
         className="relative flex items-end gap-2.5 rounded-md border border-[hsl(240_5%_26%)] bg-card p-0.5 transition-colors duration-150 focus-within:border-agent/50"
         // Drop target for image files. We MUST preventDefault on dragover and
@@ -640,24 +660,6 @@ export function Composer({
         {/* Textarea + chip row share a single flex column so the chips sit
             directly under the text (still inside the mint-bordered bar) while
             attach/send stay pinned left/right as bar legs. */}
-        {replyTo && (
-          <div className="flex items-center gap-2 border-b border-border/60 px-3 py-1.5 text-xs">
-            <span className="min-w-0 truncate text-muted-foreground">
-              {t("msg.replyingTo", { name: replyTo.authorName })}
-              <span className="ml-1 text-foreground/80">
-                {replyTo.content.slice(0, 80) || "…"}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={onReplyClear}
-              aria-label={t("msg.reply")}
-              className="ml-auto flex-none rounded p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              ✕
-            </button>
-          </div>
-        )}
         <div className="flex min-w-0 flex-1 flex-col">
         <Textarea
           ref={ref}

@@ -59,15 +59,19 @@ function previewKind(mime: string, filename?: string): PreviewKind | null {
   }
 }
 
-// A document attachment card: file icon + filename + size + actions. Documents
-// that js-preview can render (pdf/docx/xlsx) get a "preview" button opening a
-// large Dialog; every document can be downloaded.
-//
-// The preview is rendered through the Radix Dialog (not a hand-rolled fixed
-// div) on purpose: the message list virtualizes rows with `transform`, which
-// demotes any descendant `position: fixed` to be relative to that row — so a
-// naive fixed overlay would be trapped in a tiny strip. Radix Dialog portals
-// its content to document.body, escaping the transformed ancestor entirely.
+/**
+ * A document attachment card: file icon + filename + size + actions.
+ *
+ * Documents that `@js-preview` can render (pdf/docx/xlsx) get a "preview"
+ * button opening a large Dialog; every document can be downloaded. The preview
+ * is rendered through the Radix Dialog (not a hand-rolled fixed div) because
+ * the message list virtualizes rows with `transform`, which demotes any
+ * descendant `position: fixed` to be relative to that row — a naive fixed
+ * overlay would be trapped in a tiny strip. Radix Dialog portals its content
+ * to `document.body`, escaping the transformed ancestor entirely.
+ *
+ * @param props.attachment - The message attachment to render.
+ */
 export function FileCard({ attachment }: { attachment: MessageAttachment }) {
   const t = useT();
   const [previewing, setPreviewing] = useState(false);

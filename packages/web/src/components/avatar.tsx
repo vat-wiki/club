@@ -14,10 +14,15 @@ function avatarInitial(name: string): string {
   return (name.trim().charAt(0) || "?").toUpperCase();
 }
 
-// A circular first-letter avatar tinted by name. Pure presentational; pass the
-// size/typography via className (e.g. "h-7 w-7 text-xs"). aria-hidden because
-// the author's name is already rendered as text next to it — the avatar is a
-// decorative个性 cue, not information SRs need.
+/**
+ * Deterministic tint per participant — hash the name to an HSL hue so everyone
+ * gets a stable, distinct avatar color without storing or uploading anything.
+ * S/L are fixed (55% / 45%) so the palette reads as one system rather than
+ * clashing neon shades; the initial is the only personalized bit.
+ *
+ * @param name - Participant name used to derive the color and initial.
+ * @param className - Optional size/typography classes (e.g. "h-7 w-7 text-xs").
+ */
 export function Avatar({ name, className }: { name: string; className?: string }) {
   return (
     <span

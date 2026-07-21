@@ -6,10 +6,20 @@ import { useEffect, useState } from "react";
 import type { ClubConn } from "@club/sdk";
 import type { Message } from "@club/shared";
 
-// Inline message search: debounced query against GET /messages/search, results
-// in a dropdown below the input. Scoped to the current room (the focused
-// channel is what you're reading). Fire-and-forget on error (search is
-// best-effort discovery, not critical). Closes on clear; stays open while typing.
+/**
+ * Inline message search bar. Debounces the query and calls `GET /messages/search`,
+ * rendering results in a dropdown beneath the input.
+ *
+ * - Scoped to `room` when provided; searches the whole workspace when omitted.
+ * - Fire-and-forget: errors are swallowed (search is best-effort discovery,
+ *   not a critical path).
+ * - Stays open while the user types; closes when cleared.
+ *
+ * @param props.conn - Active connection; null disconnects the search input.
+ * @param props.room - Optional room slug to scope the search.
+ *
+ * @module @club/web/components/search-bar
+ */
 export function SearchBar({ conn, room }: { conn: ClubConn | null; room?: string }) {
   const t = useT();
   const [q, setQ] = useState("");

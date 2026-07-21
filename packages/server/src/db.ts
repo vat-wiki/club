@@ -48,7 +48,7 @@ import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
-import { escapeLike, type Reaction } from '@club/shared';
+import { escapeLike, type Reaction, type RoomSlugType } from '@club/shared';
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 
@@ -354,7 +354,7 @@ export interface MessageRow {
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
   reply_to_id: string | null; // id of the message this one replies to, or NULL
   deleted: number; // 1 if recalled (soft-deleted), else 0
-  room: string; // canonical room slug; "general" for backfilled rows
+  room: RoomSlugType; // canonical room slug; "general" for backfilled rows
 }
 
 // Shared SELECT fragment + JOIN for every messages↔participants projection.
@@ -390,7 +390,7 @@ export function insertMessage(
   createdAt: number,
   attachments: string | null,
   replyToId: string | null,
-  room: string
+  room: RoomSlugType
 ): void {
   insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
@@ -445,7 +445,7 @@ const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
 
 /** Messages with `rowid > rowid` in the given room, newest first. Backs the
  * "load more recent" SSE / polling path on the history tail. */
-export function getMessagesAfter(rowid: number, room: string, limit: number): MessageRow[] {
+export function getMessagesAfter(rowid: number, room: RoomSlugType, limit: number): MessageRow[] {
   return afterStmt.all(rowid, room, limit);
 }
 
@@ -458,7 +458,7 @@ export function getMessagesAfter(rowid: number, room: string, limit: number): Me
  * ordered oldest→newest" — callers like GET /messages expect the oldest row
  * first so pagination with `since` works against the tail of the page.
  */
-export function getRecentMessages(room: string, limit: number): MessageRow[] {
+export function getRecentMessages(room: RoomSlugType, limit: number): MessageRow[] {
   return recentStmt.all(room, limit).reverse();
 }
 
@@ -477,7 +477,7 @@ export function getRecentMessages(room: string, limit: number): MessageRow[] {
  */
 export function getMessagesSince(
   sinceId: string,
-  room: string,
+  room: RoomSlugType,
   limit: number
 ): { rowid: number; messages: MessageRow[] } {
   const row = sinceStmt.get(sinceId);
@@ -494,7 +494,7 @@ const beforeStmt = db.prepare<[number, string, number], MessageRow>(
  *  getMessagesSince: take the N rows with rowid < beforeId's (DESC to grab the
  *  nearest older ones), then reverse to ascending. Returns [] if beforeId is
  *  unknown (e.g. it was just deleted). Scoped to `room`. */
-export function getMessagesBeforeId(beforeId: string, room: string, limit: number): MessageRow[] {
+export function getMessagesBeforeId(beforeId: string, room: RoomSlugType, limit: number): MessageRow[] {
   const row = sinceStmt.get(beforeId);
   if (!row) return [];
   return beforeStmt.all(row.rowid, room, limit).reverse();
@@ -515,7 +515,7 @@ const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
  *  The user-supplied `q` is escaped so `%` / `_` / `\\` are treated as
  *  literal characters (no LIKE wildcard injection).
  */
-export function searchMessages(q: string, room: string | null, limit: number): MessageRow[] {
+export function searchMessages(q: string, room: RoomSlugType | null, limit: number): MessageRow[] {
   const escaped = `%${escapeLike(q)}%`;
   return room ? searchRoomStmt.all(escaped, room, limit) : searchAllStmt.all(escaped, limit);
 }

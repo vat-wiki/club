@@ -18,7 +18,7 @@ import {
   updateParticipantKey,
   updateParticipantRecover,
 } from "../db.js";
-import { jsonErr, parseJsonBody } from "../lib.js";
+import { jsonErr, parseJsonBody, withOptionalMiddleware } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { invalidateParticipantNameMap } from "../mention.js";
 import { rateLimit } from "../rate-limit.js";
@@ -73,11 +73,21 @@ function buildParticipant(name: string) {
   insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
-  return { key: plaintext, recoverCode, participant: { id, name, createdAt: Date.now() } as Participant };
+  return {
+    key: plaintext,
+    recoverCode,
+    participant: { id, name, createdAt: Date.now() } as Participant,
+  };
 }
 
-if (isTest) {
-  participants.post("/", requireJson, async (c) => {
+// The authLimiter is wired in for production and swapped for a no-op in test
+// mode. Using withOptionalMiddleware removes the duplicated test-vs-prod route
+// registration that differed only by the presence of the limiter.
+participants.post(
+  "/",
+  requireJson,
+  ...withOptionalMiddleware(authLimiter),
+  async (c) => {
     const parsed = await parseJsonBody(
       c,
       CreateParticipantRequest,
@@ -88,26 +98,8 @@ if (isTest) {
       return jsonErr(c, `name "${parsed.data.name}" is taken`, 409);
     }
     return c.json(buildParticipant(parsed.data.name), 201);
-  });
-} else {
-  participants.post(
-    "/",
-    requireJson,
-    ...(authLimiter ? [authLimiter] : []),
-    async (c) => {
-      const parsed = await parseJsonBody(
-        c,
-        CreateParticipantRequest,
-        "bad request",
-      );
-      if (!parsed.ok) return parsed.r;
-      if (getParticipantByName(parsed.data.name)) {
-        return jsonErr(c, `name "${parsed.data.name}" is taken`, 409);
-      }
-      return c.json(buildParticipant(parsed.data.name), 201);
-    },
-  );
-}
+  },
+);
 
 // POST /participants/recover  { name, recoverCode }
 //   -> { key, recoverCode, participant }   (reissued key + fresh recovery code)
@@ -144,12 +136,22 @@ function recoverParticipant(name: string, recoverCode: string) {
     ok: true as const,
     key: newPlainKey,
     recoverCode: newCode,
-    participant: { id: row.id, name: row.name, createdAt: row.created_at } as Participant,
+    participant: {
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+    } as Participant,
   };
 }
 
-if (isTest) {
-  participants.post("/recover", requireJson, async (c) => {
+// The authLimiter is wired in for production and swapped for a no-op in test
+// mode. Using withOptionalMiddleware removes the duplicated test-vs-prod route
+// registration that differed only by the presence of the limiter.
+participants.post(
+  "/recover",
+  requireJson,
+  ...withOptionalMiddleware(authLimiter),
+  async (c) => {
     const parsed = await parseJsonBody(
       c,
       RecoverParticipantRequest,
@@ -159,22 +161,5 @@ if (isTest) {
     const result = recoverParticipant(parsed.data.name, parsed.data.recoverCode);
     if (!result.ok) return jsonErr(c, "invalid recovery code", 401);
     return c.json(result, 200);
-  });
-} else {
-  participants.post(
-    "/recover",
-    requireJson,
-    ...(authLimiter ? [authLimiter] : []),
-    async (c) => {
-      const parsed = await parseJsonBody(
-        c,
-        RecoverParticipantRequest,
-        "bad request",
-      );
-      if (!parsed.ok) return parsed.r;
-      const result = recoverParticipant(parsed.data.name, parsed.data.recoverCode);
-      if (!result.ok) return jsonErr(c, "invalid recovery code", 401);
-      return c.json(result, 200);
-    },
-  );
-}
+  },
+);

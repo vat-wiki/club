@@ -1,4 +1,4 @@
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { DEFAULT_ROOM, isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
@@ -186,3 +186,39 @@ export function getRoomQuery(
   if (bad) return { ok: false, r: bad.r };
   return { ok: true, room: raw };
 }
+
+/**
+ * Produce an array containing `middleware` when truthy, or a no-op placeholder
+ * when falsy.
+ *
+ * Eliminates the common `if (isTest) { post("/", handler) } else { post("/",
+ * limiter, handler) }` duplication across rate-limited routes (participants,
+ * messages). Callers now register the route exactly once and let this helper
+ * decide whether the guard is wired in.
+ *
+ * The placeholder is a real `MiddlewareHandler` (not a lambda) so Hono's
+ * variadic-middleware overloads stay satisfied whether the limiter is present
+ * or not.
+ *
+ * @returns `[] | [MiddlewareHandler]` to spread into a route's middleware list.
+ *
+ * @example
+ * ```ts
+ * const isTest = process.env.NODE_ENV === "test";
+ * const limiter = isTest ? undefined : rateLimit({ max: 10, windowMs: 60_000 });
+ *
+ * me.post("/", ...(withOptionalMiddleware(limiter)), async (c) => {
+ *   // same handler for dev, test, and production
+ * });
+ * ```
+ */
+export function withOptionalMiddleware(
+  middleware: MiddlewareHandler | undefined,
+): MiddlewareHandler[] {
+  return middleware ? [middleware] : [noopMiddleware];
+}
+
+// Stable singleton so `withOptionalMiddleware(undefined)` and every call-site
+// share the same identity (avoids polluting middleware-stack diffs and keeps
+// the compiled output stable).
+const noopMiddleware: MiddlewareHandler = async (_ctx, next: Next) => next();

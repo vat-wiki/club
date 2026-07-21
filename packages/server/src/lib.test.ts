@@ -10,6 +10,7 @@ import {
   parseJsonBody,
   parseLimit,
   requireValidRoomSlug,
+  withOptionalMiddleware,
 } from "./lib.js";
 
 function buildApp(handler: (c: Context) => Response) {
@@ -514,5 +515,54 @@ describe("parseJsonBody", () => {
     });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid JSON" });
+  });
+});
+
+// ── withOptionalMiddleware ─────────────────────────────────────────
+
+/**
+ * `withOptionalMiddleware` returns `[MiddlewareHandler]` for a real guard
+ * and `[noopMiddleware]` for `undefined`, so rate-limited routes can be
+ * registered once regardless of NODE_ENV. We assert the no-op path
+ * passes requests through unmodified and that the return is always a
+ * non-empty array (so the spread operator `...withOptionalMiddleware(m)`
+ * is always valid).
+ */
+describe("withOptionalMiddleware", () => {
+  it("returns an array of length 1 when middleware is provided", () => {
+    const middleware = async (_c: Context, next: () => Promise<void>) => next();
+    expect(withOptionalMiddleware(middleware)).toHaveLength(1);
+    expect(withOptionalMiddleware(middleware)[0]).toBe(middleware);
+  });
+
+  it("returns an array of length 1 when middleware is undefined (no-op)", () => {
+    const result = withOptionalMiddleware(undefined);
+    expect(result).toHaveLength(1);
+    expect(typeof result[0]).toBe("function");
+  });
+
+  it("always returns a non-empty array (spread-safe)", () => {
+    expect(withOptionalMiddleware(undefined).length).toBeGreaterThan(0);
+    expect(withOptionalMiddleware(async () => {}).length).toBeGreaterThan(0);
+  });
+
+  it("reuses the same no-op singleton across undefined calls", () => {
+    const a = withOptionalMiddleware(undefined);
+    const b = withOptionalMiddleware(undefined);
+    expect(a[0]).toBe(b[0]);
+  });
+
+  it("no-op placeholder passes requests through unchanged in a real Hono app", async () => {
+    const app = new Hono();
+    app.post("/", ...withOptionalMiddleware(undefined), (c) =>
+      c.json({ status: "ok" }),
+    );
+    const res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ x: 1 }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
   });
 });

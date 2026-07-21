@@ -70,39 +70,33 @@ const conn: ClubConn = { server: "https://club.test", key: "test-key" };
 
 const m1 = {
   id: "m1",
-  author: "alice",
+  participantId: "p1",
+  authorName: "alice",
   content: "hi",
   room: "general",
   attachments: [],
-  mentions: [],
-  replies: [],
-  reactions: [],
   createdAt: 1000,
   deleted: false,
 } satisfies Message;
 
 const m2 = {
   id: "m2",
-  author: "bob",
+  participantId: "p2",
+  authorName: "bob",
   content: "hello",
   room: "general",
   attachments: [],
-  mentions: [],
-  replies: [],
-  reactions: [],
   createdAt: 2000,
   deleted: false,
 } satisfies Message;
 
 const mOtherRoom = {
   id: "m3",
-  author: "carol",
+  participantId: "p3",
+  authorName: "carol",
   content: "ping",
   room: "engineering",
   attachments: [],
-  mentions: [],
-  replies: [],
-  reactions: [],
   createdAt: 3000,
   deleted: false,
 } satisfies Message;

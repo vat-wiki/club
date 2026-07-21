@@ -81,7 +81,7 @@ describe("truncateDisplayString", () => {
 
   it("caps at default 10_000", () => {
     const long = "x".repeat(12_000);
-    expect(truncateDisplayString(long).length).toBe(10_001); // 10_000 + "…"
-    expect(truncateDisplayString(long)).toBe("x".repeat(10_000) + "…");
+    expect(truncateDisplayString(long).length).toBe(10_000); // 9_999 + "…"
+    expect(truncateDisplayString(long)).toBe("x".repeat(9_999) + "…");
   });
 });

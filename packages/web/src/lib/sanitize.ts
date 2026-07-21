@@ -53,5 +53,8 @@ export function truncateDisplayString(
 ): string {
   const sanitized = sanitizeDisplayString(s);
   if (sanitized.length <= maxChars) return sanitized;
-  return sanitized.slice(0, maxChars) + ellipsis;
+  // Truncate to maxChars - ellipsis.length so the total output (truncated text
+  // + ellipsis) lands exactly at maxChars. The cap is inclusive of the
+  // ellipsis regardless of how many characters it occupies.
+  return sanitized.slice(0, maxChars - ellipsis.length) + ellipsis;
 }

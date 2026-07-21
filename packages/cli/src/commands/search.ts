@@ -5,8 +5,8 @@
 
 import { Command } from "commander";
 
-import { ClubClient } from "@club/sdk";
-import { DEFAULT_ROOM, type Message } from "@club/shared";
+import { ClubClient, type Message } from "@club/sdk";
+import { clampPositive,DEFAULT_ROOM } from "@club/shared";
 
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
@@ -15,12 +15,19 @@ import { requireConfig } from "../config.js";
 const SEARCH_LIMIT_DEFAULT = 20;
 const SEARCH_LIMIT_MAX = 100;
 
-/** Clamp search limit the same way `read` clamps, but search's own defaults. */
-function parseSearchLimit(raw: string | undefined): number {
+/**
+ * Clamp search result count to [1, 100].
+ *
+ * Reuses shared's `clampPositive` primitive for the [1, 500] floor/ceil so the
+ * floor logic is not duplicated, but enforces search's lower ceiling (100 vs.
+ * 500) since search results are a heavier read path. `undefined`/blank /
+ * non-finite degrade to SEARCH_LIMIT_DEFAULT (20) — same UX as `read`.
+ */
+export function parseSearchLimit(raw: string | undefined): number {
   if (raw === undefined || raw.trim() === "") return SEARCH_LIMIT_DEFAULT;
   const n = Number(raw);
   if (!Number.isFinite(n)) return SEARCH_LIMIT_DEFAULT;
-  return Math.min(Math.max(1, Math.floor(n)), SEARCH_LIMIT_MAX);
+  return Math.min(clampPositive(n), SEARCH_LIMIT_MAX);
 }
 
 /** Dependency shape for `runSearch`, injected by the CLI action or by tests. */
@@ -64,7 +71,9 @@ export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
  *
  * Searches messages by content substring. Returns matching messages from all
  * rooms (or scoped to a specific room with `--room`), newest first. The limit
- * is clamped to [1, 100] with a default of 20.
+ * is clamped to [1, 100] (default 20) via shared's `clampPositive` so the
+ * floor/ceil primitive is not duplicated, while search retains its own lower
+ * ceiling since searches are a heavier read path than reads.
  *
  * @returns A configured `Command` instance to register with the CLI program.
  */
@@ -78,10 +87,8 @@ export function makeSearchCommand(): Command {
       withCatchExit(async (query: string, opts: { room?: string; limit?: string }) => {
         const cfg = requireConfig();
         const client = new ClubClient(cfg);
-        const limit = parseSearchLimit(opts.limit);
-        const room = opts.room ?? undefined;
         return runSearch(
-          { query: query.trim(), room, limit },
+          { query: query.trim(), room: opts.room ?? undefined, limit: parseSearchLimit(opts.limit) },
           { search: (q, o) => client.search(q, o) },
         );
       }),

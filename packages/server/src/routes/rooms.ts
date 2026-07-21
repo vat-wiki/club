@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { CreateRoomRequest, type Room } from '@club/shared';
 
 import { requireAuth } from '../auth.js';
-import { ensureRoom, getRoomBySlug, listRooms, type RoomRow } from '../db.js';
+import { ensureRoom, getRoomBySlug, invalidateRoomsCache, listRooms, type RoomRow } from '../db.js';
 import { jsonErr, parseJsonBody } from '../lib.js';
 import { requireJson } from '../lib/json-content-type.js';
 
@@ -76,7 +76,10 @@ rooms.post('/', requireJson, async (c) => {
     // lastActivityAt is null (per the Room contract). Route through toRoom()
     // instead of re-mapping fields inline — a single conversion site means
     // the API shape stays in sync with the shared Room type as the schema
-    // evolves (matching the module-level guarantee).
+    // evolves (matching the module-level guarantee). Invalidate the rooms list
+    // cache so the next GET /rooms includes this newly-created room rather than
+    // the stale pre-create snapshot.
+    invalidateRoomsCache();
     const newRow: RoomRow = {
       id: ensureResult.id,
       slug: ensureResult.slug,

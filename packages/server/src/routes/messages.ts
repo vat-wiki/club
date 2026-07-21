@@ -5,6 +5,7 @@ import { ulid } from "ulid";
 import {
   CreateMessageRequest,
   DEFAULT_ROOM,
+  isValidId,
   type Message,
   type MessageAttachment,
   type MessageReactionEvent,
@@ -149,10 +150,14 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   // we must reject it. Otherwise an attacker can reply-to-phantom-message
   // (information leak / confusion vector) or reply across rooms, creating
   // cross-room thread injection that confuses UI clients which assume a
-  // thread stays within its room. The format is already validated by the
-  // Zod schema (min 1, max 64), but existence + room-scope must be checked
-  // in the DB because the schema has no cross-row knowledge.
+  // thread stays within its room. The Zod schema only enforces length
+  // (min 1, max 64), so we must also reject malformed ids (spaces, slashes,
+  // control chars) before touching the DB — the same hygiene applied to
+  // since/before query params in GET /messages.
   if (replyToId) {
+    if (!isValidId(replyToId)) {
+      return jsonErr(c, "bad replyToId", 400);
+    }
     const replyRoom = getMessageRoom(replyToId);
     if (!replyRoom) {
       return jsonErr(c, "reply target not found", 404);

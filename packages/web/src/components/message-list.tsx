@@ -1,7 +1,7 @@
 import { Avatar } from "@/components/avatar";
 import { FileCard } from "@/components/file-card";
 import { ImageLightbox } from "@/components/image-lightbox";
-import { fmtDay, fmtTime, fmtTimePrecise, mentionsSelf,renderContent } from "@/lib/format";
+import { fmtDay, fmtTime, fmtTimePrecise, mentionsSelf,renderContent,sanitizeDisplayString } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -236,7 +236,7 @@ function MessageRow({
       {showDay && <DayRule ms={m.createdAt} />}
       <div
         data-message-id={m.id}
-        data-author={m.authorName}
+        data-author={sanitizeDisplayString(m.authorName)}
         // Native title tooltip carries the precise send time; aria-label gives
         // SR users the same info (the inline HH:MM + author are already in the
         // row's text content, so the label focuses on the time precision).
@@ -270,7 +270,7 @@ function MessageRow({
               )}
             >
               <span className="font-mono text-[13px] font-medium text-foreground">
-                {m.authorName}
+                {sanitizeDisplayString(m.authorName)}
               </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
               {onReply && (
@@ -308,7 +308,7 @@ function MessageRow({
               <div className="mb-1 border-l-2 border-border/60 pl-2 text-xs text-muted-foreground">
                 {replyTo ? (
                   <span className="truncate">
-                    <span className="font-medium">{replyTo.authorName}</span>: {replyTo.content.slice(0, 80) || "…"}
+                    <span className="font-medium">{sanitizeDisplayString(replyTo.authorName)}</span>: {sanitizeDisplayString(replyTo.content).slice(0, 80) || "…"}
                   </span>
                 ) : (
                   t("msg.replyNotFound")

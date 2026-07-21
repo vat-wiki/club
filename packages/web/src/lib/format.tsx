@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import type { Message, Participant } from "@club/shared";
 import { mentionMatches } from "@club/shared";
 
+import { sanitizeDisplayString, truncateDisplayString } from "./sanitize.js";
+
 // Default locale keeps the previous zh-CN behavior when a caller doesn't pass
 // one (e.g. unit tests). Components pass the active locale from useI18n() so
 // the rendered time/day follows the user's language choice.
@@ -11,6 +13,11 @@ const DEFAULT_LOCALE = "zh-CN";
 // Regex patterns for inline code and fenced code blocks
 const INLINE_CODE_RE = /`([^`]+)`/g;
 const FENCED_CODE_RE = /```(\w*)\n([\s\S]*?)```/g;
+
+// Re-export the sanitization helpers so components rendering participant
+// names (which never pass through message-content sanitization) can apply
+// the same defense-in-depth.
+export { sanitizeDisplayString, truncateDisplayString } from "./sanitize.js";
 
 export function fmtTime(ms: number, locale: string = DEFAULT_LOCALE): string {
   return new Date(ms).toLocaleTimeString(locale, {
@@ -103,6 +110,12 @@ export function renderContent(
   known: string[],
   selfName?: string,
 ): ReactNode[] {
+  // Defense-in-depth: sanitize before any processing. The server strips
+  // controls on write, but a rogue / direct-written DB row can still emit
+  // control bytes into the SSE stream. React's JSX escaping already prevents
+  // HTML injection, but invisible control bytes and CRLF break layout, SR
+  // output, and the virtualizer's estimateSize calculation.
+  const safeContent = sanitizeDisplayString(truncateDisplayString(content));
   const knownSet = new Set(known.map((n) => n.toLowerCase()));
   const selfLower = selfName?.toLowerCase();
   const out: ReactNode[] = [];
@@ -110,7 +123,7 @@ export function renderContent(
 
   // First, extract fenced code blocks
   const parts: Array<{ type: "text" | "fenced"; content: string }> = [];
-  let remaining = content;
+  let remaining = safeContent;
   let match: RegExpExecArray | null;
 
   FENCED_CODE_RE.lastIndex = 0;

@@ -333,7 +333,7 @@ messages.get("/search", (c) => {
     if (bad) return bad.r;
   }
   const room = rawRoom ?? null;
-  const rows = searchMessages(q, room ?? null, limit);
+  const rows = searchMessages(q, room, limit);
   const messageIds = rows.map((r) => r.id);
   const reactionsMap = getReactionsForMessages(messageIds);
   // `toMessage` uses reactionsMap.has(r.id) to distinguish "batched (maybe

@@ -10,6 +10,87 @@ import { mentionMatches, type Message, type MessageAttachment,type Participant, 
 
 import type { ArgsFor } from "./types.js";
 
+/**
+ * Validate a single file path supplied by an MCP tool argument.
+ *
+ * MCP tool-call arguments originate from an LLM's response. Without guarding
+ * the string, a prompted LLM can supply `/etc/passwd`, `../../etc/shadow`, or
+ * an absolute path on a Windows host (`C:\Users\admin\..`) and the path is
+ * passed verbatim to the SDK's `readFile`, exfiltrating the host's files into
+ * the chat. This function rejects inputs that escape a user-controlled working
+ * directory while allowing ordinary relative file names the LLM is expected to
+ * provide.
+ *
+ * Rejected:
+ *   - empty strings,
+ *   - absolute paths (`/foo`, `C:\foo`, `D:/foo`),
+ *   - path traversal (`..` segments, including `foo/../bar`),
+ *   - special pseudo-filesystem paths (`/dev/…`, `/proc/…`, `/sys/…`,
+ *     `nul`, `con`, `com1`),
+ *   - Windows drive-relative paths (`C:file`),
+ *   - leading slashes or backslashes (UNC-style `//server/share` / `\\host`),
+ *   - a path consisting solely of traversal (`..`).
+ *
+ * Accepted:
+ *   - bare filenames (`report.pdf`),
+ *   - relative sub-paths (`workspace/draft.png`, `project/data/x.webm`).
+ *
+ * Pure + unit-tested. Throws `Error` when the path is unsafe.
+ */
+export function validateAttachmentPath(path: string): void {
+  if (!path) throw new Error("empty file path");
+
+  // Normalise to POSIX-style so the rest of the checks are platform-agnostic.
+  const posix = path.replace(/\\/g, "/");
+
+  // UNC-style host share (check BEFORE the absolute-path guard, since //host/.. is absolute).
+  // POSIX-style //server/share, Windows-style \\host\share.
+  if (posix.startsWith("//") || path.startsWith("\\\\")) {
+    throw new Error("network share paths are not allowed");
+  }
+
+  // Absolute POSIX path (/foo).
+  if (posix.startsWith("/")) throw new Error("absolute paths are not allowed");
+
+  // Windows drive: C:/foo or C:\foo.  Also `C:` (drive-relative, no slash) is
+  // caught below via the "empty after stripping" guard, but catching it here
+  // with an explicit message is clearer.
+  if (/^[A-Za-z]:\//.test(posix) || /^[A-Za-z]:/.test(path)) {
+    throw new Error("Windows drive paths are not allowed");
+  }
+
+  // Path traversal (.. segment) in any position, including at the start.
+  const segments = posix.split("/");
+  for (const seg of segments) {
+    if (seg === ".." || seg === ".") throw new Error("path traversal is not allowed");
+  }
+
+  // Special pseudo-filesystems (even if the absolute check were evaded by a
+  // future normalisation bug, block the well-known device paths explicitly).
+  // These are also absolute on POSIX so they are already caught, but the
+  // defence-in-depth check keeps the intent visible and testable.
+  const firstLower = segments[0]?.toLowerCase();
+  if (firstLower && ["dev", "proc", "sys", "etc", "var", "tmp"].includes(firstLower)) {
+    throw new Error("special system paths are not allowed");
+  }
+
+  // Windows device/pipe names as a bare first segment.
+  if (firstLower && ["nul", "con", "com1", "com2", "com3", "com4", "lpt1"].includes(firstLower)) {
+    throw new Error("device paths are not allowed");
+  }
+
+  // Reject a single segment that is purely a drive letter with no path
+  // component (`C:` with no slash was caught above; this is the last defence).
+  if (segments.length === 1 && /^[A-Za-z]:$/.test(segments[0])) {
+    throw new Error("bare Windows drive names are not allowed");
+  }
+
+  // Reject a path that is only dots after normalisation.
+  if (segments.every((s) => s === "." || s === "..")) {
+    throw new Error("path traversal is not allowed");
+  }
+}
+
 /** Coerce an MCP tool argument to a string ("" if absent or not a string). */
 export function str(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -248,6 +329,14 @@ export async function dispatchTool(
       const images = strArray(a.images);
       const videos = strArray(a.videos);
       const documents = strArray(a.files);
+      // Validate every file path BEFORE any upload begins. MCP tool-call
+      // arguments come from the LLM's response; without this guard an LLM can
+      // be prompted to read /etc/passwd or ../../etc/shadow and exfiltrate
+      // the host's files into the chat. Fail-fast so a single unsafe path
+      // aborts the whole tool call before any disk reads occur.
+      for (const p of [...images, ...videos, ...documents]) {
+        validateAttachmentPath(p);
+      }
       // Need at least one of: text, images, videos, or documents. Bare media
       // with no text is a legitimate intent ("text-optional").
       if (!content && images.length === 0 && videos.length === 0 && documents.length === 0)

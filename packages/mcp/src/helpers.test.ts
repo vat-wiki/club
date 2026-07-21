@@ -13,7 +13,65 @@ import {
   resolveRoom,
   str,
   strArray,
+  validateAttachmentPath,
 } from "./helpers.js";
+
+/** Safe relative paths that MUST be accepted by validateAttachmentPath. */
+const safePaths = [
+  "report.pdf",
+  "photo.png",
+  "draft.md",
+  "workspace/draft.png",
+  "project/data/x.webm",
+  "a/b/c/d/file.png",
+  "0",
+  "1x1",
+  "UPPER_LOWER-123.txt",
+];
+
+describe("validateAttachmentPath", () => {
+  for (const path of safePaths) {
+    it(`accepts safe relative path ${JSON.stringify(path)}`, () => {
+      expect(() => validateAttachmentPath(path)).not.toThrow();
+    });
+  }
+
+  /** Unsafe inputs that MUST be rejected by validateAttachmentPath. */
+  const unsafePaths = [
+    // Absolute POSIX paths (system files).
+    { input: "/etc/passwd", label: "absolute POSIX system file" },
+    { input: "/proc/self/environ", label: "/proc" },
+    { input: "/dev/null", label: "/dev" },
+    { input: "/sys/class/net/eth0/address", label: "/sys" },
+    { input: "/var/log/auth.log", label: "/var" },
+    { input: "/tmp/secret.txt", label: "/tmp" },
+    // Path traversal.
+    { input: "../../etc/passwd", label: "leading traversal" },
+    { input: "foo/../bar", label: "traversal in the middle" },
+    { input: "a/b/../../../etc/shadow", label: "deep traversal" },
+    { input: "..", label: "bare '..'" },
+    { input: ".", label: "bare '.'" },
+    // UNC-style / network shares.
+    { input: "//server/share/file.txt", label: "POSIX UNC share" },
+    { input: "\\\\host\\share\\file.txt", label: "Windows UNC share" },
+    // Windows drive paths.
+    { input: "C:/Users/admin/Desktop/file.txt", label: "Windows absolute path" },
+    { input: "C:\\Users\\admin\\file.txt", label: "Windows backslash path" },
+    { input: "D:/secret.txt", label: "D: drive" },
+    // Empty / falsy.
+    { input: "", label: "empty string" },
+    // Windows device names.
+    { input: "nul", label: "Windows NUL device" },
+    { input: "con", label: "Windows CON device" },
+    { input: "com1", label: "Windows COM device" },
+  ];
+
+  for (const { input, label } of unsafePaths) {
+    it(`rejects unsafe path: ${label} (${JSON.stringify(input)})`, () => {
+      expect(() => validateAttachmentPath(input)).toThrow();
+    });
+  }
+});
 
 describe("str", () => {
   it("returns a real string unchanged", () => {
@@ -484,6 +542,65 @@ describe("dispatchTool", () => {
       dispatchTool("send", { images: Array(11).fill("a.png") }, client),
     ).rejects.toThrow(/too many attachments/);
     expect(uploadImage).not.toHaveBeenCalled();
+  });
+
+  it("send rejects absolute POSIX path /etc/passwd before any upload", async () => {
+    const client = fakeClient({
+      uploadImage: async () => ({ id: "x" }),
+    });
+    await expect(
+      dispatchTool("send", { content: "hi", images: ["/etc/passwd"] }, client),
+    ).rejects.toThrow(/absolute paths are not allowed/i);
+  });
+
+  it("send rejects path traversal ../../etc/shadow before any upload", async () => {
+    const client = fakeClient({
+      uploadDocument: async () => ({ id: "x" }),
+    });
+    await expect(
+      dispatchTool("send", { content: "hi", files: ["../../etc/shadow"] }, client),
+    ).rejects.toThrow(/traversal is not allowed/i);
+  });
+
+  it("send rejects Windows drive path before any upload", async () => {
+    const client = fakeClient({
+      uploadVideo: async () => ({ id: "x" }),
+    });
+    await expect(
+      dispatchTool("send", { videos: ["C:/Users/admin/secret.mp4"] }, client),
+    ).rejects.toThrow(/Windows drive/i);
+  });
+
+  it("send rejects UNC share path before any upload", async () => {
+    const client = fakeClient({
+      uploadImage: async () => ({ id: "x" }),
+    });
+    await expect(
+      dispatchTool("send", { images: ["//server/share/flag.png"] }, client),
+    ).rejects.toThrow(/paths are not allowed/i);
+  });
+
+  it("send rejects Windows device name NUL before any upload", async () => {
+    const client = fakeClient({
+      uploadDocument: async () => ({ id: "x" }),
+    });
+    await expect(
+      dispatchTool("send", { files: ["nul"] }, client),
+    ).rejects.toThrow(/device paths are not allowed/i);
+  });
+
+  it("send aborts on the FIRST unsafe path; safe paths later in the list are not reached", async () => {
+    const uploads: string[] = [];
+    const client = fakeClient({
+      uploadImage: async (p) => {
+        uploads.push(p);
+        return { id: "x" };
+      },
+    });
+    await expect(
+      dispatchTool("send", { images: ["../../etc/passwd", "safe.png"] }, client),
+    ).rejects.toThrow(/traversal is not allowed/i);
+    expect(uploads).toEqual([]);
   });
 
   it("send propagates an upload failure as an error", async () => {

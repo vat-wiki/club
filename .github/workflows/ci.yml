@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build shared & sdk (needed for cross-package type resolution)
+        run: npm -w @club/shared run build && npm -w @club/sdk run build
+
       - name: Type check
         run: npm run typecheck
 

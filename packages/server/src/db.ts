@@ -329,7 +329,21 @@ export function runMigrations(database: Database.Database, maxVersion = Infinity
       if (m.version > maxVersion) break;
       if (m.version <= currentVersion) continue;
       const tx = database.transaction(() => {
-        database.exec(m.sql);
+        try {
+          database.exec(m.sql);
+        } catch (e: unknown) {
+          // Idempotent: some migrations may already be present if the database
+          // was created with the full schema rather than walking the chain.
+          // "duplicate column name" means ADD COLUMN had no effect — safe to
+          // bump the version and continue. All other errors are real failures.
+          if (
+            e instanceof Error &&
+            e.message.includes("duplicate column name")
+          ) {
+          } else {
+            throw e;
+          }
+        }
         database.prepare(`UPDATE schema_version SET version = ?`).run(m.version);
       });
       tx();

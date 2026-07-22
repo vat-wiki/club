@@ -1,4 +1,19 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+
+// Each test gets its own isolated temp DB to avoid "duplicate column" errors
+// from the migration runner (v8 ALTER TABLE files ADD COLUMN filename) when
+// tests share the cwd club.db.
+const dbPath = join(tmpdir(), `club-cache-${randomUUID()}.db`);
+process.env.CLUB_DB = dbPath;
+
+afterAll(() => {
+  for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
+});
 
 // Requiring this module instantiates the DB connection and the room LRU cache.
 // We can't easily replace the underlying stmt from here, but we can observe

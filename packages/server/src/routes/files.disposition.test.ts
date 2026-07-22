@@ -1,4 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterAll, describe, expect, it } from "vitest";
+
+// Isolate the DB so the module-level `runMigrations` in `db.js` doesn't hit
+// a shared cwd/club.db that may have a partial schema from a previous run.
+const dbPath = join(tmpdir(), `club-disp-${randomUUID()}.db`);
+process.env.CLUB_DB = dbPath;
+
+afterAll(() => {
+  for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
+});
 
 import { contentDispositionFilename } from "./files.js";
 

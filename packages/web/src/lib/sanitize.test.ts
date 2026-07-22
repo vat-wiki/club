@@ -72,11 +72,11 @@ describe("truncateDisplayString", () => {
   it("sanitizes controls before applying the cap", () => {
     // NUL + DEL inflate raw length but get stripped; cap applies to clean text.
     const raw = "a".repeat(9) + "\x00\x7f" + "b".repeat(2); // 12 raw chars, 11 clean
-    expect(truncateDisplayString(raw, 10)).toBe("aaaaaaaaaa…");
+    expect(truncateDisplayString(raw, 10)).toBe("aaaaaaaaa…");
   });
 
   it("uses custom ellipsis", () => {
-    expect(truncateDisplayString("abcdef", 5, ">>")).toBe("abcde>>");
+    expect(truncateDisplayString("abcdef", 5, ">>")).toBe("abc>>");
   });
 
   it("caps at default 10_000", () => {

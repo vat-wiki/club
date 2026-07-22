@@ -27,7 +27,11 @@ interface DisplayOpts {
  * Print the participant identity, current room, all rooms with activity,
  * and the member roster.
  */
-export async function runInfo(opts: DisplayOpts, deps: InfoDeps): Promise<void> {
+export async function runInfo(
+  opts: DisplayOpts,
+  deps: InfoDeps,
+  now = Date.now(),
+): Promise<void> {
   const [me, rooms, members] = await Promise.all([
     deps.me(),
     deps.rooms(),
@@ -43,7 +47,7 @@ export async function runInfo(opts: DisplayOpts, deps: InfoDeps): Promise<void> 
   console.log(`\nRooms:`);
   for (const r of rooms) {
     const active = r.lastActivityAt
-      ? `active ${Math.floor((Date.now() - r.lastActivityAt) / 60000)}m ago`
+      ? `active ${Math.floor((now - r.lastActivityAt) / 60000)}m ago`
       : "empty";
     const tag = r.slug === opts.currentRoom ? "*" : " ";
     console.log(` ${tag}#${r.slug} ${active}`);

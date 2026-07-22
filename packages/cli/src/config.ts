@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import { DEFAULT_ROOM } from "@club/shared";
 
+export { DEFAULT_ROOM };
+
 export interface ClubConfig {
   server: string;
   key: string;
@@ -26,7 +28,7 @@ const ConfigSchema = z.object({
  */
 export function defaultRoom(cfg: { room?: string } | null): string {
   const r = cfg?.room?.trim();
-  return r ?? DEFAULT_ROOM;
+  return r === "" || r == null ? DEFAULT_ROOM : r;
 }
 
 // ~/.club/config.json by default; CLUB_CONFIG points elsewhere.

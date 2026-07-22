@@ -53,7 +53,7 @@ describe("runInfo", () => {
 
   it("marks the current room with '*' in the room list", async () => {
     const deps = makeDeps();
-    await runInfo({ server: "s", currentRoom: "general" }, deps);
+    await runInfo({ server: "s", currentRoom: "general" }, deps, 10000);
     const calls = (console.log as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls).toContainEqual([" *#general active 0m ago"]);
     expect(calls).toContainEqual(["  #random empty"]);
@@ -61,7 +61,7 @@ describe("runInfo", () => {
 
   it("marks a non-general current room with '*' correctly", async () => {
     const deps = makeDeps();
-    await runInfo({ server: "s", currentRoom: "random" }, deps);
+    await runInfo({ server: "s", currentRoom: "random" }, deps, 10000);
     const calls = (console.log as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls).toContainEqual([" *#random empty"]);
     expect(calls).toContainEqual(["  #general active 0m ago"]);

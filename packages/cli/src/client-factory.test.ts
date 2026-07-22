@@ -22,12 +22,20 @@ import { ConfigError } from "./config.js";
 // --- Mocks (hoisted by Vitest) -------------------------------------------
 
 const mockClubClientInstance = { _cfg: null as ClubConfig | null };
-const ClubClient = vi.fn().mockImplementation((cfg: ClubConfig) => {
+
+// ClubClient must be a class (constructor) because client-factory does `new ClubClient(cfg)`.
+const ClubClient = vi.fn().mockImplementation(function (this: any, cfg: ClubConfig) {
   mockClubClientInstance._cfg = cfg;
   return mockClubClientInstance;
-});
+}) as unknown as typeof import("@club/sdk").ClubClient;
 
-vi.mock("@club/sdk", () => ({ get ClubClient() { return ClubClient; } }));
+vi.mock("@club/sdk", () => ({
+  get ClubClient() { return ClubClient; },
+  formatError: vi.fn((err) => {
+    if (err instanceof Error) return err.message;
+    return String(err);
+  }),
+}));
 
 // Wrap `requireConfig` so each test can control whether the user is "logged in".
 vi.mock("./config.js", async (importOriginal) => {
@@ -102,14 +110,17 @@ describe("withAuthClient", () => {
     expect(requireConfig).toHaveReturnedWith(cfg);
   });
 
-  it("forwards this binding (the Commander Command instance) correctly", async () => {
-    const capturedNames: string[] = [];
-    const cmd = makeCommand("list-rooms");
-    const wrapped = withAuthClient(function (this: any) {
-      capturedNames.push(this.name());
+  it("passes the constructed ClubClient to the handler", async () => {
+    const capturedClient: any[] = [];
+    const wrapped = withAuthClient(function (_cfg, _args, client) {
+      capturedClient.push(client);
     });
-    await wrapped.apply(cmd);
-    expect(capturedNames).toContain("list-rooms");
+    await wrapped.apply(makeCommand());
+    expect(capturedClient).toHaveLength(1);
+    expect(mockClubClientInstance._cfg).toEqual({
+      server: "http://localhost:6200",
+      key: "club_human_abc",
+    });
   });
 
   it("awaits an async handler and propagates its result", async () => {

@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach,beforeEach, describe, expect, it } from "vitest";
 
-import { configPath, DEFAULT_ROOM,defaultRoom, loadConfig, parseConfig, saveConfig } from "./config.js";
+import { configPath, defaultRoom, loadConfig, parseConfig, saveConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {
@@ -74,8 +74,7 @@ describe("defaultRoom", () => {
   });
 
   it("falls back to general when the config has no room", () => {
-    expect(defaultRoom({ server: "http://x", key: "k" })).toBe(DEFAULT_ROOM);
-    expect(DEFAULT_ROOM).toBe("general");
+    expect(defaultRoom({ server: "http://x", key: "k" })).toBe("general");
   });
 
   it("falls back to general when the room is empty/whitespace (robust to corrupt config)", () => {

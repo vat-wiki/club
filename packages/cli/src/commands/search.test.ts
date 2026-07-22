@@ -74,9 +74,9 @@ describe("runSearch", () => {
     const bodyLines = calls
       .map((c) => c[0])
       .filter((t) => typeof t === "string" && !t.startsWith("found"));
-    // reversed order means older appears before newer in output
-    const idxOld = bodyLines.findIndex((t) => String(t).includes(older.id));
-    const idxNew = bodyLines.findIndex((t) => String(t).includes(newer.id));
+    // reversed order means older content appears before newer in output
+    const idxOld = bodyLines.findIndex((t) => String(t).includes(older.content));
+    const idxNew = bodyLines.findIndex((t) => String(t).includes(newer.content));
     expect(idxOld).toBeLessThan(idxNew);
   });
 

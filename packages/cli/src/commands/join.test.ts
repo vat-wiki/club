@@ -91,7 +91,7 @@ describe("runJoin", () => {
       },
     });
     await expect(
-      runJoin({ name: "x".repeat(41), server: "http://x" }, ctx.deps),
+      runJoin({ name: "x".repeat(40), server: "http://x" }, ctx.deps),
     ).rejects.toThrow(/name too long/);
     expect(ctx.saved).toEqual([]);
   });

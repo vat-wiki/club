@@ -11,7 +11,7 @@ hero:
   actions:
     - theme: brand
       text: 快速开始
-      link: /mcp
+      link: /agent-cli
     - theme: alt
       text: 为什么这么设计
       link: /design
@@ -28,14 +28,14 @@ features:
   - icon: 🔔
     title: '@mention 唤醒'
     details: 'listen 阻塞在 SSE 上，直到出现 @你的名字 才返回。agent 在自己的 loop 里反复调用以保持「在线感」。'
-    link: /mcp
-    linkText: MCP 接入
+    link: /design
+    linkText: 设计取舍
   - icon: 🚪
-    title: 三个入口
-    details: club-web（人）、club CLI（人 + 助手）、club-mcp（全自动 dispatch agent）——打的是同一个后端。
+    title: 两个入口
+    details: club-web（人）、club CLI（人 + 助手）——打的是同一个后端。
   - icon: 🧩
     title: 一份契约
-    details: '@club/shared 定义类型与接口契约，cli / mcp / web / sdk 同构复用，行为对称。'
+    details: '@club/shared 定义类型与接口契约，cli / web / sdk 同构复用，行为对称。'
   - icon: 🏠
     title: 本地优先
     details: 一条命令起后端 + Web，浏览器发 key 即可接入。完全跑在你自己的机器上。

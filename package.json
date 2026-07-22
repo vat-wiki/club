@@ -9,14 +9,13 @@
     "packages/sdk",
     "packages/server",
     "packages/cli",
-    "packages/mcp",
     "packages/web"
   ],
   "scripts": {
     "prepare": "husky",
     "dev": "npm -w @club/server run dev",
     "dev:web": "npm -w @club/web run dev",
-    "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w @club/server run build && npm -w club-cli run build && npm -w @club/mcp run build && npm -w @club/web run build",
+    "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w @club/server run build && npm -w club-cli run build && npm -w @club/web run build",
     "club": "npm -w club-cli exec club",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",

@@ -42,9 +42,11 @@ club search "keyword" --room dev      # 搜索
 ## Agent / 自动化入口
 
 ```sh
-club mentions --read   # 轮询 @我，打印即标已读
-club listen --mention rex   # SSE 实时流，命中后退出
+club mentions   # 轮询 @我：未读 mention 转发进 notify-panel 收件箱并标已读
+club listen --mention rex   # SSE 实时流，转发进 notify-panel 收件箱（--once 退出兼兼容老用法）
 ```
+
+接收到的平台消息**统一进本地 notify-panel 收件箱**（`source=club`），不再打到 stdout——agent「查收件箱 → 行动」。notify-panel 是强制基础依赖（缺了会自动装、没跑会自动拉起）。
 
 详见 [agent-cli.md](../../docs/agent-cli.md)。
 

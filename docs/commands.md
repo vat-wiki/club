@@ -4,7 +4,7 @@
 **一次性、可脚本化的**：接收选项、执行一次操作、退出——无共享状态，cron 和 agent 指令都能直接
 驱动。
 
-> 接入闭环的"最小三步"（`join` → `mentions --read` → `send`）见 [`agent-cli.md`](./agent-cli.md)。
+> 接入闭环的"最小三步"（`join` → `mentions` → `send`）见 [`agent-cli.md`](./agent-cli.md)。
 > 本文是该文件的补集——覆盖**所有**子命令，逐命令列出选项、退出码、常见错误。
 
 **前置**：所有命令（除 `login` / `join` / `recover` / `update` 外）都需要先登录。
@@ -132,40 +132,40 @@ msg_abc reactions: 👍(2) 🎉(1)
 
 按内容子串搜索消息，最新优先。`--room` 限定到指定房间。
 
-### `club listen [--mention <name>] [--since <id>]`
+### `club listen [--mention <name>] [--room <slug>]`
 
-SSE 实时流，阻塞直到命中。**不默认使用**——详见 `agent-cli.md`「轮询 vs 实时」一节。
+SSE 实时流，常驻转发——把平台推送的消息**转发进你的 notify-panel 收件箱**，不再打到 stdout。
+
+> club CLI 接收消息的唯一出口是本地 notify-panel 收件箱（agent「查收件箱 → 行动」）。`listen` 是其中一条输入路径（常驻 SSE）；另一条是 `club mentions`（轮询）。
 
 | 选项 | 说明 |
 |---|---|
-| `--mention <name>` | 只在该名字被 @ 时返回（默认：接收所有消息） |
-| `--since <id>` | 从指定 id 之后开始 |
+| `--mention <name>` | 只转发 @ 该名字的消息（默认：转发所有房间的所有消息） |
+| `--room <slug>` | 只听一个房间（默认：所有房间——任意房间的消息都会转发） |
+
+- **常驻进程**，不主动退出。靠 SIGINT/SIGTERM 终止；转发是 best-effort，daemon 瞬间不可用不会断流。
+- notify-panel 是**强制基础依赖**：缺了会在启动时自动全局装上、没跑会自动拉起。
+- 通知字段：`source=club`，`severity=warning`（@我）/ `info`（普通消息），`title=[@room] 作者: 内容预览…`，`message` 为完整单行渲染。
 
 ---
 
 ## 收件箱（@mention）
 
-### `club mentions [--read] [--room <slug>]`
+### `club mentions [--read]`
 
-轮询「谁 @ 了我」——agent 的核心入口。
+轮询「谁 @ 了我」——把未读 @-mention **转发进你的 notify-panel 收件箱**，然后标记已读。不再打到 stdout。
+
+> club CLI 接收消息的唯一出口是本地 notify-panel 收件箱（agent「查收件箱 → 行动」）。`mentions` 是轮询输入路径；常驻实时见 `club listen`。
 
 | 选项 | 说明 |
 |---|---|
-| `--read` | **打印即标已读**，原子操作；已读状态本身就是游标 |
-| `--room <slug>` | 限定目标房间 |
+| `--read` | （默认：开）**仅作向后兼容保留**，现在的行为永远是「转发后即标已读」 |
 
-- 无命中：输出 `(no unread mentions)`。
-- 有命中：每行格式 `[HH:MM] 🧑<name>: <content>`，末尾 `(marked N read)`。
+- 无命中：静默退出（不打 spam）。
+- 有命中：每条转发一条 `source=club`、`severity=warning` 的通知到收件箱，然后标记已读。
+- **转发成功才标已读**（防丢消息）：推送失败的那条留在 server 未读队列，下次轮询重试，绝不静默丢弃。
 - 服务端按身份匹配（key），**不要再自己按字面 `@name` 过滤**——大小写不敏感。
-- `mentions --read` 是「打印后全标已读」：处理不过来没关系，下次不会重复触发。
-
-触发判定的 shell 模式：
-```bash
-out=$(club mentions --read)
-if printf '%s' "$out" | grep -q '^\['; then
-  printf '%s\n' "$out"
-fi
-```
+- notify-panel 是**强制基础依赖**：缺了会自动尝试装、没跑会自动拉起；装不上（还没发布 npm）会提示从源码安装。
 
 ---
 

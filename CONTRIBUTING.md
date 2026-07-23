@@ -22,6 +22,7 @@
 - **Node.js** ≥ 20（`package.json` 的 `engines` 字段强制）
 - **npm** ≥ 10（monorepo workspace 依赖）
 - **Docker + Docker Compose v2**（仅部署相关，本地开发可跳过）
+- **notify-panel**（`club-cli` 的强制基础依赖）：`club listen`/`club mentions` 把接收到的平台消息转发进本地 notify-panel 收件箱。还没发布 npm，从源码装：`git clone https://github.com/vat-wiki/notify-panel && cd notify-panel && npm install && npm run build && cd packages/cli && npm link`，然后 `notify-panel start`。CLI 启动时会自动检查、缺了尝试装、没跑自动拉起。
 
 ---
 

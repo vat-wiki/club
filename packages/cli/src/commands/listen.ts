@@ -29,6 +29,32 @@ import { ensureNotifyPanel } from "../ensure-notify-panel.js";
 import { type PushInput, pushMessage } from "../notify.js";
 
 /**
+ * Whether a streamed message should be forwarded to the notify-panel inbox.
+ *
+ * Two filters, short-circuiting on the first that excludes it:
+ * 1. **Self-skip**: if we know our own participant id, never forward our own
+ *    messages — otherwise every `club send` we do echoes right back into the
+ *    inbox as if it were an incoming message. An agent reading its own outgoing
+ *    message is noise, not a trigger to act.
+ * 2. **Mention filter**: when `--mention <name>` is set, only messages that
+ *    @-mention that name pass.
+ *
+ * `meId` is `undefined` when `GET /me` failed; in that case self-skip is
+ * disabled (worst case we echo, which is safer than dropping a real incoming
+ * message).
+ *
+ * @returns true if the message should be pushed to the inbox.
+ */
+export function shouldForwardMessage(
+  m: Message,
+  opts: { meId?: string; mention?: string } = {},
+): boolean {
+  if (opts.meId && m.participantId === opts.meId) return false;
+  if (opts.mention && !mentionMatches(m.content, opts.mention)) return false;
+  return true;
+}
+
+/**
  * Build the `club listen` commander sub-command.
  *
  * Follows the live SSE stream and forwards every matching message to the local
@@ -66,12 +92,17 @@ export function makeListenCommand(): Command {
           );
         }
 
-        // Resolve our own name for severity (mention → warning). Best-effort:
-        // if /me fails we fall back to the --mention filter, or none — severity
-        // then degrades to `info`, which is safe.
+        // Resolve our own id + name. id lets us skip echoing our own outgoing
+        // messages (see shouldForwardMessage); name drives severity
+        // (mention → warning). Best-effort: if /me fails we fall back to the
+        // --mention filter for severity, and disable self-skip — severity then
+        // degrades to `info`, which is safe.
+        let meId: string | undefined;
         let meName: string | undefined;
         try {
-          meName = (await client.me()).name;
+          const me = await client.me();
+          meId = me.id;
+          meName = me.name;
         } catch {
           meName = mention;
         }
@@ -93,7 +124,7 @@ export function makeListenCommand(): Command {
 
         const sub = client.stream(
           async (m: Message) => {
-            if (mention && !mentionMatches(m.content, mention)) return;
+            if (!shouldForwardMessage(m, { meId, mention })) return;
             reportThinking(m);
             // In --once mode we MUST await the push before exiting, or the
             // process dies before the HTTP request lands. In stream mode we

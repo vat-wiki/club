@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: .
@@ -30,6 +31,7 @@ jobs:
 
   publish-cli:
     runs-on: self-hosted
+    timeout-minutes: 15
     permissions:
       id-token: write
     needs: deploy
@@ -51,10 +53,8 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-      - name: Install & build
-        run: |
-          npm ci
-          cd packages/cli && npm run build
+      - name: Build cli
+        run: cd packages/cli && npm run build
 
       - name: Publish to npm
         if: always() && needs.deploy.result == 'success'

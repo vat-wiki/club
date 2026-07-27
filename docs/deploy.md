@@ -102,6 +102,7 @@ docker image ls club
 | 环境变量 | 说明 | 默认 |
 |----------|------|------|
 | `CLUB_DB` | SQLite 数据库路径（卷内） | `/data/club.db` |
+| `CLUB_FILES` | 上传文件目录（卷内）。未设则回退 `<cwd>/files`，落进镜像可写层，容器一重建就丢 | `/data/files` |
 | `HOST` | 服务监听地址 | `0.0.0.0` |
 | `PORT` | 服务监听端口 | `6200`（容器内） |
 

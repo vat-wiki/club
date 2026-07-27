@@ -35,7 +35,11 @@ COPY packages/sdk/package.json     packages/sdk/
 COPY packages/server/package.json packages/server/
 COPY packages/cli/package.json     packages/cli/
 COPY packages/web/package.json     packages/web/
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts && \
+    npm rebuild better-sqlite3
+# ↑ --ignore-scripts 躲开了 husky 的 prepare，但也跳过了 better-sqlite3 的 install
+#   脚本（prebuild-install，负责下载对应 Node ABI 的预编译 .node）。不补这句，运行时
+#   会 "Could not locate the bindings file"（club-test 反复 Restarting 即此所致）。
 
 # 只带运行时所需的构建产物。保持 monorepo 布局（serveStatic 依赖 cwd=repo 根）：
 #   - server/dist : 主服务（含 public/join.html）
@@ -68,9 +72,13 @@ USER node
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # HOST/PORT server 已有默认；CLUB_DB 指向卷内，持久化 SQLite。
+# CLUB_FILES 同样指向卷内 /data/files —— 否则上传文件会落进镜像可写层
+# (<cwd>/files = /app/files)，容器一重建（compose up / promote / rollback）就全丢，
+# 而 DB 里的 files 行还在，导致附件 URL 永久 404。
 ENV HOST=0.0.0.0 \
     PORT=6200 \
-    CLUB_DB=/data/club.db
+    CLUB_DB=/data/club.db \
+    CLUB_FILES=/data/files
 
 EXPOSE 6200
 CMD ["node", "packages/server/dist/index.js"]

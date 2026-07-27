@@ -20,6 +20,7 @@ services:
       - "6500:6200"
     environment:
       CLUB_DB: /data/club.db
+      CLUB_FILES: /data/files
     volumes:
       - club-data-prod:/data
     networks:
@@ -39,6 +40,7 @@ services:
       - "6600:6200"
     environment:
       CLUB_DB: /data/club.db
+      CLUB_FILES: /data/files
     volumes:
       - club-data-test:/data
     networks:

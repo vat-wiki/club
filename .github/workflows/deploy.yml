@@ -53,6 +53,9 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
+      - name: Build shared & sdk (cli bundles @club/sdk, which needs its dist built first)
+        run: npm -w @club/shared run build && npm -w @club/sdk run build
+
       - name: Build cli
         run: cd packages/cli && npm run build
 

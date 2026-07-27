@@ -47,6 +47,11 @@ export function runLogin(input: LoginInput, deps: LoginDeps): void {
   deps.saveConfig({ server: input.server, key: input.key });
   console.log(`saved. server=${input.server}`);
   console.log(`try: club whoami`);
+  // Nudge users toward the persistent daemon now that their config exists —
+  // login is the natural prerequisite moment, and --install is otherwise
+  // easy to miss. (Intentionally just a hint, not auto-run: registering a
+  // system service is a side effect the user should opt into.)
+  console.log(`tip: make listen persistent with: club listen --install`);
 }
 
 export function makeLoginCommand(): Command {

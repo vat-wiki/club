@@ -11,12 +11,21 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 read_tag() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
-set_tag()  { sed -i "s|^$1=.*|$1=$2|" .env; }
+# .env 被 gitignore，CI / 首次部署时可能不存在。缺失则从 .env.example 初始化一份，
+# 并确保目标 tag 键存在且非空（sed 才能原地替换；docker-compose 用 :? 对空值报错）。
+ensure_env() {
+  [ -f .env ] || cp .env.example .env
+  grep -qE "^$1=" .env || echo "$1=" >> .env
+}
+set_tag()  { ensure_env "$1"; sed -i "s|^$1=.*|$1=$2|" .env; }
 
 case "${1:-}" in
   build)
     VER="$(node -p "require('./package.json').version")"
     docker build -t "club:$VER" -t club:latest .
+    # 首次部署时 .env 可能刚从 .env.example 初始化，PROD_TAG 还是空——
+    # 用当前 VER 兠底，避免 docker-compose 的 :? 插值报错。后续 promote 会改写 PROD_TAG。
+    [ -n "$(read_tag CLUB_PROD_TAG)" ] || set_tag CLUB_PROD_TAG "$VER"
     set_tag CLUB_TEST_TAG "$VER"
     docker compose up -d club-test
     echo "✓ test 现在跑 club:$VER（:6600）。验证 OK 后：./scripts/deploy.sh promote"

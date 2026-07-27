@@ -13,11 +13,10 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/sdk/package.json     packages/sdk/
 COPY packages/server/package.json packages/server/
 COPY packages/cli/package.json     packages/cli/
-COPY packages/mcp/package.json     packages/mcp/
 COPY packages/web/package.json     packages/web/
 RUN npm ci
 
-# 源码 + 共享 tsconfig，然后构建全部包（shared→sdk→server→cli→mcp→web）。
+# 源码 + 共享 tsconfig，然后构建全部包（shared→sdk→server→cli→web）。
 COPY tsconfig.base.json ./
 COPY packages/ packages/
 RUN npm run build
@@ -28,14 +27,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # npm ci 校验依赖树需要全部 workspace 清单，缺一个都会失败。
+# --ignore-scripts: 跳过根 package.json 的 `prepare` (husky) —— 它是 dev 工具，
+# 且 husky 本身是 devDependency，在 --omit=dev 下不存在会 exit 127。
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/sdk/package.json     packages/sdk/
 COPY packages/server/package.json packages/server/
 COPY packages/cli/package.json     packages/cli/
-COPY packages/mcp/package.json     packages/mcp/
 COPY packages/web/package.json     packages/web/
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 # 只带运行时所需的构建产物。保持 monorepo 布局（serveStatic 依赖 cwd=repo 根）：
 #   - server/dist : 主服务（含 public/join.html）
@@ -52,17 +52,19 @@ COPY --from=build /app/packages/web/dist    packages/web/dist
 RUN chown -R node:node /app && \
     mkdir -p /data && \
     chown -R node:node /data
-USER node
 
 # Entrypoint: ensure /data is writable by the non-root user. Docker named
 # volumes are created root-owned; this chown is idempotent and harmless on
 # bind-mounts that already have correct ownership. Runs before CMD.
+# Must run as root (before USER node) since it writes /usr/local/bin and
+# needs to chown the /data volume at startup.
 RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
     echo 'if [ -d /data ] && [ "$(stat -c %u /data 2>/dev/null)" = "0" ]; then' >> /usr/local/bin/entrypoint.sh && \
     echo '  chown -R node:node /data || true' >> /usr/local/bin/entrypoint.sh && \
     echo 'fi' >> /usr/local/bin/entrypoint.sh && \
     echo 'exec "$@"' >> /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
+USER node
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # HOST/PORT server 已有默认；CLUB_DB 指向卷内，持久化 SQLite。

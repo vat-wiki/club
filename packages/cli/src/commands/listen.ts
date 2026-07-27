@@ -68,7 +68,7 @@ import {
   tailLog,
   writePidFile,
 } from "../listen-runtime.js";
-import { type PushInput, pushMessage } from "../notify.js";
+import { type PushInput, pushMessageDetailed } from "../notify.js";
 
 /**
  * Whether a streamed message should be forwarded to the notify-panel inbox.
@@ -167,19 +167,19 @@ async function runListenForeground(flags: ListenFlags): Promise<void> {
       // stream can't fall back on a server-side unread queue to retry,
       // so a dropped push is a dropped message; at least make it visible.
       if (once) {
-        const ok = await pushMessage(m, conn, { meName });
-        if (!ok) {
+        const out = await pushMessageDetailed(m, conn, { meName });
+        if (!out.ok) {
           process.stderr.write(
-            `club: failed to forward message ${m.id} to notify-panel; exiting anyway (--once).\n`,
+            `club: failed to forward message ${m.id} to notify-panel (${out.reason}); exiting anyway (--once).\n`,
           );
         }
         stop(sub);
         process.exit(0);
       } else {
-        void pushMessage(m, conn, { meName }).then((ok) => {
-          if (!ok) {
+        void pushMessageDetailed(m, conn, { meName }).then((out: { ok: boolean; reason?: string }) => {
+          if (!out.ok) {
             process.stderr.write(
-              `club: failed to forward message ${m.id} to notify-panel (message lost from live stream).\n`,
+              `club: failed to forward message ${m.id} to notify-panel (${out.reason}); message lost from live stream.\n`,
             );
           }
         });

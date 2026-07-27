@@ -5,6 +5,7 @@ import type { Message } from "@club/shared";
 import {
   NOTIFY_SOURCE,
   pushMessage,
+  pushMessageDetailed,
   severityFor,
   titleFor,
 } from "./notify.js";
@@ -122,5 +123,64 @@ describe("pushMessage", () => {
     );
     const ok = await pushMessage(makeMessage(), { url: "http://127.0.0.1:8787" });
     expect(ok).toBe(false);
+  });
+});
+
+describe("pushMessageDetailed", () => {
+  it("returns { ok: true } on a 2xx response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("ok", { status: 201 }),
+    );
+    const out = await pushMessageDetailed(makeMessage(), { url: "http://127.0.0.1:8787" });
+    expect(out).toEqual({ ok: true });
+  });
+
+  it("carries the HTTP status + target URL in `reason` on a non-2xx", async () => {
+    // This is the regression guard for the bug that motivated this function:
+    // a bare `false` made it impossible to tell a notify-panel 503 from a
+    // timeout or a connection refused. The reason must name the status and
+    // the exact endpoint.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: "Service Unavailable", message: "Service Unavailable", statusCode: 503 }),
+        { status: 503, headers: { "content-type": "application/json" } },
+      ),
+    );
+    const out = await pushMessageDetailed(makeMessage(), { url: "http://127.0.0.1:8788" });
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.reason).toContain("HTTP 503");
+      expect(out.reason).toContain("http://127.0.0.1:8788/v1/notify");
+      // notify-panel's JSON error body should be surfaced in the reason so the
+      // operator sees the daemon's own message, not just the status code.
+      expect(out.reason).toContain("Service Unavailable");
+    }
+  });
+
+  it("labels a TypeError fetch as a network error with the target URL", async () => {
+    // Node's fetch throws a TypeError on ECONNREFUSED / DNS failures / offline.
+    // The reason should say "network error" (readable) plus the endpoint, not
+    // just dump the raw error.
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }),
+    );
+    const out = await pushMessageDetailed(makeMessage(), { url: "http://127.0.0.1:8788" });
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.reason.toLowerCase()).toContain("network");
+      expect(out.reason).toContain("http://127.0.0.1:8788/v1/notify");
+    }
+  });
+
+  it("labels a timeout (AbortError) as a timeout with the target URL", async () => {
+    const err = new Error("timed out");
+    err.name = "TimeoutError";
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(err);
+    const out = await pushMessageDetailed(makeMessage(), { url: "http://127.0.0.1:8787" });
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.reason.toLowerCase()).toContain("timeout");
+      expect(out.reason).toContain("http://127.0.0.1:8787/v1/notify");
+    }
   });
 });

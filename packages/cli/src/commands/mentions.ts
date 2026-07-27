@@ -27,7 +27,7 @@ import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";
 import { ensureNotifyPanel } from "../ensure-notify-panel.js";
-import { type PushInput,pushMessage } from "../notify.js";
+import { type PushInput, pushMessageDetailed } from "../notify.js";
 
 export function formatMention(m: Mention): string {
   return formatMessage({
@@ -159,7 +159,18 @@ export function makeMentionsCommand(): Command {
           mentions: () => client.mentions(),
           markMentionsRead: (ids) => client.markMentionsRead(ids),
           markMentionRead: (id) => client.markMentionRead(id),
-          push: (m) => pushMessage(m, conn, { severity: "warning" }),
+          push: async (m) => {
+            // runMentions only acts on the boolean, but we surface the failure
+            // *reason* here so the operator can see HTTP 503 vs timeout vs
+            // connection refused instead of an opaque "failed to push".
+            const out = await pushMessageDetailed(m, conn, { severity: "warning" });
+            if (!out.ok) {
+              process.stderr.write(
+                `club: failed to forward mention ${m.id} to notify-panel (${out.reason}); leaving it unread for retry.\n`,
+              );
+            }
+            return out.ok;
+          },
         });
       }),
     );

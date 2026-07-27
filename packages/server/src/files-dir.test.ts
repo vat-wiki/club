@@ -1,4 +1,4 @@
-import { existsSync,mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { afterAll,describe, expect, it } from "vitest";
@@ -28,18 +28,34 @@ describe("files-dir", () => {
 
     it("rejects a path-traversal id containing '..'", async () => {
       const p = await filePath("../decoy.txt");
-      // Must not escape the files dir.
+      // Must not resolve to the decoy file under any circumstance.
       expect(p).not.toBe(decoyFile);
-      // Resolve result must still be under the files dir (or the safe fallback
-      // cwd/files, which is also not under safeTestDir — the real guard is that
-      // the caller 404s because the file doesn't exist there).
-      expect(existsSync(p)).toBe(false);
+      // The decoy's secret content must never be reachable through the
+      // resolved path. (The fallback path may legitimately exist as a side
+      // effect of other upload tests, so `existsSync` alone is not a reliable
+      // guard — what matters is that the sensitive bytes can't be read.)
+      let leaked = false;
+      try {
+        const contents = readFileSync(p, "utf8");
+        leaked = contents.includes("secret");
+      } catch {
+        // unreadable / not the decoy → traversal blocked
+      }
+      expect(leaked).toBe(false);
     });
 
     it("rejects a traversal id using absolute path prefix", async () => {
       const p = await filePath("/etc/passwd");
       expect(p).not.toContain("etc/passwd");
-      expect(existsSync(p)).toBe(false);
+      // The resolved fallback must not expose /etc/passwd contents.
+      let leaked = false;
+      try {
+        const contents = readFileSync(p, "utf8");
+        leaked = /root:/.test(contents);
+      } catch {
+        // unreadable → traversal blocked
+      }
+      expect(leaked).toBe(false);
     });
 
     it("rejects backslash path separators", async () => {

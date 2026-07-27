@@ -68,7 +68,11 @@ export const requireAuth = createMiddleware(async (c, next) => {
   // throttled even if the hash never matches a row. This is a defence-
   // in-depth cap — the global per-IP limiter covers direct attacks, this
   // one covers cross-IP replay of a compromised credential.
-  const exceeded = checkKeyRateLimit(c, key);
+  // Disabled in test mode (NODE_ENV=test) so suites that fire dozens of
+  // authenticated requests in a single minute don't trip the 30/min ceiling;
+  // mirrors the isTest gating in the per-IP and write-path limiters.
+  const isTest = process.env.NODE_ENV === "test";
+  const exceeded = isTest ? null : checkKeyRateLimit(c, key);
   if (exceeded) return jsonErr(c, exceeded.error, exceeded.status as 429);
 
   const row = getParticipantByKeyHash(hashKey(key));

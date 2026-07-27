@@ -1,5 +1,12 @@
 import { defineConfig } from "vitest/config";
 
+// Vitest (unlike Jest) does not auto-set NODE_ENV=test. Several server
+// middleware gate defensive rate limits behind `NODE_ENV === "test"` so that
+// test suites firing dozens of authenticated requests per second don't trip
+// the production ceilings (per-IP 120/min, per-write 15/min, per-key 30/min).
+// Set it here, before any package code is imported, so those gates take effect.
+process.env.NODE_ENV ??= "test";
+
 /**
  * Shared Vitest base config reused by every `@club/*` package.
  *

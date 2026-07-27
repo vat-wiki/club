@@ -80,11 +80,11 @@ const writeGuard: import("hono").MiddlewareHandler = writeLimiter ?? identityMid
  */
 function requireValidSinceQuery(
   c: Context,
-): { error: string; status: number } | undefined {
+): Response | undefined {
   const since = c.req.query("since");
   if (since !== undefined) {
     const bad = requireValidId(c, since, "since id");
-    if (bad) return { error: bad.r.statusText, status: 400 };
+    if (bad) return bad.r;
   }
   return undefined;
 }
@@ -103,11 +103,11 @@ function requireValidSinceQuery(
  */
 function requireValidBeforeQuery(
   c: Context,
-): { error: string; status: number } | undefined {
+): Response | undefined {
   const before = c.req.query("before");
   if (before !== undefined) {
     const bad = requireValidId(c, before, "before id");
-    if (bad) return { error: bad.r.statusText, status: 400 };
+    if (bad) return bad.r;
   }
   return undefined;
 }
@@ -302,9 +302,9 @@ messages.get("/", (c) => {
   // id-format check so the route reads like a single guard list; see their
   // JSDoc for why invalid ids are rejected up-front rather than passed through.
   const badSince = requireValidSinceQuery(c);
-  if (badSince) return jsonErr(c, badSince.error, badSince.status);
+  if (badSince) return badSince;
   const badBefore = requireValidBeforeQuery(c);
-  if (badBefore) return jsonErr(c, badBefore.error, badBefore.status);
+  if (badBefore) return badBefore;
   // `before` (older history, scroll-up pagination) takes precedence over
   // `since`; they aren't combined in practice, but if both appear we serve the
   // backward page so the UI's "load earlier" never accidentally pulls newer.

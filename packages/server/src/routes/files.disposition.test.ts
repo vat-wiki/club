@@ -14,7 +14,9 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-import { contentDispositionFilename } from "./files.js";
+// Dynamic import: see files.mime.test.ts — files.js transitively loads db.js,
+// whose top-level migration must run after CLUB_DB is set.
+const { contentDispositionFilename } = await import("./files.js");
 
 describe("contentDispositionFilename", () => {
   it("returns null for empty/blank/missing filenames", () => {

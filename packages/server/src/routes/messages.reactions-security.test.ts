@@ -50,7 +50,11 @@ describe("messages route — emoji sanitization (security)", () => {
   let msgId: string;
 
   beforeEach(async () => {
-    key = await mintKey("alice");
+    // Unique name per test: participant names are unique, so reusing "alice"
+    // across beforeEach invocations makes the second mint return 409 and every
+    // subsequent assertion fail with a misleading 401 "invalid key".
+    // randomUUID is too long for the 40-char name cap, so use a short suffix.
+    key = await mintKey(`alice ${Math.random().toString(36).slice(2, 10)}`);
     msgId = await postMsg(key);
   });
 

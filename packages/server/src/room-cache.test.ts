@@ -15,10 +15,14 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-// Requiring this module instantiates the DB connection and the room LRU cache.
-// We can't easily replace the underlying stmt from here, but we can observe
-// DB-interaction through the DB module itself.
-import {
+afterAll(() => {
+  for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
+});
+
+// Dynamic import: db.js performs its top-level migration/statement-prep on
+// import, so it must be loaded AFTER process.env.CLUB_DB is set. A static
+// top-level import is evaluated before this file's env assignment runs.
+const {
   clearParticipantsCache,
   clearRoomCache,
   ensureRoom,
@@ -27,7 +31,7 @@ import {
   invalidateRoomBySlugCache,
   invalidateRoomsCache,
   listRooms,
-} from "./db.js";
+} = await import("./db.js");
 
 describe("getAllParticipants cache", () => {
   beforeEach(() => {

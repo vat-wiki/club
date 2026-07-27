@@ -14,7 +14,12 @@ afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
 });
 
-import { detectAndVerifyMime } from "./files.js";
+// Dynamic import so db.js (pulled in transitively by files.js) is only
+// evaluated AFTER process.env.CLUB_DB is set. A static top-level import would
+// cause db.js to read the default CLUB_DB before this file's env assignment
+// runs (ESM evaluates imported modules first), so migrations/statement
+// preparation would land on the wrong database.
+const { detectAndVerifyMime } = await import("./files.js");
 
 /**
  * Minimal valid file headers (just the magic bytes, padded with zeroes).

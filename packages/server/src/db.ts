@@ -1064,34 +1064,17 @@ export function markMentionRead(id: string, readAt: number): boolean {
  *  actually updated (empty if already-read or unknown). */
 const markReadBatchCache = new Map<
   number,
-  ReturnType<typeof db.prepare<[number, string, ...string[]], void>>
+  ReturnType<typeof db.prepare<[number, string, ...string[]], { id: string }>>
 >();
-
-const markReadVerifyCache = new Map<
-  number,
-  ReturnType<typeof db.prepare<[string, number, ...string[]], { id: string }>>
->();
-function markReadVerifyStmt(n: number) {
-  let stmt = markReadVerifyCache.get(n);
-  if (!stmt) {
-    const placeholders = '?,'.repeat(n).slice(0, -1);
-    // read_at = ? guards against returning ids that were already read before
-    // this call: a row is reported as updated only if it was actually set to
-    // the supplied readAt in this batch.
-    const sql = `SELECT id FROM mentions WHERE participant_id = ? AND read_at = ? AND id IN (${placeholders})`;
-    stmt = db.prepare<[string, number, ...string[]], { id: string }>(sql);
-    markReadVerifyCache.set(n, stmt);
-  }
-  return stmt;
-}
 
 /** Mark a batch of mentions read in one SQL statement, scoped to `ownerId`
  * so the caller cannot mark another participant's mentions as read.
  *
- * Performance: uses a cached prepared statement keyed on placeholder count to
- * avoid repeated statement creation on the hot path. Returns only the ids that
- * were actually updated (already-read or unknown ids are excluded from the
- * response body).
+ * Uses `UPDATE ... RETURNING id` so the result contains exactly the rows this
+ * statement mutated. Rows that were already read (filtered out by
+ * `read_at IS NULL`) never appear, which is robust even when an earlier
+ * single-read stamped the same millisecond timestamp — the previous
+ * readAt-based verify SELECT could not distinguish that case.
  *
  * @param ids - Mention ids to mark read.
  * @param ownerId - Participant id that must own the mentions.
@@ -1100,19 +1083,14 @@ function markReadVerifyStmt(n: number) {
  */
 export function markMentionsRead(ids: string[], ownerId: string, readAt: number): string[] {
   if (ids.length === 0) return [];
-  const placeholders = '?,'.repeat(ids.length).slice(0, -1);
   let stmt = markReadBatchCache.get(ids.length);
   if (!stmt) {
-    const sql = `UPDATE mentions SET read_at = ? WHERE participant_id = ? AND read_at IS NULL AND id IN (${placeholders})`;
-    stmt = db.prepare<[number, string, ...string[]], void>(sql);
+    const placeholders = '?,'.repeat(ids.length).slice(0, -1);
+    const sql = `UPDATE mentions SET read_at = ? WHERE participant_id = ? AND read_at IS NULL AND id IN (${placeholders}) RETURNING id`;
+    stmt = db.prepare<[number, string, ...string[]], { id: string }>(sql);
     markReadBatchCache.set(ids.length, stmt);
   }
-  stmt.run(readAt, ownerId, ...ids);
-  // Single batched SELECT to determine which ids were actually updated,
-  // scoped to ownerId. Rows that were already read or unknown are simply
-  // absent, and the result preserves input order. Replaces the prior N+1
-  // per-id getMentionById round-trips.
-  return markReadVerifyStmt(ids.length).all(ownerId, readAt, ...ids).map((r) => r.id);
+  return stmt.all(readAt, ownerId, ...ids).map((r) => r.id);
 }
 
 // ── Uploaded files (image metadata) ──────────────────────────────────

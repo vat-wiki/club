@@ -110,6 +110,18 @@ export function detectAndVerifyMime(
   buf: Buffer,
   claimedMime: ImageMime | VideoMime | DocumentMime,
 ): ImageMime | VideoMime | DocumentMime | null {
+  // text/markdown has no magic bytes — it is plain text by definition. Any
+  // buffer that isn't a recognized binary (image/video/pdf/zip) is acceptable
+  // as markdown, so short-circuit here before the signature scan. We still
+  // reject binary blobs that happen to be claimed as markdown below (the
+  // looksLikeZip / signature matches fall through to the kind-mismatch path).
+  if (claimedMime === "text/markdown") {
+    for (const sig of SIGNATURES) {
+      if (sig.match(buf)) return null; // binary file masquerading as .md
+    }
+    if (looksLikeZip(buf)) return null;
+    return claimedMime;
+  }
   if (buf.length < 2) return null;
   for (const sig of SIGNATURES) {
     if (sig.match(buf)) {
@@ -122,10 +134,10 @@ export function detectAndVerifyMime(
       return null; // kind mismatch → reject
     }
   }
-  // ZIP-family: accept any claimed application/... document MIME except
-  // text/markdown (which should never be a ZIP).
+  // ZIP-family: accept any claimed application/... document MIME. A
+  // text/markdown claim can't reach here — it is short-circuited above, and
+  // a ZIP buffer claimed as markdown is rejected there as a binary masquerade.
   if (looksLikeZip(buf)) {
-    if (claimedMime === "text/markdown") return null;
     return claimedMime;
   }
   // No recognized signature → reject unknown content.

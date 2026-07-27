@@ -128,14 +128,37 @@ describe("GET /files/:id", () => {
 // image-size), so the bytes' content is irrelevant — only mime + size are
 // checked. This lets us exercise the whole video pipeline without a real (and
 // large) mp4/webm fixture.
-const VIDEO_BYTES = Buffer.from(Array.from({ length: 1000 }, (_, i) => i % 256));
+// Magic-byte prefixes recognized by detectAndVerifyMime for video. The
+// rest of the buffer is just padding (the detector only inspects the header),
+// so we prefix the counter pattern used below with the right signature.
+//   MP4 : offset 4 = "ftyp" (ISO BMFF box)
+//   WebM: 0x1A45DFA3 (EBML) at offset 0
+const MP4_MAGIC = Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+const WEBM_MAGIC = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x00, 0x00, 0x00]);
+
+// Default MP4-shaped payload: 1000 bytes (well under MAX_VIDEO_BYTES) with a
+// valid ftyp magic header so MIME sniffing accepts it. The counter pattern is
+// kept in the tail so Range assertions can still slice & compare exact bytes.
+const VIDEO_BYTES = Buffer.alloc(1000, 0);
+MP4_MAGIC.copy(VIDEO_BYTES, 0);
+for (let i = MP4_MAGIC.length; i < VIDEO_BYTES.length; i++) VIDEO_BYTES[i] = i % 256;
+
+// Build a buffer with the magic for the requested container followed by the
+// same counter tail, so each video kind passes its own magic-byte check.
+function videoBytes(mime: string): Buffer {
+  const magic = mime === "video/webm" ? WEBM_MAGIC : MP4_MAGIC;
+  const buf = Buffer.alloc(1000, 0);
+  magic.copy(buf, 0);
+  for (let i = magic.length; i < buf.length; i++) buf[i] = i % 256;
+  return buf;
+}
 
 function videoFile(
   mime = "video/mp4",
   name = "v.mp4",
-  bytes: Buffer = VIDEO_BYTES,
+  bytes?: Buffer,
 ): File {
-  return new File([bytes], name, { type: mime });
+  return new File([bytes ?? videoBytes(mime)], name, { type: mime });
 }
 
 describe("POST /files — video branch", () => {
@@ -244,9 +267,26 @@ describe("GET /files/:id — HTTP Range (video seek)", () => {
 // document content — it records mime + filename + size and stores the bytes
 // verbatim. The filename comes from the multipart part's name (sanitized).
 const DOC_BYTES = Buffer.from("%PDF-1.4 arbitrary document body");
+// ZIP local-file-header magic — docx / xlsx are OOXML (ZIP) containers, so
+// detectAndVerifyMime only accepts them when the bytes start with PK\x03\x04.
+const ZIP_DOC_BYTES = Buffer.concat([
+  Buffer.from([0x50, 0x4b, 0x03, 0x04]), // PK\x03\x04
+  Buffer.from("rest-of-ooxml-payload"),
+]);
+// Plain text payload for text/markdown (no magic; detector treats it as text).
+const TEXT_DOC_BYTES = Buffer.from("# title\n\nsome markdown body");
 
 function docFile(mime: string, name: string): File {
-  return new File([DOC_BYTES], name, { type: mime });
+  // Pick bytes whose magic matches the claimed MIME so detectAndVerifyMime
+  // accepts the upload instead of 415-ing on a header/payload mismatch.
+  const bytes =
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ? ZIP_DOC_BYTES
+      : mime === "text/markdown"
+        ? TEXT_DOC_BYTES
+        : DOC_BYTES;
+  return new File([bytes], name, { type: mime });
 }
 
 describe("POST /files — document branch", () => {

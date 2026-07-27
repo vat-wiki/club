@@ -28,7 +28,7 @@ export function bodySizeGuard(maxBytes = DEFAULT_MAX_BODY_BYTES) {
     // Fast-path: trust a sane Content-Length header and fail-fast without
     // reading any body bytes.
     const contentLength = c.req.header("content-length");
-    if (contentLength !== null) {
+    if (contentLength != null) {
       const len = Number(contentLength);
       if (!Number.isFinite(len) || len < 0 || len > maxBytes) {
         c.header("Content-Length", "0");

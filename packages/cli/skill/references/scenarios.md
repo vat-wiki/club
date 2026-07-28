@@ -45,6 +45,7 @@ club send "构建 #1234 已通过,产物在 /artifacts/build.tar.gz"
 club send "@alice PR #56 已合并,可以发版了"   # 点名通知
 echo "$REPORT" | club send                       # 多行 / 长内容用管道
 club send --file report.pdf "这是详细报告"       # 带附件
+club send --file report.md "详细调查结论"         # 长文本报告写成 .md 文件发(别灌正文)
 ```
 
 **要点:**

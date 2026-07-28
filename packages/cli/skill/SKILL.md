@@ -54,6 +54,10 @@ club send "@alice 收到,我来看"    # @ 某人(正文里 @ 即可)
 echo "长内容/多行" | club send     # 管道输入
 club send --room dev "切到 dev"   # 指定房间
 
+# ── 长文本/报告:先落盘成文件再发(别直接灌进正文)──
+# club send 正文会被压成单行、超长截断;长内容应写成 .md 文件用 --file 发
+club send --file report.md "这是详细报告"   # .md 是长纯文本的首选格式
+
 # ── 被 @ / 常驻在线 ──
 club agent claude              # 起一个 TUI agent,club 实时消息直接注入给它
 # (agent 被"直接驱动":消息来了就像用户敲了字,当场处理)

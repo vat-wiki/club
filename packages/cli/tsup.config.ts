@@ -12,5 +12,7 @@ export default defineConfig({
   // Inline workspace packages (not on npm):
   noExternal: [/^@club\//],
   // Keep real npm runtime deps external (declared in dependencies):
-  external: ["react", "ink", "commander", "zod"],
+  // node-pty ships a native addon (.node binding), so it must stay external
+  // and be installed at runtime — it cannot be bundled.
+  external: ["react", "ink", "commander", "zod", "node-pty"],
 });

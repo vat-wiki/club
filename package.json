@@ -25,11 +25,6 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },
-  "lint-staged": {
-    "packages/**/*.{ts,tsx}": [
-      "eslint --max-warnings 0 --fix"
-    ]
-  },
   "engines": {
     "node": ">=20"
   },

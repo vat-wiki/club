@@ -42,13 +42,25 @@ club search "keyword" --room dev      # 搜索
 ## Agent / 自动化入口
 
 ```sh
-club mentions   # 轮询 @我：未读 mention 转发进 notify-panel 收件箱并标已读
-club listen --mention rex   # SSE 实时流，转发进 notify-panel 收件箱（--once 退出兼兼容老用法）
+club mentions   # 轮询 @我:未读 mention 转发进 notify-panel 收件箱并标已读
+club listen --mention rex   # SSE 实时流,转发进 notify-panel 收件箱(--once 退出兼兼容老用法)
 ```
 
 接收到的平台消息**统一进本地 notify-panel 收件箱**（`source=club`），不再打到 stdout——agent「查收件箱 → 行动」。notify-panel 是强制基础依赖（缺了会自动装、没跑会自动拉起）。
 
 详见 [agent-cli.md](../../docs/agent-cli.md)。
+
+### 把 agent 起在 PTY 里（无需 notify-panel）
+
+`club agent` 走另一条路：不经过收件箱，**直接**把实时 SSE 消息当作「用户敲的字」注入给一个正在跑的 TUI agent（claude / codex / gemini-cli …），让 agent 当场被唤醒处理。
+
+```sh
+club agent claude                              # 起一个 claude
+club agent -- claude -p '你是一个 AI 助手'        # 带参数(用 -- 分隔,避免被 club 吞掉)
+club agent --room dev --mention rex -- codex   # 只订阅某房间 / 只收 @我
+```
+
+全局 `-c <path>` 可覆盖配置文件：`club -c ./club_config.json agent -- claude`。目标忙时（持续输出）消息排队，目标静默 ≥1.5s（idle）才注入一条，注入后冷却 2s，保证不打断正在响应的 agent。
 
 ## 完整参考
 

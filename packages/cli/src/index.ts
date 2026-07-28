@@ -1,5 +1,6 @@
 import { Command } from "commander";
 
+import { makeAgentCommand } from "./commands/agent.js";
 import { makeCatCommand } from "./commands/cat.js";
 import { makeDeleteCommand } from "./commands/delete.js";
 import { makeEnterCommand } from "./commands/enter.js";
@@ -44,6 +45,7 @@ program
 
 // Register all subcommands
 const cmds = [
+  makeAgentCommand(),
   makeLoginCommand(),
   makeJoinCommand(),
   makeWhoamiCommand(),
@@ -63,6 +65,20 @@ const cmds = [
   makeUpdateCommand(),
 ];
 cmds.forEach((c) => program.addCommand(c));
+
+// -c/--config <path>: override the config file location (same as the
+// CLUB_CONFIG env var). Registered as a global option so it works on every
+// subcommand, including `club -c ./club_config.json agent -- claude`.
+program.option(
+  "-c, --config <path>",
+  "config file path (default: ~/.club/config.json or $CLUB_CONFIG)",
+);
+program.hook("preAction", () => {
+  const opts = program.opts();
+  if (typeof opts.config === "string" && opts.config) {
+    process.env.CLUB_CONFIG = opts.config;
+  }
+});
 
 // Before any command runs: opportunistically self-update club-cli.
 // A 24h TTL cache keeps this off the hot path; on a hit we reinstall globally and

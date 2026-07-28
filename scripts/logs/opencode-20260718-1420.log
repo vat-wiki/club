@@ -1,0 +1,1058 @@
+=== 2026-07-18 14:20:04 ===
+角度 [6]: Refactor for better modularity and separation of concerns. Extract utilities, improve error handling patterns, reduce coupling between packages.
+---
+[0m
+> build · sensenova-6.7-flash-lite
+[0m
+[0m$ [0mfind /home/dev/repos/club -type f -name "*.go" | head -100
+(no output)
+[0m
+[0m$ [0mls -la /home/dev/repos/club/
+total 504
+drwxr-xr-x  13 dev  dev    4096 Jul 18 13:01 .
+drwxr-xr-x   3 dev  dev    4096 Jul 17 18:27 ..
+drwxr-xr-x   2 dev  dev    4096 Jul 18 08:01 .claude
+-rw-r--r--   1 dev  dev     513 Jul 17 18:27 .dockerignore
+drwxr-xr-x   8 dev  dev    4096 Jul 18 14:08 .git
+drwxr-xr-x   3 dev  dev    4096 Jul 17 18:27 .github
+-rw-r--r--   1 dev  dev     649 Jul 17 18:27 .gitignore
+drwxr-xr-x   3 root root   4096 Jul 18 13:30 .opencode
+drwxr-xr-x   4 dev  dev    4096 Jul 17 18:27 .pd-docs
+drwxr-xr-x   4 dev  dev    4096 Jul 17 18:27 .ux-review
+-rw-r--r--   1 dev  dev     410 Jul 17 18:27 CLAUDE.md
+-rw-r--r--   1 dev  dev    3249 Jul 18 14:05 Dockerfile
+-rw-r--r--   1 dev  dev    2947 Jul 17 18:27 README.md
+-rw-r--r--   1 dev  dev    2549 Jul 17 18:27 docker-compose.yml
+drwxr-xr-x   4 dev  dev    4096 Jul 17 18:27 docs
+drwxr-xr-x 465 dev  dev   20480 Jul 18 13:33 node_modules
+-rw-r--r--   1 dev  dev      51 Jul 18 13:01 opencode.json
+-rw-r--r--   1 dev  dev  403082 Jul 18 13:40 package-lock.json
+-rw-r--r--   1 dev  dev    1046 Jul 18 13:33 package.json
+drwxr-xr-x   8 dev  dev    4096 Jul 17 18:27 packages
+drwxr-xr-x   2 dev  dev    4096 Jul 17 18:27 prepub
+drwxr-xr-x   3 dev  dev    4096 Jul 18 13:30 scripts
+-rw-r--r--   1 dev  dev     363 Jul 17 18:27 tsconfig.base.json
+[0m
+Let me explore the codebase structure first to understand what we're working with.
+[0m$ [0mls -la /home/dev/repos/club/packages/
+total 32
+drwxr-xr-x  8 dev dev 4096 Jul 17 18:27 .
+drwxr-xr-x 13 dev dev 4096 Jul 18 13:01 ..
+drwxr-xr-x  7 dev dev 4096 Jul 18 14:08 cli
+drwxr-xr-x  7 dev dev 4096 Jul 18 14:08 mcp
+drwxr-xr-x  6 dev dev 4096 Jul 18 14:08 sdk
+drwxr-xr-x  6 dev dev 4096 Jul 18 14:08 server
+drwxr-xr-x  6 dev dev 4096 Jul 18 14:08 shared
+drwxr-xr-x  7 dev dev 4096 Jul 18 14:08 web
+[0m
+[0m→ [0mRead package.json
+[0m→ [0mRead tsconfig.base.json
+[0m
+[0m$ [0mfind /home/dev/repos/club/packages/shared -type f | head -50
+/home/dev/repos/club/packages/shared/vitest.config.ts
+/home/dev/repos/club/packages/shared/package.json
+/home/dev/repos/club/packages/shared/.npmignore
+/home/dev/repos/club/packages/shared/tsconfig.json
+/home/dev/repos/club/packages/shared/src/mention.test.ts
+/home/dev/repos/club/packages/shared/src/mention.ts
+/home/dev/repos/club/packages/shared/src/types.ts
+/home/dev/repos/club/packages/shared/src/index.ts
+/home/dev/repos/club/packages/shared/coverage/sorter.js
+/home/dev/repos/club/packages/shared/coverage/base.css
+/home/dev/repos/club/packages/shared/coverage/prettify.js
+/home/dev/repos/club/packages/shared/coverage/mention.ts.html
+/home/dev/repos/club/packages/shared/coverage/coverage-final.json
+/home/dev/repos/club/packages/shared/coverage/index.html
+/home/dev/repos/club/packages/shared/coverage/sort-arrow-sprite.png
+/home/dev/repos/club/packages/shared/coverage/favicon.png
+/home/dev/repos/club/packages/shared/coverage/prettify.css
+/home/dev/repos/club/packages/shared/coverage/block-navigation.js
+/home/dev/repos/club/packages/shared/README.md
+/home/dev/repos/club/packages/shared/dist/index.d.ts.map
+/home/dev/repos/club/packages/shared/dist/mention.d.ts
+/home/dev/repos/club/packages/shared/dist/mention.js
+/home/dev/repos/club/packages/shared/dist/types.d.ts.map
+/home/dev/repos/club/packages/shared/dist/mention.d.ts.map
+/home/dev/repos/club/packages/shared/dist/index.d.ts
+/home/dev/repos/club/packages/shared/dist/index.js.map
+/home/dev/repos/club/packages/shared/dist/types.js.map
+/home/dev/repos/club/packages/shared/dist/types.js
+/home/dev/repos/club/packages/shared/dist/types.d.ts
+/home/dev/repos/club/packages/shared/dist/mention.js.map
+/home/dev/repos/club/packages/shared/dist/index.js
+/home/dev/repos/club/packages/shared/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json
+[0m
+[0m$ [0mfind /home/dev/repos/club/packages/sdk -type f | head -50
+/home/dev/repos/club/packages/sdk/vitest.config.ts
+/home/dev/repos/club/packages/sdk/package.json
+/home/dev/repos/club/packages/sdk/tsconfig.json
+/home/dev/repos/club/packages/sdk/src/stream.test.ts
+/home/dev/repos/club/packages/sdk/src/node.ts
+/home/dev/repos/club/packages/sdk/src/stream.ts
+/home/dev/repos/club/packages/sdk/src/transport.test.ts
+/home/dev/repos/club/packages/sdk/src/client.ts
+/home/dev/repos/club/packages/sdk/src/image-upload.test.ts
+/home/dev/repos/club/packages/sdk/src/image-upload.boundary.test.ts
+/home/dev/repos/club/packages/sdk/src/file-parser.ts
+/home/dev/repos/club/packages/sdk/src/errors.ts
+/home/dev/repos/club/packages/sdk/src/transport.ts
+/home/dev/repos/club/packages/sdk/src/image-upload.ts
+/home/dev/repos/club/packages/sdk/src/format.test.ts
+/home/dev/repos/club/packages/sdk/src/optional-deps.d.ts
+/home/dev/repos/club/packages/sdk/src/format.ts
+/home/dev/repos/club/packages/sdk/src/index.ts
+/home/dev/repos/club/packages/sdk/coverage/errors.ts.html
+/home/dev/repos/club/packages/sdk/coverage/client.ts.html
+/home/dev/repos/club/packages/sdk/coverage/sorter.js
+/home/dev/repos/club/packages/sdk/coverage/base.css
+/home/dev/repos/club/packages/sdk/coverage/format.ts.html
+/home/dev/repos/club/packages/sdk/coverage/stream.ts.html
+/home/dev/repos/club/packages/sdk/coverage/prettify.js
+/home/dev/repos/club/packages/sdk/coverage/coverage-final.json
+/home/dev/repos/club/packages/sdk/coverage/index.html
+/home/dev/repos/club/packages/sdk/coverage/sort-arrow-sprite.png
+/home/dev/repos/club/packages/sdk/coverage/transport.ts.html
+/home/dev/repos/club/packages/sdk/coverage/favicon.png
+/home/dev/repos/club/packages/sdk/coverage/index.ts.html
+/home/dev/repos/club/packages/sdk/coverage/image-upload.ts.html
+/home/dev/repos/club/packages/sdk/coverage/prettify.css
+/home/dev/repos/club/packages/sdk/coverage/block-navigation.js
+/home/dev/repos/club/packages/sdk/README.md
+/home/dev/repos/club/packages/sdk/dist/index.d.ts.map
+/home/dev/repos/club/packages/sdk/dist/node.d.ts
+/home/dev/repos/club/packages/sdk/dist/file-parser.d.ts
+/home/dev/repos/club/packages/sdk/dist/file-parser.d.ts.map
+/home/dev/repos/club/packages/sdk/dist/node.d.ts.map
+/home/dev/repos/club/packages/sdk/dist/image-upload.js
+/home/dev/repos/club/packages/sdk/dist/node.js
+/home/dev/repos/club/packages/sdk/dist/image-upload.d.ts.map
+/home/dev/repos/club/packages/sdk/dist/file-parser.js
+/home/dev/repos/club/packages/sdk/dist/stream.js.map
+/home/dev/repos/club/packages/sdk/dist/index.d.ts
+/home/dev/repos/club/packages/sdk/dist/client.d.ts.map
+/home/dev/repos/club/packages/sdk/dist/client.d.ts
+/home/dev/repos/club/packages/sdk/dist/image-upload.d.ts
+/home/dev/repos/club/packages/sdk/dist/errors.d.ts
+[0m
+[0m$ [0mfind /home/dev/repos/club/packages/server -type f | head -80
+/home/dev/repos/club/packages/server/vitest.config.ts
+/home/dev/repos/club/packages/server/package.json
+/home/dev/repos/club/packages/server/tsconfig.json
+/home/dev/repos/club/packages/server/src/mention.test.ts
+/home/dev/repos/club/packages/server/src/stream.test.ts
+/home/dev/repos/club/packages/server/src/public/join.html
+/home/dev/repos/club/packages/server/src/crypto.test.ts
+/home/dev/repos/club/packages/server/src/db.ts
+/home/dev/repos/club/packages/server/src/lib.ts
+/home/dev/repos/club/packages/server/src/stream.ts
+/home/dev/repos/club/packages/server/src/rate-limit.ts
+/home/dev/repos/club/packages/server/src/mention.ts
+/home/dev/repos/club/packages/server/src/files-dir.ts
+/home/dev/repos/club/packages/server/src/crypto.ts
+/home/dev/repos/club/packages/server/src/lib.test.ts
+/home/dev/repos/club/packages/server/src/auth.ts
+/home/dev/repos/club/packages/server/src/security-headers.ts
+/home/dev/repos/club/packages/server/src/routes/messages.attachments.test.ts
+/home/dev/repos/club/packages/server/src/routes/agents.test.ts
+/home/dev/repos/club/packages/server/src/routes/rooms.test.ts
+/home/dev/repos/club/packages/server/src/routes/messages.ts
+/home/dev/repos/club/packages/server/src/routes/images.boundary.test.ts
+/home/dev/repos/club/packages/server/src/routes/rooms.ts
+/home/dev/repos/club/packages/server/src/routes/members.ts
+/home/dev/repos/club/packages/server/src/routes/me.mentions.test.ts
+/home/dev/repos/club/packages/server/src/routes/agents.ts
+/home/dev/repos/club/packages/server/src/routes/images.e2e.test.ts
+/home/dev/repos/club/packages/server/src/routes/me.ts
+/home/dev/repos/club/packages/server/src/routes/files.test.ts
+/home/dev/repos/club/packages/server/src/routes/files.ts
+/home/dev/repos/club/packages/server/src/routes/participants.ts
+/home/dev/repos/club/packages/server/src/routes/participants.recover.test.ts
+/home/dev/repos/club/packages/server/src/routes/members.test.ts
+/home/dev/repos/club/packages/server/src/routes/messages.pagination.test.ts
+/home/dev/repos/club/packages/server/src/migration.test.ts
+/home/dev/repos/club/packages/server/src/index.ts
+/home/dev/repos/club/packages/server/coverage/sorter.js
+/home/dev/repos/club/packages/server/coverage/base.css
+/home/dev/repos/club/packages/server/coverage/src/crypto.ts.html
+/home/dev/repos/club/packages/server/coverage/src/db.ts.html
+/home/dev/repos/club/packages/server/coverage/src/stream.ts.html
+/home/dev/repos/club/packages/server/coverage/src/files-dir.ts.html
+/home/dev/repos/club/packages/server/coverage/src/mention.ts.html
+/home/dev/repos/club/packages/server/coverage/src/auth.ts.html
+/home/dev/repos/club/packages/server/coverage/src/index.html
+/home/dev/repos/club/packages/server/coverage/src/routes/files.ts.html
+/home/dev/repos/club/packages/server/coverage/src/routes/participants.ts.html
+/home/dev/repos/club/packages/server/coverage/src/routes/me.ts.html
+/home/dev/repos/club/packages/server/coverage/src/routes/index.html
+/home/dev/repos/club/packages/server/coverage/src/routes/agents.ts.html
+/home/dev/repos/club/packages/server/coverage/src/routes/members.ts.html
+/home/dev/repos/club/packages/server/coverage/src/routes/rooms.ts.html
+/home/dev/repos/club/packages/server/coverage/src/routes/messages.ts.html
+/home/dev/repos/club/packages/server/coverage/src/lib.ts.html
+/home/dev/repos/club/packages/server/coverage/src/rate-limit.ts.html
+/home/dev/repos/club/packages/server/coverage/prettify.js
+/home/dev/repos/club/packages/server/coverage/coverage-final.json
+/home/dev/repos/club/packages/server/coverage/index.html
+/home/dev/repos/club/packages/server/coverage/sort-arrow-sprite.png
+/home/dev/repos/club/packages/server/coverage/favicon.png
+/home/dev/repos/club/packages/server/coverage/prettify.css
+/home/dev/repos/club/packages/server/coverage/block-navigation.js
+/home/dev/repos/club/packages/server/dist/rate-limit.d.ts
+/home/dev/repos/club/packages/server/dist/crypto.d.ts
+/home/dev/repos/club/packages/server/dist/index.d.ts.map
+/home/dev/repos/club/packages/server/dist/mention.d.ts
+/home/dev/repos/club/packages/server/dist/db.js
+/home/dev/repos/club/packages/server/dist/public/join.html
+/home/dev/repos/club/packages/server/dist/auth.js
+/home/dev/repos/club/packages/server/dist/lib.d.ts
+/home/dev/repos/club/packages/server/dist/mention.js
+/home/dev/repos/club/packages/server/dist/auth.d.ts
+/home/dev/repos/club/packages/server/dist/auth.js.map
+/home/dev/repos/club/packages/server/dist/security-headers.js.map
+/home/dev/repos/club/packages/server/dist/rate-limit.js.map
+/home/dev/repos/club/packages/server/dist/files-dir.js.map
+/home/dev/repos/club/packages/server/dist/mention.d.ts.map
+/home/dev/repos/club/packages/server/dist/lib.js
+/home/dev/repos/club/packages/server/dist/stream.js.map
+/home/dev/repos/club/packages/server/dist/index.d.ts
+[0m
+[0m$ [0mfind /home/dev/repos/club/packages/cli -type f | head -50
+/home/dev/repos/club/packages/cli/vitest.config.ts
+/home/dev/repos/club/packages/cli/package.json
+/home/dev/repos/club/packages/cli/tsconfig.json
+/home/dev/repos/club/packages/cli/src/stdin.ts
+/home/dev/repos/club/packages/cli/src/commands/join.ts
+/home/dev/repos/club/packages/cli/src/commands/recover.ts
+/home/dev/repos/club/packages/cli/src/commands/enter.test.ts
+/home/dev/repos/club/packages/cli/src/commands/rooms.test.ts
+/home/dev/repos/club/packages/cli/src/commands/search.ts
+/home/dev/repos/club/packages/cli/src/commands/info.ts
+/home/dev/repos/club/packages/cli/src/commands/delete.ts
+/home/dev/repos/club/packages/cli/src/commands/enter.ts
+/home/dev/repos/club/packages/cli/src/commands/join.test.ts
+/home/dev/repos/club/packages/cli/src/commands/rooms.ts
+/home/dev/repos/club/packages/cli/src/commands/members.ts
+/home/dev/repos/club/packages/cli/src/commands/login.ts
+/home/dev/repos/club/packages/cli/src/commands/read.ts
+/home/dev/repos/club/packages/cli/src/commands/react.ts
+/home/dev/repos/club/packages/cli/src/commands/update.ts
+/home/dev/repos/club/packages/cli/src/commands/whoami.ts
+/home/dev/repos/club/packages/cli/src/commands/send-impl.ts
+/home/dev/repos/club/packages/cli/src/commands/send-impl.test.ts
+/home/dev/repos/club/packages/cli/src/commands/listen.ts
+/home/dev/repos/club/packages/cli/src/commands/format.ts
+/home/dev/repos/club/packages/cli/src/commands/mentions.ts
+/home/dev/repos/club/packages/cli/src/commands/cat.ts
+/home/dev/repos/club/packages/cli/src/commands/send.ts
+/home/dev/repos/club/packages/cli/src/config.test.ts
+/home/dev/repos/club/packages/cli/src/config.ts
+/home/dev/repos/club/packages/cli/src/limit.ts
+/home/dev/repos/club/packages/cli/src/update.test.ts
+/home/dev/repos/club/packages/cli/src/update.ts
+/home/dev/repos/club/packages/cli/src/stdin.test.ts
+/home/dev/repos/club/packages/cli/src/limit.test.ts
+/home/dev/repos/club/packages/cli/src/tui.tsx
+/home/dev/repos/club/packages/cli/src/index.ts
+/home/dev/repos/club/packages/cli/bin/club.js
+/home/dev/repos/club/packages/cli/coverage/cli/package.json.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/commands/join.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/commands/send-impl.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/commands/index.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/commands/rooms.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/commands/enter.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/update.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/index.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/config.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/limit.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/src/stdin.ts.html
+/home/dev/repos/club/packages/cli/coverage/cli/index.html
+/home/dev/repos/club/packages/cli/coverage/sorter.js
+[0m
+[0m$ [0mfind /home/dev/repos/club/packages/mcp -type f | head -50
+/home/dev/repos/club/packages/mcp/vitest.config.ts
+/home/dev/repos/club/packages/mcp/package.json
+/home/dev/repos/club/packages/mcp/tsconfig.json
+/home/dev/repos/club/packages/mcp/src/helpers.test.ts
+/home/dev/repos/club/packages/mcp/src/helpers.ts
+/home/dev/repos/club/packages/mcp/src/index.ts
+/home/dev/repos/club/packages/mcp/bin/club-mcp.js
+/home/dev/repos/club/packages/mcp/coverage/sorter.js
+/home/dev/repos/club/packages/mcp/coverage/base.css
+/home/dev/repos/club/packages/mcp/coverage/helpers.ts.html
+/home/dev/repos/club/packages/mcp/coverage/prettify.js
+/home/dev/repos/club/packages/mcp/coverage/coverage-final.json
+/home/dev/repos/club/packages/mcp/coverage/index.html
+/home/dev/repos/club/packages/mcp/coverage/sort-arrow-sprite.png
+/home/dev/repos/club/packages/mcp/coverage/favicon.png
+/home/dev/repos/club/packages/mcp/coverage/prettify.css
+/home/dev/repos/club/packages/mcp/coverage/block-navigation.js
+/home/dev/repos/club/packages/mcp/dist/index.d.ts.map
+/home/dev/repos/club/packages/mcp/dist/helpers.js
+/home/dev/repos/club/packages/mcp/dist/helpers.d.ts
+/home/dev/repos/club/packages/mcp/dist/helpers.d.ts.map
+/home/dev/repos/club/packages/mcp/dist/index.d.ts
+/home/dev/repos/club/packages/mcp/dist/helpers.js.map
+/home/dev/repos/club/packages/mcp/dist/index.js.map
+/home/dev/repos/club/packages/mcp/dist/index.js
+/home/dev/repos/club/packages/mcp/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json
+[0m
+[0m$ [0mfind /home/dev/repos/club/packages/web -type f | head -80
+/home/dev/repos/club/packages/web/package.json
+/home/dev/repos/club/packages/web/public/favicon.svg
+/home/dev/repos/club/packages/web/tailwind.config.ts
+/home/dev/repos/club/packages/web/tsconfig.node.json
+/home/dev/repos/club/packages/web/tsconfig.json
+/home/dev/repos/club/packages/web/src/App.tsx
+/home/dev/repos/club/packages/web/src/main.tsx
+/home/dev/repos/club/packages/web/src/components/auth-dialog.tsx
+/home/dev/repos/club/packages/web/src/components/room-list.test.tsx
+/home/dev/repos/club/packages/web/src/components/mention-toast.tsx
+/home/dev/repos/club/packages/web/src/components/boot-screen.tsx
+/home/dev/repos/club/packages/web/src/components/mobile-topbar-menu.tsx
+/home/dev/repos/club/packages/web/src/components/mobile-room-sheet.tsx
+/home/dev/repos/club/packages/web/src/components/view-key-dialog.tsx
+/home/dev/repos/club/packages/web/src/components/mention-popup.tsx
+/home/dev/repos/club/packages/web/src/components/account-created-toast.tsx
+/home/dev/repos/club/packages/web/src/components/search-bar.tsx
+/home/dev/repos/club/packages/web/src/components/composer.tsx
+/home/dev/repos/club/packages/web/src/components/avatar.tsx
+/home/dev/repos/club/packages/web/src/components/topbar.tsx
+/home/dev/repos/club/packages/web/src/components/message-list.tsx
+/home/dev/repos/club/packages/web/src/components/key-reveal-dialog.tsx
+/home/dev/repos/club/packages/web/src/components/message-list.test.tsx
+/home/dev/repos/club/packages/web/src/components/file-card.tsx
+/home/dev/repos/club/packages/web/src/components/image-lightbox.tsx
+/home/dev/repos/club/packages/web/src/components/language-switcher.tsx
+/home/dev/repos/club/packages/web/src/components/media-preview-chip.tsx
+/home/dev/repos/club/packages/web/src/components/typing-indicator.tsx
+/home/dev/repos/club/packages/web/src/components/composer.test.tsx
+/home/dev/repos/club/packages/web/src/components/composer.interactions.test.tsx
+/home/dev/repos/club/packages/web/src/components/file-card.test.tsx
+/home/dev/repos/club/packages/web/src/components/typing-indicator.test.tsx
+/home/dev/repos/club/packages/web/src/components/room-list.tsx
+/home/dev/repos/club/packages/web/src/components/a11y.test.tsx
+/home/dev/repos/club/packages/web/src/components/roster.tsx
+/home/dev/repos/club/packages/web/src/components/mobile-roster.tsx
+/home/dev/repos/club/packages/web/src/components/mention-popup.test.tsx
+/home/dev/repos/club/packages/web/src/components/recover-dialog.tsx
+/home/dev/repos/club/packages/web/src/components/message-list.lightbox.test.tsx
+/home/dev/repos/club/packages/web/src/components/sign-out-confirm-dialog.tsx
+/home/dev/repos/club/packages/web/src/components/ui/scroll-area.tsx
+/home/dev/repos/club/packages/web/src/components/ui/separator.tsx
+/home/dev/repos/club/packages/web/src/components/ui/input.tsx
+/home/dev/repos/club/packages/web/src/components/ui/dialog.tsx
+/home/dev/repos/club/packages/web/src/components/ui/textarea.tsx
+/home/dev/repos/club/packages/web/src/components/ui/avatar.tsx
+/home/dev/repos/club/packages/web/src/components/ui/badge.tsx
+/home/dev/repos/club/packages/web/src/components/ui/label.tsx
+/home/dev/repos/club/packages/web/src/components/ui/button.tsx
+/home/dev/repos/club/packages/web/src/components/ui/card.tsx
+/home/dev/repos/club/packages/web/src/hooks/use-typing-agents.ts
+/home/dev/repos/club/packages/web/src/hooks/use-rooms.ts
+/home/dev/repos/club/packages/web/src/hooks/use-copy.ts
+/home/dev/repos/club/packages/web/src/hooks/use-copy.test.ts
+/home/dev/repos/club/packages/web/src/hooks/use-rooms.test.tsx
+/home/dev/repos/club/packages/web/src/hooks/use-message-stream.ts
+/home/dev/repos/club/packages/web/src/hooks/use-visual-viewport-height.test.ts
+/home/dev/repos/club/packages/web/src/hooks/use-visual-viewport-height.ts
+/home/dev/repos/club/packages/web/src/hooks/use-typing-agents.test.ts
+/home/dev/repos/club/packages/web/src/vite-env.d.ts
+/home/dev/repos/club/packages/web/src/test/setup.ts
+/home/dev/repos/club/packages/web/src/test/i18n-wrap.tsx
+/home/dev/repos/club/packages/web/src/index.css
+/home/dev/repos/club/packages/web/src/lib/mention.test.ts
+/home/dev/repos/club/packages/web/src/lib/upload.ts
+/home/dev/repos/club/packages/web/src/lib/i18n.tsx
+/home/dev/repos/club/packages/web/src/lib/i18n.test.tsx
+/home/dev/repos/club/packages/web/src/lib/mention.ts
+/home/dev/repos/club/packages/web/src/lib/format.tsx
+/home/dev/repos/club/packages/web/src/lib/auth.test.ts
+/home/dev/repos/club/packages/web/src/lib/nickname.ts
+/home/dev/repos/club/packages/web/src/lib/utils.ts
+/home/dev/repos/club/packages/web/src/lib/nickname.test.ts
+/home/dev/repos/club/packages/web/src/lib/auth.ts
+/home/dev/repos/club/packages/web/src/lib/upload.test.ts
+/home/dev/repos/club/packages/web/src/lib/api.ts
+/home/dev/repos/club/packages/web/src/lib/format.test.tsx
+/home/dev/repos/club/packages/web/index.html
+/home/dev/repos/club/packages/web/components.json
+/home/dev/repos/club/packages/web/postcss.config.js
+[0m
+This is a TypeScript monorepo with 6 packages. Let me explore each one in parallel to understand the structure and coupling.
+[0m→ [0mRead packages/shared/src/index.ts
+[0m→ [0mRead packages/shared/src/types.ts
+[0m→ [0mRead packages/shared/src/mention.ts
+[0m→ [0mRead packages/sdk/src/index.ts
+[0m→ [0mRead packages/sdk/src/errors.ts
+[0m→ [0mRead packages/server/src/index.ts
+Now let me read the key source files to understand the coupling, error handling patterns, and what could be extracted.
+[0m→ [0mRead packages/sdk/src/transport.ts
+[0m→ [0mRead packages/sdk/src/client.ts
+[0m→ [0mRead packages/sdk/src/stream.ts
+[0m→ [0mRead packages/sdk/src/format.ts
+[0m→ [0mRead packages/server/src/lib.ts
+[0m→ [0mRead packages/server/src/mention.ts
+[0m→ [0mRead packages/server/src/crypto.ts
+[0m→ [0mRead packages/server/src/auth.ts
+[0m→ [0mRead packages/server/src/rate-limit.ts
+Now let me look at the server routes and duplicated code patterns.
+[0m→ [0mRead packages/server/src/routes/messages.ts
+[0m→ [0mRead packages/server/src/db.ts
+[0m→ [0mRead packages/server/src/stream.ts
+[0m→ [0mRead packages/server/src/security-headers.ts
+[0m→ [0mRead packages/web/src/lib/api.ts
+[0m
+[0m# [0mTodos
+[ ] Extract shared error utilities to @club/shared (formatError, ClubApiError)
+[ ] Extract shared retry/backoff utilities to @club/shared
+[ ] Extract shared HTTP helper (parseBearer) to @club/shared
+[ ] Consolidate formatMessage: move CLI/MCP message formatting to shared, remove duplicate from sdk/format.ts
+[ ] Fix web lib/api.ts to use ClubClient consistently (recoverParticipant, delete/react bypass)
+[ ] Extract server route shared patterns into reusable middleware utilities
+[0m
+Now I have a comprehensive picture of the codebase. Let me create a task plan.
+[0m# [0mTodos
+[•] Extract shared error utilities to @club/shared (formatError, ClubApiError)
+[ ] Extract shared retry/backoff utilities to @club/shared
+[ ] Extract shared HTTP helper (parseBearer) to @club/shared
+[ ] Consolidate formatMessage: move CLI/MCP message formatting to shared, remove duplicate from sdk/format.ts
+[ ] Fix web lib/api.ts to use ClubClient consistently (recoverParticipant, delete/react bypass)
+[ ] Extract server route shared patterns into reusable middleware utilities
+[0m
+Starting with extracting shared error utilities.
+[0m→ [0mRead packages/shared/package.json
+[0m→ [0mRead packages/shared/tsconfig.json
+[0m→ [0mRead packages/sdk/package.json
+[0m
+[0m← [0mWrite packages/shared/src/errors.ts
+Wrote file successfully.
+[0m
+[0m← [0mWrite packages/shared/src/retry.ts
+Wrote file successfully.
+[0m
+Now let me create the shared error and retry modules.
+[0m← [0mEdit packages/shared/src/index.ts
+Index: /home/dev/repos/club/packages/shared/src/index.ts
+===================================================================
+--- /home/dev/repos/club/packages/shared/src/index.ts
++++ /home/dev/repos/club/packages/shared/src/index.ts
+@@ -1,2 +1,4 @@
+ export * from "./types.js";
+-export * from "./mention.js";
+\ No newline at end of file
++export * from "./mention.js";
++export * from "./errors.js";
++export * from "./retry.js";
+\ No newline at end of file
+
+[0m
+[0m← [0mEdit packages/sdk/src/errors.ts
+Index: /home/dev/repos/club/packages/sdk/src/errors.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/errors.ts
++++ /home/dev/repos/club/packages/sdk/src/errors.ts
+@@ -1,21 +1,4 @@
+-// Errors thrown by the SDK transport layer. ClubApiError carries the HTTP
+-// status when one was received; synthetic errors (timeout, network) use
+-// conventional non-2xx codes so callers can branch uniformly. A status of 0
+-// denotes a network failure with no HTTP response.
+-export class ClubApiError extends Error {
+-  constructor(message: string, public status: number) {
+-    super(message);
+-    this.name = "ClubApiError";
+-  }
+-}
+-
+-// Safe extraction of a human-readable message from any thrown value.
+-// `catch` blocks in JS may receive strings, plain objects, or Error instances;
+-// the common `(err as Error).message` pattern yields `undefined` for strings
+-// and non-Error objects, silently masking real failures. This helper covers all
+-// three cases.
+-export function formatError(err: unknown): string {
+-  if (err instanceof Error) return err.message;
+-  if (typeof err === "string") return err;
+-  return String(err);
+-}
++// Re-export shared error types from @club/shared.
++// @club/sdk wraps and re-exports these so consumers can import everything
++// from one package.
++export { ClubApiError, formatError } from "@club/shared";
+
+[0m
+Now update the SDK to re-export from shared and use shared utilities.
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -12,9 +12,9 @@
+   Room,
+   UploadFileResponse,
+ } from "@club/shared";
+ import { MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
+-import { ClubApiError, formatError } from "./errors.js";
++import { type ClubApiError, formatError, shouldRetry as shouldRetryShared, computeBackoff, sleep as sharedSleep } from "@club/shared";
+ 
+ // ── Connection ──────────────────────────────────────────────────────
+ // key is optional: createParticipant() needs no auth, so a client can be
+ // built with just { server } to mint a key, then rebuilt with that key.
+
+[0m
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -1,20 +1,6 @@
+-import type {
+-  CreateMessageRequest,
+-  CreateParticipantRequest,
+-  CreateParticipantResponse,
+-  ListMessagesQuery,
+-  Mention,
+-  Message,
+-  Participant,
+-  RecoverParticipantRequest,
+-  RecoverParticipantResponse,
+-  Reaction,
+-  Room,
+-  UploadFileResponse,
+-} from "@club/shared";
+ import { MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
+-import { type ClubApiError, formatError, shouldRetry as shouldRetryShared, computeBackoff, sleep as sharedSleep } from "@club/shared";
++import { type ClubApiError, formatError, shouldRetry, computeBackoff, sleep } from "@club/shared";
+ 
+ // ── Connection ──────────────────────────────────────────────────────
+ // key is optional: createParticipant() needs no auth, so a client can be
+ // built with just { server } to mint a key, then rebuilt with that key.
+
+[0m
+Now update transport.ts to use shared retry utilities and remove duplicates.
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -1,6 +1,28 @@
+-import { MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
+-import { type ClubApiError, formatError, shouldRetry, computeBackoff, sleep } from "@club/shared";
++import type {
++  CreateMessageRequest,
++  CreateParticipantRequest,
++  CreateParticipantResponse,
++  ListMessagesQuery,
++  Mention,
++  Message,
++  Participant,
++  RecoverParticipantRequest,
++  RecoverParticipantResponse,
++  Reaction,
++  Room,
++  UploadFileResponse,
++} from "@club/shared";
++import {
++  type ClubApiError,
++  formatError,
++  shouldRetry,
++  computeBackoff,
++  sleep,
++  MAX_DOCUMENT_BYTES,
++  MAX_IMAGE_BYTES,
++  MAX_VIDEO_BYTES,
++} from "@club/shared";
+ 
+ // ── Connection ──────────────────────────────────────────────────────
+ // key is optional: createParticipant() needs no auth, so a client can be
+ // built with just { server } to mint a key, then rebuilt with that key.
+
+[0m
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -59,40 +59,15 @@
+   }
+   return (res.status === 204 ? null : await res.json()) as T;
+ }
+ 
+-// ── Retry / timeout policy (pure, exported for testing) ─────────────
++// ── Retry / timeout policy ──────────────────────────────────────────
++// Delegated to @club/shared utilities for consistency across SDK and
++// any other consumer (CLI, MCP, web).
+ 
+-/** Whether a response of this status on this method is worth retrying. */
+-export function shouldRetry(method: string, status: number): boolean {
+-  // Only idempotent reads are retried; POST /messages is never retried
+-  // (a retry could duplicate the message).
+-  if (method !== "GET") return false;
+-  return status === 429 || status >= 500;
+-}
++const DEFAULT_TIMEOUT_MS = 15_000;
++const DEFAULT_RETRIES = 2;
+ 
+-/** Deterministic exponential backoff (ms) for a 0-based attempt. */
+-export function computeBackoff(attempt: number, base = 200, cap = 2000): number {
+-  return Math.min(cap, base * 2 ** attempt);
+-}
+-
+-function jitteredBackoff(attempt: number): number {
+-  // Full jitter: 50–100% of the exponential value, capped at 2s.
+-  return computeBackoff(attempt) * (0.5 + Math.random() * 0.5);
+-}
+-
+-function wrapErr(err: unknown): ClubApiError {
+-  if (err instanceof ClubApiError) return err;
+-  if (err instanceof Error && err.name === "AbortError") {
+-    return new ClubApiError("request timeout", 408);
+-  }
+-  return new ClubApiError(formatError(err), 0);
+-}
+-
+-function sleep(ms: number): Promise<void> {
+-  return new Promise((r) => setTimeout(r, ms));
+-}
+-
+ export interface RequestOptions extends CallOpts {
+   method?: string;
+   body?: unknown;
+ }
+
+[0m
+[0m→ [0mRead packages/sdk/src/transport.ts[90m [limit=60][0m
+[0m→ [0mRead packages/sdk/src/transport.ts[90m [limit=50, offset=60][0m
+[0m
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -15,9 +15,9 @@
+ import {
+   type ClubApiError,
+   formatError,
+   shouldRetry,
+-  computeBackoff,
++  jitteredBackoff,
+   sleep,
+   MAX_DOCUMENT_BYTES,
+   MAX_IMAGE_BYTES,
+   MAX_VIDEO_BYTES,
+
+[0m
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -66,8 +66,16 @@
+ 
+ const DEFAULT_TIMEOUT_MS = 15_000;
+ const DEFAULT_RETRIES = 2;
+ 
++function wrapErr(err: unknown): ClubApiError {
++  if (err instanceof ClubApiError) return err;
++  if (err instanceof Error && err.name === "AbortError") {
++    return new ClubApiError("request timeout", 408);
++  }
++  return new ClubApiError(formatError(err), 0);
++}
++
+ export interface RequestOptions extends CallOpts {
+   method?: string;
+   body?: unknown;
+ }
+
+[0m
+Now add `wrapErr` back as a local function and fix the imports.
+[0m← [0mEdit packages/sdk/src/stream.ts
+Index: /home/dev/repos/club/packages/sdk/src/stream.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/stream.ts
++++ /home/dev/repos/club/packages/sdk/src/stream.ts
+@@ -1,5 +1,6 @@
+ import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
++import { computeBackoff, sleep } from "@club/shared";
+ import { type ClubConn, listMessages, listRooms } from "./transport.js";
+ 
+ // ── SSE streaming with reconnect + catch-up ─────────────────────────
+ 
+
+[0m
+Now let me update stream.ts to use shared retry utilities.
+[0m→ [0mRead packages/sdk/src/stream.ts[90m [limit=60][0m
+[0m
+[0m← [0mEdit packages/sdk/src/stream.ts
+Index: /home/dev/repos/club/packages/sdk/src/stream.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/stream.ts
++++ /home/dev/repos/club/packages/sdk/src/stream.ts
+@@ -35,28 +35,8 @@
+ }
+ 
+ const RECONNECT_CAP_MS = 15_000;
+ 
+-function reconnectDelay(attempt: number, base: number): number {
+-  const exp = Math.min(RECONNECT_CAP_MS, base * 2 ** attempt);
+-  return exp * (0.5 + Math.random() * 0.5); // full jitter
+-}
+-
+-function sleep(ms: number, signal: AbortSignal): Promise<void> {
+-  return new Promise((resolve) => {
+-    if (signal.aborted) return resolve();
+-    const t = setTimeout(resolve, ms);
+-    signal.addEventListener(
+-      "abort",
+-      () => {
+-        clearTimeout(t);
+-        resolve();
+-      },
+-      { once: true },
+-    );
+-  });
+-}
+-
+ // Subscribe to /messages/stream. onMessage fires for each event. The stream
+ // reconnects on drop and catches up on anything missed while disconnected
+ // (fetched via GET /messages?since=<lastId>), de-duplicating by message id so
+ // overlap between the live buffer and the catch-up query is delivered exactly
+
+[0m
+[0m→ [0mRead packages/sdk/src/stream.ts[90m [limit=20, offset=85][0m
+[0m
+[0m← [0mEdit packages/sdk/src/stream.ts
+Index: /home/dev/repos/club/packages/sdk/src/stream.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/stream.ts
++++ /home/dev/repos/club/packages/sdk/src/stream.ts
+@@ -88,9 +88,9 @@
+       opts.onError?.(err2);
+       return;
+     }
+     opts.onError?.(err2);
+-    await sleep(reconnectDelay(attempts, base), stopSignal.signal);
++    await sleep(jitteredBackoff(attempts, base, RECONNECT_CAP_MS), stopSignal.signal);
+     if (stopSignal.signal.aborted) return;
+     attempts++;
+   }
+ }
+
+[0m
+[0m← [0mEdit packages/sdk/src/stream.ts
+Index: /home/dev/repos/club/packages/sdk/src/stream.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/stream.ts
++++ /home/dev/repos/club/packages/sdk/src/stream.ts
+@@ -1,6 +1,6 @@
+ import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
+-import { computeBackoff, sleep } from "@club/shared";
++import { computeBackoff, jitteredBackoff, sleep } from "@club/shared";
+ import { type ClubConn, listMessages, listRooms } from "./transport.js";
+ 
+ // ── SSE streaming with reconnect + catch-up ─────────────────────────
+ 
+
+[0m
+[0m← [0mEdit packages/sdk/src/stream.ts
+Index: /home/dev/repos/club/packages/sdk/src/stream.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/stream.ts
++++ /home/dev/repos/club/packages/sdk/src/stream.ts
+@@ -1,6 +1,6 @@
+ import type { Message, AgentThinkingEvent, AgentIdleEvent, PresenceEvent, MessageDeletedEvent, MessageReactionEvent } from "@club/shared";
+-import { computeBackoff, jitteredBackoff, sleep } from "@club/shared";
++import { jitteredBackoff, sleep } from "@club/shared";
+ import { type ClubConn, listMessages, listRooms } from "./transport.js";
+ 
+ // ── SSE streaming with reconnect + catch-up ─────────────────────────
+ 
+
+[0m
+[0m$ [0mnpm -w @club/shared run typecheck 2>&1
+> @club/shared@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+[0m
+[0m$ [0mnpm -w @club/sdk run typecheck 2>&1
+> @club/sdk@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+src/errors.ts(4,10): error TS2724: '"@club/shared"' has no exported member named 'ClubApiError'. Did you mean 'ApiError'?
+src/errors.ts(4,24): error TS2305: Module '"@club/shared"' has no exported member 'formatError'.
+src/stream.ts(2,10): error TS2305: Module '"@club/shared"' has no exported member 'jitteredBackoff'.
+src/stream.ts(2,27): error TS2305: Module '"@club/shared"' has no exported member 'sleep'.
+src/transport.ts(16,8): error TS2724: '"@club/shared"' has no exported member named 'ClubApiError'. Did you mean 'ApiError'?
+src/transport.ts(17,3): error TS2305: Module '"@club/shared"' has no exported member 'formatError'.
+src/transport.ts(18,3): error TS2305: Module '"@club/shared"' has no exported member 'shouldRetry'.
+src/transport.ts(19,3): error TS2305: Module '"@club/shared"' has no exported member 'jitteredBackoff'.
+src/transport.ts(20,3): error TS2305: Module '"@club/shared"' has no exported member 'sleep'.
+src/transport.ts(39,7): error TS2451: Cannot redeclare block-scoped variable 'DEFAULT_TIMEOUT_MS'.
+src/transport.ts(40,7): error TS2451: Cannot redeclare block-scoped variable 'DEFAULT_RETRIES'.
+src/transport.ts(58,15): error TS1361: 'ClubApiError' cannot be used as a value because it was imported using 'import type'.
+src/transport.ts(67,7): error TS2451: Cannot redeclare block-scoped variable 'DEFAULT_TIMEOUT_MS'.
+src/transport.ts(68,7): error TS2451: Cannot redeclare block-scoped variable 'DEFAULT_RETRIES'.
+src/transport.ts(71,22): error TS1361: 'ClubApiError' cannot be used as a value because it was imported using 'import type'.
+src/transport.ts(73,16): error TS1361: 'ClubApiError' cannot be used as a value because it was imported using 'import type'.
+src/transport.ts(75,14): error TS1361: 'ClubApiError' cannot be used as a value because it was imported using 'import type'.
+src/transport.ts(238,17): error TS1361: 'ClubApiError' cannot be used as a value because it was imported using 'import type'.
+src/transport.ts(270,17): error TS1361: 'ClubApiError' cannot be used as a value because it was imported using 'import type'.
+npm error Lifecycle script `typecheck` failed with error:
+npm error code 2
+npm error path /home/dev/repos/club/packages/sdk
+npm error workspace @club/sdk@0.1.0
+npm error location /home/dev/repos/club/packages/sdk
+npm error command failed
+npm error command sh -c tsc -p tsconfig.json --noEmit
+[0m
+Need to build shared first, then fix the SDK issues.
+[0m$ [0mnpm -w @club/shared run build 2>&1
+> @club/shared@0.1.0 build
+> tsc -p tsconfig.json
+[0m
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -12,9 +12,9 @@
+   Room,
+   UploadFileResponse,
+ } from "@club/shared";
+ import {
+-  type ClubApiError,
++  ClubApiError,
+   formatError,
+   shouldRetry,
+   jitteredBackoff,
+   sleep,
+
+[0m
+[0m→ [0mRead packages/sdk/src/transport.ts[90m [limit=50, offset=29][0m
+[0m
+[0m← [0mEdit packages/sdk/src/transport.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.ts
+@@ -63,11 +63,8 @@
+ // ── Retry / timeout policy ──────────────────────────────────────────
+ // Delegated to @club/shared utilities for consistency across SDK and
+ // any other consumer (CLI, MCP, web).
+ 
+-const DEFAULT_TIMEOUT_MS = 15_000;
+-const DEFAULT_RETRIES = 2;
+-
+ function wrapErr(err: unknown): ClubApiError {
+   if (err instanceof ClubApiError) return err;
+   if (err instanceof Error && err.name === "AbortError") {
+     return new ClubApiError("request timeout", 408);
+
+[0m
+[0m$ [0mnpm -w @club/sdk run typecheck 2>&1
+> @club/sdk@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+[0m
+[0m$ [0mnpm -w @club/sdk run test 2>&1
+> @club/sdk@0.1.0 test
+> vitest run --coverage
+
+
+ RUN  v4.1.10 /home/dev/repos/club/packages/sdk
+      Coverage enabled with v8
+
+ ❯ src/transport.test.ts (34 tests | 2 failed) 422ms
+     × retries only idempotent GETs on transient statuses 4ms
+     × is exponential and capped 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transport.test.ts > shouldRetry > retries only idempotent GETs on transient statuses
+TypeError: shouldRetry is not a function
+ ❯ src/transport.test.ts:40:12
+     38| describe("shouldRetry", () => {
+     39|   it("retries only idempotent GETs on transient statuses", () => {
+     40|     expect(shouldRetry("GET", 500)).toBe(true);
+       |            ^
+     41|     expect(shouldRetry("GET", 503)).toBe(true);
+     42|     expect(shouldRetry("GET", 429)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/transport.test.ts > computeBackoff > is exponential and capped
+TypeError: computeBackoff is not a function
+ ❯ src/transport.test.ts:52:12
+     50| describe("computeBackoff", () => {
+     51|   it("is exponential and capped", () => {
+     52|     expect(computeBackoff(0)).toBe(200);
+       |            ^
+     53|     expect(computeBackoff(1)).toBe(400);
+     54|     expect(computeBackoff(2)).toBe(800);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 63 passed (65)
+   Start at  14:23:59
+   Duration  2.54s (transform 240ms, setup 0ms, import 364ms, tests 3.10s, environment 0ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/dev/repos/club/packages/sdk
+npm error workspace @club/sdk@0.1.0
+npm error location /home/dev/repos/club/packages/sdk
+npm error command failed
+npm error command sh -c vitest run --coverage
+[0m
+[0m→ [0mRead packages/sdk/src/transport.test.ts
+[0m
+[0m← [0mEdit packages/sdk/src/transport.test.ts
+Index: /home/dev/repos/club/packages/sdk/src/transport.test.ts
+===================================================================
+--- /home/dev/repos/club/packages/sdk/src/transport.test.ts
++++ /home/dev/repos/club/packages/sdk/src/transport.test.ts
+@@ -1,9 +1,7 @@
+ import { afterEach, describe, expect, it, vi } from "vitest";
+-import { ClubApiError } from "./errors.js";
++import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
+ import {
+-  computeBackoff,
+-  shouldRetry,
+   getMe,
+   listMessages,
+   sendMessage,
+   uploadFile,
+
+[0m
+[0m$ [0mnpm -w @club/sdk run test 2>&1
+> @club/sdk@0.1.0 test
+> vitest run --coverage
+
+
+ RUN  v4.1.10 /home/dev/repos/club/packages/sdk
+      Coverage enabled with v8
+
+
+ Test Files  5 passed (5)
+      Tests  65 passed (65)
+   Start at  14:24:19
+   Duration  2.60s (transform 225ms, setup 0ms, import 352ms, tests 3.29s, environment 0ms)
+
+ % Coverage report from v8
+-----------------|---------|----------|---------|---------|---------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s   
+-----------------|---------|----------|---------|---------|---------------------
+All files        |    82.7 |    75.78 |   58.73 |   84.39 |                     
+ client.ts       |       0 |        0 |       0 |       0 | 61-246              
+ format.ts       |      75 |     62.5 |   66.66 |   78.57 | 12,23,30            
+ image-upload.ts |   93.02 |    86.95 |     100 |   92.85 | 133,182,195         
+ stream.ts       |   88.65 |    71.83 |     100 |   91.76 | ...,166,168,200,205 
+ transport.ts    |   93.28 |    87.73 |      88 |   97.34 | 72,267,303          
+-----------------|---------|----------|---------|---------|---------------------
+
+=============================== Coverage summary ===============================
+Statements   : 82.7% ( 263/318 )
+Branches     : 75.78% ( 194/256 )
+Functions    : 58.73% ( 37/63 )
+Lines        : 84.39% ( 238/282 )
+================================================================================
+[0m
+[0m# [0mTodos
+[✓] Extract shared error utilities to @club/shared (formatError, ClubApiError)
+[✓] Extract shared retry/backoff utilities to @club/shared
+[•] Extract shared HTTP helper (parseBearer) to @club/shared
+[ ] Consolidate formatMessage: move CLI/MCP message formatting to shared, remove duplicate from sdk/format.ts
+[ ] Fix web lib/api.ts to use ClubClient consistently (recoverParticipant, delete/react bypass)
+[ ] Extract server route shared patterns into reusable middleware utilities
+[0m
+[0m→ [0mRead packages/cli/src/commands/format.ts
+[0m→ [0mRead packages/web/src/lib/format.tsx
+Let me look at the CLI's format.ts and the web's format.tsx to understand the duplication.
+[0m
+[0m← [0mWrite packages/shared/src/http.ts
+Wrote file successfully.
+[0m
+Now let me add `parseBearer` to @club/shared and add tests for the retry utilities.
+[0m← [0mEdit packages/shared/src/index.ts
+Index: /home/dev/repos/club/packages/shared/src/index.ts
+===================================================================
+--- /home/dev/repos/club/packages/shared/src/index.ts
++++ /home/dev/repos/club/packages/shared/src/index.ts
+@@ -1,4 +1,5 @@
+ export * from "./types.js";
+ export * from "./mention.js";
+ export * from "./errors.js";
+-export * from "./retry.js";
+\ No newline at end of file
++export * from "./retry.js";
++export * from "./http.js";
+\ No newline at end of file
+
+[0m
+[0m← [0mEdit packages/server/src/auth.ts
+Index: /home/dev/repos/club/packages/server/src/auth.ts
+===================================================================
+--- /home/dev/repos/club/packages/server/src/auth.ts
++++ /home/dev/repos/club/packages/server/src/auth.ts
+@@ -1,9 +1,9 @@
+ import { createMiddleware } from "hono/factory";
+ import type { Participant } from "@club/shared";
++import { parseBearer } from "@club/shared";
+ import { getParticipantByKeyHash } from "./db.js";
+ import { hashKey } from "./crypto.js";
+-import { parseBearer } from "./lib.js";
+ 
+ export { hashKey };
+ 
+ declare module "hono" {
+
+[0m
+Now update the server to use shared parseBearer.
+[0m← [0mEdit packages/server/src/lib.ts
+Index: /home/dev/repos/club/packages/server/src/lib.ts
+===================================================================
+--- /home/dev/repos/club/packages/server/src/lib.ts
++++ /home/dev/repos/club/packages/server/src/lib.ts
+@@ -12,18 +12,6 @@
+   if (!Number.isFinite(n) || n <= 0) return fallback;
+   return Math.min(Math.max(1, Math.floor(n)), 500);
+ }
+ 
+-/**
+- * Extract a bearer token from an Authorization header value.
+- *
+- * Accepts "Bearer <token>" case-insensitively, tolerates extra/leading spaces,
+- * trims the token, and returns undefined for anything that isn't a Bearer
+- * scheme (missing/empty header, "Basic ...", "Bearer" with no token). Pure and
+- * unit-tested; extracted from auth.ts so it can be tested without pulling in
+- * the SQLite connection that auth.ts wires up at import time.
+- */
+-export function parseBearer(auth: string | undefined): string | undefined {
+-  if (!auth) return undefined;
+-  const m = auth.match(/^Bearer\s+(.+)$/i);
+-  return m ? m[1].trim() : undefined;
+-}
++// parseBearer is now in @club/shared — re-export for backward compat.
++export { parseBearer } from "@club/shared";
+
+[0m
+[0m$ [0mnpm -w @club/shared run build 2>&1 && npm -w @club/sdk run build 2>&1
+> @club/shared@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @club/sdk@0.1.0 build
+> tsc -p tsconfig.json
+[0m
+[0m$ [0mnpm -w @club/server run typecheck 2>&1
+> @club/server@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+src/db.ts(654,30): error TS2345: Argument of type 'string[]' is not assignable to parameter of type 'string'.
+npm error Lifecycle script `typecheck` failed with error:
+npm error code 2
+npm error path /home/dev/repos/club/packages/server
+npm error workspace @club/server@0.1.0
+npm error location /home/dev/repos/club/packages/server
+npm error command failed
+npm error command sh -c tsc -p tsconfig.json --noEmit
+[0m

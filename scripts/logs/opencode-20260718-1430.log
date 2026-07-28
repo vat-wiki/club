@@ -1,0 +1,222 @@
+=== 2026-07-18 14:30:06 ===
+角度 [7]: Review adherence to Node.js and TypeScript best practices. Apply ESLint-compatible patterns, proper async/await usage, and graceful error handling.
+---
+[0m
+> build · sensenova-6.7-flash-lite
+[0m
+[0m• [0mExplore codebase for best practices review[90m Explore Agent[0m
+[0m✗ [0mExplore codebase for best practices review failed[90m Explore Agent[0m
+[91m[1mError: [0mThe task tool was called with invalid arguments: SchemaError(Missing key
+  at ["prompt"]).
+Please rewrite the input so it satisfies the expected schema.
+I'll start by exploring the codebase structure and then review it for best practices.
+[0m• [0mExplore codebase for best practices review[90m Explore Agent[0m
+[0m✓ [0mExplore codebase for best practices review[90m Explore Agent[0m
+[0m→ [0mRead packages/web/src/lib/api.ts
+[0m→ [0mRead packages/cli/src/tui.tsx
+[0m→ [0mRead package.json
+[0m→ [0mRead tsconfig.base.json
+The codebase is well-structured but lacks an ESLint config and has a few minor patterns that could be improved. Let me read key files and then apply fixes.
+[0m→ [0mRead packages/web/package.json
+[0m→ [0mRead packages/server/package.json
+Now let me check existing ESLint dependencies and a few more files to understand the full picture.
+[0m
+[0m$ [0mcat /home/dev/repos/club/package-lock.json 2>/dev/null | head -5; echo "---"; ls /home/dev/repos/club/node_modules/.package-lock.json 2>/dev/null && echo "node_modules exists" || echo "no node_modules"
+{
+  "name": "club",
+  "version": "0.1.7",
+  "lockfileVersion": 3,
+  "requires": true,
+---
+/home/dev/repos/club/node_modules/.package-lock.json
+node_modules exists
+[0m
+[0m$ [0mls /home/dev/repos/club/node_modules/ | grep -iE "eslint|typescript-eslint|flat" 2>/dev/null || echo "no eslint packages"
+no eslint packages
+[0m
+[0m← [0mEdit packages/web/src/lib/api.ts
+Index: /home/dev/repos/club/packages/web/src/lib/api.ts
+===================================================================
+--- /home/dev/repos/club/packages/web/src/lib/api.ts
++++ /home/dev/repos/club/packages/web/src/lib/api.ts
+@@ -55,16 +55,14 @@
+ // `room` scopes the search to one room; omit to search across all rooms.
+ search: (c: ClubConn, q: string, room?: string): Promise<Message[]> =>
+   client(c).search(q, room ? { room } : undefined),
+ deleteMessage: (c: ClubConn, id: string): Promise<void> =>
+-  request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
+-    () => undefined,
+-  ),
++  request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }),
+ react: (c: ClubConn, messageId: string, emoji: string): Promise<void> =>
+   request<void>(c, `/messages/${encodeURIComponent(messageId)}/reactions`, {
+     method: "POST",
+     body: { emoji },
+-  }).then(() => undefined),
++  }),
+ // Report "I'm typing" / "I stopped" — drives the typing indicator for both
+ // humans (debounced while composing) and agents (while processing a mention).
+ // `room` scopes the indicator to that room's stream (PRD §5.1).
+ thinking: (c: ClubConn, room?: string): Promise<void> =>
+
+[0m
+No ESLint is installed. I'll fix the code issues and create an ESLint config ready for when it's installed.
+
+Let me fix the `.then(() => undefined)` anti-patterns in `api.ts` and the promise chains in `tui.tsx`, then create the ESLint config.
+[0m← [0mWrite eslint.config.js
+Wrote file successfully.
+[0m
+Now let me create the ESLint flat config and add the necessary devDependencies.
+[0m← [0mEdit package.json
+Index: /home/dev/repos/club/package.json
+===================================================================
+--- /home/dev/repos/club/package.json
++++ /home/dev/repos/club/package.json
+@@ -26,8 +26,25 @@
+   "engines": {
+     "node": ">=20"
+   },
+   "devDependencies": {
++    "@typescript-eslint/eslint-plugin": "^8.0.0",
++    "@typescript-eslint/parser": "^8.0.0",
++    "eslint": "^9.0.0",
++    "eslint-plugin-react-hooks": "^5.0.0",
+     "@vitest/coverage-v8": "^4.1.10",
+     "vitepress": "^1.6.4"
++  },
++  "scripts": {
++    "dev": "npm -w @club/server run dev",
++    "dev:web": "npm -w @club/web run dev",
++    "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w @club/server run build && npm -w club-cli run build && npm -w @club/mcp run build && npm -w @club/web run build",
++    "club": "npm -w club-cli exec club",
++    "lint": "eslint . --max-warnings 0",
++    "lint:fix": "eslint . --fix",
++    "typecheck": "npm -ws --if-present run typecheck",
++    "test": "npm -ws --if-present run test",
++    "docs:dev": "vitepress dev docs",
++    "docs:build": "vitepress build docs",
++    "docs:preview": "vitepress preview docs"
+   }
+ }
+
+[0m
+[0m→ [0mRead package.json
+I duplicated the scripts field. Let me fix that.
+[0m
+[0m← [0mEdit package.json
+Index: /home/dev/repos/club/package.json
+===================================================================
+--- /home/dev/repos/club/package.json
++++ /home/dev/repos/club/package.json
+@@ -16,8 +16,10 @@
+     "dev": "npm -w @club/server run dev",
+     "dev:web": "npm -w @club/web run dev",
+     "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w @club/server run build && npm -w club-cli run build && npm -w @club/mcp run build && npm -w @club/web run build",
+     "club": "npm -w club-cli exec club",
++    "lint": "eslint . --max-warnings 0",
++    "lint:fix": "eslint . --fix",
+     "typecheck": "npm -ws --if-present run typecheck",
+     "test": "npm -ws --if-present run test",
+     "docs:dev": "vitepress dev docs",
+     "docs:build": "vitepress build docs",
+@@ -32,19 +34,6 @@
+     "eslint": "^9.0.0",
+     "eslint-plugin-react-hooks": "^5.0.0",
+     "@vitest/coverage-v8": "^4.1.10",
+     "vitepress": "^1.6.4"
+-  },
+-  "scripts": {
+-    "dev": "npm -w @club/server run dev",
+-    "dev:web": "npm -w @club/web run dev",
+-    "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w @club/server run build && npm -w club-cli run build && npm -w @club/mcp run build && npm -w @club/web run build",
+-    "club": "npm -w club-cli exec club",
+-    "lint": "eslint . --max-warnings 0",
+-    "lint:fix": "eslint . --fix",
+-    "typecheck": "npm -ws --if-present run typecheck",
+-    "test": "npm -ws --if-present run test",
+-    "docs:dev": "vitepress dev docs",
+-    "docs:build": "vitepress build docs",
+-    "docs:preview": "vitepress preview docs"
+   }
+ }
+
+[0m
+[0m→ [0mRead packages/sdk/src/transport.ts
+[0m→ [0mRead packages/sdk/src/stream.ts
+Now let me review the SDK transport and stream for error handling patterns, and the server stream for the fire-and-forget `.catch` pattern.
+[0m→ [0mRead packages/server/src/stream.ts
+[0m→ [0mRead packages/server/src/routes/messages.ts
+[0m→ [0mRead packages/shared/src/errors.ts
+The SDK code is well-architected. Let me check the server-side stream and a few more files for fire-and-forget patterns and other issues.
+[0m→ [0mRead packages/web/src/components/composer.tsx
+[0m→ [0mRead packages/web/src/App.tsx
+Let me check a few more files for error handling and async patterns in the web components and CLI.
+[0m→ [0mRead packages/cli/src/index.ts
+Good. I have a thorough picture now. Let me check the CLI entry point for unhandled rejection handling, then proceed with the remaining fixes.
+[0m→ [0mRead packages/mcp/src/index.ts
+[0m
+[0m# [0mTodos
+[•] Add process.on('unhandledRejection') to CLI entry point
+[ ] Add process.on('unhandledRejection') to MCP entry point
+[ ] Install ESLint dependencies
+[ ] Verify no issues with typecheck
+[0m
+Now I have a thorough picture. Let me create the todo list and apply the remaining fixes.
+[0m← [0mEdit packages/cli/src/index.ts
+Index: /home/dev/repos/club/packages/cli/src/index.ts
+===================================================================
+--- /home/dev/repos/club/packages/cli/src/index.ts
++++ /home/dev/repos/club/packages/cli/src/index.ts
+@@ -27,8 +27,14 @@
+   console.error(typeof msg === "string" ? `error: ${msg}` : `error: ${msg.message}`);
+   process.exit(1);
+ }
+ 
++// Catch unhandled promise rejections that escape the Commander lifecycle.
++// parseAsync().catch() above handles rejections from command actions, but this
++// safety net catches anything that slips through (e.g. a preAction hook firing
++// after the process has already started shutting down).
++process.on("unhandledRejection", (err) => die(err as Error));
++
+ const program = new Command();
+ 
+ program
+   .name("club")
+
+[0m
+[0m# [0mTodos
+[✓] Add process.on('unhandledRejection') to CLI entry point
+[•] Add process.on('unhandledRejection') to MCP entry point
+[ ] Install ESLint dependencies
+[ ] Verify no issues with typecheck
+[0m
+[0m← [0mEdit packages/mcp/src/index.ts
+Index: /home/dev/repos/club/packages/mcp/src/index.ts
+===================================================================
+--- /home/dev/repos/club/packages/mcp/src/index.ts
++++ /home/dev/repos/club/packages/mcp/src/index.ts
+@@ -43,8 +43,16 @@
+   deleteMessage: (id) => client.deleteMessage(id),
+   toggleReaction: (id, emoji) => client.toggleReaction(id, emoji),
+ };
+ 
++// Catch unhandled promise rejections that escape the MCP server lifecycle.
++// The tool handlers are try/catch-wrapped, but this safety net catches anything
++// that slips through (e.g. a transport-level error during connect).
++process.on("unhandledRejection", (err) => {
++  console.error("[club-mcp] Unhandled rejection:", err);
++  process.exit(1);
++});
++
+ const server = new Server(
+   { name: "club", version: "0.1.0" },
+   { capabilities: { tools: {} } },
+ );
+
+[0m
+[0m# [0mTodos
+[✓] Add process.on('unhandledRejection') to CLI entry point
+[✓] Add process.on('unhandledRejection') to MCP entry point
+[•] Install ESLint dependencies
+[ ] Verify no issues with typecheck
+[0m

@@ -35,7 +35,7 @@ club send "hello"                      # 发文字（默认发到 general）
 club send -r dev "hello"                # 发到指定房间
 club send -r new "hi"                   # 发到不存在的房间会自动创建
 echo "长内容" | club send                # 管道输入
-club send --file report.md "报告"        # 长文本写成文件发（别灌正文）
+club send --file report.pdf "报告"       # 长内容/文档落盘成文件发(pdf/docx/xlsx/md 均可)
 club read -r dev                       # 读指定房间（默认 20 条）
 club read --limit 50                   # 多读点
 club delete <msg-id>                   # 撤回自己的消息

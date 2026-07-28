@@ -1,16 +1,13 @@
 // club agent -- <cmd> [args...]
 //
 // 把任意交互式 TUI agent(claude / codex / gemini-cli / …)起在一个伪终端里,
-// club 的实时 SSE 消息被格式化成单行后**自动当作"用户敲的字"注入**,让
-// agent 被外部事件唤醒。
+// club 的实时 SSE 消息被格式化成单行后**直接当作"用户敲的字"注入**,让
+// agent 被外部事件当场唤醒处理。
 //
-// 与 `club listen` 的区别:listen 把消息转发进 notify-panel 收件箱(给一个
-// 自己会去查收件箱的 agent 用);`club agent` 则**直接**把消息喂进正在运行
-// 的 TUI agent 的输入,无需 notify-panel、无需查收件箱 —— agent 当场就被
-// 唤醒处理。
+//   club SSE ──直连──▶ PTY 注入 ──▶ 这个 TUI agent
 //
-//   listen:  club stream → notify-panel 收件箱 → (别的 agent 自己查)
-//   agent :  club stream ──直连──▶ PTY 注入 ──▶ 这个 TUI agent
+// 这是 club 唯一的实时接入姿势:不经过收件箱/中转 daemon,消息来了就驱动。
+// (早期版本的 `club listen` 曾用 notify-panel 收件箱中转,现已移除。)
 //
 // 用法:
 //   club agent claude                                  # 起一个 claude
@@ -41,28 +38,28 @@ import { runAgent } from "../agent/pty.js";
 export function makeAgentCommand(): Command {
   return new Command("agent")
     .description(
-      "把一个 TUI agent 起在 PTY 里,club 实时消息自动注入给它(无需 notify-panel)",
+      "run a TUI agent in a PTY and inject live club messages into it (no notify-panel needed)",
     )
     .option(
       "--room <slug>",
-      "只订阅这个房间的消息(默认:所有房间)",
+      "subscribe to this room only (default: all rooms)",
     )
     .option(
       "--mention <name>",
-      "只投递 @<name> 的消息(默认:投递所有非自己发的消息)",
+      "only deliver messages that @<name> (default: all messages except your own)",
     )
     .argument(
       "[cmd...]",
-      "要起的 TUI agent 及其参数(建议用 -- 分隔,避免参数被 club 吞掉)",
+      "the TUI agent to run and its args (use -- to separate, so club won't swallow its flags)",
     )
     .allowExcessArguments(true)
     .action(
       withCatchExit(async (cmdArgs: string[], opts: { room?: string; mention?: string }) => {
         if (!cmdArgs || cmdArgs.length === 0) {
           console.error(
-            "error: club agent 需要指定要起的 TUI agent,例如:\n" +
+            "error: club agent needs a TUI agent to run, e.g.:\n" +
               "  club agent claude\n" +
-              "  club agent -- claude -p '你是一个 AI 助手'\n" +
+              "  club agent -- claude -p 'you are an AI assistant'\n" +
               "  club agent --room dev --mention rex -- codex",
           );
           process.exit(2);
@@ -93,24 +90,24 @@ export function makeAgentCommand(): Command {
             mention: opts.mention,
             meId,
             onDelivered: (n) => {
-              if (n === 1) process.stderr.write("club agent: 第一条消息已投递\n");
+              if (n === 1) process.stderr.write("club agent: first message delivered\n");
             },
             onError: (err) => {
-              process.stderr.write(`club agent: stream 错误 ${err.message}\n`);
+              process.stderr.write(`club agent: stream error ${err.message}\n`);
             },
           });
         };
 
         process.stderr.write(
-          `club agent: 启动 ${cmd} ${args.join(" ")}(订阅 ${opts.room ?? "所有房间"}` +
-            `${opts.mention ? `,仅 @${opts.mention}` : ""})\n`,
+          `club agent: starting ${cmd} ${args.join(" ")} (room: ${opts.room ?? "all"}` +
+            `${opts.mention ? ", mention: " + opts.mention : ""})\n`,
         );
 
         const code = await runAgent(
           { cmd, args },
           feedFactory,
           (text) => {
-            process.stderr.write(`club agent: 注入 ${text.length} 字符\n`);
+            process.stderr.write(`club agent: injected ${text.length} chars\n`);
           },
         );
         process.exit(code);

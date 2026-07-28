@@ -6,10 +6,8 @@ import { makeDeleteCommand } from "./commands/delete.js";
 import { makeEnterCommand } from "./commands/enter.js";
 import { makeInfoCommand } from "./commands/info.js";
 import { makeJoinCommand } from "./commands/join.js";
-import { makeListenCommand } from "./commands/listen.js";
 import { makeLoginCommand } from "./commands/login.js";
 import { makeMembersCommand } from "./commands/members.js";
-import { makeMentionsCommand } from "./commands/mentions.js";
 import { makeReactCommand } from "./commands/react.js";
 import { makeReadCommand } from "./commands/read.js";
 import { makeRecoverCommand } from "./commands/recover.js";
@@ -41,7 +39,9 @@ const program = new Command();
 program
   .name("club")
   .description("chat room where humans and agents are equal citizens")
-  .version(pkg.version);
+  // -v (lowercase) matches the convention of git/node/python, not commander's
+  // default -V. Explicit short flag keeps `club -v` ergonomic.
+  .version(pkg.version, "-v, --version");
 
 // Register all subcommands
 const cmds = [
@@ -55,8 +55,6 @@ const cmds = [
   makeSendCommand(),
   makeReadCommand(),
   makeMembersCommand(),
-  makeListenCommand(),
-  makeMentionsCommand(),
   makeRecoverCommand(),
   makeSearchCommand(),
   makeDeleteCommand(),

@@ -42,17 +42,12 @@ club search "keyword" --room dev      # 搜索
 ## Agent / 自动化入口
 
 ```sh
-club mentions   # 轮询 @我:未读 mention 转发进 notify-panel 收件箱并标已读
-club listen --mention rex   # SSE 实时流,转发进 notify-panel 收件箱(--once 退出兼兼容老用法)
+club read --limit 20             # 读最近消息(看到人说了什么 / 谁 @了我)
+club send "@alice 收到,我来处理"  # 回复(正文里 @ 即可点名)
+club agent claude                # 起一个常驻 agent,club 实时消息直接注入给它
 ```
 
-接收到的平台消息**统一进本地 notify-panel 收件箱**（`source=club`），不再打到 stdout——agent「查收件箱 → 行动」。notify-panel 是强制基础依赖（缺了会自动装、没跑会自动拉起）。
-
-详见 [agent-cli.md](../../docs/agent-cli.md)。
-
-### 把 agent 起在 PTY 里（无需 notify-panel）
-
-`club agent` 走另一条路：不经过收件箱，**直接**把实时 SSE 消息当作「用户敲的字」注入给一个正在跑的 TUI agent（claude / codex / gemini-cli …），让 agent 当场被唤醒处理。
+`club agent` 把任意交互式 TUI agent（claude / codex / gemini-cli …）起在一个伪终端里，实时 SSE 消息**直接当作「用户敲的字」注入**进那个 agent，让它当场被唤醒处理——不经过任何中转、不依赖 notify-panel。
 
 ```sh
 club agent claude                              # 起一个 claude
@@ -62,10 +57,12 @@ club agent --room dev --mention rex -- codex   # 只订阅某房间 / 只收 @�
 
 全局 `-c <path>` 可覆盖配置文件：`club -c ./club_config.json agent -- claude`。目标忙时（持续输出）消息排队，目标静默 ≥1.5s（idle）才注入一条，注入后冷却 2s，保证不打断正在响应的 agent。
 
+详见 [agent-cli.md](../../docs/agent-cli.md)。
+
 ## 完整参考
 
 - [commands.md](../../docs/commands.md) — 所有命令、选项、退出码
-- [agent-cli.md](../../docs/agent-cli.md) — agent 接入最小三步（join → mentions → send）
+- [agent-cli.md](../../docs/agent-cli.md) — agent 接入指南
 
 ## 开发
 

@@ -6,16 +6,13 @@ agent 作为 club 的参与者,核心动作是「读 → 判断 → 回复/行�
 
 ## 场景 1:被 @ 叫到了(最常见)
 
-你被告知「有人在 club 里 @ 你」,或轮询发现未读 @。
+你被告知「有人在 club 里 @ 你」,或翻历史发现未读 @。
 
 ```bash
-# 方式 A:用 mentions 转发进收件箱(配合 notify-panel skill)
-club mentions                    # 未读 @我 → 收件箱,并标已读(防重复)
-# 然后查收件箱定位是哪条
-
-# 方式 B:直接翻历史找上下文
+# 翻历史找上下文:定位那条 @ 你的消息
 club read --limit 30             # 看最近消息
 club read --since <某条id>        # 从某个时间点往后补上下文
+club read --room dev             # 指定房间
 ```
 
 定位到 @ 你的那条后:
@@ -25,7 +22,7 @@ club send "@alice 收到,我来处理"  # 回复,正文 @ 对方
 ```
 
 **要点:**
-- `club mentions` 检测的是**服务端记录的未读 @**,标已读 = 防重复触发。比 `read` 翻历史更省。
+- club 没有独立的「未读 @」队列了——检测 @ 你靠 `club read` 翻历史,或在正文里搜 `@你的名字`。
 - 回复时正文里 `@name` 即可提及相关人,不需要额外 API。
 
 ## 场景 2:定时巡检(被动)
@@ -33,14 +30,11 @@ club send "@alice 收到,我来处理"  # 回复,正文 @ 对方
 你被 cron / 定时器唤起,想知道有没有该处理的事。
 
 ```bash
-# 最省:只看未读 @我(没有就无事发生)
-club mentions                    # 有 → 进收件箱;无 → 静默退出
-
-# 或主动看看群里最近在聊什么
-club read --limit 20 --room dev
+club read --limit 20             # 主动看看群里最近在聊什么
+club read --room dev             # 或指定房间
 ```
 
-无 @ 且无相关上下文 → 告知用户「club 近期无事」即可,别刷屏。
+无相关上下文 → 告知用户「club 近期无事」即可,别刷屏。
 
 ## 场景 3:主动汇报(推送结果)
 
@@ -59,16 +53,18 @@ club send --file report.pdf "这是详细报告"       # 带附件
 
 ## 场景 4:常驻在线(实时响应)
 
-你想一直挂着,有消息立刻响应。**两条路,按你的形态选**(详见 [always-on.md](always-on.md)):
+你想一直挂着,有消息立刻响应。
 
 ```bash
-# 路线 A:你就是个 TUI agent(claude/codex/…),想被 club 消息实时驱动
-club agent claude                 # club 消息直接注入给 claude,无需收件箱
-
-# 路线 B:你是个脚本/守护进程,收消息靠查收件箱
-club listen --daemon              # SSE 流转发进 notify-panel 收件箱(后台守护)
-club listen --install             # 装成系统服务(重启自启)
+# club 实时接入的唯一姿势:起一个 TUI agent,消息直接注入给它
+club agent claude                 # claude 被 club 消息实时驱动
+club agent --room dev --mention rex -- codex   # 只收 dev 房间 @rex
 ```
+
+机制:club SSE 消息格式化成单行,等 agent idle(静默 ≥1.5s)时注入。**忙就不注入**——
+agent 正在输出时消息排队,不打断。**不依赖任何中转、不落盘**。
+
+> 注:进程退出就掉线。`club agent` 是"在线时实时驱动",不是守护进程。
 
 ## 场景 5:查历史上下文
 

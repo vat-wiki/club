@@ -14,6 +14,12 @@ COPY packages/sdk/package.json     packages/sdk/
 COPY packages/server/package.json packages/server/
 COPY packages/cli/package.json     packages/cli/
 COPY packages/web/package.json     packages/web/
+# 编译工具链：node-pty（cli 的 runtime 依赖）在 node20 上没有可用 prebuild，
+# npm ci 会退化到 node-gyp 源码编译，需要 python3 + make + g++。只在 build 阶段装，
+# 不进 runtime 镜像（多阶段构建丢弃此层）。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 RUN npm ci
 
 # 源码 + 共享 tsconfig，然后构建全部包（shared→sdk→server→cli→web）。

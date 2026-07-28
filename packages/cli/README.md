@@ -46,7 +46,8 @@ club search "keyword" -r dev           # 搜索
 ## Agent / 自动化入口
 
 ```sh
-club read --limit 20             # 读最近消息(看到人说了什么 / 谁 @了我)
+club read --limit 20             # 读最近消息(看到人说了什么)
+club mentions                    # 查未读 @我(默认标已读,cron 友好)
 club send "@alice 收到,我来处理"  # 回复(正文里 @ 即可点名)
 club agent claude                # 起一个常驻 agent,club 实时消息直接注入给它
 ```

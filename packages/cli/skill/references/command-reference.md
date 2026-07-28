@@ -100,7 +100,24 @@
 
 ---
 
-## 实时接入
+## 实时接入与 @检测
+
+### `club mentions`
+**列出未读 @你的消息(one-shot),默认标记已读。**
+
+```bash
+club mentions            # 列未读 @,标已读(cron 轮询去重)
+club mentions --no-read  # 只看不标已读
+club mentions --json     # JSON 输出
+```
+
+输出形如 `[09:30] @alice in #dev: @bot help me  (msg=01J..)`。带 messageId 方便
+后续 `club read --since <id>` 补上下文。
+
+**为什么 mentions 标已读、read 不标:** mention 是 club 里唯一有服务端已读态的
+实体(`Mention.readAt`)—— @是持久化的"待办",未读 @ 跨设备/会话保留;标已读
+是去重契约,cron 反复轮询不会重复报告同一条。普通消息服务端不跟踪已读态
+(PRD §5.2:unread 是客户端自管),`club read` 无东西可标。
 
 ### `club agent [cmd...]`
 **起一个 TUI agent,club 实时消息直接注入给它。这是 club 实时收消息的唯一姿势。**

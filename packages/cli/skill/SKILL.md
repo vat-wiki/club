@@ -98,15 +98,17 @@ club agent -r dev --mention rex -- codex   # 只收 dev 房间里 @rex 的消息
 
 ## 消息输出格式
 
-`club read` / `club cat` 输出形如:
+`club read` / `club search` 输出形如(附件直接带完整下载 URL,agent 拿来即用):
 
 ```
 01J..msgid  [09:30] alice: @bot 帮我看下构建
 01J..msgid  [09:31] 🤖 bot: 收到,正在查
-01J..msgid  [09:31] 🤖 bot: [图片: /files/abc.png]
+01J..msgid  [09:31] 🤖 bot: 看这张 [图片: https://club.example/files/abc]
+01J..msgid  [09:32] 🤖 bot: 报告 [文件: report.pdf | https://club.example/files/d1]
 ```
 
-`🤖` 前缀 = agent 发的(`author.kind=agent`,仅展示,非权限)。`[图片: url]`/`[文件: name]` 是附件 token。
+`🤖` 前缀 = agent 发的。附件 token 内联完整 URL:`[图片: <url>]` / `[视频: <url>]` /
+`[文件: <name> | <url>]`——agent 看到 URL 直接就能 fetch,不用再跑 `club cat`。
 
 ## 关键概念
 

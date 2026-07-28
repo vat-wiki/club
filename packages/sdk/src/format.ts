@@ -31,17 +31,52 @@ interface DocumentAttachment extends MessageAttachment {
 
 type TypedAttachment = ImageAttachment | VideoAttachment | DocumentAttachment;
 
-function renderAttachment(a: TypedAttachment): string {
-  if (a.mime.startsWith("video/")) return `[视频: ${a.url}]`;
-  if (a.mime.startsWith("image/")) return `[图片: ${a.url}]`;
-  return `[文件: ${a.filename ?? a.id}]`;
+function renderAttachment(a: TypedAttachment, server?: string): string {
+  if (a.mime.startsWith("video/")) return `[视频: ${absoluteUrl(a.url, server)}]`;
+  if (a.mime.startsWith("image/")) return `[图片: ${absoluteUrl(a.url, server)}]`;
+  // Documents surface both the filename (what it is) and the URL (where to fetch
+  // it) when a server base is provided, so an agent reading `club read` output
+  // gets a fully-usable download link without a second `club cat` round-trip.
+  const name = a.filename ?? a.id;
+  const link = absoluteUrl(a.url, server);
+  return server ? `[文件: ${name} | ${link}]` : `[文件: ${name}]`;
+}
+
+/**
+ * Resolve an attachment url to an absolute one when a server base is given.
+ * - No server → return as-is (legacy/relative behavior, back-comat).
+ * - Already absolute (http(s)://) → return as-is (idempotent).
+ * - Relative → prepend server (normalized for trailing/leading slashes).
+ */
+function absoluteUrl(url: string, server?: string): string {
+  if (!server) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = server.replace(/\/+$/, "");
+  return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
 }
 
 export type FormattedMessage = string & { readonly __formattedMessage: unique symbol };
 
+/** Options for {@link formatMessage}. */
+export interface FormatMessageOptions {
+  /**
+   * Server base URL (e.g. `https://club.example`). When provided, attachment
+   * URLs in the rendered line are resolved to absolute URLs so a consumer
+   * (agent, script) gets a directly-usable download link without a second
+   * `club cat` round-trip. Omit for the legacy relative-path behavior.
+   */
+  server?: string;
+}
+
 // Human-readable single-line rendering of a message, shared by CLI & MCP text
 // results. Pure; safe to import anywhere.
-export function formatMessage(m: Message): FormattedMessage {
+//
+// `opts.server`, when provided, makes attachment URLs absolute in the output
+// (see {@link FormatMessageOptions.server}).
+export function formatMessage(
+  m: Message,
+  opts: FormatMessageOptions = {},
+): FormattedMessage {
   const t = new Date(m.createdAt);
   const hh = String(t.getHours()).padStart(2, "0");
   const mm = String(t.getMinutes()).padStart(2, "0");
@@ -55,8 +90,10 @@ export function formatMessage(m: Message): FormattedMessage {
   // appends a token — `[图片: url]` / `[视频: url]` for media, `[文件: name]`
   // for documents (named, since a document is identified by its filename more
   // than a url). This only guarantees you can SEE attachments from the CLI/MCP.
+  // With `opts.server`, urls become absolute so an agent reading the output
+  // gets a fetch-ready link inline.
   const media = (m.attachments ?? [])
-    .map((a) => renderAttachment(a as TypedAttachment))
+    .map((a) => renderAttachment(a as TypedAttachment, opts.server))
     .join(" ");
   const body = media ? `${m.content} ${media}`.trim() : m.content;
 

@@ -34,6 +34,8 @@ export function parseSearchLimit(raw: string | undefined): number {
 export interface SearchDeps {
   /** Simulate `ClubClient.search(query, opts)`. */
   search: (query: string, opts: { room?: string; limit: number }) => Promise<Message[]>;
+  /** Server base URL, to resolve attachment urls to absolute in the output. */
+  server?: string;
 }
 
 export interface SearchInput {
@@ -61,7 +63,7 @@ export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
     console.log(`found ${results.length} message${results.length !== 1 ? "s" : ""}:`);
     for (const msg of [...results].reverse()) {
       const roomTag = msg.room !== DEFAULT_ROOM ? `[#${msg.room}] ` : "";
-      console.log(`  ${roomTag}${formatMessage(msg)}`);
+      console.log(`  ${roomTag}${formatMessage(msg, { server: deps.server })}`);
     }
   })();
 }
@@ -89,7 +91,7 @@ export function makeSearchCommand(): Command {
         const client = new ClubClient(cfg);
         return runSearch(
           { query: query.trim(), room: opts.room ?? undefined, limit: parseSearchLimit(opts.limit) },
-          { search: (q, o) => client.search(q, o) },
+          { search: (q, o) => client.search(q, o), server: cfg.server },
         );
       }),
     );

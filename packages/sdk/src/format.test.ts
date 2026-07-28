@@ -145,4 +145,56 @@ describe("formatMessage", () => {
     const m = { ...base("x", { deleted: true }), authorName: "" };
     expect(formatMessage(m)).toBe("[09:05] : (recalled)");
   });
+
+  // ── opts.server: absolute attachment URLs (agent-friendly) ──
+
+  it("resolves image/video urls to absolute when opts.server is given", () => {
+    const m = base("look", {
+      attachments: [
+        { id: "abc", url: "/files/abc", mime: "image/png", size: 10 },
+        { id: "v1", url: "/files/v1", mime: "video/mp4", size: 1000 },
+      ],
+    });
+    expect(formatMessage(m, { server: "https://club.example" })).toBe(
+      "[09:05] alice: look [图片: https://club.example/files/abc] [视频: https://club.example/files/v1]",
+    );
+  });
+
+  it("renders document as [文件: name | <abs-url>] when opts.server is given", () => {
+    const m = base("see", {
+      attachments: [
+        { id: "d1", url: "/files/d1", mime: "application/pdf", size: 500, filename: "notes.pdf" },
+      ],
+    });
+    expect(formatMessage(m, { server: "https://club.example" })).toBe(
+      "[09:05] alice: see [文件: notes.pdf | https://club.example/files/d1]",
+    );
+  });
+
+  it("normalizes server trailing slash", () => {
+    const m = base("x", {
+      attachments: [{ id: "a", url: "/files/a", mime: "image/png", size: 1 }],
+    });
+    expect(formatMessage(m, { server: "https://club.example/" })).toBe(
+      "[09:05] alice: x [图片: https://club.example/files/a]",
+    );
+  });
+
+  it("leaves already-absolute urls untouched (idempotent)", () => {
+    const m = base("x", {
+      attachments: [{ id: "a", url: "https://cdn.example/x.png", mime: "image/png", size: 1 }],
+    });
+    expect(formatMessage(m, { server: "https://club.example" })).toBe(
+      "[09:05] alice: x [图片: https://cdn.example/x.png]",
+    );
+  });
+
+  it("omits server → legacy relative behavior (back-compat)", () => {
+    const m = base("see", {
+      attachments: [
+        { id: "d1", url: "/files/d1", mime: "application/pdf", size: 500, filename: "notes.pdf" },
+      ],
+    });
+    expect(formatMessage(m)).toBe("[09:05] alice: see [文件: notes.pdf]");
+  });
 });

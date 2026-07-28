@@ -82,7 +82,7 @@ export function makeReadCommand(): Command {
           const { ClubClient } = await import("@club/sdk");
           return runRead(opts, {
             getClient: () => new ClubClient(cfg),
-            formatMessage,
+            formatMessage: (m) => formatMessage(m, { server: cfg.server }),
             parseLimit,
             defaultRoom: () => defaultRoom(),
           });

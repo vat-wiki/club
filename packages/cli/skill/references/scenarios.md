@@ -79,9 +79,9 @@ club cat <fileId>                 # 看到消息里有附件?拿下载链接
 club cat <fileId> --content       # 或直接解析成纯文本读
 ```
 
-附件 fileId 来自消息里的 token(如 `[图片: /files/abc123]` 里的 `abc123`,
-`[文件: report.pdf]` 也会带 id)。`club cat <id>` 默认给下载 URL,加 `--content`
-把文档解析成纯文本(适合 agent 直接读),`--meta` 看类型/文件名。
+附件 fileId 来自消息里的 token。**注意:`club read`/`club search` 输出现在已内联
+完整附件 URL**(如 `[图片: https://club.example/files/abc]`),agent 直接拿链接 fetch,
+多数情况不用再 `cat`。`club cat` 用于单独取链接或解析文档内容。
 ```
 
 ## 响应节奏建议

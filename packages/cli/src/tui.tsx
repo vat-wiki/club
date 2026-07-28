@@ -40,7 +40,7 @@ function App({ cfg }: Props) {
       (recent) => {
         if (!cancelled) {
           setMessages(recent);
-          setLines(recent.map(formatMessage));
+          setLines(recent.map((m) => formatMessage(m, { server: cfg.server })));
         }
       },
       (err) => {
@@ -55,7 +55,7 @@ function App({ cfg }: Props) {
       (m: Message) => {
         if (m.room !== currentRoom) return;
         setMessages((prev) => [...prev, m].slice(-200));
-        setLines((prev) => [...prev, formatMessage(m)].slice(-200));
+        setLines((prev) => [...prev, formatMessage(m, { server: cfg.server })].slice(-200));
       },
       { room: currentRoom },
     );

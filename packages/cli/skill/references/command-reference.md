@@ -86,14 +86,17 @@
 - `--limit <n>`:最大结果数(默认 20,上限 100)
 
 ### `club cat <fileId>`
-读附件。**默认输出下载 URL**(`<server>/files/<id>`,最常用——拿到链接就能下/看)。
+读附件。**默认输出下载 URL**(`<server>/files/<id>`)。
+
+> 提示:`club read` / `club search` 的输出现在已内联完整附件 URL,多数情况下直接从消息里拿
+> 链接即可,不必再跑 `cat`。`cat` 用于:只知 id 想单独拿链接、或要解析内容。
 
 - (无 flag):输出下载 URL,如 `https://club.example/files/abc123`
 - `--content`:解析成纯文本输出(文档类,agent 直接读)
 - `--raw`:输出原始 base64(二进制类)
 - `--meta`:输出文件元数据 JSON(mime/格式/文件名/大小)
 
-fileId 来自消息里的附件 token(如 `[图片: /files/abc123]` 里的 `abc123`)。
+fileId 来自消息里的附件 token(如 `[图片: https://.../abc]` 末尾的 id 段)。
 
 ### `club delete <id>`
 撤回自己的消息(只有自己发的能删)。

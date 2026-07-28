@@ -49,6 +49,12 @@ COPY --from=build /app/packages/server/dist packages/server/dist
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/web/dist    packages/web/dist
 
+# gosu: drop privileges from root (entrypoint) to the non-root 'node' user
+# after fixing up /data ownership. Lighter than installing sudo and, unlike
+# `su`, execs the child directly so signals (SIGTERM) propagate cleanly.
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && \
+    rm -rf /var/lib/apt/lists/*
+
 # Non-root user for runtime (defense-in-depth: container breakouts can't
 # escalate from root inside the container). 'node' user already exists in the
 # bookworm-slim image (UID 1000). The /data volume is mounted by docker-compose
@@ -57,18 +63,21 @@ RUN chown -R node:node /app && \
     mkdir -p /data && \
     chown -R node:node /data
 
-# Entrypoint: ensure /data is writable by the non-root user. Docker named
-# volumes are created root-owned; this chown is idempotent and harmless on
-# bind-mounts that already have correct ownership. Runs before CMD.
-# Must run as root (before USER node) since it writes /usr/local/bin and
-# needs to chown the /data volume at startup.
-RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
-    echo 'if [ -d /data ] && [ "$(stat -c %u /data 2>/dev/null)" = "0" ]; then' >> /usr/local/bin/entrypoint.sh && \
-    echo '  chown -R node:node /data || true' >> /usr/local/bin/entrypoint.sh && \
-    echo 'fi' >> /usr/local/bin/entrypoint.sh && \
-    echo 'exec "$@"' >> /usr/local/bin/entrypoint.sh && \
+# Entrypoint: ensure /data is writable by the non-root user, then drop to 'node'.
+# Docker named volumes are created root-owned (uid 0); a non-root process cannot
+# chown them, so the chown MUST run as root here, BEFORE gosu drops privileges.
+# We chown unconditionally — it's a fast no-op when /data is already node-owned
+# (e.g. a bind-mount with correct ownership, or a previously-fixed volume) and
+# fixes the fresh-root-owned-volume case. Only the server (CMD) runs as node;
+# PID 1 stays root just long enough to fix perms, matching the common pattern.
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'set -e' \
+    'if [ -d /data ]; then' \
+    '  chown -R node:node /data' \
+    'fi' \
+    'exec gosu node "$@"' > /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
-USER node
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # HOST/PORT server 已有默认；CLUB_DB 指向卷内，持久化 SQLite。

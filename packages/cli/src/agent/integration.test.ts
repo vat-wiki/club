@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { ClubClient } from "@club/sdk";
 import type { Message } from "@club/shared";
+
 import { startFeed } from "./feed.js";
-import { QueuedInjector, IDLE_QUIET_MS } from "./queue.js";
+import { IDLE_QUIET_MS,QueuedInjector } from "./queue.js";
 
 describe("integration: feed -> queue -> inject", () => {
   beforeEach(() => vi.useFakeTimers());

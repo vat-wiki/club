@@ -6,9 +6,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  QueuedInjector,
   IDLE_QUIET_MS,
   POST_INJECT_COOLDOWN_MS,
+  QueuedInjector,
 } from "../agent/queue.js";
 
 beforeEach(() => {

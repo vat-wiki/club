@@ -21,10 +21,10 @@ import { Command } from "commander";
 
 import { ClubClient } from "@club/sdk";
 
-import { withCatchExit } from "../catch-exit.js";
-import { requireConfig } from "../config.js";
 import { startFeed } from "../agent/feed.js";
 import { runAgent } from "../agent/pty.js";
+import { withCatchExit } from "../catch-exit.js";
+import { requireConfig } from "../config.js";
 
 /**
  * Build the `club agent` commander sub-command.

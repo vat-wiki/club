@@ -10,10 +10,11 @@
 // 修复:raw mode 修复 + 提交键时序(见各自注释),它们对 claude/codex 等
 // TUI agent 是注入能否生效的关键。
 
-import * as pty from "node-pty";
 import { execSync } from "node:child_process";
 
-import { QueuedInjector, type InjectFn } from "./queue.js";
+import * as pty from "node-pty";
+
+import { type InjectFn,QueuedInjector } from "./queue.js";
 
 /** 起目标进程的参数。 */
 export interface SpawnOptions {

@@ -119,8 +119,8 @@ export class QueuedInjector {
       this.setState("idle");
       // idle 且队列有货 → 注入一条
       if (this.queue.length > 0) {
-        const text = this.queue.shift()!;
-        if (this.inject(text)) {
+        const text = this.queue.shift();
+        if (text !== undefined && this.inject(text)) {
           // 注入成功:强制 busy 一段冷却期,等目标"接住"并开始响应。
           // 冷却期不被静默推翻(否则刚注入完的静默会被立刻判 idle 连注)。
           this.lastOutputAt = now;

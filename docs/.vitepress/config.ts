@@ -56,7 +56,6 @@ export default defineConfig({
         items: [
           { text: "数据库 Schema", link: "/database" },
           { text: "部署运维", link: "/deploy" },
-          { text: "自动优化日志", link: "/auto-opt-log" },
         ],
       },
     ],

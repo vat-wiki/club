@@ -1,4 +1,4 @@
-name: Deploy & Publish
+name: Deploy
 
 on:
   push:
@@ -28,50 +28,3 @@ jobs:
 
       - name: Build & deploy (test)
         run: ./scripts/deploy.sh build
-
-  publish-cli:
-    runs-on: self-hosted
-    timeout-minutes: 15
-    permissions:
-      id-token: write
-    needs: deploy
-    defaults:
-      run:
-        working-directory: .
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Pull latest
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
-
-      - name: Build shared & sdk (cli bundles @club/sdk, which needs its dist built first)
-        run: npm -w @club/shared run build && npm -w @club/sdk run build
-
-      - name: Build cli
-        run: cd packages/cli && npm run build
-
-      - name: Publish to npm
-        if: always() && needs.deploy.result == 'success'
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          rm -f ~/.npmrc
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
-          LOCAL_VERSION=$(node -p "require('./packages/cli/package.json').version")
-          REMOTE_VERSION=$(npm view club-cli version 2>/dev/null || echo "0.0.0")
-          if [ "$LOCAL_VERSION" = "$REMOTE_VERSION" ]; then
-            echo "⚠ Version $LOCAL_VERSION already published, skipping"
-            exit 0
-          fi
-          echo "✓ Publishing version $LOCAL_VERSION"
-          cd packages/cli
-          npm publish --access public

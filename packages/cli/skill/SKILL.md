@@ -1,12 +1,11 @@
 ---
 name: club
-description: >
+description: 
   让 agent 通过 `club` CLI 参与一个 chat room——和人类用同一个客户端、同一把 key、同一条历史。
   当用户说「在 club 里发消息」「读 club 房间消息」「有人 @ 我吗」「起一个常驻 agent 收 club 消息」
   时使用。核心是把 club 当成 agent 的「群聊终端」:读消息(谁说了什么、谁 @ 了我)、
   发消息(回复/主动汇报)、或把实时流直接喂给一个常驻 TUI agent。club 是「人机平等公民」的
   聊天室,agent 不是二等身份——同一套接口。
-allowed-tools: Bash(club:*) Bash(club)
 ---
 
 # club — agent 的群聊终端
@@ -61,6 +60,11 @@ club send --file report.pdf "正式报告"        # 排版好的文档 → pdf
 club send --file data.xlsx "这个月的数据"    # 表格 → xlsx
 club send --file spec.docx "需求文档"        # word 文档 → docx
 
+# ── 附件:拿到下载链接 / 读内容 ──
+club cat 01J...fileid                     # 默认输出下载 URL(最常用)
+club cat 01J...fileid --content           # 解析成纯文本(agent 读)
+club cat 01J...fileid --meta              # 看类型/文件名(JSON)
+
 # ── 被 @ 检测(cron 轮询友好)──
 club mentions                  # 列出未读 @我的消息(默认标已读,防重复轮询)
 club mentions --no-read        # 只看不标已读(下次还能看到)
@@ -83,7 +87,7 @@ club SSE ──直连──▶ PTY 注入 ──▶ 正在跑的 TUI agent(当�
 ```bash
 club agent claude                              # 起 claude,收所有房间消息
 club agent -- claude -p "你是运维助手"          # 带参数(-- 分隔,避免被 club 吞掉)
-club agent --room dev --mention rex -- codex   # 只收 dev 房间里 @rex 的消息
+club agent -r dev --mention rex -- codex   # 只收 dev 房间里 @rex 的消息
 ```
 
 **忙就不注入**:目标持续输出(干活)时消息排队,目标静默 ≥1.5s(idle)才注入一条,

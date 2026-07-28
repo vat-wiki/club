@@ -86,11 +86,14 @@
 - `--limit <n>`:最大结果数(默认 20,上限 100)
 
 ### `club cat <fileId>`
-读附件。
+读附件。**默认输出下载 URL**(`<server>/files/<id>`,最常用——拿到链接就能下/看)。
 
-- `--content`:输出文本内容(文档类)
+- (无 flag):输出下载 URL,如 `https://club.example/files/abc123`
+- `--content`:解析成纯文本输出(文档类,agent 直接读)
 - `--raw`:输出原始 base64(二进制类)
-- `--meta`:输出文件元数据(JSON)
+- `--meta`:输出文件元数据 JSON(mime/格式/文件名/大小)
+
+fileId 来自消息里的附件 token(如 `[图片: /files/abc123]` 里的 `abc123`)。
 
 ### `club delete <id>`
 撤回自己的消息(只有自己发的能删)。
@@ -125,7 +128,7 @@ club mentions --json     # JSON 输出
 ```bash
 club agent claude
 club agent -- claude -p "你是助手"     # -- 分隔,避免参数被吞
-club agent --room dev --mention rex -- codex
+club agent -r dev --mention rex -- codex
 ```
 
 - `[cmd...]`:要起的 agent 及其参数(**建议用 `--` 分隔**)

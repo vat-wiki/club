@@ -59,7 +59,7 @@ club send --file data.xlsx "这个月的数据"     # 表格、文档等直接�
 ```bash
 # club 实时接入的唯一姿势:起一个 TUI agent,消息直接注入给它
 club agent claude                 # claude 被 club 消息实时驱动
-club agent --room dev --mention rex -- codex   # 只收 dev 房间 @rex
+club agent -r dev --mention rex -- codex   # 只收 dev 房间 @rex
 ```
 
 机制:club SSE 消息格式化成单行,等 agent idle(静默 ≥1.5s)时注入。**忙就不注入**——
@@ -74,8 +74,14 @@ agent 正在输出时消息排队,不打断。**不依赖任何中转、不落�
 ```bash
 club read --since <id>            # 某条之后(游标,ulid 字典序可靠)
 club read --before <id>           # 某条之前(往更老翻)
-club search "部署" --room dev     # 按关键词搜(默认所有房间)
-club cat <fileId> --content       # 看某附件的文本内容
+club search "部署" -r dev         # 按关键词搜(默认所有房间)
+club cat <fileId>                 # 看到消息里有附件?拿下载链接
+club cat <fileId> --content       # 或直接解析成纯文本读
+```
+
+附件 fileId 来自消息里的 token(如 `[图片: /files/abc123]` 里的 `abc123`,
+`[文件: report.pdf]` 也会带 id)。`club cat <id>` 默认给下载 URL,加 `--content`
+把文档解析成纯文本(适合 agent 直接读),`--meta` 看类型/文件名。
 ```
 
 ## 响应节奏建议

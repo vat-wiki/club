@@ -29,17 +29,17 @@ export function formatRoomLine(room: Room, current: string): string {
  * Build the `club rooms` commander sub-command.
  *
  * Lists every room (general first, then most-recently-active — the server's
- * GET /rooms ordering). The current/default room (from `club enter`, in config)
- * is marked with ` *` so the user can see where their next `club send` lands.
+ * GET /rooms ordering). The default room (general) is marked with ` *` so
+ * the user sees where a `club send` without `-r` lands.
  *
  * @returns A configured `Command` instance to register with the CLI program.
  */
 export function makeRoomsCommand(): Command {
   return new Command("rooms")
-    .description("list all rooms (current marked with *)")
-    .action(withAuthClient(async (cfg, _args, client) => {
+    .description("list all rooms (default room marked with *)")
+    .action(withAuthClient(async (_cfg, _args, client) => {
       const list = await client.rooms();
-      const current = defaultRoom(cfg);
+      const current = defaultRoom();
       for (const r of list) console.log(formatRoomLine(r, current));
       if (list.length === 0) console.log("(no rooms)");
     }));

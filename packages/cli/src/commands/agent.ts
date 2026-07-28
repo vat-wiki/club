@@ -41,7 +41,7 @@ export function makeAgentCommand(): Command {
       "run a TUI agent in a PTY and inject live club messages into it (no notify-panel needed)",
     )
     .option(
-      "--room <slug>",
+      "-r, --room <slug>",
       "subscribe to this room only (default: all rooms)",
     )
     .option(

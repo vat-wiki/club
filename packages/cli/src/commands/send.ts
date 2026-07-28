@@ -57,8 +57,8 @@ export function makeSendCommand(): Command {
       [] as string[],
     )
     .option(
-      "--room <slug>",
-      "post to this room (default: the room from `club enter`, or general)",
+      "-r, --room <slug>",
+      "post to this room (default: general)",
     )
     .action(
       async (
@@ -84,7 +84,7 @@ export function makeSendCommand(): Command {
 
         const cfg = requireConfig();
         const client = new ClubClient(cfg);
-        const room = opts.room ?? defaultRoom(cfg);
+        const room = opts.room ?? defaultRoom();
 
         const deps: SendDeps = {
           uploadImage: (conn, p) => uploadImageFile(conn, p),

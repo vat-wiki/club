@@ -11,24 +11,25 @@ export { DEFAULT_ROOM };
 export interface ClubConfig {
   server: string;
   key: string;
-  /** Current/default room slug written by `club enter`. Absent → `DEFAULT_ROOM`. */
-  room?: string;
 }
 
 // Validates the on-disk config shape. server/key must be non-empty strings.
+// NOTE: a legacy `room` field (written by the removed `club enter` command)
+// is tolerated and stripped on load — there is no longer any notion of a
+// "current/default room" in config; commands always default to DEFAULT_ROOM
+// unless `--room` is given explicitly.
 const ConfigSchema = z.object({
   server: z.string().min(1),
   key: z.string().min(1),
-  room: z.string().optional(),
 });
 
 /**
- * Resolve the effective default room for a config: the room `club enter` wrote,
- * falling back to `DEFAULT_ROOM` when unset.
+ * The implicit default room when no `--room` is passed. Always `general`.
+ * There is no longer a per-config "current room" — pass `--room` explicitly
+ * to target anything else.
  */
-export function defaultRoom(cfg: { room?: string } | null): string {
-  const r = cfg?.room?.trim();
-  return r === "" || r == null ? DEFAULT_ROOM : r;
+export function defaultRoom(): string {
+  return DEFAULT_ROOM;
 }
 
 // ~/.club/config.json by default; CLUB_CONFIG points elsewhere.

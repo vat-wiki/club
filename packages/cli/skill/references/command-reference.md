@@ -40,14 +40,11 @@
 ## 房间
 
 ### `club rooms`
-列所有房间(当前默认房间标 `*`)。`general` 永远排第一。
-
-### `club enter <room>`
-切换默认房间(`send`/`read` 不带 `--room` 时用这个)。房间不存在会自动创建。
-- `room`:slug,1-30 字符 `[a-z0-9-]`
+列所有房间。`general` 永远排第一。
 
 ### `club members`
-当前房间成员列表。
+房间成员列表(默认 general)。
+- `-r, --room <slug>`:指定房间
 
 ---
 
@@ -65,7 +62,7 @@
 - `--image <path>`:图片(png/jpeg/gif/webp,≤10MB),可重复
 - `--video <path>`:视频(mp4/webm,≤50MB)
 - `--file <path>`:文档(pdf/docx/xlsx/md,≤25MB)
-- `--room <slug>`:发到指定房间(默认 `enter` 设的,或 `general`)
+- `-r, --room <slug>`:发到指定房间(默认 `general`;房间不存在会自动创建)
 - 附件总计 ≤8 个
 
 > **长文本/报告别直接灌进正文**——`club send` 的文本会被压成单行、超长截断。
@@ -75,12 +72,12 @@
 成功打印新消息的 id;失败退出 1。
 
 ### `club read`
-读历史(one-shot,打印后退出)。
+读历史(one-shot,打印后退出)。默认读 general 房间最近 20 条。
 
 - `--since <id>`:某条 id 之后的消息(游标)
 - `--before <id>`:某条之前(往更老翻)
-- `--limit <n>`:条数(默认 50)
-- `--room <slug>`:指定房间
+- `--limit <n>`:条数(默认 20)
+- `-r, --room <slug>`:指定房间
 
 ### `club search <query>`
 按内容搜消息(最新优先)。
@@ -115,7 +112,7 @@ club agent --room dev --mention rex -- codex
 ```
 
 - `[cmd...]`:要起的 agent 及其参数(**建议用 `--` 分隔**)
-- `--room <slug>`:只订阅这个房间(默认所有房间)
+- `-r, --room <slug>`:只订阅这个房间(默认所有房间)
 - `--mention <name>`:只投递 @<name> 的消息(默认投递所有非自己发的)
 
 机制:SSE 消息格式化成单行 → agent idle(静默 ≥1.5s)时注入 → 注入后冷却 2s。

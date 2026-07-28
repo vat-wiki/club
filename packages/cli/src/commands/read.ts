@@ -1,8 +1,8 @@
 // club read [--room <slug>] [--since <id>] [--before <id>] [--limit <n>]
 //
 // Fetch and print messages. --since anchors to a message id (newer history),
-// --before goes older, --limit caps the response (1-500, default 50).
-// Respects the default room from config unless --room is explicit.
+// --before goes older, --limit caps the response (1-500, default 20).
+// Defaults to general unless -r/--room is explicit.
 
 import { Command } from "commander";
 
@@ -20,7 +20,7 @@ export interface ReadOpts {
   before?: string;
   /** Maximum number of messages to fetch. */
   limit: string;
-  /** Room slug; defaults to the room from `club enter`, or general. */
+  /** Room slug; defaults to general (DEFAULT_ROOM) when omitted. */
   room?: string;
 }
 
@@ -59,10 +59,9 @@ export async function runRead(
 /**
  * Build the `club read` commander sub-command.
  *
- * Fetches and prints messages from the current room (one-shot). Supports
+ * Fetches and prints messages from a room (one-shot). Supports
  * pagination anchors (`--since` / `--before`) and a configurable `--limit`
- * (1-500, default 50). Respects the default room from config unless `--room`
- * is explicit.
+ * (1-500, default 20). Defaults to general unless `-r`/`--room` is explicit.
  *
  * @returns A configured `Command` instance to register with the CLI program.
  */
@@ -71,10 +70,10 @@ export function makeReadCommand(): Command {
     .description("print recent messages (one-shot)")
     .option("--since <id>", "show messages after this message id")
     .option("--before <id>", "show messages before this message id (older history)")
-    .option("--limit <n>", "number of messages", "50")
+    .option("--limit <n>", "number of messages", "20")
     .option(
-      "--room <slug>",
-      "read from this room (default: the room from `club enter`, or general)",
+      "-r, --room <slug>",
+      "read from this room (default: general)",
     )
     .action(
       withCatchExit(
@@ -85,7 +84,7 @@ export function makeReadCommand(): Command {
             getClient: () => new ClubClient(cfg),
             formatMessage,
             parseLimit,
-            defaultRoom: () => defaultRoom(cfg),
+            defaultRoom: () => defaultRoom(),
           });
         },
       ),

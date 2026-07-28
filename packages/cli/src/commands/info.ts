@@ -74,7 +74,7 @@ export function makeInfoCommand(): Command {
     .action(withAuthClient(async (cfg, _args, client) => {
       // defaultRoom() falls back to "general" when the config room is unset;
       // this is the canonical current room for a fresh login.
-      const currentRoom = defaultRoom(cfg);
+      const currentRoom = defaultRoom();
 
       return runInfo(
         { server: cfg.server, currentRoom },

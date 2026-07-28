@@ -47,43 +47,29 @@ describe("parseConfig", () => {
     expect(parseConfig("[]")).toBeNull();
   });
 
-  it("preserves an optional room field when present", () => {
+  it("strips a legacy `room` field (written by the removed `club enter`)", () => {
     const raw = JSON.stringify({
       server: "http://localhost:6200",
       key: "club_human_abc",
       room: "deploy-debug",
     });
+    // room is no longer part of the config shape; an old config carrying it
+    // is still valid, but the field is dropped on load.
     expect(parseConfig(raw)).toEqual({
       server: "http://localhost:6200",
       key: "club_human_abc",
-      room: "deploy-debug",
     });
   });
 
-  it("accepts an empty room string without invalidating the config (room is a preference)", () => {
+  it("ignores a legacy empty room string (field stripped, config still valid)", () => {
     const raw = JSON.stringify({ server: "http://x", key: "club_x", room: "" });
-    // An empty room must NOT lock a logged-in user out; defaultRoom() handles
-    // the fallback to general downstream.
-    expect(parseConfig(raw)).toEqual({ server: "http://x", key: "club_x", room: "" });
+    expect(parseConfig(raw)).toEqual({ server: "http://x", key: "club_x" });
   });
 });
 
 describe("defaultRoom", () => {
-  it("returns the config's room when set", () => {
-    expect(defaultRoom({ server: "http://x", key: "k", room: "internal" })).toBe("internal");
-  });
-
-  it("falls back to general when the config has no room", () => {
-    expect(defaultRoom({ server: "http://x", key: "k" })).toBe("general");
-  });
-
-  it("falls back to general when the room is empty/whitespace (robust to corrupt config)", () => {
-    expect(defaultRoom({ server: "http://x", key: "k", room: "" })).toBe("general");
-    expect(defaultRoom({ server: "http://x", key: "k", room: "   " })).toBe("general");
-  });
-
-  it("falls back to general when there is no config at all (not logged in)", () => {
-    expect(defaultRoom(null)).toBe("general");
+  it("always returns general (no per-config current room anymore)", () => {
+    expect(defaultRoom()).toBe("general");
   });
 });
 

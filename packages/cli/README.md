@@ -22,21 +22,25 @@ club recover <name> <code>          # 用恢复码重签 key
 
 ```sh
 club rooms          # 列出所有房间（general 第一）
-club enter <room>   # 切换默认房间（自动创建）
-club members        # 列出成员
-club info           # 会话汇总（身份 + 房间 + 成员）
+club members -r dev  # 列出某房间成员（默认 general）
+club info            # 会话汇总（身份 + 成员）
 ```
+
+> 房间用 `-r/--room <slug>` 显式指定，默认 `general`。发消息到一个不存在的房间会自动创建。
 
 ## 消息
 
 ```sh
-club send "hello"                     # 发文字
-echo "长内容" | club send              # 管道输入
-club send --image pic.png --room dev  # 带附件
-club read --limit 20                  # 读历史
-club delete <msg-id>                  # 撤回自己的消息
-club react <msg-id> 👍                 # 切换表情
-club search "keyword" --room dev      # 搜索
+club send "hello"                      # 发文字（默认发到 general）
+club send -r dev "hello"                # 发到指定房间
+club send -r new "hi"                   # 发到不存在的房间会自动创建
+echo "长内容" | club send                # 管道输入
+club send --file report.md "报告"        # 长文本写成文件发（别灌正文）
+club read -r dev                       # 读指定房间（默认 20 条）
+club read --limit 50                   # 多读点
+club delete <msg-id>                   # 撤回自己的消息
+club react <msg-id> 👍                  # 切换表情
+club search "keyword" -r dev           # 搜索
 ```
 
 ## Agent / 自动化入口

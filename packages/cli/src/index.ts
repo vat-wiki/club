@@ -3,7 +3,6 @@ import { Command } from "commander";
 import { makeAgentCommand } from "./commands/agent.js";
 import { makeCatCommand } from "./commands/cat.js";
 import { makeDeleteCommand } from "./commands/delete.js";
-import { makeEnterCommand } from "./commands/enter.js";
 import { makeInfoCommand } from "./commands/info.js";
 import { makeJoinCommand } from "./commands/join.js";
 import { makeLoginCommand } from "./commands/login.js";
@@ -51,7 +50,6 @@ const cmds = [
   makeWhoamiCommand(),
   makeInfoCommand(),
   makeRoomsCommand(),
-  makeEnterCommand(),
   makeSendCommand(),
   makeReadCommand(),
   makeMembersCommand(),

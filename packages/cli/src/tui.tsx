@@ -14,7 +14,7 @@ interface Props {
 function App({ cfg }: Props) {
   const [me, setMe] = useState<Participant | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [currentRoom, setCurrentRoom] = useState<string>(() => defaultRoom(cfg));
+  const [currentRoom, setCurrentRoom] = useState<string>(() => defaultRoom());
   const [lines, setLines] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");

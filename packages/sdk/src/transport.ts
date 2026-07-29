@@ -22,6 +22,7 @@ import {
   MAX_VIDEO_BYTES,
   NETWORK_ERROR_STATUS,
   parseHttpErrorStatus,
+  parseRetryAfterMs,
   shouldRetry,
   sleep,
 } from "@club/shared";
@@ -160,8 +161,16 @@ export async function request<T>(
   const maxRetries = method === "GET" ? opts.retries ?? DEFAULT_RETRIES : 0;
 
   let lastErr: unknown;
+  // Set when the server returns 429 with a `Retry-After`; the next retry then
+  // waits that long instead of the short default backoff. Re-hitting a fixed
+  // rate-limit window every ~2s pins the bucket at zero — a feedback loop that
+  // keeps the client blocked — so defer to the server's reset signal.
+  let retryAfterMs: number | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) await sleep(jitteredBackoff(attempt - 1));
+    if (attempt > 0) {
+      await sleep(retryAfterMs ?? jitteredBackoff(attempt - 1));
+      retryAfterMs = null;
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -172,6 +181,9 @@ export async function request<T>(
         signal: controller.signal,
       });
       clearTimeout(timer);
+      if (res.status === 429) {
+        retryAfterMs = parseRetryAfterMs(res.headers.get("retry-after"));
+      }
       if (shouldRetry(method, res.status) && attempt < maxRetries) continue;
       return await check<T>(res);
     } catch (err) {

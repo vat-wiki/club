@@ -76,6 +76,9 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
     let stopped = false;
     let sub: { stop: () => void } | null = null;
     let reconnect: ReturnType<typeof setTimeout>;
+    // Reconnect attempt count since the last successful connection — drives the
+    // exponential backoff below. Reset to 0 each time a connection is opened.
+    let reconnectTries = 0;
 
     const connect = () => {
       if (stopped) return;
@@ -97,10 +100,19 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
           // capability the SDK exposes (used by CLI/MCP); the web client opts
           // into all-rooms because it tracks unread (PRD §5.2).
           reconnect: false,
-          onError: () => {
+          onError: (err) => {
             if (stopped) return;
             setStatus('lost');
-            reconnect = setTimeout(connect, 3000);
+            // Honor the server's Retry-After on 429 when the SDK surfaces it;
+            // otherwise back off exponentially (capped at 15s) instead of a
+            // fixed 3s. A fixed cadence re-hits a fixed rate-limit window and
+            // keeps it pinned at zero — the feedback loop where one stuck
+            // client rate-limits itself (and, behind a shared-IP proxy,
+            // everyone).
+            const retryAfterMs = (err as { retryAfterMs?: number | null })?.retryAfterMs;
+            const delay = retryAfterMs ?? Math.min(15_000, 1000 * 2 ** reconnectTries);
+            reconnectTries += 1;
+            reconnect = setTimeout(connect, delay);
           },
           onAgentThinking: (e) => {
             // Typing indicators are room-scoped events; only show the ones for
@@ -134,6 +146,7 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
         }
       );
       setStatus('connected');
+      reconnectTries = 0;
     };
 
     hasMoreRef.current = true;

@@ -72,6 +72,51 @@ export function jitteredBackoff(attempt: number, base = 200, cap = 2000): number
   return computeBackoff(attempt, base, cap) * (0.5 + Math.random() * 0.5);
 }
 
+/** Upper bound on how long a `Retry-After` header may stall a client. A
+ *  misconfigured or hostile server could advertise an enormous value; capping
+ *  keeps the client recovering on its own schedule rather than parking forever. */
+export const MAX_RETRY_AFTER_MS = 60_000;
+
+/**
+ * Parse an HTTP `Retry-After` response header into milliseconds.
+ *
+ * The header may be delta-seconds (`"55"`) or an HTTP-date (RFC 7231). Returns
+ * `null` when the header is absent, unparseable, or non-positive, so callers
+ * fall back to their normal backoff. A positive result is capped at
+ * {@link MAX_RETRY_AFTER_MS}.
+ *
+ * The SDK transport and SSE client use this to slow down on 429 instead of
+ * re-hitting a fixed rate-limit window every couple of seconds — which pins the
+ * bucket at zero and sustains the block (a feedback loop where the client's own
+ * retries keep it rate-limited).
+ *
+ * @param header - Raw `Retry-After` header value, or null/undefined if absent.
+ * @returns Milliseconds to wait, or `null` if the header is unusable.
+ * @example
+ * ```ts
+ * const wait = parseRetryAfterMs(res.headers.get("retry-after"));
+ * await sleep(wait ?? jitteredBackoff(attempt));
+ * ```
+ */
+export function parseRetryAfterMs(
+  header: string | null | undefined,
+): number | null {
+  if (!header) return null;
+  const trimmed = header.trim();
+  // Delta-seconds form (what our server emits): a non-negative integer.
+  const seconds = Number(trimmed);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(MAX_RETRY_AFTER_MS, Math.round(seconds * 1000));
+  }
+  // HTTP-date form (e.g. a reverse proxy's Retry-After). Resolves to ms from now.
+  const date = Date.parse(trimmed);
+  if (!Number.isNaN(date)) {
+    const delta = date - Date.now();
+    if (delta > 0) return Math.min(MAX_RETRY_AFTER_MS, Math.round(delta));
+  }
+  return null;
+}
+
 /**
  * Await `ms` milliseconds, or return immediately if the supplied signal
  * is already aborted (or aborts during the wait).

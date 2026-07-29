@@ -35,7 +35,7 @@
  */
 
 import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
-import { jitteredBackoff, sleep } from "@club/shared";
+import { jitteredBackoff, parseRetryAfterMs, sleep } from "@club/shared";
 
 import { type ClubConn, listMessages, listRooms } from "./transport.js";
 
@@ -238,7 +238,15 @@ export function streamMessages(
           return;
         }
         opts.onError?.(err2);
-        await sleep(jitteredBackoff(attempts, base, RECONNECT_CAP_MS), stopSignal.signal);
+        // On 429 the server sends `Retry-After`; honor it so a fixed rate-limit
+        // window can recover instead of being re-hit on the default backoff
+        // (which pins the bucket at zero — a feedback loop). err2 carries the
+        // parsed value when openStream() threw on a 429.
+        const retryAfterMs = (err2 as { retryAfterMs?: number | null }).retryAfterMs ?? null;
+        await sleep(
+          retryAfterMs ?? jitteredBackoff(attempts, base, RECONNECT_CAP_MS),
+          stopSignal.signal,
+        );
         if (stopSignal.signal.aborted) return;
         attempts++;
       }
@@ -264,7 +272,20 @@ export function streamMessages(
         signal: fetchController.signal,
       },
     );
-    if (!res.ok || !res.body) throw new Error(`stream failed: HTTP ${res.status}`);
+    if (!res.ok || !res.body) {
+      const err = new Error(`stream failed: HTTP ${res.status}`) as Error & {
+        status?: number;
+        retryAfterMs?: number | null;
+      };
+      err.status = res.status;
+      // Surface the server's Retry-After on 429 so the reconnect loop — and
+      // any caller-driven reconnect via onError — backs off for the window
+      // reset instead of re-hitting it on the default cadence.
+      if (res.status === 429) {
+        err.retryAfterMs = parseRetryAfterMs(res.headers.get("retry-after"));
+      }
+      throw err;
+    }
 
     // Subscribe-first: the SSE connection is now live, so anything broadcast
     // during catch-up lands in its buffer. Catch up on the gap (if any); the

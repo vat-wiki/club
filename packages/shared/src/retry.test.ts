@@ -1,6 +1,6 @@
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
-import { computeBackoff, jitteredBackoff, shouldRetry, sleep } from "./retry.js";
+import { computeBackoff, jitteredBackoff, parseRetryAfterMs, shouldRetry, sleep } from "./retry.js";
 
 // ── shouldRetry ───────────────────────────────────────────────────────
 
@@ -92,6 +92,57 @@ describe("jitteredBackoff", () => {
       expect(j).toBeGreaterThanOrEqual(1000);
       expect(j).toBeLessThanOrEqual(2000);
     }
+  });
+});
+
+// ── parseRetryAfterMs ─────────────────────────────────────────────────
+
+describe("parseRetryAfterMs", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-29T14:00:00Z").getTime());
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("returns null for absent / empty / blank header", () => {
+    expect(parseRetryAfterMs(null)).toBeNull();
+    expect(parseRetryAfterMs(undefined)).toBeNull();
+    expect(parseRetryAfterMs("")).toBeNull();
+    expect(parseRetryAfterMs("   ")).toBeNull();
+  });
+
+  it("parses delta-seconds into milliseconds", () => {
+    expect(parseRetryAfterMs("1")).toBe(1000);
+    expect(parseRetryAfterMs("55")).toBe(55_000);
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(parseRetryAfterMs("  5  ")).toBe(5000);
+  });
+
+  it("returns null for zero or negative delta-seconds (so callers fall back to normal backoff)", () => {
+    expect(parseRetryAfterMs("0")).toBeNull();
+    expect(parseRetryAfterMs("-5")).toBeNull();
+  });
+
+  it("caps at MAX_RETRY_AFTER_MS (60s)", () => {
+    expect(parseRetryAfterMs("9999")).toBe(60_000);
+  });
+
+  it("parses a future HTTP-date as ms-from-now", () => {
+    // Now is 2026-07-29T14:00:00Z; 10s ahead → 10000ms. Build the string via
+    // toUTCString() so the weekday always matches the pinned instant.
+    const future = new Date(Date.now() + 10_000).toUTCString();
+    expect(parseRetryAfterMs(future)).toBe(10_000);
+  });
+
+  it("returns null for a past HTTP-date", () => {
+    const past = new Date(Date.now() - 60_000).toUTCString();
+    expect(parseRetryAfterMs(past)).toBeNull();
+  });
+
+  it("returns null for unparseable values", () => {
+    expect(parseRetryAfterMs("not-a-date")).toBeNull();
   });
 });
 

@@ -73,10 +73,29 @@ export function addSubscriber(
     online,
   });
   // Announce the newcomer's own online status to every live subscriber (global
-  // by design — presence is not room-scoped, PRD §8.7). writeAll handles
-  // delivery to all subscribers; do not write other subscribers' presence into
-  // the newcomer's own stream (the client never consumes those frames).
+  // by design — presence is not room-scoped, PRD §8.7).
   broadcastPresence(presence(participant, true));
+  // Seed the newcomer with everyone *already* online so the roster can mark
+  // them live immediately instead of waiting for each to re-announce. Presence
+  // is global (PRD §8.7), so every live subscriber is included regardless of
+  // room filter, and each frame is written ONLY into the newcomer's own stream
+  // — not re-broadcast to everyone. The client's onPresence handler consumes
+  // these exactly like any other presence event. (This was previously omitted
+  // on the mistaken belief that the client ignored other subscribers' frames;
+  // it does not — a generic onPresence adds any online participantId.)
+  for (const sub of subscribers) {
+    if (sub === entry || sub.dead) continue;
+    void s
+      .writeSSE(
+        eventToFrame({ event: 'presence', payload: presence(sub.participant, true) })
+      )
+      .catch(() => {
+        // Writing to the newcomer failed — the connection is already broken.
+        // Mark it dead and drop it so we stop routing events to a dead stream.
+        entry.dead = true;
+        subscribers.delete(entry);
+      });
+  }
   return () => {
     entry.dead = true;
     subscribers.delete(entry);

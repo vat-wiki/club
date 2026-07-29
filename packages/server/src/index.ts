@@ -26,15 +26,21 @@ const joinHtmlPath = resolve(__dirname, "public", "join.html");
 
 const app = new Hono();
 
+// Whether to trust forwarding headers (X-Forwarded-For / X-Real-IP) when
+// resolving the client IP for rate limiting. Enable ONLY behind a trusted
+// reverse proxy (nginx/caddy) that overwrites these headers — otherwise the
+// socket address is the source of truth and spoofable headers must be ignored.
+// Caveat: bare Docker port-publishing sets no XFF, so flipping this on without
+// a proxy does NOT restore per-client buckets — the limiter still collapses
+// every connection onto the proxy/gateway IP. Put a proxy that sets
+// X-Forwarded-For in front, then set TRUSTED_PROXY=true.
+const trustedProxy = process.env.TRUSTED_PROXY === "true";
+
 // Global rate limiter: 120 requests per minute per IP (generous for read paths).
-// Proxy headers are read only when TRUSTED_PROXY=true — defaulting to socket
-// address for direct connections prevents forwarding-header spoofing bypasses.
-// This keeps the rate limiter effective even when the server is not behind a
-// trusted reverse proxy.
 app.use("*", rateLimit({
   max: 120,
   windowMs: 60_000,
-  key: (c) => getClientIp(c, () => getConnInfo(c)),
+  key: (c) => getClientIp(c, () => getConnInfo(c), trustedProxy),
 }));
 
 // Security headers: CSP, HSTS, X-Content-Type-Options, etc.

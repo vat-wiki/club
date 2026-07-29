@@ -59,3 +59,60 @@ describe("writeAll room filtering", () => {
     expect(true).toBe(true);
   });
 });
+
+describe("addSubscriber presence seeding", () => {
+  // addSubscriber mutates the module-level `subscribers` set; unsubscribe every
+  // entry we add so it stays clean across tests in this file.
+  const cleanups: Array<() => void> = [];
+  afterEach(() => {
+    while (cleanups.length) cleanups.pop()!();
+  });
+
+  // Minimal SSE stream double: records every frame written to it. writeSSE
+  // resolves so the real `.catch()` chaining in addSubscriber is exercised.
+  const makeStream = () => {
+    const frames: Array<{ event?: string; data: string }> = [];
+    return {
+      frames,
+      writeSSE: vi.fn((frame: { event?: string; data: string }) => {
+        frames.push(frame);
+        return Promise.resolve();
+      }),
+    };
+  };
+
+  it("seeds a newcomer with every already-online subscriber's presence", async () => {
+    // A connects first.
+    const a = makeStream();
+    cleanups.push(Stream.addSubscriber(a as never, { id: "a", name: "A" }, null));
+
+    // B connects later and must be seeded with A's online presence — otherwise
+    // the roster never learns A is online (the bug: members who connected
+    // before you stay invisible until they reconnect).
+    const b = makeStream();
+    cleanups.push(Stream.addSubscriber(b as never, { id: "b", name: "B" }, null));
+    await Promise.resolve();
+
+    const bPresence = b.frames
+      .filter((f) => f.event === "presence")
+      .map((f) => JSON.parse(f.data));
+    expect(bPresence).toContainEqual({ participantId: "a", name: "A", online: true });
+  });
+
+  it("seeds only the newcomer — does not re-broadcast others' presence to everyone", async () => {
+    const a = makeStream();
+    cleanups.push(Stream.addSubscriber(a as never, { id: "a", name: "A" }, null));
+    await Promise.resolve();
+    const aBefore = a.frames.length;
+
+    const b = makeStream();
+    cleanups.push(Stream.addSubscriber(b as never, { id: "b", name: "B" }, null));
+    await Promise.resolve();
+
+    // When B joins, A must receive exactly ONE new presence frame — B's own
+    // online broadcast — never a re-broadcast of the rest of the roster.
+    const newOnA = a.frames.slice(aBefore).filter((f) => f.event === "presence");
+    expect(newOnA).toHaveLength(1);
+    expect(JSON.parse(newOnA[0].data)).toMatchObject({ participantId: "b", online: true });
+  });
+});

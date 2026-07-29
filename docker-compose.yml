@@ -21,6 +21,10 @@ services:
     environment:
       CLUB_DB: /data/club.db
       CLUB_FILES: /data/files
+      # 仅当 club 位于会改写 X-Forwarded-For 的可信反向代理（nginx/caddy）之后时，
+      # 才取消注释设 TRUSTED_PROXY=true。裸 Docker 端口映射不产生 XFF，此时开启无效——
+      # 限流仍会把所有连接归到网关同一个 IP 桶。默认按 socket 地址限流。
+      # TRUSTED_PROXY: "true"
     volumes:
       - club-data-prod:/data
     networks:
@@ -41,6 +45,10 @@ services:
     environment:
       CLUB_DB: /data/club.db
       CLUB_FILES: /data/files
+      # 仅当 club 位于会改写 X-Forwarded-For 的可信反向代理（nginx/caddy）之后时，
+      # 才取消注释设 TRUSTED_PROXY=true。裸 Docker 端口映射不产生 XFF，此时开启无效——
+      # 限流仍会把所有连接归到网关同一个 IP 桶。默认按 socket 地址限流。
+      # TRUSTED_PROXY: "true"
     volumes:
       - club-data-test:/data
     networks:

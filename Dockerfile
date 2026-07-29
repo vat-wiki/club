@@ -32,20 +32,22 @@ FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# npm ci 校验依赖树需要全部 workspace 清单，缺一个都会失败。
-# --ignore-scripts: 跳过根 package.json 的 `prepare` (husky) —— 它是 dev 工具，
-# 且 husky 本身是 devDependency，在 --omit=dev 下不存在会 exit 127。
+# runtime 只跑 server (+ 其 @club/shared 依赖)。cli/sdk/web 的 node 依赖运行时
+# 用不到：cli 是本地 TUI(ink/node-pty)；sdk 已打进 web/dist 浏览器 bundle；
+# web 运行时仅是静态 dist。npm ci 会装「全部 workspace 的 prod deps 并集」，
+# 把 node-pty/mammoth/xlsx/pdf-parse/react-dom/@radix-ui/* … 全塞进镜像。
+# 这里把 root workspaces 收敛到 shared/server，只装它们的 prod deps。
+# 用 install 而非 ci：精简后 workspaces 与 lockfile(5个) 不一致，ci 会拒绝；
+# install 仍读 lockfile 锁定 shared/server 版本，仅整理掉多余的 workspace 条目。
+# --ignore-scripts：跳过 root package.json 的 `prepare`(husky) —— 它是 dev 工具，
+# 且 husky 在 --omit=dev 下不存在会 exit 127（同时也跳过 better-sqlite3 的
+# prebuild-install，故下面补一句 rebuild，否则运行时 "Could not locate the bindings"）。
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
-COPY packages/sdk/package.json     packages/sdk/
 COPY packages/server/package.json packages/server/
-COPY packages/cli/package.json     packages/cli/
-COPY packages/web/package.json     packages/web/
-RUN npm ci --omit=dev --ignore-scripts && \
+RUN node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.workspaces=p.workspaces.filter(w=>['packages/shared','packages/server'].includes(w));fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+RUN npm install --omit=dev --ignore-scripts && \
     npm rebuild better-sqlite3
-# ↑ --ignore-scripts 躲开了 husky 的 prepare，但也跳过了 better-sqlite3 的 install
-#   脚本（prebuild-install，负责下载对应 Node ABI 的预编译 .node）。不补这句，运行时
-#   会 "Could not locate the bindings file"（club-test 反复 Restarting 即此所致）。
 
 # 只带运行时所需的构建产物。保持 monorepo 布局（serveStatic 依赖 cwd=repo 根）：
 #   - server/dist : 主服务（含 public/join.html）

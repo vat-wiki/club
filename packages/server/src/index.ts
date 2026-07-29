@@ -85,12 +85,19 @@ app.route("/rooms", rooms);
 // hit an authenticated endpoint like GET /me.
 app.get("/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
 
-// Production: serve the built web UI (packages/web/dist) at the same origin so
-// the SPA ships without a separate host. In dev the Vite app runs on :6100 and
-// proxies API calls here. serveStatic's root is relative to cwd, so this only
-// matches when cwd is the repo root (true for `node packages/server/dist/index.js`);
-// the existsSync guard keeps dev/standalone runs untouched.
-const webDistDir = resolve(process.cwd(), "packages", "web", "dist");
+// Production: serve the built web UI at the same origin so the SPA ships
+// without a separate host. In dev the Vite app runs on :6100 and proxies API
+// calls here. The SPA resolves two ways, neither depending on process.cwd():
+//   - published npm package: the built SPA is copied into <dist>/public/spa
+//     (see the copy-web-dist / prepack scripts), sitting next to join.html, so
+//     we locate it relative to THIS file via __dirname;
+//   - dev / docker / custom frontend: set CLUB_WEB_DIST to an absolute web/dist
+//     path (docker points it at /app/packages/web/dist).
+// serveStatic takes an absolute root and joins it directly, and the existsSync
+// guard keeps dev/standalone runs (no SPA present) on the /join redirect.
+const webDistDir = process.env.CLUB_WEB_DIST
+  ? resolve(process.env.CLUB_WEB_DIST)
+  : resolve(__dirname, "public", "spa");
 if (existsSync(webDistDir)) {
   // Root serves the chat SPA, which decides what to show: a stored key logs
   // straight into the room, and no key opens the auth dialog. Previously "/"
@@ -100,7 +107,7 @@ if (existsSync(webDistDir)) {
   app.get("/", async (c) =>
     c.html(await readFile(join(webDistDir, "index.html"), "utf-8")),
   );
-  app.use("/*", serveStatic({ root: "packages/web/dist" }));
+  app.use("/*", serveStatic({ root: webDistDir }));
   // SPA fallback: any unmatched GET returns index.html so deep links resolve.
   app.get("/*", async (c) =>
     c.html(await readFile(join(webDistDir, "index.html"), "utf-8")),

@@ -2,7 +2,7 @@ import { renderWithI18n } from "@/test/i18n-wrap";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach,describe, expect, it, vi } from "vitest";
 
-import type { MessageAttachment } from "@club/shared";
+import type { MessageAttachment } from "@vatwiki/shared";
 
 import { FileCard } from "./file-card";
 

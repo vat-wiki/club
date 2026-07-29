@@ -9,7 +9,7 @@
 
 import { Command } from "commander";
 
-import type { ClubClient, ParsedFile } from "@club/sdk";
+import type { ClubClient, ParsedFile } from "@vatwiki/sdk";
 
 import { withAuthClient } from "../client-factory.js";
 

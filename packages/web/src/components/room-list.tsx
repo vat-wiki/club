@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Hash, Plus } from "lucide-react";
 import { type KeyboardEvent,useEffect, useRef, useState } from "react";
 
-import { type Room,ROOM_SLUG_REGEX } from "@club/shared";
+import { type Room,ROOM_SLUG_REGEX } from "@vatwiki/shared";
 
 // One room row. The whole row is a <button> (keyboard-operable, focusable) so
 // switching rooms works with Tab + Enter/Space and gets a native focus ring.

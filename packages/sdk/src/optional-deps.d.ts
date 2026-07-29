@@ -4,7 +4,7 @@
 // `import()` only when a matching file type is actually parsed, and a missing
 // install is handled gracefully (file-parser.ts catches the failed import and
 // returns an error string). Keeping them out of dependencies avoids bloating the
-// browser-safe main entry of @club/sdk.
+// browser-safe main entry of @vatwiki/sdk.
 //
 // These declarations exist solely so `tsc` doesn't flag the dynamic imports
 // (TS2307). If any of these packages ever becomes a real dependency, delete its

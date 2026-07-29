@@ -1,8 +1,8 @@
 import { act,renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ClubConn } from "@club/sdk";
-import type { Message } from "@club/shared";
+import type { ClubConn } from "@vatwiki/sdk";
+import type { Message } from "@vatwiki/shared";
 
 // The hook only talks to api.rooms / api.createRoom over the network; the
 // unread/mention/sort logic under test is pure in-memory routing.

@@ -1,4 +1,4 @@
-import type { ClubConn } from "@club/sdk";
+import type { ClubConn } from "@vatwiki/sdk";
 
 const KEY = "club_key";
 const SERVER = "club_server";

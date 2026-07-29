@@ -1,5 +1,5 @@
-// Re-export shared error types from @club/shared.
-// @club/sdk wraps and re-exports these so consumers can import everything
+// Re-export shared error types from @vatwiki/shared.
+// @vatwiki/sdk wraps and re-exports these so consumers can import everything
 // from one package.
 export {
   ClubApiError,
@@ -11,4 +11,4 @@ export {
   NETWORK_ERROR_STATUS,
   type NetworkFailureStatus,
   parseHttpErrorStatus,
-} from "@club/shared";
+} from "@vatwiki/shared";

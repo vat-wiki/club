@@ -18,8 +18,8 @@ import { API_URL, clearConn, getKey,loadConn, saveConn, saveRecoverCode } from "
 import { useI18n } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ClubConn } from "@club/sdk";
-import type { ImageMime, Message, Participant } from "@club/shared";
+import type { ClubConn } from "@vatwiki/sdk";
+import type { ImageMime, Message, Participant } from "@vatwiki/shared";
 
 export default function App() {
   const { t } = useI18n();

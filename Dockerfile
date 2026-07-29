@@ -49,10 +49,11 @@ RUN node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.
 RUN npm install --omit=dev --ignore-scripts && \
     npm rebuild better-sqlite3
 
-# 只带运行时所需的构建产物。保持 monorepo 布局（serveStatic 依赖 cwd=repo 根）：
+# 只带运行时所需的构建产物。保持 monorepo 布局：
 #   - server/dist : 主服务（含 public/join.html）
 #   - shared/dist : server 运行时通过 @club/shared workspace 链接解析
-#   - web/dist    : 静态托管的 SPA 产物
+#   - web/dist    : 静态托管的 SPA 产物（server 经 CLUB_WEB_DIST env 定位，
+#                   见 index.ts；npm 包形态则把 SPA 拷进 server/dist/public/spa）
 COPY --from=build /app/packages/server/dist packages/server/dist
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/web/dist    packages/web/dist
@@ -95,7 +96,8 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 ENV HOST=0.0.0.0 \
     PORT=6200 \
     CLUB_DB=/data/club.db \
-    CLUB_FILES=/data/files
+    CLUB_FILES=/data/files \
+    CLUB_WEB_DIST=/app/packages/web/dist
 
 EXPOSE 6200
 CMD ["node", "packages/server/dist/index.js"]

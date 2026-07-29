@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import { CreateRoomRequest, type Room } from '@club/shared';
+import { CreateRoomRequest, type Room } from '@vatwiki/shared';
 
 import { requireAuth } from '../auth.js';
 import { ensureRoom, getRoomBySlug, invalidateRoomsCache, listRooms, type RoomRow } from '../db.js';

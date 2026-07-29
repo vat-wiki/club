@@ -1,8 +1,8 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach,describe, expect, it, vi } from "vitest";
 
-import type { ClubConn } from "@club/sdk";
-import type { MessageAttachment } from "@club/shared";
+import type { ClubConn } from "@vatwiki/sdk";
+import type { MessageAttachment } from "@vatwiki/shared";
 
 // The composer drives uploads through @/lib/api.uploadFile. We mock that module
 // so tests don't hit XHR/fetch, and we can resolve/reject uploads at will.

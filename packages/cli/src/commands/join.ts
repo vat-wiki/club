@@ -17,9 +17,9 @@
 
 import { Command } from "commander";
 
-import { ClubApiError, ClubClient } from "@club/sdk";
-import type { Participant } from "@club/shared";
-import { ParticipantNameRegex } from "@club/shared";
+import { ClubApiError, ClubClient } from "@vatwiki/sdk";
+import type { Participant } from "@vatwiki/shared";
+import { ParticipantNameRegex } from "@vatwiki/shared";
 
 import { withCatchExit } from "../catch-exit.js";
 import { saveConfig } from "../config.js";

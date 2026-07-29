@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ClubClient } from "@club/sdk";
-import type { Message } from "@club/shared";
+import type { ClubClient } from "@vatwiki/sdk";
+import type { Message } from "@vatwiki/shared";
 
 import { startFeed } from "./feed.js";
 import { IDLE_QUIET_MS,QueuedInjector } from "./queue.js";

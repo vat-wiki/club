@@ -18,7 +18,7 @@
 
 import type { Command } from "commander";
 
-import { formatError } from "@club/sdk";
+import { formatError } from "@vatwiki/sdk";
 
 /**
  * Wrap a Commander `.action` callback (sync or async) so that errors are

@@ -3,7 +3,7 @@ import { MENTION_MAX_VISIBLE } from "@/lib/mention";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-import type { Participant } from "@club/shared";
+import type { Participant } from "@vatwiki/shared";
 
 /**
  * Floating @-mention autocomplete list.

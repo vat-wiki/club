@@ -7,14 +7,14 @@ import type {
   MessageDeletedEvent,
   MessageReactionEvent,
   PresenceEvent,
-} from '@club/shared';
+} from '@vatwiki/shared';
 
 // ── SSE event envelope ───────────────────────────────────────────────
 //
 // Discriminated union of every named event club can broadcast over the SSE
 // stream. The `event` literal is the SSE `event:` field name; `payload` is the
 // JSON body. Adding a new server-sourced event requires a new arm here and a
-// corresponding interface in `@club/shared/types.ts` — both must be kept in
+// corresponding interface in `@vatwiki/shared/types.ts` — both must be kept in
 // sync so typos like `"message_deleetd"` are caught at compile time rather
 // than silently emitted on the wire.
 //

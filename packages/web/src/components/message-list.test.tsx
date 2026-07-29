@@ -2,7 +2,7 @@ import { renderWithI18n } from "@/test/i18n-wrap";
 import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Message, Participant } from "@club/shared";
+import type { Message, Participant } from "@vatwiki/shared";
 
 import { MessageList } from "./message-list";
 

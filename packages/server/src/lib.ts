@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { DEFAULT_ROOM, isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
+import { DEFAULT_ROOM, isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@vatwiki/shared";
 
 /**
  * Send a `{ error: message }` JSON response with the given status. Centralises
@@ -40,7 +40,7 @@ export function parseLimit(raw: string | number | undefined, fallback = 100): nu
   return parseQueryLimit(raw, fallback);
 }
 
-// parseBearer is now in @club/shared — re-export for backward compat.
+// parseBearer is now in @vatwiki/shared — re-export for backward compat.
 
 /**
  * Parse a JSON request body through a Zod schema in one shot.
@@ -106,7 +106,7 @@ export async function parseJsonBody<T>(
   return { ok: true, data: parsed.data as T };
 }
 
-export { parseBearer } from "@club/shared";
+export { parseBearer } from "@vatwiki/shared";
 
 /**
  * Reject a request with a 400 error when the id param fails format validation.

@@ -77,7 +77,7 @@ export default [
       // that unrelated changes don't churn the same file. The groups are:
       //   [0] Node.js built-in modules (fs, path, crypto, url, child_process …)
       //   [1] Packages (react, commander, hono, ulid …)
-      //   [2] Custom packages scoped under "@club/" (@club/shared, @club/sdk …)
+      //   [2] Custom packages scoped under "@vatwiki/" (@vatwiki/shared, @vatwiki/sdk …)
       //   [3] Internal absolute imports (paths starting with "./" or "../")
       //   [4] Type-only imports (import type …)
       // eslint-plugin-simple-import-sort is safe to auto-fix; it never moves
@@ -85,7 +85,7 @@ export default [
       "simple-import-sort/imports": [
         "error",
         {
-          groups: [["^node:"], ["^"], ["^@club/"], ["^\\./", "^\.\\./"], ["^"], ["^[.]$"]],
+          groups: [["^node:"], ["^"], ["^@vatwiki/"], ["^\\./", "^\.\\./"], ["^"], ["^[.]$"]],
         },
       ],
       "simple-import-sort/exports": "error",

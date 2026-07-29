@@ -10,7 +10,7 @@ import type {
   RecoverParticipantResponse,
   Room,
   UploadFileResponse,
-} from "@club/shared";
+} from "@vatwiki/shared";
 
 import { type FileFormatTag } from "./file-parser.js";
 import { type StreamHandle, streamMessages, type StreamOptions } from "./stream.js";
@@ -180,7 +180,7 @@ export class ClubClient {
    *  attachmentId. Pre-flight mime/size locally before calling.
    *
    *  NOTE: the Node convenience `uploadImage(path)` that reads + sniffs + calls
-   *  this lives in `@club/sdk/node`, NOT on this class — this package's main
+   *  this lives in `@vatwiki/sdk/node`, NOT on this class — this package's main
    *  entry is browser-safe (web imports `ClubClient`), so the fs/image-size
    *  helpers are isolated behind the Node-only subpath. */
   uploadFile(input: UploadFileInput): Promise<UploadFileResponse> {
@@ -196,7 +196,7 @@ export class ClubClient {
   /** GET /files/:id — fetch and parse a file attachment into readable text.
    *  Supports: text/*, JSON, PDF, Word (.docx), Excel (.xlsx). Returns a
    *  `ParsedFile` with parsed text and format info for agent consumption.
-   *  NOTE: Only available in @club/sdk/node (Node.js environment). */
+   *  NOTE: Only available in @vatwiki/sdk/node (Node.js environment). */
   async readFileContent(id: string): Promise<ParsedFile> {
     const { buffer, mime, filename } = await this.getFile(id);
     // Dynamic import of parser (only available in Node)

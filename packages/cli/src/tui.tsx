@@ -1,8 +1,8 @@
 import { Box, render, Text,useApp, useInput } from "ink";
 import { useEffect, useRef,useState } from "react";
 
-import { ClubClient } from "@club/sdk";
-import type { Message, Participant, Room } from "@club/shared";
+import { ClubClient } from "@vatwiki/sdk";
+import type { Message, Participant, Room } from "@vatwiki/shared";
 
 import { formatMessage } from "./commands/format.js";
 import { type ClubConfig,defaultRoom } from "./config.js";

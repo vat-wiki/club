@@ -9,7 +9,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
-import type { Message, MessageAttachment, Participant } from "@club/shared";
+import type { Message, MessageAttachment, Participant } from "@vatwiki/shared";
 
 type Status = "connecting" | "connected" | "lost";
 

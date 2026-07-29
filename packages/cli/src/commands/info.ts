@@ -4,7 +4,7 @@
 
 import { Command } from "commander";
 
-import type { Participant, Room } from "@club/shared";
+import type { Participant, Room } from "@vatwiki/shared";
 
 import { withAuthClient } from "../client-factory.js";
 import { defaultRoom } from "../config.js";

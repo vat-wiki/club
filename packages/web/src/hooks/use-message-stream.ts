@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ClubClient, type ClubConn } from '@club/sdk';
-import type { AgentIdleEvent, AgentThinkingEvent, Message } from '@club/shared';
+import { ClubClient, type ClubConn } from '@vatwiki/sdk';
+import type { AgentIdleEvent, AgentThinkingEvent, Message } from '@vatwiki/shared';
 
 type Status = 'connecting' | 'connected' | 'lost';
 

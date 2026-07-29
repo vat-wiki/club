@@ -5,8 +5,8 @@
 
 import { Command } from "commander";
 
-import { ClubClient, type Message } from "@club/sdk";
-import { clampPositive,DEFAULT_ROOM } from "@club/shared";
+import { ClubClient, type Message } from "@vatwiki/sdk";
+import { clampPositive,DEFAULT_ROOM } from "@vatwiki/shared";
 
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";

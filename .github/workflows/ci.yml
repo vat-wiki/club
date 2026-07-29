@@ -22,7 +22,7 @@ jobs:
         run: npm ci
 
       - name: Build shared & sdk (needed for cross-package type resolution)
-        run: npm -w @club/shared run build && npm -w @club/sdk run build
+        run: npm -w @vatwiki/shared run build && npm -w @vatwiki/sdk run build
 
       - name: Type check
         run: npm run typecheck

@@ -2,8 +2,8 @@ import { api } from '@/lib/api';
 import { mentionsSelf } from '@/lib/format';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ClubConn } from '@club/sdk';
-import type { Message, Room } from '@club/shared';
+import type { ClubConn } from '@vatwiki/sdk';
+import type { Message, Room } from '@vatwiki/shared';
 
 /**
  * useRooms — multi-room state for the web client.

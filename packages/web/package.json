@@ -1,5 +1,5 @@
 {
-  "name": "@club/web",
+  "name": "@vatwiki/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@club/sdk": "*",
-    "@club/shared": "*",
+    "@vatwiki/sdk": "*",
+    "@vatwiki/shared": "*",
     "@floating-ui/react-dom": "^2.1.9",
     "@floating-ui/react-dom-interactions": "^0.13.3",
     "@js-preview/docx": "^1.6.4",

@@ -1,13 +1,13 @@
-name: Publish CLI
+name: Publish
 
 on:
   push:
     branches: [main]
 
 jobs:
-  publish-cli:
+  publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       id-token: write
     steps:
@@ -21,24 +21,47 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build shared & sdk (cli bundles @club/sdk, which needs its dist built first)
-        run: npm -w @club/shared run build && npm -w @club/sdk run build
+      # Build in dependency order. web is built BEFORE server so server's
+      # copy-web-dist (also re-run by prepack during publish) can bundle the
+      # SPA into the published tarball.
+      - name: Build all packages
+        run: |
+          npm -w @vatwiki/shared run build
+          npm -w @vatwiki/sdk     run build
+          npm -w @vatwiki/web     run build
+          npm -w club-serve  run build
+          npm -w club-cli      run build
 
-      - name: Build cli
-        run: cd packages/cli && npm run build
-
-      - name: Publish to npm
+      - name: Configure npm auth
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           rm -f ~/.npmrc
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
-          LOCAL_VERSION=$(node -p "require('./packages/cli/package.json').version")
-          REMOTE_VERSION=$(npm view club-cli version 2>/dev/null || echo "0.0.0")
-          if [ "$LOCAL_VERSION" = "$REMOTE_VERSION" ]; then
-            echo "⚠ Version $LOCAL_VERSION already published, skipping"
-            exit 0
-          fi
-          echo "✓ Publishing version $LOCAL_VERSION"
+
+      # Publish. @vatwiki/shared is NOT published separately — it is inlined
+      # into club-serve's dist/index.js by tsup (noExternal: @vatwiki/*), so `npx club-serve` needs
+      # only the one package. Each step is version-idempotent (skips if the
+      # version already exists on the registry); first publish: `npm view` 404s
+      # → falls back to 0.0.0 → 0.1.0 ≠ 0.0.0 → publishes.
+
+      - name: Publish club-serve (bundles SPA)
+        run: |
+          test -d packages/web/dist || { echo "✗ web dist missing — refusing to publish server without UI"; exit 1; }
+          cd packages/server
+          npm run copy-web-dist        # bundle packages/web/dist → dist/public/spa
+          test -d dist/public/spa || { echo "✗ SPA copy failed"; exit 1; }
+          L=$(node -p "require('./package.json').version")
+          R=$(npm view club-serve version 2>/dev/null || echo "0.0.0")
+          if [ "$L" = "$R" ]; then echo "⚠ club-serve $L already published, skipping"; exit 0; fi
+          echo "✓ Publishing club-serve $L"
+          npm publish --access public --provenance
+
+      - name: Publish club-cli
+        run: |
           cd packages/cli
-          npm publish --access public
+          L=$(node -p "require('./package.json').version")
+          R=$(npm view club-cli version 2>/dev/null || echo "0.0.0")
+          if [ "$L" = "$R" ]; then echo "⚠ club-cli $L already published, skipping"; exit 0; fi
+          echo "✓ Publishing club-cli $L"
+          npm publish --access public --provenance

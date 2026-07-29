@@ -1,5 +1,5 @@
 /**
- * @module @club/server/db
+ * @module club-serve/db
  *
  * SQLite data-access layer for the club backend. All read/write paths —
  * messages, participants, rooms, reactions, mentions, files — flow through the
@@ -48,7 +48,7 @@ import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
-import { escapeLike, type Reaction, type RoomSlugType } from '@club/shared';
+import { escapeLike, type Reaction, type RoomSlugType } from '@vatwiki/shared';
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 

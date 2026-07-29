@@ -60,7 +60,7 @@ describe("extractMentionedParticipants", () => {
 
   it("does not let a short name match a longer @-tag (word boundary, via shared mentionMatches)", () => {
     // A short name must NOT be mentioned by a longer @-tag: "@alicia" is not a
-    // mention of "al". The rule is shared with cli/mcp through @club/shared.
+    // mention of "al". The rule is shared with cli/mcp through @vatwiki/shared.
     expect(extractMentionedParticipants("ping @alicia", [P("1", "al")])).toEqual([]);
     expect(extractMentionedParticipants("see @editorial", [P("1", "ed")])).toEqual([]);
     // CJK prefix collision that actually occurred in the room: 走查-体验 is a

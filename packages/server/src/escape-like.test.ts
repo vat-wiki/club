@@ -5,7 +5,7 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterAll,describe, expect, it } from "vitest";
 
-import { escapeLike } from "@club/shared";
+import { escapeLike } from "@vatwiki/shared";
 
 /** Build an isolated temp SQLite db with known messages so we can
  *  exercise the full search code path (LIKE + escapeLike) without touching

@@ -3,5 +3,5 @@
 // share the same clamp semantics ([1, 500], default 50, 0/negatives → 1),
 // so this avoids a second copy of the clamping rule.
 //
-// @see {@link @club/shared#parseFlagLimit}
-export { parseFlagLimit as parseLimit } from "@club/shared";
+// @see {@link @vatwiki/shared#parseFlagLimit}
+export { parseFlagLimit as parseLimit } from "@vatwiki/shared";

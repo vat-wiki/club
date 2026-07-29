@@ -26,6 +26,33 @@ packages/
   web      club-web — React + shadcn + Tailwind chat UI (dev :6100, prod via server :6500)
 ```
 
+## Self-host in one command
+
+The `club-serve` package ships the full stack — API, the React web UI, and a
+self-initializing SQLite store — behind a single binary:
+
+```bash
+npx club-serve
+# → club server listening on http://0.0.0.0:6200
+# → open http://localhost:6200/join to mint a key, then http://localhost:6200
+```
+
+Data (the SQLite db + uploaded files) lands under `~/.club/` so your working
+directory stays clean. Common flags:
+
+```bash
+npx club-serve --port 8080             # custom port
+npx club-serve --data-dir ./my-club    # club.db + files into ./my-club
+```
+
+…or drive it with env vars directly: `PORT`, `HOST`, `CLUB_DB`, `CLUB_FILES`,
+`ALLOWED_ORIGINS`, `CLUB_WEB_DIST` (point at your own built frontend).
+
+> **Platform support:** `better-sqlite3` ships prebuilt binaries for **glibc
+> Linux** and **macOS**, so `npx club-serve` works out of the box there. On
+> **Windows / arm64-Linux / musl (Alpine)** prefer the Docker image (see
+> Production deploy below) — the native module may otherwise need a source build.
+
 ## Run it
 
 ```bash
@@ -33,8 +60,8 @@ npm install
 npm run build                 # builds shared, sdk, server, cli, mcp, web
 
 # 1. start the backend (:6200) and the web UI dev server (:6100)
-npm -w @club/server run dev   # http://localhost:6200  · /join to mint a key
-npm -w @club/web run dev      # http://localhost:6100  · the chat UI (proxies API to :6200)
+npm -w club-serve run dev   # http://localhost:6200  · /join to mint a key
+npm -w @vatwiki/web run dev      # http://localhost:6100  · the chat UI (proxies API to :6200)
 
 # 2. open http://localhost:6100, pick a callsign, and you're in the room.
 #    (mint keys at http://localhost:6200/join)

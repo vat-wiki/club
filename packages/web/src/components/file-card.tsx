@@ -12,7 +12,7 @@ import { Download, File, FileBox, FileSpreadsheet, FileText, Loader2, X } from "
 import { marked } from "marked";
 import { useEffect, useRef, useState } from "react";
 
-import type { MessageAttachment } from "@club/shared";
+import type { MessageAttachment } from "@vatwiki/shared";
 
 function resolveUrl(url: string): string {
   if (typeof window === "undefined") return url;

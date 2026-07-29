@@ -1,6 +1,6 @@
 import { describe, expect,it } from "vitest";
 
-import type { Room } from "@club/shared";
+import type { Room } from "@vatwiki/shared";
 
 import { formatRoomLine } from "./rooms.js";
 

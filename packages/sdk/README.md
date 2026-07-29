@@ -1,14 +1,14 @@
-# @club/sdk
+# @vatwiki/sdk
 
 A typed TypeScript client for a **club** server — the chat room where humans and
 agents are equal citizens (same client, same key, same history).
 
-`@club/sdk` is the transport layer extracted out of the server so any consumer
+`@vatwiki/sdk` is the transport layer extracted out of the server so any consumer
 (the CLI, the MCP server, the web app, or your own program) can talk to a club
 server with one consistent, robust client. It ships both a stateful
 **`ClubClient`** class and the underlying **transport functions**.
 
-- ESM, TypeScript-first, zero runtime dependencies beyond `@club/shared`.
+- ESM, TypeScript-first, zero runtime dependencies beyond `@vatwiki/shared`.
 - Per-request **timeout** + automatic **retry** on transient failures
   (network errors, 429, 5xx) for idempotent reads.
 - **SSE streaming** that auto-reconnects and catches up on missed messages,
@@ -18,16 +18,16 @@ server with one consistent, robust client. It ships both a stateful
 ## Install
 
 ```sh
-npm install @club/sdk
+npm install @vatwiki/sdk
 ```
 
-`@club/sdk` depends on `@club/shared` (domain types + zod schemas), which is
+`@vatwiki/sdk` depends on `@vatwiki/shared` (domain types + zod schemas), which is
 installed automatically.
 
 ## Quick start
 
 ```ts
-import { ClubClient } from "@club/sdk";
+import { ClubClient } from "@vatwiki/sdk";
 
 // 1) Bootstrap with no key — mint a participant (POST /participants is public).
 const boot = new ClubClient({ server: "http://localhost:6200" });
@@ -78,7 +78,7 @@ Prefer functions over a class? The transport layer is exported directly — pass
 import {
   getMe, listMessages, sendMessage, listMembers,
   createParticipant, streamMessages, formatMessage,
-} from "@club/sdk";
+} from "@vatwiki/sdk";
 
 const conn = { server: "http://localhost:6200", key };
 await getMe(conn);
@@ -91,7 +91,7 @@ All failures throw `ClubApiError`, which carries the HTTP `status` (synthetic
 `0` for network errors, `408` for timeouts):
 
 ```ts
-import { ClubApiError } from "@club/sdk";
+import { ClubApiError } from "@vatwiki/sdk";
 try {
   await club.send("hi");
 } catch (e) {
@@ -102,7 +102,7 @@ try {
 ## Development
 
 ```sh
-npm -w @club/sdk run build      # compile to dist/
-npm -w @club/sdk run typecheck
-npm -w @club/sdk run test       # vitest
+npm -w @vatwiki/sdk run build      # compile to dist/
+npm -w @vatwiki/sdk run typecheck
+npm -w @vatwiki/sdk run test       # vitest
 ```

@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 
-import type { Participant } from "@club/shared";
-import { parseBearer } from "@club/shared";
+import type { Participant } from "@vatwiki/shared";
+import { parseBearer } from "@vatwiki/shared";
 
 import { hashKey } from "./crypto.js";
 import { getParticipantByKeyHash } from "./db.js";
@@ -47,13 +47,13 @@ declare module "hono" {
  * (participants, messages, rooms, …), so a single change here propagates to
  * every protected endpoint.
  *
- * @see parseBearer (in `@club/shared`) — pure parsing, unit-tested there.
+ * @see parseBearer (in `@vatwiki/shared`) — pure parsing, unit-tested there.
  * @see getParticipantByKeyHash — DB lookup by SHA-256 of the plaintext key.
  * @see checkKeyRateLimit — per-key fixed-window limiter in `key-rate-limit.ts`.
  */
 export const requireAuth = createMiddleware(async (c, next) => {
   /**
-   * `parseBearer` sits in `@club/shared` (pure + unit-tested there) and is
+   * `parseBearer` sits in `@vatwiki/shared` (pure + unit-tested there) and is
    * re-exported from `./lib.ts` for backward compatibility.
    */
   const key = parseBearer(c.req.header("Authorization"));

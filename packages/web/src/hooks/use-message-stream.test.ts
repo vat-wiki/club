@@ -1,13 +1,13 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ClubConn, StreamHandle, StreamOptions } from "@club/sdk";
+import type { ClubConn, StreamHandle, StreamOptions } from "@vatwiki/sdk";
 import type {
   AgentIdleEvent,
   AgentThinkingEvent,
   Message,
   PresenceEvent,
-} from "@club/shared";
+} from "@vatwiki/shared";
 
 import { useMessageStream } from "./use-message-stream";
 
@@ -39,8 +39,8 @@ class MockStream implements StreamHandle {
 
 let mockMessagesResult: Message[] = [];
 
-vi.mock("@club/sdk", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@club/sdk")>();
+vi.mock("@vatwiki/sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@vatwiki/sdk")>();
 
   class MockClubClient {
     readonly server: string;

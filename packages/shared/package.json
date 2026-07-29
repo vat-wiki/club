@@ -1,6 +1,7 @@
 {
-  "name": "@club/shared",
+  "name": "@vatwiki/shared",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "description": "Shared types and utilities for the club chat platform",
   "main": "./dist/index.js",

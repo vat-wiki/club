@@ -6,7 +6,7 @@
 
 import { Command } from "commander";
 
-import { ClubClient } from "@club/sdk";
+import { ClubClient } from "@vatwiki/sdk";
 
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";

@@ -1,6 +1,6 @@
 import { uploadImage } from "@/lib/upload";
 
-import { ClubClient, type ClubConn,request } from "@club/sdk";
+import { ClubClient, type ClubConn,request } from "@vatwiki/sdk";
 import type {
   CreateMessageRequest,
   CreateParticipantResponse,
@@ -13,7 +13,7 @@ import type {
   Room,
   RotateKeyRequest,
   UploadFileResponse,
-} from "@club/shared";
+} from "@vatwiki/shared";
 
 // ── Shared types ────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export interface UploadOptions {
  * The thin API facade the web UI imports from. Every method is typed so the
  * compiler catches mismatched calls (wrong arg order, missing required params,
  * dropped return types) and callers get IDE autocomplete instead of guessing
- * the shape of `@club/sdk`'s methods.
+ * the shape of `@vatwiki/sdk`'s methods.
  */
 export interface ClubApi {
   /** GET /me — the participant the current key belongs to. */
@@ -114,7 +114,7 @@ export interface ClubApi {
 // ── Implementation ─────────────────────────────────────────────────
 
 // Thin facade over ClubClient so components import from one place. The real
-// HTTP/SSE logic lives in @club/sdk's ClubClient; this just constructs a client
+// HTTP/SSE logic lives in @vatwiki/sdk's ClubClient; this just constructs a client
 // per call from the connection the app holds.
 function client(c: ClubConn): ClubClient {
   return new ClubClient(c);

@@ -1,4 +1,4 @@
-import type { Participant } from "@club/shared";
+import type { Participant } from "@vatwiki/shared";
 
 /**
  * @-mention autocomplete helpers.

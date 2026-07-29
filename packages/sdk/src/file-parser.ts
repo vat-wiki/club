@@ -3,7 +3,7 @@
 // Converts various file formats into plain text that agents can read.
 // Supports: text, JSON, PDF, Word (.docx), Excel (.xlsx), markdown
 
-import { type AttachmentMime as AttachmentMimeType } from "@club/shared";
+import { type AttachmentMime as AttachmentMimeType } from "@vatwiki/shared";
 
 import { formatError } from "./errors.js";
 

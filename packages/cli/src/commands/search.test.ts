@@ -1,6 +1,6 @@
 import { afterEach, beforeEach,describe, expect, it, vi } from "vitest";
 
-import type { Message } from "@club/shared";
+import type { Message } from "@vatwiki/shared";
 
 import { runSearch, type SearchDeps } from "./search.js";
 

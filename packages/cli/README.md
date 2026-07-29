@@ -72,7 +72,7 @@ club agent --room dev --mention rex -- codex   # 只订阅某房间 / 只收 @�
 ## 开发
 
 ```sh
-npm -w @club/cli run build
-npm -w @club/cli run typecheck
-npm -w @club/cli run test
+npm -w club-cli run build
+npm -w club-cli run typecheck
+npm -w club-cli run test
 ```

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Check, ChevronDown, Copy, Key, LogOut, MoreVertical, Radio, Users } from "lucide-react";
 import { useState } from "react";
 
-import type { Participant } from "@club/shared";
+import type { Participant } from "@vatwiki/shared";
 
 import type { Status as TopbarStatus } from "./topbar";
 

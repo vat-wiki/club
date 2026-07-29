@@ -1,13 +1,13 @@
-import type { Message, MessageAttachment } from "@club/shared";
+import type { Message, MessageAttachment } from "@vatwiki/shared";
 import type {
   DocumentMime,
   ImageMime,
   VideoMime,
-} from "@club/shared";
+} from "@vatwiki/shared";
 
 // ── Type-level discriminated attachment union ─────────────────────
 //
-// `MessageAttachment.mime` in `@club/shared` is a literal union
+// `MessageAttachment.mime` in `@vatwiki/shared` is a literal union
 // (`ImageMime | VideoMime | DocumentMime`). The old implementation
 // used `a.mime.startsWith("video/")` to branch at runtime, which
 // silently accepted any string prefix and bypassed the type narrowing

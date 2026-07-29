@@ -1,7 +1,7 @@
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ClubApiError } from "@club/sdk";
-import type { Participant, Room } from "@club/shared";
+import { ClubApiError } from "@vatwiki/sdk";
+import type { Participant, Room } from "@vatwiki/shared";
 
 import { type InfoDeps,roomDisplayLabel, runInfo } from "./info.js";
 

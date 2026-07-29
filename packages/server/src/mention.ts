@@ -7,7 +7,7 @@
  * server now needs to know too, so it can persist per-participant inbox rows
  * that survive the recipient being offline.
  *
- * The actual match rule lives in @club/shared `mentionMatches` and is shared
+ * The actual match rule lives in @vatwiki/shared `mentionMatches` and is shared
  * with the client-side matchers (packages/mcp/src/helpers.ts `matchesMention`
  * and packages/cli/src/commands/listen.ts), so an agent that wakes from its
  * inbox sees exactly the messages it would have caught live via
@@ -23,7 +23,7 @@ export interface NamedParticipant {
 // Reuse the same character class that mentionMatches uses for word-boundary
 // checks, so the server's single-pass scanner agrees exactly with the shared
 // matcher. Keeping it here avoids pulling an implementation detail into the
-// @club/shared library.
+// @vatwiki/shared library.
 const NAME_CHAR = /[\p{L}\p{N}_-]/u;
 
 /**
@@ -73,7 +73,7 @@ const _cache = { roster: null as readonly NamedParticipant[] | null, map: new Ma
 /**
  * Return the roster entries that `content` @-mentions.
  *
- * Matching is delegated to @club/shared `mentionMatches` (word-boundary aware)
+ * Matching is delegated to @vatwiki/shared `mentionMatches` (word-boundary aware)
  * so the server's inbox agrees with the CLI/MCP live matchers. A name with an
  * empty string is skipped. Duplicate ids in the input are de-duplicated so a
  * participant is mentioned at most once per message.

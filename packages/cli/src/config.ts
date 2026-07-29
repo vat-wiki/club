@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { DEFAULT_ROOM } from "@club/shared";
+import { DEFAULT_ROOM } from "@vatwiki/shared";
 
 export { DEFAULT_ROOM };
 

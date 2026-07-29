@@ -1,4 +1,4 @@
-import type { MessageAttachment } from "@club/shared";
+import type { MessageAttachment } from "@vatwiki/shared";
 
 // Allowed MIME values — must mirror the shared `AttachmentMime` union so the
 // server rejects a row whose mime is not in the agreed enum. Kept in sync with

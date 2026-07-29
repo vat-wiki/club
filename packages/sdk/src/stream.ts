@@ -1,5 +1,5 @@
 /**
- * @module @club/sdk/stream
+ * @module @vatwiki/sdk/stream
  *
  * Real-time message streaming via Server-Sent Events (SSE).
  *
@@ -20,8 +20,8 @@
  *
  * @example
  * ```ts
- * import { streamMessages } from "@club/sdk";
- * import { ClubClient } from "@club/sdk";
+ * import { streamMessages } from "@vatwiki/sdk";
+ * import { ClubClient } from "@vatwiki/sdk";
  *
  * const client = new ClubClient({ server: "https://club.example" });
  * const { stop } = streamMessages(
@@ -34,8 +34,8 @@
  * ```
  */
 
-import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
-import { jitteredBackoff, parseRetryAfterMs, sleep } from "@club/shared";
+import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageReactionEvent,PresenceEvent } from "@vatwiki/shared";
+import { jitteredBackoff, parseRetryAfterMs, sleep } from "@vatwiki/shared";
 
 import { type ClubConn, listMessages, listRooms } from "./transport.js";
 

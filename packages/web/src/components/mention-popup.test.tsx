@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Participant } from "@club/shared";
+import type { Participant } from "@vatwiki/shared";
 
 import { MentionPopup } from "./mention-popup";
 

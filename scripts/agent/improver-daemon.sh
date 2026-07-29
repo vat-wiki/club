@@ -3,8 +3,8 @@
 # 在容器中用 nohup 后台运行
 
 set -e
-PROJECT_DIR="/home/dev/repos/club"
-LOG_DIR="$PROJECT_DIR/.claude"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+LOG_DIR="$PROJECT_DIR/.ai"
 PID_FILE="$LOG_DIR/improver.pid"
 LOG_FILE="$LOG_DIR/improver.log"
 

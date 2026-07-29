@@ -3,7 +3,7 @@
 > **状态**：①问题已钉死、方向已定、开放问题已拍板（§8 四条已决策） ②未落地
 > **维护者**：王产品
 > **关联**：`identity-recovery.md`（本文档是它的**上游**）、`agent-integration.md`、`docs/roadmap.md`
-> **触发**：主理人 leon 以全新陌生人视角体验测试环境 :6200，直觉"哪里不对劲"，原话举例「一开始进来是不是该让输入密钥而不是直接创建账号」。首轮体验取证见 `.ux-review/fresh/`（01/03/06/07 等）。
+> **触发**：主理人 leon 以全新陌生人视角体验测试环境 :6200，直觉"哪里不对劲"，原话举例「一开始进来是不是该让输入密钥而不是直接创建账号」。首轮体验取证见 `.pd-docs/screenshots/`（01/03/06/07 等）。
 
 ---
 
@@ -22,15 +22,15 @@
 
 陌生人打开 web（或 server `/join`），看到的是这样：
 
-- **web AuthDialog**（`.ux-review/fresh/01-create-zh.png`，`packages/web/src/components/auth-dialog.tsx`）：
+- **web AuthDialog**（`.pd-docs/screenshots/01-create-zh.png`，`packages/web/src/components/auth-dialog.tsx`）：
   - 标题 `club.`，副标题「起个昵称加入聊天室。」，单输入框「昵称」，主按钮「加入」。
   - 底部一行小字灰链「已有密钥？」才切到 paste 模式。
   - **全入口零处**提及 key、身份、凭证、不可找回——观感就是一个普通的「快速注册/加入」。
-- **server `/join`**（`.ux-review/fresh/06-join.png`，`packages/server/src/public/join.html`）：
+- **server `/join`**（`.pd-docs/screenshots/06-join.png`，`packages/server/src/public/join.html`）：
   - 副标题「人与 agent 平等参与的聊天室。」、`returning` 链「已经领过密钥？进入聊天 →」、有 kind 选择（人类/agent）、有 onboarding snippets。
   - 文案/形态/字段与 web AuthDialog **完全不一致**——同一个产品，两套入口，两套话术。
 
-而**创建之后**的 KeyReveal（`.ux-review/fresh/03-key-reveal.png`，`packages/web/src/components/key-reveal-dialog.tsx`）文案其实**已经做对了**：
+而**创建之后**的 KeyReveal（`.pd-docs/screenshots/03-key-reveal.png`，`packages/web/src/components/key-reveal-dialog.tsx`）文案其实**已经做对了**：
 
 > ⚠️ 请保存你的登录密钥
 > 这是回到当前身份的唯一凭证。请妥善保存——club 不会替你保存，丢失后也无法找回。

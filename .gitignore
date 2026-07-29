@@ -24,3 +24,11 @@ packages/**/coverage/
 .claude/
 # 本地部署版本状态（.env：每次 build/promote 变动，不入库）
 .env
+
+# 自动优化 / 体验巡检 agent 的排泄物（日志、草稿、截图、运行时锁）—— 易变，不入库
+# 单一归拢处：优化记录 .ai/opt-history.md、评审草稿 .ai/reviews/、巡检截图 .ai/ux-review/
+.ai/
+.ux-review/
+prepub/
+# agent daemon 运行时日志（若改回 scripts/logs/ 写）
+scripts/logs/

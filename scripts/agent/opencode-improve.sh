@@ -2,9 +2,9 @@
 # 每18分钟用opencode从不同角度完善 ~/repos/club 项目
 # 使用锁文件防止重叠运行
 
-PROJECT_DIR="$HOME/repos/club"
-LOG_DIR="$PROJECT_DIR/scripts/logs"
-LOCK_FILE="$PROJECT_DIR/scripts/.opencode-pid"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+LOG_DIR="$PROJECT_DIR/.ai"
+LOCK_FILE="$PROJECT_DIR/.ai/opencode.pid"
 LOCK_TIMEOUT=3600  # 锁文件超时(秒)，防止死锁
 
 mkdir -p "$LOG_DIR"

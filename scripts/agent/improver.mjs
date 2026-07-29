@@ -92,7 +92,7 @@ function main() {
 3. 运行 \`npm run typecheck\` 验证
 4. 如需查看测试环境视觉效果：https://club-test.vat.wiki/
 5. 如需记录截图，使用 club-cli 发送图片
-6. 将本次改进记录到 .claude/improvement-log.md
+6. 将本次改进记录到 .ai/improvement-log.md
 7. 如果该角度暂不需要改进，记录说明并跳过
 `;
 

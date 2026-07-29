@@ -1,9 +1,9 @@
 // club 消息 → 单行注入文本的格式化 + 直连 SSE 订阅器。
 //
 // 这是 `club agent` 的数据源:直接用 ClubClient.stream() 订阅实时消息,
-// 每条消息格式化成"给 agent 看的一条用户消息"压成严格单行,塞进
-// QueuedInjector。**不经过 notify-panel** —— club stream 自身的 ulid 去重
-// 已经保证了 exactly-once,无需"注入成功才标已读"那套契约。
+// 每条消息格式化成"给 agent 的一条通知"(只含来源/房间/消息 id,不发正文)
+// 压成严格单行,塞进 QueuedInjector。**不经过 notify-panel** —— club stream
+// 自身的 ulid 去重已经保证了 exactly-once,无需"注入成功才标已读"那套契约。
 //
 // 对照 notify-panel-tui 的 watcher:那里轮询 daemon 的未读队列,注入成功才
 // 标记已读;这里订阅 SSE 活流,消息天然不重复,投递即"已读"。
@@ -35,34 +35,20 @@ export interface FeedOptions {
 }
 
 /**
- * 单条注入文本长度上限。claude/codex 这类 TUI 的输入框遇到换行会进入多行
- * 编辑模式(回车变成"换行"而非"提交"),所以注入文本必须压成严格单行;
- * 超长截断并提示,agent 可自行用工具查详情。
- */
-const MAX_INJECT_LEN = 500;
-
-function severityEmoji(mentioned: boolean): string {
-  return mentioned ? "🟡" : "🔵";
-}
-
-/**
- * 把一条 club 消息格式化成注入给 agent 的单行文本。
+ * 把一条 club 消息格式化成注入给 agent 的单行**通知**。
  *
- * 形如:`🟡[@dev] rex: @bot 帮我看下日志`(被 @ → 🟡 warning,否则 🔵 info)。
- * 强制去 `\r\n\t`、折叠空白、超长截断,保证回车 = 提交。
+ * club 的职责只是告诉 agent「有事找你」;要不要 `club read` 取正文、要不要
+ * 回复,是 agent 自己的事。所以注入文本只是一条通知头:来源(club)、房间、
+ * 消息 id(供 agent 拉上下文 `club read --since <id>`),外加一句「是否查看/
+ * 回复由你定」把可选性讲死 —— 避免把 `@bot 去做X` 这种正文直接灌进去,被
+ * agent 当成必须执行的任务。
+ *
+ * 严格单行:claude/codex 这类 TUI 输入框遇换行会进多行编辑模式(回车变
+ * "换行"而非"提交")。这里只含受控字段(房间 slug / ulid id),无自由文本,
+ * 天然无换行/超长风险。
  */
-export function formatForInject(m: Message, mentioned: boolean): string {
-  const emoji = severityEmoji(mentioned);
-  const room = m.room;
-  const author = m.authorName;
-  const body = m.content.trim();
-  const head = `${emoji}[@${room}] ${author}:`;
-  let text = body ? `${head} ${body}` : head;
-  text = text.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
-  if (text.length > MAX_INJECT_LEN) {
-    text = text.slice(0, MAX_INJECT_LEN) + "…(已截断)";
-  }
-  return text;
+export function formatForInject(m: Message): string {
+  return `🔔 club 发来一条通知 · #${m.room} · ${m.id} · 是否查看/回复由你定`;
 }
 
 /**
@@ -98,10 +84,7 @@ export function startFeed(client: ClubClient, opts: FeedOptions): () => void {
 
   const handle = client.stream((m: Message) => {
     if (!shouldDeliver(m, { meId: opts.meId, mention: opts.mention })) return;
-    const mentioned = opts.mention
-      ? mentionMatches(m.content, opts.mention)
-      : false;
-    opts.inject.enqueue(formatForInject(m, mentioned));
+    opts.inject.enqueue(formatForInject(m));
     delivered++;
     opts.onDelivered?.(delivered);
   }, streamOpts);

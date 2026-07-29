@@ -23,38 +23,23 @@ function msg(over: Partial<Message> = {}): Message {
 }
 
 describe("formatForInject", () => {
-  it("格式化为单行:emoji + [@room] author: body", () => {
+  it("渲染成 club 通知:来源 + 房间 + 消息 id,严格单行", () => {
     const m = msg({ content: "你好", room: "dev", authorName: "rex" });
-    expect(formatForInject(m, false)).toBe("🔵[@dev] rex: 你好");
+    expect(formatForInject(m)).toBe(
+      `🔔 club 发来一条通知 · #dev · ${m.id} · 是否查看/回复由你定`,
+    );
   });
 
-  it("被 @ 的消息用 🟡(warning),否则 🔵(info)", () => {
-    const m = msg({ content: "@bot 看下日志", authorName: "rex", room: "dev" });
-    expect(formatForInject(m, true)).toBe("🟡[@dev] rex: @bot 看下日志");
-    expect(formatForInject(m, false)).toBe("🔵[@dev] rex: @bot 看下日志");
+  it("正文不外发:agent 想看自己 club read,是否响应由 agent 定", () => {
+    const secret = "这条正文不该被注入 @bot";
+    const out = formatForInject(msg({ content: secret, room: "dev" }));
+    expect(out).not.toContain(secret);
+    expect(out).not.toContain("@bot");
   });
 
-  it("把换行/制表符压成单行(否则 TUI 输入框会进多行模式,回车不再提交)", () => {
-    const m = msg({
-      content: "第一行\n第二行\t有缩进\r\n第三行",
-      authorName: "a",
-      room: "r",
-    });
-    const out = formatForInject(m, false);
+  it("严格单行,无换行/制表符(TUI 输入框回车即提交)", () => {
+    const out = formatForInject(msg({ room: "dev" }));
     expect(out).not.toMatch(/\r|\n|\t/);
-    expect(out.startsWith("🔵[@r] a: 第一行 ")).toBe(true);
-  });
-
-  it("超长内容截断并标记(避免灌爆 TUI 输入框)", () => {
-    const long = "x".repeat(1000);
-    const out = formatForInject(msg({ content: long }), false);
-    expect(out.endsWith("…(已截断)")).toBe(true);
-    expect(out.length).toBeLessThan(long.length);
-  });
-
-  it("空内容也给出可识别的标题(不崩)", () => {
-    const out = formatForInject(msg({ content: "   " }), false);
-    expect(out).toBe("🔵[@general] alice:");
   });
 });
 

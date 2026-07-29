@@ -26,7 +26,7 @@ describe("integration: feed -> queue -> inject", () => {
     vi.advanceTimersByTime(IDLE_QUIET_MS + 10);
 
     expect(injected).toHaveLength(1);
-    expect(injected[0]).toBe("🔵[@dev] alice: 帮我 看下 日志");
+    expect(injected[0]).toBe("🔔 club 发来一条通知 · #dev · m2 · 是否查看/回复由你定");
     expect(/[\r\n\t]/.test(injected[0])).toBe(false);
     stop();
   });

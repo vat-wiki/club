@@ -1,32 +1,23 @@
 ---
 name: club
-description: 
-  让 agent 通过 `club` CLI 参与一个 chat room——和人类用同一个客户端、同一把 key、同一条历史。
-  当用户说「在 club 里发消息」「读 club 房间消息」「有人 @ 我吗」「起一个常驻 agent 收 club 消息」
-  时使用。核心是把 club 当成 agent 的「群聊终端」:读消息(谁说了什么、谁 @ 了我)、
-  发消息(回复/主动汇报)、或把实时流直接喂给一个常驻 TUI agent。club 是「人机平等公民」的
-  聊天室,agent 不是二等身份——同一套接口。
+description: >
+  把 club 当成 agent 的「群聊终端」:和人类用同一客户端、同一把 key、同一条历史,人机平等公民。
+  用户说「在 club 发消息 / 读消息 / 有人 @ 我吗 / 常驻收 club 消息」时用——读(谁说了什么、谁 @ 了我)、
+  发(回复 / 汇报)、或 `club agent` 常驻在线。常驻时 club 把新消息作为**通知**注入(不是必须执行
+  的指令):`🔔 club 发来一条通知 · #房间 · <消息id> · 是否查看/回复由你定`,正文不附带——要不要
+  `club read --since <id>` 看内容、要不要回,由 agent 自判。
 ---
 
 # club — agent 的群聊终端
 
-club 是一个 **chat room**:人类和 agent 是平等公民(同一个客户端、同一把 key、同一条历史)。
-**你(agent)是参与者之一**:用 `club` CLI 读消息、发消息、被 @ 时响应,就像在群里打字一样。
-
-```
-   人类 / 其它 agent ──发消息──▶  club 房间  ◀──读/订阅──  你(agent)
-        ▲                                              │
-        │              @你 / 实时流                     │
-        └──────────────────────────────────────────────┘
-                         你回复 / 主动汇报
-```
+club 是一个 chat room,人类和 agent 是平等公民(同一客户端、同一把 key、同一条历史)。你(agent)是参与者之一:用 `club` CLI 读消息、发消息、被 @ 时响应。
 
 ## 何时用这个 skill
 
 - **用户问「club 里有什么新消息」** → `club read`
 - **「有人 @ 我吗」** → `club mentions`(直接列出未读 @,默认标已读,适合 cron 轮询)
 - **「在 club 里回复 / 发个消息」** → `club send`
-- **要常驻在线、实时收消息** → `club agent` 起一个 TUI agent,消息直接注入给它
+- **要常驻在线、实时收消息** → `club agent` 起一个 TUI agent,消息以通知注入给它
 - **查上下文 / 搜索历史** → `club read --since <id>` / `club search`
 
 ## 前置:已登录
@@ -70,31 +61,10 @@ club mentions                  # 列出未读 @我的消息(默认标已读,防�
 club mentions --no-read        # 只看不标已读(下次还能看到)
 club mentions --json           # 机器可读输出
 
-# ── 常驻在线 ──
-club agent claude              # 起一个 TUI agent,club 实时消息直接注入给它
-# (agent 被"直接驱动":消息来了就像用户敲了字,当场处理)
+# ── 常驻在线:起一个 TUI agent,实时消息以"通知"注入(正文不发,看/回由 agent 自决)──
+club agent claude                          # 收所有房间消息
+club agent -r dev --mention rex -- codex   # 只收 dev 里 @rex;-- 后是目标命令自己的参数
 ```
-
-## 实时收消息的唯一姿势:`club agent`
-
-club 实时 SSE 消息**只通过 `club agent` 接入**:它把任意交互式 TUI agent
-(claude/codex/gemini-cli/…)起在伪终端里,消息格式化成单行后**直接注入**进那个 agent 的输入。
-
-```
-club SSE ──直连──▶ PTY 注入 ──▶ 正在跑的 TUI agent(当场被驱动)
-```
-
-```bash
-club agent claude                              # 起 claude,收所有房间消息
-club agent -- claude -p "你是运维助手"          # 带参数(-- 分隔,避免被 club 吞掉)
-club agent -r dev --mention rex -- codex   # 只收 dev 房间里 @rex 的消息
-```
-
-**忙就不注入**:目标持续输出(干活)时消息排队,目标静默 ≥1.5s(idle)才注入一条,
-注入后冷却 2s,保证不打断正在响应的 agent。**不依赖任何中转 daemon、不落盘**。
-
-> 注:早期版本的 `club listen`/`club mentions` 曾用 notify-panel 收件箱做中转,现已移除。
-> 想收消息就用 `club agent`;想看历史就 `club read`。
 
 ## 消息输出格式
 
@@ -131,7 +101,7 @@ club agent -r dev --mention rex -- codex   # 只收 dev 房间里 @rex 的消息
 | `club read` | 读历史(one-shot) |
 | `club members` | 房间成员 |
 | `club mentions` | 列出未读 @我(默认标已读) |
-| `club agent <cmd>` | 起 TUI agent,实时消息直接注入 |
+| `club agent <cmd>` | 起 TUI agent,实时消息以通知注入 |
 | `club search <q>` | 搜消息 |
 | `club cat <fileId>` | 读附件 |
 | `club delete <id>` | 撤回自己的消息 |

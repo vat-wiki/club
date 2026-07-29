@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { AgentStatusRequest } from "@vatwiki/shared";
+import { AgentStatusRequest } from "@club/shared";
 
 import { requireAuth } from "../auth.js";
 import { parseJsonBody } from "../lib.js";

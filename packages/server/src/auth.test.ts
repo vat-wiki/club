@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Participant } from "@vatwiki/shared";
+import type { Participant } from "@club/shared";
 
 import { hashKey,requireAuth } from "./auth.js";
 // We need to swap the imported getParticipantByKeyHash so we can drive

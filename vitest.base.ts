@@ -8,7 +8,7 @@ import { defineConfig } from "vitest/config";
 process.env.NODE_ENV ??= "test";
 
 /**
- * Shared Vitest base config reused by every `@vatwiki/*` package.
+ * Shared Vitest base config reused by every `@club/*` package.
  *
  * Coverage uses the V8 provider (no extra babel/istanbul dependency) and
  * emits text + json + html reporters. Tests, dist and node_modules are

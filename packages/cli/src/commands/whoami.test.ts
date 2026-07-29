@@ -1,6 +1,6 @@
 import { afterEach,describe, expect, it, vi } from "vitest";
 
-import type { Participant } from "@vatwiki/shared";
+import type { Participant } from "@club/shared";
 
 import { runWhoami, type WhoamiDeps } from "./whoami.js";
 

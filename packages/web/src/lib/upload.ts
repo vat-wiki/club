@@ -1,4 +1,4 @@
-import { ClubApiError, type ClubConn,NETWORK_ERROR_STATUS, parseHttpErrorStatus } from '@vatwiki/sdk';
+import { ClubApiError, type ClubConn,NETWORK_ERROR_STATUS, parseHttpErrorStatus } from '@club/sdk';
 import {
   DocumentMime,
   ImageMime,
@@ -8,31 +8,31 @@ import {
   type MessageAttachment,
   type UploadFileResponse,
   VideoMime,
-} from '@vatwiki/shared';
+} from '@club/shared';
 
 /**
  * upload.ts — client-side media validation + multipart file upload for the
  * web UI.
  *
- * Validates files against the whitelists and size caps defined in `@vatwiki/shared`
+ * Validates files against the whitelists and size caps defined in `@club/shared`
  * (single source of truth) before any bytes hit the network. The server
  * re-checks authoritatively, but pre-flight rejects give the user instant
  * feedback instead of a round-trip error.
  *
- * Multipart upload (`uploadImage`) lives here — NOT in `@vatwiki/sdk` — because
+ * Multipart upload (`uploadImage`) lives here — NOT in `@club/sdk` — because
  * the SDK's transport layer is JSON-only and cannot emit `FormData`/streaming
  * bodies. Auth mirrors the transport: a `Bearer` header when a key is present.
  *
  * > This is the same layer the composer (picker / paste / drop) routes through.
  *
- * @module @vatwiki/web/lib/upload
+ * @module @club/web/lib/upload
  */
 
-/** Allowed image MIMEs — mirrors `@vatwiki/shared` `ImageMime` zod options. */
+/** Allowed image MIMEs — mirrors `@club/shared` `ImageMime` zod options. */
 export const IMAGE_MIME_WHITELIST: readonly string[] = ImageMime.options;
-/** Allowed video MIMEs — mirrors `@vatwiki/shared` `VideoMime` zod options. */
+/** Allowed video MIMEs — mirrors `@club/shared` `VideoMime` zod options. */
 export const VIDEO_MIME_WHITELIST: readonly string[] = VideoMime.options;
-/** Allowed document MIMEs — mirrors `@vatwiki/shared` `DocumentMime` zod options. */
+/** Allowed document MIMEs — mirrors `@club/shared` `DocumentMime` zod options. */
 export const DOCUMENT_MIME_WHITELIST: readonly string[] = DocumentMime.options;
 
 /** Whether `mime` is an allowed image type. */

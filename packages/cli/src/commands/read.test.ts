@@ -1,6 +1,6 @@
 import { afterEach,describe, expect, it, vi } from "vitest";
 
-import type { ClubClient, Message } from "@vatwiki/sdk";
+import type { ClubClient, Message } from "@club/sdk";
 
 import { type ReadDeps,runRead } from "./read.js";
 

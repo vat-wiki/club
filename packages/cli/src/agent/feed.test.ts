@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { Message } from "@vatwiki/shared";
+import type { Message } from "@club/shared";
 
 import { formatForInject, shouldDeliver } from "../agent/feed.js";
 

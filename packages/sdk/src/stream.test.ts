@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Message } from "@vatwiki/shared";
+import type { Message } from "@club/shared";
 
 import { streamMessages } from "./stream.js";
 

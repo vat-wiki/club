@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
-import type { Mention } from "@vatwiki/shared";
-import { MarkMentionsReadRequest } from "@vatwiki/shared";
+import type { Mention } from "@club/shared";
+import { MarkMentionsReadRequest } from "@club/shared";
 
 import { requireAuth } from "../auth.js";
 import {

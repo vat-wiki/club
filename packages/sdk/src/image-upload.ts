@@ -24,7 +24,7 @@ import {
   MAX_VIDEO_BYTES,
   type MessageAttachment,
   VideoMime,
-} from "@vatwiki/shared";
+} from "@club/shared";
 
 import { ClubApiError, formatError,NETWORK_ERROR_STATUS } from "./errors.js";
 import { type ClubConn,uploadFile } from "./transport.js";

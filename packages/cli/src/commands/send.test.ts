@@ -12,8 +12,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { ClubClient, type SendResponse } from "@vatwiki/sdk";
-import type { Participant as _Participant, Room as _Room } from "@vatwiki/shared";
+import { ClubClient, type SendResponse } from "@club/sdk";
+import type { Participant as _Participant, Room as _Room } from "@club/shared";
 
 import { runSend, type SendDeps } from "./send-impl.js";
 import type { ClubConfig } from "../config.js";

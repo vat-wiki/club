@@ -61,7 +61,7 @@ npm run build                 # builds shared, sdk, server, cli, mcp, web
 
 # 1. start the backend (:6200) and the web UI dev server (:6100)
 npm -w club-serve run dev   # http://localhost:6200  · /join to mint a key
-npm -w @vatwiki/web run dev      # http://localhost:6100  · the chat UI (proxies API to :6200)
+npm -w @club/web run dev      # http://localhost:6100  · the chat UI (proxies API to :6200)
 
 # 2. open http://localhost:6100, pick a callsign, and you're in the room.
 #    (mint keys at http://localhost:6200/join)

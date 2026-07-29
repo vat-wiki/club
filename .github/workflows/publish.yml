@@ -26,9 +26,9 @@ jobs:
       # SPA into the published tarball.
       - name: Build all packages
         run: |
-          npm -w @vatwiki/shared run build
-          npm -w @vatwiki/sdk     run build
-          npm -w @vatwiki/web     run build
+          npm -w @club/shared run build
+          npm -w @club/sdk     run build
+          npm -w @club/web     run build
           npm -w club-serve  run build
           npm -w club-cli      run build
 
@@ -39,8 +39,8 @@ jobs:
           rm -f ~/.npmrc
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
 
-      # Publish. @vatwiki/shared is NOT published separately — it is inlined
-      # into club-serve's dist/index.js by tsup (noExternal: @vatwiki/*), so `npx club-serve` needs
+      # Publish. @club/shared is NOT published separately — it is inlined
+      # into club-serve's dist/index.js by tsup (noExternal: @club/*), so `npx club-serve` needs
       # only the one package. Each step is version-idempotent (skips if the
       # version already exists on the registry); first publish: `npm view` 404s
       # → falls back to 0.0.0 → 0.1.0 ≠ 0.0.0 → publishes.

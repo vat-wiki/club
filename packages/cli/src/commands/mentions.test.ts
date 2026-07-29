@@ -4,7 +4,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { Mention } from "@vatwiki/shared";
+import type { Mention } from "@club/shared";
 
 import { formatMentionLine, runMentions } from "./mentions.js";
 

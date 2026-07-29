@@ -48,7 +48,7 @@ import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
-import { escapeLike, type Reaction, type RoomSlugType } from '@vatwiki/shared';
+import { escapeLike, type Reaction, type RoomSlugType } from '@club/shared';
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 

@@ -9,7 +9,7 @@ import {
   type Participant,
   RecoverParticipantRequest,
   RotateKeyRequest,
-} from "@vatwiki/shared";
+} from "@club/shared";
 
 import { hashKey } from "../crypto.js";
 import {

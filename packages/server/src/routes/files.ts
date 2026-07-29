@@ -16,7 +16,7 @@ import {
   type MessageAttachment,
   sanitizeFilename,
   type VideoMime,
-} from "@vatwiki/shared";
+} from "@club/shared";
 
 import { requireAuth } from "../auth.js";
 import { getFile, insertFile } from "../db.js";

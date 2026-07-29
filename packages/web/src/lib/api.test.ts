@@ -9,7 +9,7 @@ function mockFile(name = "x.png", type = "image/png", size = 100): File {
 // class declarations), so the SDK stubs must be self-contained. We use a real
 // class so `new ClubClient(...)` works, and a static `_instances` array so
 // tests can read back the most-recent instance.
-vi.mock("@vatwiki/sdk", () => {
+vi.mock("@club/sdk", () => {
   const request = vi.fn().mockResolvedValue({});
   class ClubClient {
     static _instances: ClubClient[] = [];
@@ -34,7 +34,7 @@ vi.mock("@vatwiki/sdk", () => {
   };
 });
 
-vi.mock("@vatwiki/shared", () => ({
+vi.mock("@club/shared", () => ({
   ImageMime: { options: ["image/png", "image/jpeg", "image/gif", "image/webp"] },
   VideoMime: { options: ["video/mp4", "video/webm"] },
   DocumentMime: { options: ["application/pdf"] },
@@ -54,8 +54,8 @@ vi.mock("./upload", () => ({
 
 // Import the api facade once. Because the SDK mocks above are hoisted,
 // every call to `new ClubClient(...)` in api.ts gets a stub.
-import type { ClubConn } from "@vatwiki/sdk";
-import * as sdk from "@vatwiki/sdk";
+import type { ClubConn } from "@club/sdk";
+import * as sdk from "@club/sdk";
 
 import { api, createParticipant, recoverParticipant } from "./api";
 
@@ -127,7 +127,7 @@ describe("api.send — route selection", () => {
 
   it("uses request POST when attachmentIds are present", async () => {
     await api.send(conn, "hello", ["att-1"]);
-    const { request } = await import("@vatwiki/sdk");
+    const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       conn,
       "/messages",
@@ -144,7 +144,7 @@ describe("api.send — route selection", () => {
 
   it("includes replyToId in the body when provided", async () => {
     await api.send(conn, "re", [], "msg-0");
-    const { request } = await import("@vatwiki/sdk");
+    const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       expect.anything(),
       "/messages",
@@ -154,7 +154,7 @@ describe("api.send — route selection", () => {
 
   it("includes room in the body when provided", async () => {
     await api.send(conn, "hi", [], undefined, "dev");
-    const { request } = await import("@vatwiki/sdk");
+    const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       expect.anything(),
       "/messages",
@@ -166,7 +166,7 @@ describe("api.send — route selection", () => {
 describe("api.deleteMessage — encodes id", () => {
   it("encodes messageId and sends DELETE", async () => {
     await api.deleteMessage(conn, "msg/a+1");
-    const { request } = await import("@vatwiki/sdk");
+    const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       expect.anything(),
       "/messages/msg%2Fa%2B1",
@@ -178,7 +178,7 @@ describe("api.deleteMessage — encodes id", () => {
 describe("api.react — encodes messageId", () => {
   it("encodes messageId and posts emoji", async () => {
     await api.react(conn, "msg/a+1", "👍");
-    const { request } = await import("@vatwiki/sdk");
+    const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       expect.anything(),
       "/messages/msg%2Fa%2B1/reactions",
@@ -217,7 +217,7 @@ describe("recoverParticipant — posts recovery request", () => {
       name: "alice",
       recoverCode: "rec-123",
     });
-    const { request } = await import("@vatwiki/sdk");
+    const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       { server: "https://example.club", key: "" },
       "/participants/recover",

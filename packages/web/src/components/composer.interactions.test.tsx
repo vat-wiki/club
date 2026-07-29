@@ -1,8 +1,8 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach,describe, expect, it, vi } from "vitest";
 
-import type { ClubConn } from "@vatwiki/sdk";
-import type { MessageAttachment } from "@vatwiki/shared";
+import type { ClubConn } from "@club/sdk";
+import type { MessageAttachment } from "@club/shared";
 
 // Composer input-path coverage that complements composer.test.tsx: paste
 // (mixed text+image, image-only), drop (image, document, non-attachment ignored),

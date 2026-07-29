@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import type { Participant } from "@vatwiki/shared";
+import type { Participant } from "@club/shared";
 
 import { requireAuth } from "../auth.js";
 import { getAllParticipants } from "../db.js";

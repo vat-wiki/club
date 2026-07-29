@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, LogOut, Radio } from "lucide-react";
 import { useState } from "react";
 
-import type { Participant, Room } from "@vatwiki/shared";
+import type { Participant, Room } from "@club/shared";
 
 export type Status = "connecting" | "connected" | "lost";
 

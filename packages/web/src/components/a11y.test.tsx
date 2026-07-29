@@ -6,7 +6,7 @@ import * as axe from "axe-core";
 import type { ReactNode } from "react";
 import { describe, expect,it } from "vitest";
 
-import type { Message, Participant } from "@vatwiki/shared";
+import type { Message, Participant } from "@club/shared";
 
 import { AuthDialog } from "./auth-dialog";
 import { BootScreen } from "./boot-screen";

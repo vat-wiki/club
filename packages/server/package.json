@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
-    "@vatwiki/shared": "*",
+    "@club/shared": "*",
     "@vitest/coverage-v8": "^4.1.10",
     "tsx": "^4.19.2",
     "tsup": "^8.3.5",

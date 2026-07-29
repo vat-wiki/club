@@ -19,7 +19,7 @@ process.env.CLUB_FILES = dir;
 const { messages } = await import("./messages.js");
 const { files } = await import("./files.js");
 const { participants } = await import("./participants.js");
-const { MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE } = await import("@vatwiki/shared");
+const { MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE } = await import("@club/shared");
 const { Hono } = await import("hono");
 
 const app = new Hono();

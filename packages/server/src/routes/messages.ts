@@ -13,7 +13,7 @@ import {
   type Reaction,
   sanitizeContent,
   ToggleReactionRequest,
-} from "@vatwiki/shared";
+} from "@club/shared";
 
 import { parseAttachments } from "./attachment-cache.js";
 import { requireAuth } from "../auth.js";

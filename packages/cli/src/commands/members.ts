@@ -6,7 +6,7 @@
 
 import { Command } from "commander";
 
-import type { Participant } from "@vatwiki/shared";
+import type { Participant } from "@club/shared";
 
 import { withAuthClient } from "../client-factory.js";
 

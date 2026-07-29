@@ -19,7 +19,7 @@
 
 import { Command } from "commander";
 
-import { ClubClient } from "@vatwiki/sdk";
+import { ClubClient } from "@club/sdk";
 
 import { startFeed } from "../agent/feed.js";
 import { runAgent } from "../agent/pty.js";

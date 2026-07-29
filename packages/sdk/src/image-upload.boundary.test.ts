@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MAX_IMAGE_BYTES } from "@vatwiki/shared";
+import { MAX_IMAGE_BYTES } from "@club/shared";
 
 import { assertAttachmentCount, uploadImageFile } from "./image-upload.js";
 import { ClubApiError, isClubApiError } from "./index.js";

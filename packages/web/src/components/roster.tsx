@@ -5,7 +5,7 @@ import type { RoomUnread } from "@/hooks/use-rooms";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-import type { Participant, Room } from "@vatwiki/shared";
+import type { Participant, Room } from "@club/shared";
 
 function Row({ p, self, online }: { p: Participant; self: boolean; online: boolean }) {
   const t = useT();

@@ -19,7 +19,7 @@
 
 import { Command } from "commander";
 
-import { ClubClient, type Mention } from "@vatwiki/sdk";
+import { ClubClient, type Mention } from "@club/sdk";
 
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";

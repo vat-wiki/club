@@ -4,7 +4,7 @@ import { ViewKeyDialog } from "@/components/view-key-dialog";
 import { useT } from "@/lib/i18n";
 import { Users } from "lucide-react";
 
-import type { Participant } from "@vatwiki/shared";
+import type { Participant } from "@club/shared";
 
 // Mobile-only roster: on small screens the desktop aside is hidden, so this
 // trigger in the topbar opens a right-side sheet with the same sections.

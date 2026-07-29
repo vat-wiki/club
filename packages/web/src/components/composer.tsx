@@ -20,9 +20,9 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, Paperclip, Send } from "lucide-react";
 import { type KeyboardEvent,useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ClubConn } from "@vatwiki/sdk";
-import type { Message,Participant } from "@vatwiki/shared";
-import { MAX_IMAGES_PER_MESSAGE } from "@vatwiki/shared";
+import type { ClubConn } from "@club/sdk";
+import type { Message,Participant } from "@club/shared";
+import { MAX_IMAGES_PER_MESSAGE } from "@club/shared";
 
 export function Composer({
   onSend,

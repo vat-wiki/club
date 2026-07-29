@@ -8,8 +8,8 @@
 // 对照 notify-panel-tui 的 watcher:那里轮询 daemon 的未读队列,注入成功才
 // 标记已读;这里订阅 SSE 活流,消息天然不重复,投递即"已读"。
 
-import type { ClubClient } from "@vatwiki/sdk";
-import { mentionMatches,type Message } from "@vatwiki/shared";
+import type { ClubClient } from "@club/sdk";
+import { mentionMatches,type Message } from "@club/shared";
 
 /** 注入器接口:QueuedInjector 暴露的入队口(解耦,便于测试)。 */
 export interface Enqueuer {

@@ -1,5 +1,5 @@
 // Shared error types and utilities for the club platform.
-// Used by @vatwiki/sdk transport layer and any other package that needs
+// Used by @club/sdk transport layer and any other package that needs
 // consistent error handling across the HTTP/SSE boundary.
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ClubApiError, type ClubConn } from "@vatwiki/sdk";
-import { MAX_DOCUMENT_BYTES,MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@vatwiki/shared";
+import { ClubApiError, type ClubConn } from "@club/sdk";
+import { MAX_DOCUMENT_BYTES,MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@club/shared";
 
 import {
   _setCreateXHR,

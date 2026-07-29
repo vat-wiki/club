@@ -1,4 +1,4 @@
-# @vatwiki/shared
+# @club/shared
 
 Shared types, schemas, and utilities for the club chat platform.
 
@@ -13,7 +13,7 @@ This package contains the single source of truth for:
 ## Installation
 
 ```bash
-npm install @vatwiki/shared
+npm install @club/shared
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ import {
   MAX_MESSAGE_CONTENT,
   MAX_IMAGES_PER_MESSAGE,
   mentionMatches,
-} from "@vatwiki/shared";
+} from "@club/shared";
 ```
 
 ## Domain Types
@@ -102,7 +102,7 @@ Check if a message content mentions a participant by name.
 **Rule**: Case-insensitive match of `@<name>` that is NOT immediately followed by another name character (letter/digit/underscore/hyphen).
 
 ```typescript
-import { mentionMatches } from "@vatwiki/shared";
+import { mentionMatches } from "@club/shared";
 
 mentionMatches("hey @alice", "alice");      // true
 mentionMatches("hey @alice", "ALICE");       // true (case-insensitive)
@@ -121,7 +121,7 @@ All API request shapes have corresponding Zod schemas for validation:
 - `AgentStatusRequest`
 
 ```typescript
-import { CreateMessageRequest } from "@vatwiki/shared";
+import { CreateMessageRequest } from "@club/shared";
 
 const result = CreateMessageRequest.safeParse({
   content: "Hello world",
@@ -133,7 +133,7 @@ const result = CreateMessageRequest.safeParse({
 
 ### Room Slug
 ```typescript
-import { ROOM_SLUG_REGEX, RoomSlug } from "@vatwiki/shared";
+import { ROOM_SLUG_REGEX, RoomSlug } from "@club/shared";
 
 // Regex check
 ROOM_SLUG_REGEX.test("general");  // true

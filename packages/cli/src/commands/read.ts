@@ -6,7 +6,7 @@
 
 import { Command } from "commander";
 
-import type { ClubClient, Message } from "@vatwiki/sdk";
+import type { ClubClient, Message } from "@club/sdk";
 
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
@@ -79,7 +79,7 @@ export function makeReadCommand(): Command {
       withCatchExit(
         async (opts: ReadOpts) => {
           const cfg = requireConfig();
-          const { ClubClient } = await import("@vatwiki/sdk");
+          const { ClubClient } = await import("@club/sdk");
           return runRead(opts, {
             getClient: () => new ClubClient(cfg),
             formatMessage: (m) => formatMessage(m, { server: cfg.server }),

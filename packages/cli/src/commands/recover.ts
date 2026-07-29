@@ -10,7 +10,7 @@
 
 import { Command } from "commander";
 
-import { ClubClient } from "@vatwiki/sdk";
+import { ClubClient } from "@club/sdk";
 
 import { withCatchExit } from "../catch-exit.js";
 import { loadConfig, saveConfig } from "../config.js";

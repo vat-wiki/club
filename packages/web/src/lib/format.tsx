@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import type { Message, Participant } from "@vatwiki/shared";
-import { mentionMatches } from "@vatwiki/shared";
+import type { Message, Participant } from "@club/shared";
+import { mentionMatches } from "@club/shared";
 
 import { sanitizeDisplayString, truncateDisplayString } from "./sanitize.js";
 
@@ -223,7 +223,7 @@ export function renderContent(
 
 // Cheap mention check used by MessageRow to decide whether a row visually
 // flags "this mentions the current user" (row-level signal that complements
-// the inline self-mention highlight). Delegates to @vatwiki/shared `mentionMatches`
+// the inline self-mention highlight). Delegates to @club/shared `mentionMatches`
 // so it shares the same word-boundary logic as the server's inbox and the CLI
 // matcher — no false-positives on @alice_bob when self is alice.
 // Pure so it can be unit-tested directly.

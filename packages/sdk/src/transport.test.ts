@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ClubApiError, computeBackoff, shouldRetry } from "@vatwiki/shared";
+import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
 
 import {
   createParticipant,

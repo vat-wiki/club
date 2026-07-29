@@ -4,7 +4,7 @@ import type { RoomUnread } from "@/hooks/use-rooms";
 import { useT } from "@/lib/i18n";
 import { type ReactNode,useState } from "react";
 
-import type { Room } from "@vatwiki/shared";
+import type { Room } from "@club/shared";
 
 // Mobile room selector: on small screens the desktop sidebar is hidden, so the
 // topbar's room badge opens this bottom sheet with the ROOMS list + new-room

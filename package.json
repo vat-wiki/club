@@ -14,8 +14,8 @@
   "scripts": {
     "prepare": "husky",
     "dev": "npm -w club-serve run dev",
-    "dev:web": "npm -w @vatwiki/web run dev",
-    "build": "npm -w @vatwiki/shared run build && npm -w @vatwiki/sdk run build && npm -w club-serve run build && npm -w club-cli run build && npm -w @vatwiki/web run build",
+    "dev:web": "npm -w @club/web run dev",
+    "build": "npm -w @club/shared run build && npm -w @club/sdk run build && npm -w club-serve run build && npm -w club-cli run build && npm -w @club/web run build",
     "club": "npm -w club-cli exec club",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",

@@ -8,8 +8,8 @@
 
 import { Command } from "commander";
 
-import { ClubClient } from "@vatwiki/sdk";
-import { uploadDocumentFile,uploadImageFile, uploadVideoFile } from "@vatwiki/sdk/node";
+import { ClubClient } from "@club/sdk";
+import { uploadDocumentFile,uploadImageFile, uploadVideoFile } from "@club/sdk/node";
 
 import { runSend, type SendDeps } from "./send-impl.js";
 import { defaultRoom, requireConfig } from "../config.js";

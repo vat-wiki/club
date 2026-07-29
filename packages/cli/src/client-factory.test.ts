@@ -27,9 +27,9 @@ const mockClubClientInstance = { _cfg: null as ClubConfig | null };
 const ClubClient = vi.fn().mockImplementation(function (this: any, cfg: ClubConfig) {
   mockClubClientInstance._cfg = cfg;
   return mockClubClientInstance;
-}) as unknown as typeof import("@vatwiki/sdk").ClubClient;
+}) as unknown as typeof import("@club/sdk").ClubClient;
 
-vi.mock("@vatwiki/sdk", () => ({
+vi.mock("@club/sdk", () => ({
   get ClubClient() { return ClubClient; },
   formatError: vi.fn((err) => {
     if (err instanceof Error) return err.message;

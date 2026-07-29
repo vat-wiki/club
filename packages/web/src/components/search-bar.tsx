@@ -3,8 +3,8 @@ import { useT } from "@/lib/i18n";
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { ClubConn } from "@vatwiki/sdk";
-import type { Message } from "@vatwiki/shared";
+import type { ClubConn } from "@club/sdk";
+import type { Message } from "@club/shared";
 
 /**
  * Inline message search bar. Debounces the query and calls `GET /messages/search`,
@@ -18,7 +18,7 @@ import type { Message } from "@vatwiki/shared";
  * @param props.conn - Active connection; null disconnects the search input.
  * @param props.room - Optional room slug to scope the search.
  *
- * @module @vatwiki/web/components/search-bar
+ * @module @club/web/components/search-bar
  */
 export function SearchBar({ conn, room }: { conn: ClubConn | null; room?: string }) {
   const t = useT();

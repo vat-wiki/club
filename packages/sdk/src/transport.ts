@@ -12,7 +12,7 @@ import type {
   Room,
   RoomSlugType,
   UploadFileResponse,
-} from "@vatwiki/shared";
+} from "@club/shared";
 import {
   ClubApiError,
   formatError,
@@ -25,7 +25,7 @@ import {
   parseRetryAfterMs,
   shouldRetry,
   sleep,
-} from "@vatwiki/shared";
+} from "@club/shared";
 
 // ── Connection ──────────────────────────────────────────────────────
 // key is optional: createParticipant() needs no auth, so a client can be
@@ -99,7 +99,7 @@ async function check<T>(res: Response): Promise<T> {
 }
 
 // ── Retry / timeout policy ──────────────────────────────────────────
-// Delegated to @vatwiki/shared utilities for consistency across SDK and
+// Delegated to @club/shared utilities for consistency across SDK and
 // any other consumer (CLI, MCP, web).
 
 function wrapErr(err: unknown): ClubApiError {
@@ -286,7 +286,7 @@ export interface UploadFileInput {
 
 // Client-side upload limits. These should match or be slightly more conservative
 // than the server limits to avoid uploading bytes that will be rejected.
-// Single source of truth: @vatwiki/shared constants — never duplicate here.
+// Single source of truth: @club/shared constants — never duplicate here.
 
 function getMaxLengthForMime(mime: string): number {
   if (mime.startsWith("video/")) return MAX_VIDEO_BYTES;
@@ -557,7 +557,7 @@ export async function deleteMessage(
 // POST /messages/:id/reactions { emoji } — toggle a reaction. Adds if absent,
 // removes if present. Broadcasts the refreshed aggregate to all subscribers.
 // Returns the updated reaction list [{ emoji, count }].
-// NOTE: Reaction type is imported from @vatwiki/shared.
+// NOTE: Reaction type is imported from @club/shared.
 
 export async function toggleMessageReaction(
   c: ClubConn,

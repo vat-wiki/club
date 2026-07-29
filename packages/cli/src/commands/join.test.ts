@@ -1,7 +1,7 @@
 import { describe, expect,it } from "vitest";
 
-import { ClubApiError } from "@vatwiki/sdk";
-import type { Participant } from "@vatwiki/shared";
+import { ClubApiError } from "@club/sdk";
+import type { Participant } from "@club/shared";
 
 import { JoinNameTakenError,renderJoinSuccess, runJoin } from "./join.js";
 

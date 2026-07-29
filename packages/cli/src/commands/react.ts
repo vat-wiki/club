@@ -6,8 +6,8 @@
 
 import { Command } from "commander";
 
-import { ClubClient } from "@vatwiki/sdk";
-import type { Reaction } from "@vatwiki/shared";
+import { ClubClient } from "@club/sdk";
+import type { Reaction } from "@club/shared";
 
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";

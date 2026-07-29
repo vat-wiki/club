@@ -28,8 +28,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@vatwiki/shared": "*",
-    "@vatwiki/sdk": "*",
+    "@club/shared": "*",
+    "@club/sdk": "*",
     "@types/react": "^18.3.12",
     "tsx": "^4.19.2",
     "tsup": "^8.3.5",

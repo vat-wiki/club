@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { sanitizeSingleLine } from "./sanitize.js";
+
 // ── Domain ──────────────────────────────────────────────────────────
 
 // A participant is a participant — club deliberately does NOT classify people
@@ -18,6 +20,13 @@ import { z } from "zod";
 export interface Participant {
   id: string;
   name: string;
+  // Free-form self-introduction / role description the participant writes for
+  // themselves. Category-blind: the SAME field serves humans and agents - club
+  // never classifies participants, so "what's my role" is something each
+  // participant conveys in their own words (see .pd-docs/requirements/
+  // category-blind.md). Empty string = unset. Single-line (control chars
+  // stripped at ingestion); capped at MAX_BIO.
+  bio: string;
   createdAt: number;
 }
 
@@ -201,10 +210,38 @@ export const ParticipantName = z
   );
 
 /** Request body for POST /participants — create a new participant */
+export const MAX_BIO = 200;
+
+// A participant's free-form self-introduction / role description. Single-line
+// (control chars incl. newlines stripped via sanitizeSingleLine) so it renders
+// as one truncated line in the roster; any visible Unicode (CJK, emoji,
+// punctuation) is welcome. Defaults to "" (unset) so callers that omit it -
+// legacy clients, a bare `club join <name>` - get an empty bio rather than a
+// required field. Category-blind: same field for humans and agents; club never
+// stamps a role label (see .pd-docs/requirements/category-blind.md).
+export const ParticipantBio = z
+  .string()
+  .max(MAX_BIO)
+  .transform(sanitizeSingleLine)
+  .default("");
+
 export const CreateParticipantRequest = z.object({
   name: ParticipantName,
+  bio: ParticipantBio,
 });
 export type CreateParticipantRequest = z.infer<typeof CreateParticipantRequest>;
+
+// PATCH /me { bio } - update the authenticated participant's
+// self-introduction. `bio: ""` clears it. Strict: a stray key is a client bug,
+// not a graceful-deprecation case like the create path, so unknown fields are
+// rejected. `bio` defaults to "" so an empty body clears the bio rather than
+// 400-ing.
+export const UpdateProfileRequest = z
+  .object({
+    bio: ParticipantBio,
+  })
+  .strict();
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 
 // ── Rooms (multi-room) ──────────────────────────────────────────────
 //

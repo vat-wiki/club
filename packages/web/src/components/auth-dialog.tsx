@@ -11,6 +11,8 @@ import { isBlockingIssue, NICKNAME_RULE,validateNickname } from "@/lib/nickname"
 import { AlertTriangle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
+import { MAX_BIO } from "@club/shared";
+
 type Mode = "create" | "paste";
 
 export function AuthDialog({
@@ -40,6 +42,10 @@ export function AuthDialog({
   const t = useT();
   const [mode, setMode] = useState<Mode>("create");
   const [name, setName] = useState("");
+  // Optional self-introduction (category-blind: same field for humans and
+  // agents). Empty is allowed; the roster just omits the line. Doesn't touch
+  // the key/reveal flow - onCreated's signature is unchanged.
+  const [bio, setBio] = useState("");
   const [pasteKey, setPasteKey] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -92,7 +98,7 @@ export function AuthDialog({
     }
     setBusy(true);
     try {
-      const { key, recoverCode } = await createParticipant(API_URL, name.trim());
+      const { key, recoverCode } = await createParticipant(API_URL, name.trim(), bio.trim());
       // Hand the freshly-minted key + recovery code to the app WITHOUT
       // persisting; the app shows the reveal and only saves once the user
       // acknowledges they've saved both.
@@ -222,6 +228,25 @@ export function AuthDialog({
                   {t("auth.field.nicknameHint")}
                 </p>
               )}
+            </div>
+            {/* Optional self-introduction. Empty is fine; the server defaults
+                bio to "". Enter submits the form (same as the nickname field)
+                so a keyboard user can join without reaching for the mouse. */}
+            <div className="space-y-2">
+              <Label htmlFor="bio">{t("auth.field.bio")}</Label>
+              <Input
+                id="bio"
+                value={bio}
+                maxLength={MAX_BIO}
+                placeholder={t("auth.field.bioPlaceholder")}
+                autoComplete="off"
+                aria-describedby="bio-hint"
+                onChange={(e) => setBio(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && create()}
+              />
+              <p id="bio-hint" className="text-xs text-muted-foreground">
+                {t("auth.field.bioHint")}
+              </p>
             </div>
             <Button className="w-full" disabled={busy} onClick={create}>
               {busy ? t("auth.join.busy") : t("auth.join")}

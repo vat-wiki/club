@@ -83,3 +83,25 @@ export function sanitizeContent(raw: string): string {
   // form feed (\x0c) are stripped (no chat purpose).
   return raw.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
 }
+
+/**
+ * Strip ALL ASCII control characters from a single-line text field - including
+ * newlines and tabs, unlike {@link sanitizeContent} which preserves them.
+ *
+ * Used for participant bios: a bio renders as one truncated line in the roster,
+ * so an embedded line break would push the row's height and break the list
+ * layout. Stripping the full control set (\x00-\x1f, \x7f - including \n \r \t)
+ * keeps the stored value single-line while preserving every visible Unicode
+ * grapheme (CJK, emoji, punctuation). The server runs this on ingestion so
+ * every read path (DB, SSE, CLI, SDK, MCP) sees the same single-line shape.
+ *
+ * @param raw - Untrusted single-line text from the client.
+ * @returns The same text with every ASCII control byte removed.
+ *
+ * @example
+ *   sanitizeSingleLine("运维\n常驻")   // "运维常驻"
+ *   sanitizeSingleLine("a\x00b\tc")    // "abc"
+ */
+export function sanitizeSingleLine(raw: string): string {
+  return raw.replace(/[\x00-\x1f\x7f]/g, "");
+}

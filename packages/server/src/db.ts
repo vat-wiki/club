@@ -296,6 +296,20 @@ const migrations: Migration[] = [
       ALTER TABLE messages ADD COLUMN edited_count INTEGER DEFAULT 0;
     `,
   },
+  {
+    version: 15,
+    description:
+      'participant bio (self-introduction) column - category-blind role description',
+    // A free-form, single-line self-introduction each participant writes for
+    // themselves - the SAME field for humans and agents (club does not classify
+    // participants; see .pd-docs/requirements/category-blind.md). NOT NULL
+    // DEFAULT '' so every existing row backfills to "unset" in place (zero data
+    // loss, no backfill script), and every read path treats bio as a plain
+    // string with no null-handling. Capped at MAX_BIO (200) and stripped of
+    // control chars by the shared ParticipantBio schema at ingestion, so the
+    // stored value is always single-line.
+    sql: `ALTER TABLE participants ADD COLUMN bio TEXT NOT NULL DEFAULT '';`,
+  },
 ];
 
 db.exec(`
@@ -426,8 +440,8 @@ export function insertMessage(
   insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
 }
 
-const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; created_at: number }>(
-  `SELECT id, name, created_at FROM participants ORDER BY created_at ASC`
+const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; bio: string; created_at: number }>(
+  `SELECT id, name, bio, created_at FROM participants ORDER BY created_at ASC`
 );
 
 // Cache the prepared-statement result (the full participants table) so frequent
@@ -445,7 +459,7 @@ const PARTICIPANTS_CACHE_KEY = Symbol('participantsCache');
  * {@link invalidateParticipantNamesCache}, which is already called on every
  * participant mutation (create / delete / recover) in the participant route.
  */
-export function getAllParticipants(): { id: string; name: string; created_at: number }[] {
+export function getAllParticipants(): { id: string; name: string; bio: string; created_at: number }[] {
   const hit = participantsRowsCache.get(PARTICIPANTS_CACHE_KEY);
   if (hit !== undefined) return hit;
   const rows = allParticipantsSelectStmt.all();
@@ -714,11 +728,12 @@ export function toggleReaction(
 export interface ParticipantRow {
   id: string;
   name: string;
+  bio: string;
   created_at: number;
 }
 
 const participantByKeyHashStmt = db.prepare<[string], ParticipantRow | undefined>(
-  `SELECT id, name, created_at FROM participants WHERE key_hash = ?`
+  `SELECT id, name, bio, created_at FROM participants WHERE key_hash = ?`
 );
 
 /** Participant row looked up by hashed key (auth path). Returns undefined if
@@ -728,7 +743,7 @@ export function getParticipantByKeyHash(hash: string): ParticipantRow | undefine
 }
 
 const participantByNameStmt = db.prepare<[string], ParticipantRow | undefined>(
-  `SELECT id, name, created_at FROM participants WHERE name = ?`
+  `SELECT id, name, bio, created_at FROM participants WHERE name = ?`
 );
 
 /** Participant row looked up by callsign. Returns undefined if the name
@@ -738,8 +753,8 @@ export function getParticipantByName(name: string): ParticipantRow | undefined {
 }
 
 const insertParticipantStmt = db.prepare(
-  `INSERT INTO participants (id, name, key_hash, recover_hash, created_at)
-   VALUES (?, ?, ?, ?, ?)`
+  `INSERT INTO participants (id, name, bio, key_hash, recover_hash, created_at)
+   VALUES (?, ?, ?, ?, ?, ?)`
 );
 
 /** Insert a new participant (idempotent at the row level — only called from
@@ -755,11 +770,12 @@ const insertParticipantStmt = db.prepare(
 export function insertParticipant(
   id: string,
   name: string,
+  bio: string,
   keyHash: string,
   recoverHash: string,
   createdAt: number
 ): void {
-  insertParticipantStmt.run(id, name, keyHash, recoverHash, createdAt);
+  insertParticipantStmt.run(id, name, bio, keyHash, recoverHash, createdAt);
 }
 
 // ── Identity recovery ───────────────────────────────────────────────
@@ -773,12 +789,13 @@ export function insertParticipant(
 export interface ParticipantRecoverRow {
   id: string;
   name: string;
+  bio: string;
   created_at: number;
   recover_hash: string | null;
 }
 
 const getParticipantForRecoverStmt = db.prepare<[string], ParticipantRecoverRow>(
-  `SELECT id, name, created_at, recover_hash FROM participants WHERE name = ?`
+  `SELECT id, name, bio, created_at, recover_hash FROM participants WHERE name = ?`
 );
 
 /** A participant row including recover_hash, looked up by callsign (for the
@@ -802,6 +819,24 @@ const updateParticipantRecoverStmt = db.prepare(
  *  or a sha256 hex string to arm a new recovery code. */
 export function updateParticipantRecover(id: string, newHash: string | null): void {
   updateParticipantRecoverStmt.run(newHash, id);
+}
+
+const updateParticipantBioStmt = db.prepare(
+  `UPDATE participants SET bio = ? WHERE id = ?`
+);
+
+/** Set the participant's bio (free-form self-introduction / role description).
+ *  Pass "" to clear. Idempotent at the row level. The caller is responsible for
+ *  calling {@link invalidateParticipantNamesCache} afterwards so the members
+ *  list cache (which carries bio) is dropped - mirroring insertParticipant /
+ *  updateParticipantKey, which also leave invalidation to their callers.
+ *
+ *  @param id - Participant id.
+ *  @param bio - Already-sanitized single-line bio (the route parses through the
+ *    shared ParticipantBio schema, which strips control chars and caps length).
+ */
+export function updateParticipantBio(id: string, bio: string): void {
+  updateParticipantBioStmt.run(bio, id);
 }
 
 // ── Account deletion ──────────────────────────────────────────────────

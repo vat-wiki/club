@@ -8,6 +8,7 @@ import { makeJoinCommand } from "./commands/join.js";
 import { makeLoginCommand } from "./commands/login.js";
 import { makeMembersCommand } from "./commands/members.js";
 import { makeMentionsCommand } from "./commands/mentions.js";
+import { makeProfileCommand } from "./commands/profile.js";
 import { makeReactCommand } from "./commands/react.js";
 import { makeReadCommand } from "./commands/read.js";
 import { makeRecoverCommand } from "./commands/recover.js";
@@ -49,6 +50,7 @@ const cmds = [
   makeLoginCommand(),
   makeJoinCommand(),
   makeWhoamiCommand(),
+  makeProfileCommand(),
   makeInfoCommand(),
   makeRoomsCommand(),
   makeSendCommand(),

@@ -11,8 +11,8 @@ import { MessageList } from "./message-list";
 // complement the existing gallery-render tests, which only assert the static
 // thumbnail markup (grid classes, alt/aria-label) — not the open/close dialog.
 
-const me: Participant = { id: "p1", name: "alice", createdAt: 0 };
-const bot: Participant = { id: "p2", name: "bot", createdAt: 0 };
+const me: Participant = { id: "p1", name: "alice", bio: "", createdAt: 0 };
+const bot: Participant = { id: "p2", name: "bot", bio: "", createdAt: 0 };
 const members: Participant[] = [me, bot];
 
 function att(id: string): MessageAttachment {

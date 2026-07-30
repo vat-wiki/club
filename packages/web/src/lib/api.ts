@@ -12,6 +12,7 @@ import type {
   RecoverParticipantResponse,
   Room,
   RotateKeyRequest,
+  UpdateProfileRequest,
   UploadFileResponse,
 } from "@club/shared";
 
@@ -39,6 +40,13 @@ export interface UploadOptions {
 export interface ClubApi {
   /** GET /me — the participant the current key belongs to. */
   me(c: ClubConn): Promise<Participant>;
+
+  /**
+   * PATCH /me { bio } - update the authenticated participant's
+   * self-introduction. `bio: ""` clears it. Returns the refreshed Participant
+   * (server returns the post-update row so callers can swap state directly).
+   */
+  updateProfile(c: ClubConn, bio: string): Promise<Participant>;
 
   /**
    * GET /messages — recent history of a room.
@@ -130,6 +138,16 @@ function client(c: ClubConn): ClubClient {
 export const api: ClubApi = {
   me: (c: ClubConn): Promise<Participant> => client(c).me(),
 
+  // PATCH /me { bio } - update the authenticated participant's
+  // self-introduction. Goes through the low-level `request` helper (like
+  // editMessage / rawRotateKey) so we don't depend on a SDK method being added.
+  // The server returns the refreshed Participant row.
+  updateProfile: (c: ClubConn, bio: string): Promise<Participant> =>
+    request<Participant>(c, "/me", {
+      method: "PATCH",
+      body: { bio } satisfies UpdateProfileRequest,
+    }),
+
   // `room` scopes history to a room (default "general" server-side when omitted).
   // `since` returns messages after an id; omitted here returns the recent batch.
   messages: (c: ClubConn, since?: string, room?: string): Promise<Message[]> =>
@@ -188,9 +206,14 @@ export const api: ClubApi = {
 export async function createParticipant(
   server: string,
   name: string,
+  bio?: string,
 ): Promise<{ key: string; recoverCode: string }> {
+  // `bio` defaults to "" on the server (ParticipantBio.default("")), but we pass
+  // it explicitly so a registration can carry a self-introduction. Optional here
+  // so existing callers (and the paste/recover paths) keep working unchanged.
   const { key, recoverCode } = await new ClubClient({ server }).createParticipant({
     name,
+    bio: bio ?? "",
   });
   return { key, recoverCode };
 }

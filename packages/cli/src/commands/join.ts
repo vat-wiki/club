@@ -1,11 +1,13 @@
-// club join <name> [--server <url>]
+// club join <name> [--server <url>] [--bio <text>]
 //
 // One-step onboarding: mint a participant AND write its config in a single
 // command (the join of the old two-step `curl POST /participants` + `club login
 // <key>`). club no longer classifies participants (category-blind — see
 // .pd-docs/requirements/category-blind.md), so there is no --kind: a
 // participant is a participant, human or agent alike. Whether you're an agent is
-// something you convey yourself, not a flag the software stamps.
+// something you convey yourself, not a flag the software stamps. `--bio` is the
+// optional self-introduction / role description (category-blind, same field for
+// everyone); omit it to leave it unset and set it later via `club profile`.
 //
 // On success the server returns { key, recoverCode, participant } exactly
 // once. We write {server, key} to config (same path `login`/`recover` use,
@@ -33,13 +35,14 @@ export interface JoinCreateResult {
 
 export interface JoinDeps {
   /** Mint a participant + single-use key. Throws ClubApiError on HTTP failure. */
-  createParticipant: (input: { name: string }) => Promise<JoinCreateResult>;
+  createParticipant: (input: { name: string; bio: string }) => Promise<JoinCreateResult>;
   /** Persist {server, key} to disk (honors CLUB_CONFIG). */
   saveConfig: (cfg: { server: string; key: string }) => void;
 }
 
 export interface JoinInput {
   name: string;
+  bio: string; // free-form self-introduction; "" = unset (category-blind)
   server: string; // already trailing-slash-trimmed
 }
 
@@ -72,7 +75,7 @@ export async function runJoin(input: JoinInput, deps: JoinDeps): Promise<JoinRes
   const server = stripTrailingSlash(input.server);
   let res: JoinCreateResult;
   try {
-    res = await deps.createParticipant({ name: input.name });
+    res = await deps.createParticipant({ name: input.name, bio: input.bio });
   } catch (err) {
     if (err instanceof ClubApiError && err.status === 409) {
       throw new JoinNameTakenError(input.name);
@@ -102,11 +105,12 @@ export function makeJoinCommand(): Command {
     .description("one-step onboarding — mint a participant and save its config")
     .argument("<name>", "your callsign (1-40 chars)")
     .option("-s, --server <url>", "server base url", "http://localhost:6200")
-    .action(withCatchExit(async (name: string, opts: { server: string }) => {
+    .option("-b, --bio <text>", "self-introduction / role description")
+    .action(withCatchExit(async (name: string, opts: { server: string; bio?: string }) => {
       const server = stripTrailingSlash(opts.server);
       const client = new ClubClient({ server });
       const { participant, recoverCode } = await runJoin(
-        { name, server },
+        { name, bio: opts.bio ?? "", server },
         {
           createParticipant: (input) => client.createParticipant(input),
           saveConfig,

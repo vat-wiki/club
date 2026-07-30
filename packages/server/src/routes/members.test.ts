@@ -47,10 +47,11 @@ describe("GET /members", () => {
     const list = await res.json();
     expect(Array.isArray(list)).toBe(true);
     expect(list).toHaveLength(1);
-    // Exact-shape assertion: only the three contract keys, camelCase, no leak.
+    // Exact-shape assertion: only the four contract keys, camelCase, no leak.
     expect(list[0]).toEqual({
       id: expect.any(String),
       name: "alice",
+      bio: "",
       createdAt: expect.any(Number),
     });
     expect(list[0]).not.toHaveProperty("created_at");

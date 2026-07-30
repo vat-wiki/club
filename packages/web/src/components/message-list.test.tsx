@@ -12,8 +12,8 @@ import { MessageList } from "./message-list";
 // contract the styles hang off, and these guard against regressions where
 // `self` stops influencing the row layout (the original bug: `self && ""`).
 
-const me: Participant = { id: "p1", name: "alice", createdAt: 0 };
-const bot: Participant = { id: "p2", name: "bot", createdAt: 0 };
+const me: Participant = { id: "p1", name: "alice", bio: "", createdAt: 0 };
+const bot: Participant = { id: "p2", name: "bot", bio: "", createdAt: 0 };
 const members: Participant[] = [me, bot];
 
 function mk(p: Participant, content: string, id: string): Message {

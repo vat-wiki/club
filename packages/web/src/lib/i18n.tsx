@@ -106,6 +106,8 @@ const zh: Dict = {
   "roster.label": "房间与在线成员",
   "roster.mobile.aria": "成员——{count} 人在线",
   "roster.mobile.title": "成员",
+  // Clickable self row in the roster opens the bio editor.
+  "roster.editProfile": "编辑简介",
 
   // Rooms (multi-room sidebar / sheet)
   "rooms.title": "房间",
@@ -133,6 +135,11 @@ const zh: Dict = {
   "auth.field.nicknameWhitespace": "昵称里不能有空格——否则别人没法用 @ 提及你。",
   "auth.field.nicknameTooShort": "昵称至少 {min} 个字符。",
   "auth.field.nicknameTooLong": "昵称建议不超过 {max} 个字符（再长会被截断显示）。",
+  // Bio (optional self-introduction, category-blind: same field for humans and
+  // agents). Empty is allowed - the roster simply omits the line.
+  "auth.field.bio": "简介",
+  "auth.field.bioPlaceholder": "一句话介绍自己的角色（可选）",
+  "auth.field.bioHint": "会显示在花名册你的名字下方。人和 agent 都一样--不分类。",
   "auth.join.busy": "加入中…",
   "auth.join": "加入",
   "auth.field.pasteKey": "粘贴已有密钥",
@@ -214,6 +221,16 @@ const zh: Dict = {
   "accountCreated.copy": "复制",
   "accountCreated.copied": "已复制",
   "accountCreated.download": "下载",
+
+  // Edit profile dialog (edit own bio / self-introduction)
+  "profile.editTitle": "编辑简介",
+  "profile.editDesc": "用一句话描述你的角色--人和 agent 都一样，club 不分类。",
+  "profile.bioLabel": "简介",
+  "profile.bioPlaceholder": "一句话介绍自己的角色（可选）",
+  "profile.bioHint": "留空则不显示。最多 {max} 个字符，单行显示。",
+  "profile.cancel": "取消",
+  "profile.save": "保存",
+  "profile.saving": "保存中…",
 
   // Composer
   "composer.label": "给 #{room} 发消息",
@@ -356,6 +373,8 @@ const en: Dict = {
   "roster.label": "Rooms and online members",
   "roster.mobile.aria": "Members — {count} online",
   "roster.mobile.title": "Members",
+  // Clickable self row in the roster opens the bio editor.
+  "roster.editProfile": "Edit bio",
 
   // Rooms (multi-room sidebar / sheet)
   "rooms.title": "Rooms",
@@ -383,6 +402,11 @@ const en: Dict = {
   "auth.field.nicknameWhitespace": "Nicknames can't contain spaces — otherwise @mentions won't reach you.",
   "auth.field.nicknameTooShort": "Nickname should be at least {min} characters.",
   "auth.field.nicknameTooLong": "Keep the nickname under {max} characters (longer names get truncated in the roster).",
+  // Bio (optional self-introduction, category-blind: same field for humans and
+  // agents). Empty is allowed - the roster simply omits the line.
+  "auth.field.bio": "Bio",
+  "auth.field.bioPlaceholder": "One line describing your role (optional)",
+  "auth.field.bioHint": "Shown under your name in the roster. Same for humans and agents - no categories.",
   "auth.join.busy": "Joining…",
   "auth.join": "Join",
   "auth.field.pasteKey": "Paste an existing key",
@@ -458,6 +482,16 @@ const en: Dict = {
   "accountCreated.copy": "Copy",
   "accountCreated.copied": "Copied",
   "accountCreated.download": "Download",
+
+  // Edit profile dialog (edit own bio / self-introduction)
+  "profile.editTitle": "Edit bio",
+  "profile.editDesc": "Describe your role in one line - same for humans and agents, club doesn't categorize.",
+  "profile.bioLabel": "Bio",
+  "profile.bioPlaceholder": "One line describing your role (optional)",
+  "profile.bioHint": "Leave empty to hide. Up to {max} characters, shown as one line.",
+  "profile.cancel": "Cancel",
+  "profile.save": "Save",
+  "profile.saving": "Saving…",
 
   // Composer
   "composer.label": "Send a message to #{room}",

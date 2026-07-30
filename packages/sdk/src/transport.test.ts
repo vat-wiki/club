@@ -19,6 +19,7 @@ import {
   searchMessages,
   sendMessage,
   toggleMessageReaction,
+  updateProfile,
   uploadFile,
 } from "./transport.js";
 
@@ -231,6 +232,44 @@ describe("createParticipant", () => {
     );
     expect(res.key).toBe("club_agent_t");
     expect(res.participant.name).toBe("bot");
+  });
+});
+
+describe("updateProfile", () => {
+  it("PATCHes /me with the bio body and returns the refreshed participant", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe("http://x/me");
+      expect(init.method).toBe("PATCH");
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer club_k");
+      expect(JSON.parse(init.body as string)).toEqual({ bio: "运维 agent" });
+      return jsonRes({ id: "1", name: "a", bio: "运维 agent", createdAt: 1 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const me = await updateProfile({ server: "http://x", key: "club_k" }, { bio: "运维 agent" });
+    expect(me.bio).toBe("运维 agent");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends an empty bio to clear the field", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toEqual({ bio: "" });
+      return jsonRes({ id: "1", name: "a", bio: "", createdAt: 1 });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const me = await updateProfile({ server: "http://x", key: "k" }, { bio: "" });
+    expect(me.bio).toBe("");
+  });
+
+  it("is NOT retried on 5xx (PATCH is non-idempotent)", async () => {
+    const fetchMock = vi.fn(async () => jsonRes({ error: "boom" }, 500));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await expect(
+      updateProfile({ server: "http://x", key: "k" }, { bio: "x" }),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

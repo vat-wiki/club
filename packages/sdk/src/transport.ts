@@ -11,6 +11,7 @@ import type {
   RecoverParticipantResponse,
   Room,
   RoomSlugType,
+  UpdateProfileRequest,
   UploadFileResponse,
 } from "@club/shared";
 import {
@@ -204,6 +205,24 @@ export async function request<T>(
 
 export async function getMe(c: ClubConn, opts: CallOpts = {}): Promise<Participant> {
   return request<Participant>(c, "/me", opts);
+}
+
+// PATCH /me { bio } - update the authenticated participant's self-introduction
+// / role description. `bio: ""` clears it. Returns the refreshed full
+// Participant. Category-blind: the SAME field serves humans and agents - club
+// never stamps a role label, each participant conveys it in their own words
+// (see .pd-docs/requirements/category-blind.md). The server sanitizes to a
+// single line + caps at MAX_BIO; callers may pre-flight with ParticipantBio.
+export async function updateProfile(
+  c: ClubConn,
+  input: UpdateProfileRequest,
+  opts: { timeoutMs?: number } = {},
+): Promise<Participant> {
+  return request<Participant>(c, "/me", {
+    method: "PATCH",
+    body: input,
+    ...opts,
+  });
 }
 
 export async function listMessages(

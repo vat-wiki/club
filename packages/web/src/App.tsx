@@ -2,6 +2,7 @@ import { AccountCreatedToast } from "@/components/account-created-toast";
 import { AuthDialog } from "@/components/auth-dialog";
 import { BootScreen } from "@/components/boot-screen";
 import { Composer } from "@/components/composer";
+import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { MentionToasts } from "@/components/mention-toast";
 import { MessageList, type MessageListHandle } from "@/components/message-list";
 import { Roster } from "@/components/roster";
@@ -36,6 +37,10 @@ export default function App() {
   const [members, setMembers] = useState<Participant[]>([]);
   const [authOpen, setAuthOpen] = useState(!conn);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  // Bio editor (self-introduction). Opened from the roster's self row. Saving
+  // PATCHes /me and refreshes the roster so the new bio shows immediately
+  // instead of waiting for the 8s polling tick.
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
   // Account created toast state (P0-7: non-blocking toast instead of blocking reveal)
   const [accountCreatedToast, setAccountCreatedToast] = useState<{
     recoverCode: string;
@@ -199,6 +204,17 @@ export default function App() {
     setConn({ server: API_URL, key });
   };
 
+  // Save an edited bio. PATCH /me returns the refreshed Participant, which we
+  // swap straight into `me`; refreshMembers() re-pulls the roster so the self
+  // row's secondary line updates without waiting on the 8s poll. Throws bubble
+  // up to the dialog, which surfaces them inline.
+  const handleSaveBio = async (bio: string) => {
+    if (!conn) return;
+    const updated = await api.updateProfile(conn, bio);
+    setMe(updated);
+    void refreshMembers();
+  };
+
   // A brand-new identity was minted. Save key + recover code immediately (P0-7:
   // non-blocking flow). Show a toast with the recover code so the user can copy it.
   const handleCreated = (key: string, recoverCode: string) => {
@@ -338,6 +354,7 @@ export default function App() {
           onSelectRoom={handleSwitchRoom}
           onCreateRoom={handleCreateRoom}
           onSignOutRequest={() => setSignOutOpen(true)}
+          onEditProfile={() => setEditProfileOpen(true)}
         />
       )}
 
@@ -351,6 +368,7 @@ export default function App() {
           unread={rooms.unread}
           onSelectRoom={handleSwitchRoom}
           onCreateRoom={handleCreateRoom}
+          onEditProfile={() => setEditProfileOpen(true)}
         />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
@@ -437,6 +455,15 @@ export default function App() {
         onOpenChange={setSignOutOpen}
         key_={getKey()}
         onConfirm={performSignOut}
+      />
+
+      {/* Edit own bio / self-introduction (category-blind). Opened from the
+          roster's self row on both desktop and mobile. */}
+      <EditProfileDialog
+        open={editProfileOpen}
+        onOpenChange={setEditProfileOpen}
+        currentBio={me?.bio ?? ""}
+        onSave={handleSaveBio}
       />
     </div>
   );

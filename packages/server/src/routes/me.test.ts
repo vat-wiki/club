@@ -283,3 +283,68 @@ describe("POST /me/mentions/read (batch)", () => {
     expect(body[0].id).toBe(mine);
   });
 });
+
+describe("PATCH /me (bio)", () => {
+  it("updates the bio and returns the refreshed participant", async () => {
+    const { key, id, name } = await mintParticipant(nextName("bio-update"));
+    const res = await app.request("/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ bio: "产品经理，负责需求验收" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      id,
+      name,
+      bio: "产品经理，负责需求验收",
+      createdAt: expect.any(Number),
+    });
+  });
+
+  it("clears the bio with an empty string", async () => {
+    const { key } = await mintParticipant(nextName("bio-clear"));
+    await app.request("/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ bio: "临时简介" }),
+    });
+    const res = await app.request("/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ bio: "" }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).bio).toBe("");
+  });
+
+  it("strips control chars (single-line) on update", async () => {
+    const { key } = await mintParticipant(nextName("bio-sanitize"));
+    const res = await app.request("/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ bio: "a\nb\tc" }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).bio).toBe("abc");
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const res = await app.request("/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bio: "x" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a bio longer than MAX_BIO", async () => {
+    const { key } = await mintParticipant(nextName("bio-toolong"));
+    const res = await app.request("/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ bio: "a".repeat(201) }),
+    });
+    expect(res.status).toBe(400);
+  });
+});

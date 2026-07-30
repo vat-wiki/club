@@ -70,17 +70,17 @@ function safeEqualHex(a: string, b: string): boolean {
 }
 
 // POST /participants  { name } -> { key, recoverCode, participant }
-function buildParticipant(name: string) {
+function buildParticipant(name: string, bio: string) {
   const id = ulid();
   const plaintext = newKey();
   const recoverCode = newRecoverCode();
-  insertParticipant(id, name, hashKey(plaintext), hashKey(recoverCode), Date.now());
+  insertParticipant(id, name, bio, hashKey(plaintext), hashKey(recoverCode), Date.now());
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
   return {
     key: plaintext,
     recoverCode,
-    participant: { id, name, createdAt: Date.now() } as Participant,
+    participant: { id, name, bio, createdAt: Date.now() } as Participant,
   };
 }
 
@@ -101,7 +101,7 @@ participants.post(
     if (getParticipantByName(parsed.data.name)) {
       return jsonErr(c, `name "${parsed.data.name}" is taken`, 409);
     }
-    return c.json(buildParticipant(parsed.data.name), 201);
+    return c.json(buildParticipant(parsed.data.name, parsed.data.bio), 201);
   },
 );
 
@@ -143,6 +143,7 @@ function recoverParticipant(name: string, recoverCode: string) {
     participant: {
       id: row.id,
       name: row.name,
+      bio: row.bio,
       createdAt: row.created_at,
     } as Participant,
   };

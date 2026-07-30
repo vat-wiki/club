@@ -69,6 +69,7 @@ describe("POST /participants (recovery code)", () => {
     expect(body.participant).toEqual({
       id: expect.any(String),
       name: "alice",
+      bio: "",
       createdAt: expect.any(Number),
     });
 

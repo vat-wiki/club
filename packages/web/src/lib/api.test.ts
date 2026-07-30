@@ -207,7 +207,31 @@ describe("createParticipant — returns key + recoverCode", () => {
   it("calls ClubClient.createParticipant and returns identity", async () => {
     const result = await createParticipant("https://example.club", "alice");
     expect(result).toEqual({ key: "new_key", recoverCode: "rec-123" });
-    expect(last().createParticipant).toHaveBeenCalledWith({ name: "alice" });
+    // bio defaults to "" when omitted (server ParticipantBio.default("")).
+    expect(last().createParticipant).toHaveBeenCalledWith({ name: "alice", bio: "" });
+  });
+
+  it("forwards bio when provided", async () => {
+    await createParticipant("https://example.club", "alice", "运维 agent");
+    expect(last().createParticipant).toHaveBeenCalledWith({
+      name: "alice",
+      bio: "运维 agent",
+    });
+  });
+});
+
+describe("api.updateProfile - PATCH /me with bio", () => {
+  it("sends PATCH /me with the bio body", async () => {
+    await api.updateProfile(conn, "新角色");
+    const { request } = await import("@club/sdk");
+    expect(request).toHaveBeenCalledWith(
+      conn,
+      "/me",
+      expect.objectContaining({
+        method: "PATCH",
+        body: { bio: "新角色" },
+      }),
+    );
   });
 });
 

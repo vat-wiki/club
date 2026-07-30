@@ -11,6 +11,7 @@ function makeMembers(count: number): Participant[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `id_${i}`,
     name: `user${i}`,
+    bio: "",
     createdAt: 1000 + i,
   }));
 }

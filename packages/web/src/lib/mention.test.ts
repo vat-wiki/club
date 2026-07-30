@@ -12,6 +12,7 @@ import {
 const P = (id: string, name: string): Participant => ({
   id,
   name,
+  bio: "",
   createdAt: 0,
 });
 

@@ -34,6 +34,7 @@ import {
   searchMessages as searchMessagesFn,
   sendMessage,
   toggleMessageReaction as toggleMessageReactionFn,
+  updateProfile as updateProfileFn,
   uploadFile,
   type UploadFileInput,
 } from "./transport.js";
@@ -99,6 +100,13 @@ export class ClubClient {
   /** GET /me — the participant this key belongs to. */
   me(): Promise<Participant> {
     return getMe(this.conn(), this.callOpts());
+  }
+
+  /** PATCH /me { bio } - update the authenticated participant's
+   *  self-introduction / role description. `bio: ""` clears it. Returns the
+   *  refreshed participant. Category-blind: same field for humans and agents. */
+  updateProfile(bio: string): Promise<Participant> {
+    return updateProfileFn(this.conn(), { bio }, { timeoutMs: this.timeoutMs });
   }
 
   /** GET /members — roster of the room. */

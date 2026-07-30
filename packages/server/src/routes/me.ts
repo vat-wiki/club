@@ -1,24 +1,46 @@
 import { Hono } from "hono";
 
-import type { Mention } from "@club/shared";
-import { MarkMentionsReadRequest } from "@club/shared";
+import type { Mention, Participant } from "@club/shared";
+import { MarkMentionsReadRequest, UpdateProfileRequest } from "@club/shared";
 
 import { requireAuth } from "../auth.js";
 import {
   getMentionById,
   getMentionFull,
   getUnreadMentions,
+  invalidateParticipantNamesCache,
   markMentionRead,
   markMentionsRead,
   type MentionRow,
+  updateParticipantBio,
 } from "../db.js";
 import { jsonErr, parseJsonBody, requireValidId } from "../lib.js";
+import { requireJson } from "../lib/json-content-type.js";
+import { invalidateParticipantNameMap } from "../mention.js";
 
 export const me = new Hono();
 me.use("*", requireAuth);
 
 // GET /me -> current participant
 me.get("/", (c) => c.json(c.get("participant")));
+
+// PATCH /me { bio } -> update the authenticated participant's bio
+// (self-introduction / role description). Category-blind: the SAME field humans
+// and agents use to describe their own role in their own words - club never
+// stamps a label (see .pd-docs/requirements/category-blind.md). `bio: ""`
+// clears it. Returns the refreshed Participant so the caller updates its local
+// copy without a second GET /me. The members roster cache is invalidated so
+// other clients pick up the new bio on their next poll (the web roster polls
+// /members every ~8s - no SSE event needed for such a low-frequency change).
+me.patch("/", requireJson, async (c) => {
+  const me = c.get("participant");
+  const parsed = await parseJsonBody(c, UpdateProfileRequest, "bad request");
+  if (!parsed.ok) return parsed.r;
+  updateParticipantBio(me.id, parsed.data.bio);
+  invalidateParticipantNamesCache();
+  invalidateParticipantNameMap();
+  return c.json({ ...me, bio: parsed.data.bio } as Participant, 200);
+});
 
 // DB rows are snake_case; the API must return the shared Mention contract
 // (camelCase). Mirrors toMessage()/toParticipant() in the other routes — the

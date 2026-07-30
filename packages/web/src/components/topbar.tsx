@@ -53,6 +53,7 @@ export function Topbar({
   onSelectRoom,
   onCreateRoom,
   onSignOutRequest,
+  onEditProfile,
 }: {
   meName: string | null;
   status: Status;
@@ -66,6 +67,8 @@ export function Topbar({
   onSelectRoom: (slug: string) => void;
   onCreateRoom: (name: string) => Promise<void>;
   onSignOutRequest: () => void;
+  /** Opens the bio editor for the self row (passed through to the mobile roster). */
+  onEditProfile?: () => void;
 }) {
   const t = useT();
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -123,6 +126,7 @@ export function Topbar({
         key_={key_}
         open={rosterOpen}
         onOpenChange={setRosterOpen}
+        onEditProfile={onEditProfile}
       />
 
       {/* Desktop: full set of top-right icons (hidden on mobile) */}

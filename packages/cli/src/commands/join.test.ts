@@ -9,7 +9,7 @@ import { JoinNameTakenError,renderJoinSuccess, runJoin } from "./join.js";
 // so we can assert order + arguments; `saved` captures the last write.
 function makeDeps(
   over: Partial<{
-    createParticipant: (input: { name: string }) => Promise<{
+    createParticipant: (input: { name: string; bio: string }) => Promise<{
       key: string;
       recoverCode: string;
       participant: Participant;
@@ -17,10 +17,11 @@ function makeDeps(
   }> = {},
 ) {
   const saved: { server: string; key: string }[] = [];
-  const calls: { name: string }[] = [];
+  const calls: { name: string; bio: string }[] = [];
   const participant: Participant = {
     id: "01HWAGENT0PARTICIPANTID0001",
     name: "rex",
+    bio: "",
     createdAt: 1719700000000,
   };
   return {
@@ -49,10 +50,10 @@ describe("runJoin", () => {
   it("mints a participant and writes {server, key} to config", async () => {
     const ctx = makeDeps();
     const res = await runJoin(
-      { name: "rex", server: "http://localhost:6200" },
+      { name: "rex", bio: "", server: "http://localhost:6200" },
       ctx.deps,
     );
-    expect(ctx.calls).toEqual([{ name: "rex" }]);
+    expect(ctx.calls).toEqual([{ name: "rex", bio: "" }]);
     expect(ctx.saved).toEqual([
       { server: "http://localhost:6200", key: "club_secrettoken" },
     ]);
@@ -61,9 +62,18 @@ describe("runJoin", () => {
     expect(res.recoverCode).toBe("club_recover_recovertoken");
   });
 
+  it("passes --bio through to createParticipant (category-blind self-intro)", async () => {
+    const ctx = makeDeps();
+    await runJoin(
+      { name: "rex", bio: "运维 agent，常驻 :6600", server: "http://x" },
+      ctx.deps,
+    );
+    expect(ctx.calls).toEqual([{ name: "rex", bio: "运维 agent，常驻 :6600" }]);
+  });
+
   it("trims a trailing slash from the server url before saving", async () => {
     const ctx = makeDeps();
-    await runJoin({ name: "rex", server: "http://x:6200/" }, ctx.deps);
+    await runJoin({ name: "rex", bio: "", server: "http://x:6200/" }, ctx.deps);
     expect(ctx.saved[0]?.server).toBe("http://x:6200");
   });
 
@@ -74,13 +84,13 @@ describe("runJoin", () => {
       },
     });
     await expect(
-      runJoin({ name: "rex", server: "http://x" }, ctx.deps),
+      runJoin({ name: "rex", bio: "", server: "http://x" }, ctx.deps),
     ).rejects.toBeInstanceOf(JoinNameTakenError);
     // Nothing must have been written when minting failed.
     expect(ctx.saved).toEqual([]);
     // And the friendly message names the requested callsign.
     await expect(
-      runJoin({ name: "rex", server: "http://x" }, ctx.deps),
+      runJoin({ name: "rex", bio: "", server: "http://x" }, ctx.deps),
     ).rejects.toThrow(`name "rex" already taken; choose another`);
   });
 
@@ -91,7 +101,7 @@ describe("runJoin", () => {
       },
     });
     await expect(
-      runJoin({ name: "x".repeat(40), server: "http://x" }, ctx.deps),
+      runJoin({ name: "x".repeat(40), bio: "", server: "http://x" }, ctx.deps),
     ).rejects.toThrow(/name too long/);
     expect(ctx.saved).toEqual([]);
   });
@@ -103,7 +113,7 @@ describe("runJoin", () => {
       },
     });
     await expect(
-      runJoin({ name: "rex", server: "http://unreachable" }, ctx.deps),
+      runJoin({ name: "rex", bio: "", server: "http://unreachable" }, ctx.deps),
     ).rejects.toThrow(/network/);
     expect(ctx.saved).toEqual([]);
   });
@@ -113,6 +123,7 @@ describe("renderJoinSuccess", () => {
   const participant: Participant = {
     id: "01HWAGENT0PARTICIPANTID0001",
     name: "rex",
+    bio: "",
     createdAt: 1719700000000,
   };
   const recoverCode = "club_recover_recovertoken";

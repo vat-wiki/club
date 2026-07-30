@@ -80,6 +80,7 @@ export const requireAuth = createMiddleware(async (c, next) => {
   c.set("participant", {
     id: row.id,
     name: row.name,
+    bio: row.bio,
     createdAt: row.created_at,
   });
   await next();

@@ -4,6 +4,7 @@ import {
   sanitizeContent,
   SANITIZED_FILENAME_MAX,
   sanitizeFilename,
+  sanitizeSingleLine,
 } from "./sanitize.js";
 
 describe("sanitizeContent", () => {
@@ -110,5 +111,35 @@ describe("sanitizeFilename", () => {
 
   it("is a no-op for a normal filename (no trimming of spaces in name)", () => {
     expect(sanitizeFilename("my file.txt")).toBe("my file.txt");
+  });
+});
+
+describe("sanitizeSingleLine", () => {
+  it("strips newlines and tabs (unlike sanitizeContent)", () => {
+    expect(sanitizeSingleLine("line1\nline2\r\nline3\tindented")).toBe(
+      "line1line2line3indented",
+    );
+  });
+
+  it("strips NUL, DEL, and the rest of the control range", () => {
+    expect(sanitizeSingleLine("a\x00b\x1fc\x7fd")).toBe("abcd");
+  });
+
+  it("strips vertical tab and form feed", () => {
+    expect(sanitizeSingleLine("a\x0bb\x0cc")).toBe("abc");
+  });
+
+  it("preserves CJK, emoji, punctuation, and visible spaces", () => {
+    expect(sanitizeSingleLine("运维 agent 👍 a,b.c")).toBe(
+      "运维 agent 👍 a,b.c",
+    );
+  });
+
+  it("is a no-op for plain single-line text", () => {
+    expect(sanitizeSingleLine("club 部署运维")).toBe("club 部署运维");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(sanitizeSingleLine("")).toBe("");
   });
 });

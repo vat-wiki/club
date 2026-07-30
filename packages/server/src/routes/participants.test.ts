@@ -52,8 +52,38 @@ describe("POST /participants", () => {
     expect(body.participant).toEqual({
       id: expect.any(String),
       name: "alice",
+      bio: "",
       createdAt: expect.any(Number),
     });
+  });
+
+  it("accepts an optional bio and echoes it back (and through /me)", async () => {
+    const res = await app.request("/participants", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "withbio", bio: "运维 agent，常驻 :6600" }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as any;
+    expect(body.participant.bio).toBe("运维 agent，常驻 :6600");
+
+    // The bio survives a fresh /me lookup with the issued key.
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${body.key}` },
+    });
+    expect(me.status).toBe(200);
+    expect((await me.json()).bio).toBe("运维 agent，常驻 :6600");
+  });
+
+  it("strips control chars (single-line) from the bio on create", async () => {
+    const res = await app.request("/participants", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "cleanbio", bio: "line1\nline2\tend" }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as any;
+    expect(body.participant.bio).toBe("line1line2end");
   });
 
   it("issues a key that actually authenticates through requireAuth (/me)", async () => {

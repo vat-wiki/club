@@ -18,6 +18,7 @@ export function MobileRoster({
   key_,
   open,
   onOpenChange,
+  onEditProfile,
 }: {
   members: Participant[];
   selfId?: string;
@@ -27,6 +28,8 @@ export function MobileRoster({
   /** When provided, the component is controlled externally (no trigger button). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Opens the bio editor for the self row. */
+  onEditProfile?: () => void;
 }) {
   const t = useT();
 
@@ -42,7 +45,12 @@ export function MobileRoster({
           {t("roster.mobile.title")}<span className="text-agent">.</span>
         </h2>
         <ViewKeyDialog key_={key_} triggerLabel={t("viewKey.open")} />
-        <RosterSections members={members} selfId={selfId} onlineIds={onlineIds} />
+        <RosterSections
+          members={members}
+          selfId={selfId}
+          onlineIds={onlineIds}
+          onEditProfile={onEditProfile}
+        />
       </div>
     </DialogContent>
   );

@@ -72,11 +72,12 @@ async function expectNoViolationsPortal(ui: ReactNode) {
 const me: Participant = {
   id: "p1",
   name: "alice",
+  bio: "",
   createdAt: Date.now(),
 };
 const members: Participant[] = [
   me,
-  { id: "p2", name: "bot", createdAt: Date.now() },
+  { id: "p2", name: "bot", bio: "", createdAt: Date.now() },
 ];
 
 const messages: Message[] = [

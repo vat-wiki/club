@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { ParticipantName } from "./types";
+import {
+  CreateParticipantRequest,
+  MAX_BIO,
+  ParticipantBio,
+  ParticipantName,
+  UpdateProfileRequest,
+} from "./types";
 
 describe("ParticipantName schema", () => {
   const valid = [
@@ -73,5 +79,70 @@ describe("ParticipantName schema", () => {
 
   it.each(invalid)("rejects %p", (input) => {
     expect(() => ParticipantName.parse(input)).toThrow();
+  });
+});
+
+describe("ParticipantBio schema", () => {
+  it("defaults to empty string when omitted", () => {
+    expect(ParticipantBio.parse(undefined)).toBe("");
+  });
+
+  it("parses a valid bio", () => {
+    expect(ParticipantBio.parse("运维 agent，常驻 :6600")).toBe(
+      "运维 agent，常驻 :6600",
+    );
+  });
+
+  it("strips control chars incl. newlines/tabs (single-line)", () => {
+    expect(ParticipantBio.parse("line1\nline2\tend")).toBe("line1line2end");
+    expect(ParticipantBio.parse("a\x00b\x7fc")).toBe("abc");
+  });
+
+  it("rejects bios longer than MAX_BIO", () => {
+    expect(() => ParticipantBio.parse("a".repeat(MAX_BIO + 1))).toThrow();
+    expect(ParticipantBio.parse("a".repeat(MAX_BIO))).toBe(
+      "a".repeat(MAX_BIO),
+    );
+  });
+
+  it("preserves CJK and emoji", () => {
+    expect(ParticipantBio.parse("产品经理 🚀")).toBe("产品经理 🚀");
+  });
+});
+
+describe("CreateParticipantRequest", () => {
+  it("accepts name only (bio defaults to empty)", () => {
+    expect(CreateParticipantRequest.parse({ name: "alice" })).toEqual({
+      name: "alice",
+      bio: "",
+    });
+  });
+
+  it("accepts name + bio", () => {
+    expect(
+      CreateParticipantRequest.parse({ name: "alice", bio: "运维" }),
+    ).toEqual({ name: "alice", bio: "运维" });
+  });
+
+  it("strips unknown fields (non-strict, graceful deprecation)", () => {
+    expect(
+      CreateParticipantRequest.parse({ name: "alice", kind: "agent" }),
+    ).toEqual({ name: "alice", bio: "" });
+  });
+});
+
+describe("UpdateProfileRequest", () => {
+  it("parses a bio", () => {
+    expect(UpdateProfileRequest.parse({ bio: "新角色" })).toEqual({
+      bio: "新角色",
+    });
+  });
+
+  it("defaults missing bio to empty (clears bio)", () => {
+    expect(UpdateProfileRequest.parse({})).toEqual({ bio: "" });
+  });
+
+  it("rejects unknown fields (strict)", () => {
+    expect(() => UpdateProfileRequest.parse({ bio: "x", extra: 1 })).toThrow();
   });
 });

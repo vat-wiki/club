@@ -3,25 +3,77 @@ import { RoomList } from "@/components/room-list";
 import { Separator } from "@/components/ui/separator";
 import type { RoomUnread } from "@/hooks/use-rooms";
 import { useT } from "@/lib/i18n";
+import { sanitizeDisplayString } from "@/lib/sanitize";
 import { cn } from "@/lib/utils";
 
 import type { Participant, Room } from "@club/shared";
 
-function Row({ p, self, online }: { p: Participant; self: boolean; online: boolean }) {
+function Row({
+  p,
+  self,
+  online,
+  onEditProfile,
+}: {
+  p: Participant;
+  self: boolean;
+  online: boolean;
+  /** When provided AND this is the self row, the row becomes a button that opens the bio editor. */
+  onEditProfile?: () => void;
+}) {
   const t = useT();
-  return (
-    <div className="flex min-h-[44px] items-center gap-2 rounded-md px-4 py-1.5 text-sm transition-colors hover:bg-accent/70 active:bg-accent">
+  // Single-line, control-char-stripped bio for the secondary line. Empty bio
+  // ("" = unset) renders nothing so the roster stays compact. CSS `truncate`
+  // caps the visual width; the full text is server-capped at MAX_BIO.
+  const bio = sanitizeDisplayString(p.bio);
+  const editable = self && !!onEditProfile;
+  const className = cn(
+    "flex min-h-[44px] w-full items-center gap-2 rounded-md px-4 py-1.5 text-left text-sm transition-colors hover:bg-accent/70 active:bg-accent",
+    editable &&
+      "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring/40",
+  );
+  // Name + optional bio stacked in a min-w-0 column so `truncate` can clip.
+  const inner = (
+    <>
       {/* Offline (no live SSE connection) members read as "who's here now" via
           the dimmer avatar; the name keeps a contrast-safe muted color rather
           than an opacity multiplier, which previously dropped it below AA
           (opacity-50 on muted-foreground → 2.87:1). */}
       <Avatar name={p.name} className={cn("h-7 w-7 text-xs", !online && "opacity-50")} />
-      <span className={cn("truncate", self || online ? "text-foreground" : "text-muted-foreground")}>
-        {p.name}
-        {self && <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">{t("roster.you")}</span>}
-      </span>
-    </div>
+      <div className="min-w-0 flex-1">
+        <span
+          className={cn(
+            "block truncate",
+            self || online ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {p.name}
+          {self && (
+            <span className="ml-1.5 align-middle font-mono text-[10px] text-muted-foreground">
+              {t("roster.you")}
+            </span>
+          )}
+        </span>
+        {bio && <p className="truncate text-xs text-muted-foreground">{bio}</p>}
+      </div>
+    </>
   );
+  // The self row is the only entry point to edit your own bio, so it becomes a
+  // real <button> (keyboard-focusable, Enter/Space activation) when an editor
+  // is wired up. Everyone else stays a plain div.
+  if (editable) {
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={onEditProfile}
+        aria-label={t("roster.editProfile")}
+        title={t("roster.editProfile")}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className={className}>{inner}</div>;
 }
 
 // Shared roster body — rendered inside the desktop aside and the mobile sheet.
@@ -34,10 +86,13 @@ export function RosterSections({
   members,
   selfId,
   onlineIds,
+  onEditProfile,
 }: {
   members: Participant[];
   selfId?: string;
   onlineIds?: Set<string>;
+  /** Opens the bio editor for the self row. Optional: only the self row uses it. */
+  onEditProfile?: () => void;
 }) {
   // Split into online and offline, then sort each group.
   // Online members go first, sorted by name (case-insensitive).
@@ -75,10 +130,10 @@ export function RosterSections({
   return (
     <div className="space-y-1">
       {online.map((p) => (
-        <Row key={p.id} p={p} self={p.id === selfId} online={true} />
+        <Row key={p.id} p={p} self={p.id === selfId} online={true} onEditProfile={onEditProfile} />
       ))}
       {offline.map((p) => (
-        <Row key={p.id} p={p} self={p.id === selfId} online={false} />
+        <Row key={p.id} p={p} self={p.id === selfId} online={false} onEditProfile={onEditProfile} />
       ))}
     </div>
   );
@@ -93,6 +148,7 @@ export function Roster({
   unread,
   onSelectRoom,
   onCreateRoom,
+  onEditProfile,
 }: {
   members: Participant[];
   selfId?: string;
@@ -102,6 +158,8 @@ export function Roster({
   unread: Record<string, RoomUnread>;
   onSelectRoom: (slug: string) => void;
   onCreateRoom: (name: string) => Promise<void>;
+  /** Opens the bio editor for the self row. */
+  onEditProfile?: () => void;
 }) {
   const t = useT();
   return (
@@ -124,7 +182,12 @@ export function Roster({
       />
       <Separator />
       <div aria-label={t("roster.onlineLabel")}>
-        <RosterSections members={members} selfId={selfId} onlineIds={onlineIds} />
+        <RosterSections
+          members={members}
+          selfId={selfId}
+          onlineIds={onlineIds}
+          onEditProfile={onEditProfile}
+        />
       </div>
     </aside>
   );

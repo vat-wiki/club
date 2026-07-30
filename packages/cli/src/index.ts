@@ -18,6 +18,7 @@ import { makeReadCommand } from "./commands/read.js";
 import { makeRecoverCommand } from "./commands/recover.js";
 import { makeSearchCommand } from "./commands/search.js";
 import { makeSendCommand } from "./commands/send.js";
+import { makeSkillCommand } from "./commands/skill.js";
 import { makeUpdateCommand } from "./commands/update.js";
 import { makeWhoamiCommand } from "./commands/whoami.js";
 import { loadConfig } from "./config.js";
@@ -68,6 +69,7 @@ const cmds = [
   makeKickCommand(),
   makeReactCommand(),
   makeCatCommand(),
+  makeSkillCommand(),
   makeUpdateCommand(),
 ];
 cmds.forEach((c) => program.addCommand(c));

@@ -25,6 +25,7 @@ import { startFeed } from "../agent/feed.js";
 import { runAgent } from "../agent/pty.js";
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";
+import { decideSkillInstall } from "../skill.js";
 
 /**
  * Build the `club agent` commander sub-command.
@@ -48,13 +49,14 @@ export function makeAgentCommand(): Command {
       "--mention <name>",
       "only deliver messages that @<name> (default: all messages except your own)",
     )
+    .option("--no-skill", "skip club skill auto-sync check on startup")
     .argument(
       "[cmd...]",
       "the TUI agent to run and its args (use -- to separate, so club won't swallow its flags)",
     )
     .allowExcessArguments(true)
     .action(
-      withCatchExit(async (cmdArgs: string[], opts: { channel?: string; mention?: string }) => {
+      withCatchExit(async (cmdArgs: string[], opts: { channel?: string; mention?: string; skill?: boolean }) => {
         if (!cmdArgs || cmdArgs.length === 0) {
           console.error(
             "error: club agent needs a TUI agent to run, e.g.:\n" +
@@ -80,10 +82,26 @@ export function makeAgentCommand(): Command {
           // 降级:不做自回声过滤
         }
 
+        // skill 自检:命中 agent 则比对 cwd 下已装版本,缺失/更旧就组装安装消息,
+        // 等 agent idle 后注入(让 agent 自己 cp 落地,CLI 不写 agent 目录)。fail-open。
+        const skillDecision = (() => {
+          try {
+            return decideSkillInstall(cmd, process.cwd(), {
+              enabled: opts.skill !== false && process.env.CLUB_NO_SKILL_SYNC !== "1",
+            });
+          } catch {
+            return { msg: null, log: null } as const;
+          }
+        })();
+        if (skillDecision.log) process.stderr.write(skillDecision.log + "\n");
+
         // feedFactory:把 club stream 接到 QueuedInjector 上。
         // 这里才真正创建数据源 —— runAgent 内部在 PTY 起好后调用它,
         // 保证 agent 一启动就开始收消息。
         const feedFactory = (inject: { enqueue: (t: string) => void }) => {
+          // skill 安装消息优先入队(若需更新):agent idle 后先于/夹杂在 club 消息流
+          // 里被注入,agent 收到即自行 cp 落地。
+          if (skillDecision.msg) inject.enqueue(skillDecision.msg);
           return startFeed(client, {
             inject,
             channel: opts.channel,

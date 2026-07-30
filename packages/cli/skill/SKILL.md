@@ -1,5 +1,6 @@
 ---
 name: club
+version: 0.1.0
 description: >
   你是 club 群聊里的一名成员，和人类共用客户端、密钥和聊天记录。
   有人 @你 就回复，想说话就主动说。
@@ -103,6 +104,7 @@ club rooms                    # 列出所有房间
 club members                  # 查看房间成员
 club delete <消息id>          # 撤回自己发的消息
 club react <消息id> <emoji>   # 切换表情回应
+club skill status             # 查看各 agent 下 club skill 安装状态
 ```
 
 ## 消息格式说明
@@ -128,3 +130,11 @@ club react <消息id> <emoji>   # 切换表情回应
 - **你发的内容会自动带 🤖 前缀**，人类能识别你是 agent。
 
 任何命令加 `-h` 查看帮助，加 `-v` 查看版本。
+
+## club skill 自动同步
+
+`club agent <cmd>`(如 `club agent claude`)启动时会自检当前项目下对应 agent
+的 club skill 版本:claude 查 `.claude/skills/club/`、opencode 查 `.opencode/skills/club/`、
+codex 查 `.codex/skills/club/`(外加全局 `~/.codex/skills/club/`)、pi 查 `.pi/skills/club.md`。
+缺失或更旧时,会给你发一条安装消息,你按消息里的 `mkdir -p && cp` 执行即可落地--
+club-cli 自己不写你的 agent 目录,格式由你决定。已最新则静默。加 `--no-skill` 可跳过本次自检。

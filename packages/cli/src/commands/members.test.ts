@@ -1,24 +1,34 @@
-import { afterEach,describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Participant } from "@club/shared";
 
-import { type MembersDeps,runMembers } from "./members.js";
+import { formatMemberLine, type MembersDeps, runMembers } from "./members.js";
 
-const alice: Participant = { id: "p_1", name: "alice", createdAt: 0 };
-const bob: Participant = { id: "p_2", name: "bob", createdAt: 0 };
+const alice: Participant = { id: "p_1", name: "alice", bio: "运维", createdAt: 0 };
+const bob: Participant = { id: "p_2", name: "bob", bio: "", createdAt: 0 };
+
+describe("formatMemberLine", () => {
+  it("appends the bio after a bio: marker when set", () => {
+    expect(formatMemberLine(alice)).toBe("alice  bio: 运维");
+  });
+
+  it("prints only the name when the bio is unset", () => {
+    expect(formatMemberLine(bob)).toBe("bob");
+  });
+});
 
 describe("runMembers", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("prints each participant name in order", async () => {
+  it("prints each participant with bio (when set) in order", async () => {
     const deps: MembersDeps = { members: vi.fn().mockResolvedValue([alice, bob]) };
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await runMembers(deps);
     expect(deps.members).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledTimes(2);
-    expect(log).toHaveBeenCalledWith("alice");
+    expect(log).toHaveBeenCalledWith("alice  bio: 运维");
     expect(log).toHaveBeenLastCalledWith("bob");
   });
 
@@ -36,7 +46,7 @@ describe("runMembers", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await runMembers(deps);
     expect(log).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledWith("alice");
+    expect(log).toHaveBeenCalledWith("alice  bio: 运维");
     expect(log).not.toHaveBeenCalledWith("(no members)");
   });
 

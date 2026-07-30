@@ -12,7 +12,7 @@ process.env.CLUB_DB = dbPath;
 
 // Dynamic import keeps the env-first ordering intact for hermetic isolation.
 const { participants } = await import("./participants.js");
-const { getParticipantByKeyHash, db } = await import("../db.js");
+const { getParticipantByKeyHash, db, insertMessage, getAllParticipants } = await import("../db.js");
 const { hashKey } = await import("../crypto.js");
 const { requireAuth } = await import("../auth.js");
 const { Hono } = await import("hono");
@@ -227,25 +227,40 @@ describe("open model — kick + edit-anyone-bio", () => {
     expect((await me.json()).bio).toBe("rewritten by someone else");
   });
 
-  it("POST /participants/:id/kick revokes the target's key and soft-deletes their messages", async () => {
+  it("POST /participants/:id/kick soft-deletes the account (revokes key, hides from roster, preserves messages)", async () => {
     const caller = await mint("kicker");
     const target = await mint("kick-target");
-    // Target posts a message, then is kicked by the caller.
-    await app.request("/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", Authorization: `Bearer ${target.key}` },
-      body: JSON.stringify({ content: "I will be erased" }),
-    });
-    const res = await app.request(`/participants/${target.id}/kick`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${caller.key}` },
-    });
-    expect(res.status).toBe(204);
-    // The kicked participant can no longer authenticate.
-    const me = await app.request("/me", {
-      headers: { Authorization: `Bearer ${target.key}` },
-    });
-    expect(me.status).toBe(401);
+    // Target authors a message, then is kicked by the caller.
+    insertMessage("m1", target.id, "I will be erased", 0, null, null, "general");
+    try {
+      const res = await app.request(`/participants/${target.id}/kick`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${caller.key}` },
+      });
+      expect(res.status).toBe(204);
+      // The kicked participant can no longer authenticate.
+      const me = await app.request("/me", {
+        headers: { Authorization: `Bearer ${target.key}` },
+      });
+      expect(me.status).toBe(401);
+      // The account is flagged deleted and dropped from the roster...
+      const pRow = db
+        .prepare("SELECT deleted FROM participants WHERE id = ?")
+        .get(target.id) as { deleted: number } | undefined;
+      expect(pRow?.deleted).toBe(1);
+      expect(getAllParticipants().find((p) => p.id === target.id)).toBeUndefined();
+      // ...but the authored message is preserved untouched (content + not deleted).
+      const msg = db
+        .prepare("SELECT content, deleted FROM messages WHERE id = 'm1'")
+        .get() as { content: string; deleted: number } | undefined;
+      expect(msg?.content).toBe("I will be erased");
+      expect(msg?.deleted).toBe(0);
+    } finally {
+      // This suite's beforeEach wipes only participants (messages are
+      // FK-referenced), so remove the row we inserted or the next test's
+      // participant wipe trips a FOREIGN KEY constraint.
+      db.prepare("DELETE FROM messages WHERE id = 'm1'").run();
+    }
   });
 
   it("kick requires authentication (no bearer → 401)", async () => {

@@ -80,7 +80,7 @@ describe("MR1 — multi-channel migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
 
     raw.close();
   });
@@ -96,7 +96,7 @@ describe("MR1 — multi-channel migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
     // general still exactly one row (INSERT OR IGNORE is idempotent too).
     const count = raw
       .prepare<[], { n: number }>(
@@ -149,7 +149,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
     raw.close();
   });
 
@@ -163,7 +163,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
     raw.close();
   });
 });
@@ -192,7 +192,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
 
     // Populate data so EXPLAIN QUERY PLAN is meaningful.
     raw.exec(
@@ -239,7 +239,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
     raw.close();
   });
 });
@@ -293,7 +293,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
     raw.close();
   });
 
@@ -307,7 +307,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(17);
+    expect(version?.version).toBe(18);
     raw.close();
   });
 });
@@ -345,7 +345,7 @@ describe("MR5 — channel display_name migration (v17)", () => {
     expect(
       raw.prepare<[], { version: number }>("SELECT version FROM schema_version").get()
         ?.version,
-    ).toBe(17);
+    ).toBe(18);
     raw.close();
   });
 
@@ -359,7 +359,67 @@ describe("MR5 — channel display_name migration (v17)", () => {
     expect(
       raw.prepare<[], { version: number }>("SELECT version FROM schema_version").get()
         ?.version,
-    ).toBe(17);
+    ).toBe(18);
+    raw.close();
+  });
+});
+
+describe("MR6 - participant soft-delete flag migration (v18)", () => {
+  it("adds a non-null deleted column to participants (existing rows backfill to 0)", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw, 17); // pre-v18: participants has no deleted column
+    // Seed a participant at v17 so we can observe the backfill.
+    raw
+      .prepare(
+        `INSERT INTO participants (id, name, bio, key_hash, recover_hash, created_at)
+         VALUES ('p1', 'alice', '', 'hash', NULL, 0)`,
+      )
+      .run();
+
+    // At v17 the column does not exist yet.
+    const colsBefore = raw
+      .prepare<[], { name: string }>("PRAGMA table_info(participants)")
+      .all()
+      .map((c) => c.name);
+    expect(colsBefore).not.toContain("deleted");
+
+    runMigrations(raw); // applies v18
+
+    const colsAfter = raw
+      .prepare<[], { name: string }>("PRAGMA table_info(participants)")
+      .all()
+      .map((c) => c.name);
+    expect(colsAfter).toContain("deleted");
+
+    // The pre-existing participant backfills to 0 (active), not NULL.
+    const row = raw
+      .prepare<[], { deleted: number }>(
+        "SELECT deleted FROM participants WHERE id = 'p1'",
+      )
+      .get();
+    expect(row?.deleted).toBe(0);
+
+    expect(
+      raw.prepare<[], { version: number }>("SELECT version FROM schema_version").get()
+        ?.version,
+    ).toBe(18);
+    raw.close();
+  });
+
+  it("is idempotent - re-running on an already-migrated db is a no-op", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw);
+    expect(() => runMigrations(raw)).not.toThrow();
+    expect(
+      raw.prepare<[], { version: number }>("SELECT version FROM schema_version").get()
+        ?.version,
+    ).toBe(18);
     raw.close();
   });
 });

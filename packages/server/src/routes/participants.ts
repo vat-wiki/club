@@ -20,7 +20,7 @@ import {
   getParticipantForRecover,
   insertParticipant,
   invalidateParticipantNamesCache,
-  softDeleteParticipantMessages,
+  softDeleteParticipant,
   updateParticipantBio,
   updateParticipantKey,
   updateParticipantRecover,
@@ -201,27 +201,25 @@ participants.post("/:id/rotate-key", requireJson, async (c) => {
   return c.json({ key: newPlainKey, recoverCode: newCode }, 200);
 });
 
-// Revoke a participant's credentials and soft-delete their authored content so
-// they can no longer authenticate and leave no traces in history. Shared by the
-// self-delete (DELETE /:id, two-factor) and kick (POST /:id/kick, open) paths —
-// the only difference between those is authorization, not the deletion effect.
-function purgeParticipant(id: string): void {
-  // Revoke both credentials (key_hash blanked → auth can never match; recover
-  // cleared so the account can't be recovered back to life).
-  updateParticipantKey(id, "");
-  updateParticipantRecover(id, null);
-  // Soft-delete authored content so the participant leaves no traces.
-  softDeleteParticipantMessages(id);
+// Deactivate a participant (soft delete): revoke credentials and flag the
+// account deleted so it can no longer authenticate, can't be recovered, and
+// drops out of the roster / @mention set. The row is kept and the
+// participant's authored content (messages, reactions, mentions) is preserved
+// untouched - history stays intact. Shared by the self-delete (DELETE /:id,
+// two-factor) and kick (POST /:id/kick, open) paths; they differ only in
+// authorization, not the effect.
+function deactivateParticipant(id: string): void {
+  softDeleteParticipant(id);
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
 }
 
 // DELETE /participants/:id { password, recoverCode } -> 204
-// Permanently deletes the authenticated participant. Requires the current key
-// (Authorization header) PLUS the current recovery code in the body, giving a
-// high-stakes operation a second factor. Soft-deletes the participant's key
-// hash and recovery hash, and soft-deletes all authored messages so history
-// stays intact.
+// Deactivates the authenticated participant's own account (soft delete).
+// Requires the current key (Authorization header) PLUS the current recovery
+// code in the body, giving a high-stakes operation a second factor. Revokes
+// the key + recovery hash and marks the account deleted so it drops out of the
+// roster; authored messages are preserved so history stays intact.
 participants.delete("/:id", requireJson, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
@@ -240,21 +238,21 @@ participants.delete("/:id", requireJson, async (c) => {
   if (!safeEqualHex(hashKey(parsed.data.recoverCode), row.recover_hash)) {
     return jsonErr(c, "invalid recovery code", 403);
   }
-  purgeParticipant(me.id);
+  deactivateParticipant(me.id);
   return c.body(null, 204);
 });
 
 // POST /participants/:id/kick -> 204
-// "Kick = account deleted" in the open model: ANY authenticated participant may
+// "Kick = account deactivated" in the open model: ANY authenticated participant may
 // remove ANY other participant (or themselves). No second factor — the
 // permissionless design trades safety for simplicity (anyone can kick anyone).
-// The effect is identical to self-delete: credentials revoked + authored content
-// soft-deleted. Idempotent — kicking an unknown id still returns 204.
+// The effect is identical to self-delete: credentials revoked + account hidden,
+// authored content preserved. Idempotent — kicking an unknown id still returns 204.
 participants.post("/:id/kick", requireAuth, (c) => {
   const id = c.req.param("id");
   const bad = requireValidId(c, id, "participant id");
   if (bad) return bad.r;
-  purgeParticipant(id);
+  deactivateParticipant(id);
   return c.body(null, 204);
 });
 

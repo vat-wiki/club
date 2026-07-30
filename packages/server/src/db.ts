@@ -344,6 +344,18 @@ const migrations: Migration[] = [
     // runner's "duplicate column name" guard.
     sql: `ALTER TABLE channels ADD COLUMN display_name TEXT;`,
   },
+  {
+    version: 18,
+    description: 'participant soft-delete flag (kick/self-delete keeps the account + content, hides from roster)',
+    // Removing a participant (kick or self-delete) is a *soft* delete: the row
+    // stays so messages still JOIN to a valid author name, but the account is
+    // marked deleted so it drops out of the roster / mention set and can no
+    // longer authenticate. The participant's authored content (messages,
+    // reactions, mentions) is preserved untouched - history stays intact.
+    // Existing rows backfill to 0 (active) in place (zero data loss). ADD
+    // COLUMN is idempotent under the runner's "duplicate column name" guard.
+    sql: `ALTER TABLE participants ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;`,
+  },
 ];
 
 db.exec(`
@@ -475,7 +487,7 @@ export function insertMessage(
 }
 
 const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; bio: string; created_at: number }>(
-  `SELECT id, name, bio, created_at FROM participants ORDER BY created_at ASC`
+  `SELECT id, name, bio, created_at FROM participants WHERE deleted = 0 ORDER BY created_at ASC`
 );
 
 // Cache the prepared-statement result (the full participants table) so frequent
@@ -764,10 +776,12 @@ export interface ParticipantRow {
   name: string;
   bio: string;
   created_at: number;
+  /** Soft-delete flag (v18): 0 = active, 1 = deactivated (hidden, can't auth). */
+  deleted: number;
 }
 
 const participantByKeyHashStmt = db.prepare<[string], ParticipantRow | undefined>(
-  `SELECT id, name, bio, created_at FROM participants WHERE key_hash = ?`
+  `SELECT id, name, bio, created_at, deleted FROM participants WHERE key_hash = ? AND deleted = 0`
 );
 
 /** Participant row looked up by hashed key (auth path). Returns undefined if
@@ -777,7 +791,7 @@ export function getParticipantByKeyHash(hash: string): ParticipantRow | undefine
 }
 
 const participantByNameStmt = db.prepare<[string], ParticipantRow | undefined>(
-  `SELECT id, name, bio, created_at FROM participants WHERE name = ?`
+  `SELECT id, name, bio, created_at, deleted FROM participants WHERE name = ?`
 );
 
 /** Participant row looked up by callsign. Returns undefined if the name
@@ -873,25 +887,22 @@ export function updateParticipantBio(id: string, bio: string): void {
   updateParticipantBioStmt.run(bio, id);
 }
 
-// ── Account deletion ──────────────────────────────────────────────────
+// ── Account deactivation (soft delete) ───────────────────────────────
 
 /**
- * Soft-delete every message authored by a participant, plus any mentions
- * associated with them, so the participant's content vanishes from history
- * without destroying channel integrity.
- *
- * @returns the number of messages removed.
+ * Soft-delete a participant: blank the credentials (so the account can no
+ * longer authenticate or be recovered) and set the `deleted` flag (so the
+ * account drops out of the roster and the @mention name set). The row is kept,
+ * so messages still JOIN to a valid author name - the participant's authored
+ * content (messages, reactions, mentions) is preserved untouched and history
+ * stays intact. Shared by the self-delete (DELETE /:id, two-factor) and kick
+ * (POST /:id/kick, open) paths; they differ only in authorization.
  */
-export function softDeleteParticipantMessages(participantId: string): number {
-  // Remove mentions authored by the participant.
-  db.prepare(`DELETE FROM mentions WHERE author_id = ?`).run(participantId);
-  // Remove reactions from the participant.
-  db.prepare(`DELETE FROM reactions WHERE participant_id = ?`).run(participantId);
-  // Soft-delete messages authored by the participant.
-  const changes = db.prepare(
-    `UPDATE messages SET deleted = 1, content = '' WHERE participant_id = ?`
-  ).run(participantId).changes;
-  return Number(changes);
+const softDeleteParticipantStmt = db.prepare(
+  `UPDATE participants SET key_hash = '', recover_hash = NULL, deleted = 1 WHERE id = ?`
+);
+export function softDeleteParticipant(id: string): void {
+  softDeleteParticipantStmt.run(id);
 }
 
 // ── Mentions (per-participant @-mention inbox) ──────────────────────
@@ -923,7 +934,7 @@ export interface MentionRow {
 }
 
 const allParticipantsStmt = db.prepare<[], { id: string; name: string }>(
-  `SELECT id, name FROM participants`
+  `SELECT id, name FROM participants WHERE deleted = 0`
 );
 
 /**

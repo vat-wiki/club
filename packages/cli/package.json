@@ -2,6 +2,11 @@
   "name": "club-cli",
   "version": "0.8.1",
   "author": "club",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vat-wiki/club.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "bin": {
     "club": "bin/club.js"

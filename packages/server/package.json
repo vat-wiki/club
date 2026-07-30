@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "description": "club backend — Hono + SQLite + SPA host. Run a full club with `npx club-serve`.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vat-wiki/club.git",
+    "directory": "packages/server"
+  },
   "bin": {
     "club-serve": "bin/club-serve.js"
   },

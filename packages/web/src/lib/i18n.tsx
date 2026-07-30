@@ -325,9 +325,16 @@ const zh: Dict = {
   "boot.error.retry": "重试",
   "boot.error.retry.aria": "重新尝试连接服务器",
   "boot.error.reload": "重新加载页面",
+  "boot.error.switch": "换个密钥登录",
+  "boot.error.switch.aria": "清除本机保存的登录密钥并重新加入",
   "boot.error.retrying": "正在重试（第 {n} 次）…",
   "boot.error.online": "网络已恢复——正在重连…",
   "boot.connecting": "正在接入…",
+  // 401/403 on /me: stored key isn't recognized by THIS server (DB reset /
+  // swapped env / stale key). Definitive - no retry, so no "can't reach server"
+  // misdirection; the only path is rejoining.
+  "boot.rejected.title": "密钥不被此服务器识别",
+  "boot.rejected.desc": "本机保存的登录密钥在此服务器上无效--可能是服务器数据已重置、或这是来自其他环境的旧密钥。重新加入即可。",
 
   // Agent typing indicator (P1-5 placeholder; pending backend agent_thinking event)
   "typing.labelOne": "{name} 正在输入…",
@@ -580,9 +587,13 @@ const en: Dict = {
   "boot.error.retry": "Retry",
   "boot.error.retry.aria": "Retry connecting to the server",
   "boot.error.reload": "Reload page",
+  "boot.error.switch": "Sign in with a different key",
+  "boot.error.switch.aria": "Clear the saved key on this device and rejoin",
   "boot.error.retrying": "Retrying (attempt {n})…",
   "boot.error.online": "Back online — reconnecting…",
   "boot.connecting": "Connecting…",
+  "boot.rejected.title": "This server doesn't recognize your key",
+  "boot.rejected.desc": "The saved login key isn't valid on this server - the data may have been reset, or it's a stale key from another environment. Rejoin to continue.",
 
   // Agent typing indicator (P1-5 placeholder)
   "typing.labelOne": "{name} is typing…",

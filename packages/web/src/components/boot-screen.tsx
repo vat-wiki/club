@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, RefreshCw, RotateCw } from "lucide-react";
+import { AlertTriangle, KeyRound, RefreshCw, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type BootStatus = "loading" | "error";
+export type BootStatus = "loading" | "error" | "rejected";
 
 // First-load gate shown while validating a stored key against /me, and the
 // error state when that validation fails repeatedly. Two important properties:
@@ -32,10 +32,15 @@ export function BootScreen({
   /** Bump to force a manual retry from the parent (key change → effect re-run). */
   retryNonce,
   onRetry,
+  /** Abandon the stored key and return to the auth dialog. The escape hatch
+      when /me keeps failing because the key no longer matches this server's
+      data (e.g. the DB was reset / swapped) - retry alone can't fix that. */
+  onSwitch,
 }: {
   status: BootStatus;
   retryNonce: number;
   onRetry: () => void;
+  onSwitch: () => void;
 }) {
   const t = useT();
   // Tracks auto-retry attempts within the current failure cycle; resets when the
@@ -96,6 +101,10 @@ export function BootScreen({
 
   const autoRetrying = status === "error" && attempt < MAX_AUTO_ATTEMPTS;
   const exhausted = status === "error" && attempt >= MAX_AUTO_ATTEMPTS;
+  // 401/403 on /me: the key doesn't exist on this server. Definitive - no retry,
+  // no backoff, no "can't reach the server" misdirection. The only sensible
+  // action is dropping the key and re-joining, so that becomes the primary CTA.
+  const rejected = status === "rejected";
 
   if (status === "loading" && !onlineTriggered) {
     return (
@@ -122,15 +131,17 @@ export function BootScreen({
         <AlertTriangle className="h-6 w-6 animate-pulse text-destructive" aria-hidden />
         <div className="space-y-1.5">
           <p className="font-display text-base font-semibold text-destructive">
-            {t("boot.error.title")}
+            {t(rejected ? "boot.rejected.title" : "boot.error.title")}
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {t("boot.error.desc")}
+            {t(rejected ? "boot.rejected.desc" : "boot.error.desc")}
           </p>
         </div>
 
         {/* Live status line: which attempt / online-triggered / exhausted.
-            aria-live so SR users hear the state change without scanning. */}
+            aria-live so SR users hear the state change without scanning.
+            Skipped for "rejected" - there's no retry cycle to narrate. */}
+        {!rejected && (
         <p
           role="status"
           aria-live="polite"
@@ -150,8 +161,23 @@ export function BootScreen({
           )}
           {exhausted && !onlineTriggered && <span>&nbsp;</span>}
         </p>
+        )}
 
         <div className="flex w-full flex-col gap-2">
+          {rejected ? (
+            /* No retry for a wrong key - it'll 401 every time. Primary CTA is
+               dropping it and re-joining. */
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={onSwitch}
+              aria-label={t("boot.error.switch.aria")}
+            >
+              <KeyRound className="h-4 w-4" aria-hidden />
+              {t("boot.error.switch")}
+            </Button>
+          ) : (
+          <>
           <Button
             variant="outline"
             className="w-full gap-2"
@@ -171,6 +197,21 @@ export function BootScreen({
             <RotateCw className="h-3.5 w-3.5" aria-hidden />
             {t("boot.error.reload")}
           </Button>
+          {/* Escape hatch for a key that's valid-shaped but wrong for this
+              server (DB reset / swapped, or a stale key from another env):
+              retry can never succeed, so let the user drop it and re-join
+              instead of bricking them on this screen forever. */}
+          <Button
+            variant="ghost"
+            className="w-full gap-2 text-muted-foreground"
+            onClick={onSwitch}
+            aria-label={t("boot.error.switch.aria")}
+          >
+            <KeyRound className="h-3.5 w-3.5" aria-hidden />
+            {t("boot.error.switch")}
+          </Button>
+          </>
+          )}
         </div>
       </div>
     </div>

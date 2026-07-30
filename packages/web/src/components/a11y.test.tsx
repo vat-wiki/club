@@ -260,13 +260,20 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   it("BootScreen (error state) has no violations", async () => {
     // The /me-failure retry screen (P0-2): role=alert + retry/reload buttons.
     await expectNoViolations(
-      <BootScreen status="error" retryNonce={0} onRetry={() => {}} />,
+      <BootScreen status="error" retryNonce={0} onRetry={() => {}} onSwitch={() => {}} />,
     );
   });
 
   it("BootScreen (loading state) has no violations", async () => {
     await expectNoViolations(
-      <BootScreen status="loading" retryNonce={0} onRetry={() => {}} />,
+      <BootScreen status="loading" retryNonce={0} onRetry={() => {}} onSwitch={() => {}} />,
+    );
+  });
+
+  it("BootScreen (rejected state - wrong key) has no violations", async () => {
+    // 401/403 on /me: non-retryable, primary CTA is switching keys.
+    await expectNoViolations(
+      <BootScreen status="rejected" retryNonce={0} onRetry={() => {}} onSwitch={() => {}} />,
     );
   });
 

@@ -19,7 +19,7 @@ import { API_URL, clearConn, getKey,loadConn, saveConn, saveRecoverCode } from "
 import { useI18n } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ClubConn } from "@club/sdk";
+import { ClubApiError, type ClubConn } from "@club/sdk";
 import type { ImageMime, Message, Participant } from "@club/shared";
 
 export default function App() {
@@ -54,7 +54,7 @@ export default function App() {
   // explanation (and, on a transient server hiccup, cost them their credential).
   // Now we keep the key and surface a retryable error screen instead (P0-2).
   // Null once we're past boot (entered the channel OR there was no stored key).
-  const [bootStatus, setBootStatus] = useState<"loading" | "error" | null>(!!conn ? "loading" : null);
+  const [bootStatus, setBootStatus] = useState<"loading" | "error" | "rejected" | null>(!!conn ? "loading" : null);
   // Bumped on each manual retry to force the boot effect to re-run (and to reset
   // BootScreen's auto-retry counter). The effect deps include this nonce.
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
@@ -110,8 +110,15 @@ export default function App() {
         setMessages(history);
         setBootStatus(null);
         void refreshMembers();
-      } catch {
-        setBootStatus("error");
+      } catch (err) {
+        // Distinguish a wrong key from a transient outage. A 401/403 here means
+        // the stored key doesn't exist on THIS server (DB reset / swapped env /
+        // stale key from elsewhere) - retrying will never help, so surface a
+        // non-retryable "rejected" state instead of misleading the user with
+        // "can't reach the server" + pointless backoff. Network/timeout/5xx stay
+        // the retryable "error" path where the key is still worth keeping.
+        const status = err instanceof ClubApiError ? err.status : undefined;
+        setBootStatus(status === 401 || status === 403 ? "rejected" : "error");
       }
     },
     [refreshMembers, setMessages],
@@ -191,6 +198,19 @@ export default function App() {
   // Kick a retry: bump the nonce so the boot effect re-runs validateConn, and
   // BootScreen resets its attempt counter.
   const retryBoot = useCallback(() => setBootRetryNonce((n) => n + 1), []);
+
+  // Abandon the stored key from the boot-failure screen. Unlike retryBoot
+  // (which keeps the key), this wipes it and reopens the auth dialog - the
+  // only way out when the key is structurally fine but wrong for this server
+  // (DB reset/swapped), where retry would loop forever. Mirrors performSignOut
+  // but also clears bootStatus so we leave the boot gate.
+  const abandonBootKey = useCallback(() => {
+    clearConn();
+    setConn(null);
+    setMe(null);
+    setBootStatus(null);
+    setAuthOpen(true);
+  }, []);
 
   // periodic roster refresh (members change rarely)
   useEffect(() => {
@@ -379,7 +399,7 @@ export default function App() {
               composer, so a server-down on reload never silently wipes the key
               or strands the user in the empty state. Once null, the channel shows. */}
           {bootStatus ? (
-            <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} />
+            <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} onSwitch={abandonBootKey} />
           ) : (
             <>
               <SearchBar conn={conn} channel={channels.currentChannel} />

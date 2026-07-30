@@ -103,25 +103,25 @@ const zh: Dict = {
   "roster.onlineLabel": "在线成员",
   // The aside now holds channels (top) + online members (bottom); this labels the
   // whole complementary region for SR landmark navigation.
-  "roster.label": "房间与在线成员",
+  "roster.label": "频道与在线成员",
   "roster.mobile.aria": "成员——{count} 人在线",
   "roster.mobile.title": "成员",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "编辑简介",
 
   // Channels (multi-channel sidebar / sheet)
-  "channels.title": "房间",
-  "channels.newChannel": "新建房间",
-  "channels.newChannelPlaceholder": "房间名（如 deploy-debug）",
-  "channels.newChannelLabel": "新房间名",
+  "channels.title": "频道",
+  "channels.newChannel": "新建频道",
+  "channels.newChannelPlaceholder": "频道名（如 deploy-debug）",
+  "channels.newChannelLabel": "新频道名",
   "channels.newChannelInvalid": "只能用小写字母、数字、连字符，1–30 字符",
   "channels.newChannelBusy": "创建中…",
-  "channels.loading": "加载房间…",
+  "channels.loading": "加载频道…",
   "channels.unread.aria": "{count} 条未读",
   "channels.unreadMention.aria": "{count} 条未读，含提及",
-  "channels.current": "当前房间",
+  "channels.current": "当前频道",
   "channels.switchTo": "切换到 #{channel}",
-  "channels.mobile.title": "选择房间",
+  "channels.mobile.title": "选择频道",
 
   // Auth dialog
   "auth.nameRequired": "先起个昵称吧",
@@ -167,7 +167,7 @@ const zh: Dict = {
   // Key reveal (post-create)
   "keyReveal.title": "请保存你的登录密钥与恢复码",
   "keyReveal.desc":
-    "登录密钥是你进入房间的凭证；恢复码是密钥丢失后找回身份的唯一后路。请把两个都妥善保存——club 不会替你保存，密钥丢失后只能用恢复码找回。",
+    "登录密钥是你进入频道的凭证；恢复码是密钥丢失后找回身份的唯一后路。请把两个都妥善保存——club 不会替你保存，密钥丢失后只能用恢复码找回。",
   "keyReveal.label": "你的登录密钥",
   "keyReveal.formatHint": "密钥由固定前缀 + 随机令牌组成，每次生成都不同，无需对照格式。",
   "keyReveal.recoverLabel": "你的恢复码",

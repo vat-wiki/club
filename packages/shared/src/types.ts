@@ -288,6 +288,10 @@ export interface Channel {
   slug: ChannelSlugType;
   createdAt: number;
   lastActivityAt: number | null;
+  // Mutable human label; null ⇒ clients render the slug. The slug stays the
+  // immutable key (messages/SSE/mentions reference it), so renaming is done via
+  // this field, never by changing the slug.
+  displayName: string | null;
 }
 
 // POST /channels { name } — create/ensure a channel exists. Idempotent: posting an
@@ -298,6 +302,17 @@ export const CreateChannelRequest = z.object({
   name: ChannelSlug,
 });
 export type CreateChannelRequest = z.infer<typeof CreateChannelRequest>;
+
+// PATCH /channels/:slug — set a channel's display name. The slug stays the
+// immutable key; `displayName` is the mutable human label. Strict: a stray key is
+// a client bug. Pass null to clear (clients fall back to the slug).
+/** Request body for PATCH /channels/:slug — update display name (slug immutable) */
+export const UpdateChannelRequest = z
+  .object({
+    displayName: z.string().max(60).nullable(),
+  })
+  .strict();
+export type UpdateChannelRequest = z.infer<typeof UpdateChannelRequest>;
 
 /**
  * Response from POST /participants.

@@ -195,3 +195,64 @@ describe("POST /participants", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ── Open model: kick (account delete) + edit anyone's bio ───────────
+describe("open model — kick + edit-anyone-bio", () => {
+  async function mint(name: string): Promise<{ key: string; id: string }> {
+    const res = await app.request("/participants", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = (await res.json()) as any;
+    return { key: body.key, id: body.participant.id };
+  }
+
+  it("PATCH /participants/:id sets another participant's bio (open model)", async () => {
+    const caller = await mint("bio-editor");
+    const target = await mint("bio-target");
+    const res = await app.request(`/participants/${target.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${caller.key}`,
+      },
+      body: JSON.stringify({ bio: "rewritten by someone else" }),
+    });
+    expect(res.status).toBe(204);
+    // The target reads back the new bio through their own /me.
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${target.key}` },
+    });
+    expect((await me.json()).bio).toBe("rewritten by someone else");
+  });
+
+  it("POST /participants/:id/kick revokes the target's key and soft-deletes their messages", async () => {
+    const caller = await mint("kicker");
+    const target = await mint("kick-target");
+    // Target posts a message, then is kicked by the caller.
+    await app.request("/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${target.key}` },
+      body: JSON.stringify({ content: "I will be erased" }),
+    });
+    const res = await app.request(`/participants/${target.id}/kick`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${caller.key}` },
+    });
+    expect(res.status).toBe(204);
+    // The kicked participant can no longer authenticate.
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${target.key}` },
+    });
+    expect(me.status).toBe(401);
+  });
+
+  it("kick requires authentication (no bearer → 401)", async () => {
+    const target = await mint("kick-noauth-target");
+    const res = await app.request(`/participants/${target.id}/kick`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+});

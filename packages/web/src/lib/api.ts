@@ -84,6 +84,30 @@ export interface ClubApi {
   createChannel(c: ClubConn, name: string): Promise<Channel>;
 
   /**
+   * PATCH /channels/:slug { displayName } — rename a channel via its mutable
+   * display name (the slug is immutable). Pass null to clear. Open-CRUD: any
+   * participant may rename any channel.
+   */
+  updateChannel(c: ClubConn, slug: string, displayName: string | null): Promise<Channel>;
+
+  /**
+   * DELETE /channels/:slug — delete a channel and cascade-clean its messages.
+   * `general` is protected. Open-CRUD: any participant may delete any channel.
+   */
+  deleteChannel(c: ClubConn, slug: string): Promise<void>;
+
+  /**
+   * POST /participants/:id/kick — remove a participant (open model: anyone may
+   * kick anyone). Revokes their key and soft-deletes their messages.
+   */
+  kickParticipant(c: ClubConn, id: string): Promise<void>;
+
+  /**
+   * PATCH /participants/:id { bio } — set ANY participant's bio (open model).
+   */
+  updateParticipantBio(c: ClubConn, id: string, bio: string): Promise<void>;
+
+  /**
    * GET /messages/search — substring search, newest first.
    * @param q    - Substring to search.
    * @param channel - Optional channel scope; omit to search all channels.
@@ -175,6 +199,12 @@ export const api: ClubApi = {
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
   channels: (c: ClubConn): Promise<Channel[]> => client(c).channels(),
   createChannel: (c: ClubConn, name: string): Promise<Channel> => client(c).createChannel(name),
+  updateChannel: (c: ClubConn, slug: string, displayName: string | null): Promise<Channel> =>
+    client(c).updateChannel(slug, displayName),
+  deleteChannel: (c: ClubConn, slug: string): Promise<void> => client(c).deleteChannel(slug),
+  kickParticipant: (c: ClubConn, id: string): Promise<void> => client(c).kickParticipant(id),
+  updateParticipantBio: (c: ClubConn, id: string, bio: string): Promise<void> =>
+    client(c).updateParticipantBio(id, bio),
   search: (c: ClubConn, q: string, channel?: string): Promise<Message[]> =>
     client(c).search(q, channel ? { channel } : undefined),
   deleteMessage: (c: ClubConn, id: string): Promise<void> =>

@@ -1,11 +1,14 @@
 import { Command } from "commander";
 
 import { makeAgentCommand } from "./commands/agent.js";
+import { makeBioCommand } from "./commands/bio.js";
 import { makeCatCommand } from "./commands/cat.js";
+import { makeChannelCommand } from "./commands/channel.js";
 import { makeChannelsCommand } from "./commands/channels.js";
 import { makeDeleteCommand } from "./commands/delete.js";
 import { makeInfoCommand } from "./commands/info.js";
 import { makeJoinCommand } from "./commands/join.js";
+import { makeKickCommand } from "./commands/kick.js";
 import { makeLoginCommand } from "./commands/login.js";
 import { makeMembersCommand } from "./commands/members.js";
 import { makeMentionsCommand } from "./commands/mentions.js";
@@ -51,8 +54,10 @@ const cmds = [
   makeJoinCommand(),
   makeWhoamiCommand(),
   makeProfileCommand(),
+  makeBioCommand(),
   makeInfoCommand(),
   makeChannelsCommand(),
+  makeChannelCommand(),
   makeSendCommand(),
   makeReadCommand(),
   makeMembersCommand(),
@@ -60,6 +65,7 @@ const cmds = [
   makeRecoverCommand(),
   makeSearchCommand(),
   makeDeleteCommand(),
+  makeKickCommand(),
   makeReactCommand(),
   makeCatCommand(),
   makeUpdateCommand(),

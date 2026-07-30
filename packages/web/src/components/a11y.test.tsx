@@ -102,8 +102,8 @@ const messages: Message[] = [
 // A couple of channels + a no-op switch/create so the channel-aware components render
 // fully under axe without dragging in real data fetching.
 const channels = [
-  { id: "r1", slug: "general", createdAt: 0, lastActivityAt: Date.now() },
-  { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: Date.now() },
+  { id: "r1", slug: "general", createdAt: 0, lastActivityAt: Date.now(), displayName: null },
+  { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: Date.now(), displayName: null },
 ];
 const noop = async () => {};
 const channelNav = {

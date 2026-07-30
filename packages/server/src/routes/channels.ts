@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 
-import { type Channel,CreateChannelRequest } from '@club/shared';
+import { type Channel,CreateChannelRequest,UpdateChannelRequest } from '@club/shared';
 
 import { requireAuth } from '../auth.js';
-import { type ChannelRow,ensureChannel, getChannelBySlug, invalidateChannelsCache, listChannels } from '../db.js';
-import { jsonErr, parseJsonBody } from '../lib.js';
+import { type ChannelRow,deleteChannel,ensureChannel, getChannelBySlug, invalidateChannelsCache, listChannels, updateChannelDisplayName } from '../db.js';
+import { jsonErr, parseJsonBody, requireValidChannelSlug } from '../lib.js';
 import { requireJson } from '../lib/json-content-type.js';
 
 /**
@@ -43,6 +43,7 @@ function toChannel(r: ChannelRow): Channel {
     slug: r.slug,
     createdAt: r.created_at,
     lastActivityAt: r.last_activity_at,
+    displayName: r.display_name,
   };
 }
 
@@ -85,6 +86,7 @@ channels.post('/', requireJson, async (c) => {
       slug: ensureResult.slug,
       created_at: ensureResult.created_at,
       last_activity_at: null,
+      display_name: ensureResult.display_name,
     };
     return c.json(toChannel(newRow), 201);
   }
@@ -97,4 +99,46 @@ channels.post('/', requireJson, async (c) => {
     return jsonErr(c, 'channel not found', 500);
   }
   return c.json(toChannel(existing), 200);
+});
+
+/**
+ * PATCH /channels/:slug { displayName } -> Channel (200)
+ *
+ * Set the channel's mutable display name (pass `null` to clear → clients render the
+ * slug). The slug itself never changes — it is the key referenced by
+ * messages/SSE/mentions. Any authenticated participant may rename any channel
+ * (open-CRUD model). 404 if the slug is unknown.
+ */
+channels.patch('/:slug', requireJson, async (c) => {
+  const slug = c.req.param('slug');
+  const bad = requireValidChannelSlug(c, slug);
+  if (bad) return bad.r;
+  const parsed = await parseJsonBody(c, UpdateChannelRequest, 'bad request');
+  if (!parsed.ok) return parsed.r;
+  if (!getChannelBySlug(slug)) return jsonErr(c, 'channel not found', 404);
+  updateChannelDisplayName(slug, parsed.data.displayName);
+  invalidateChannelsCache();
+  // Re-read authoritative state (display_name + lastActivityAt) for the response.
+  const updated = getChannelBySlug(slug);
+  if (!updated) return jsonErr(c, 'channel not found', 500);
+  return c.json(toChannel(updated), 200);
+});
+
+/**
+ * DELETE /channels/:slug -> 204
+ *
+ * Delete a channel and cascade-clean its messages, mentions, and reactions. The
+ * seeded `general` channel is protected (409). Any authenticated participant may
+ * delete any other channel (open-CRUD model). Idempotent: an unknown slug returns
+ * 404 so the caller can distinguish "already gone" from "deleted just now".
+ */
+channels.delete('/:slug', (c) => {
+  const slug = c.req.param('slug');
+  const bad = requireValidChannelSlug(c, slug);
+  if (bad) return bad.r;
+  if (slug === 'general') return jsonErr(c, 'cannot delete the general channel', 409);
+  const deleted = deleteChannel(slug);
+  if (!deleted) return jsonErr(c, 'channel not found', 404);
+  invalidateChannelsCache();
+  return c.body(null, 204);
 });

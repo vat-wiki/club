@@ -19,9 +19,11 @@ import {
   type ClubConn,
   createChannel as createChannelFn,
   createParticipant as createParticipantFn,
+  deleteChannel as deleteChannelFn,
   deleteMessage as deleteMessageFn,
   getFile,
   getMe,
+  kickParticipant as kickParticipantFn,
   listChannels as listChannelsFn,
   listMembers,
   listMentions,
@@ -34,6 +36,8 @@ import {
   searchMessages as searchMessagesFn,
   sendMessage,
   toggleMessageReaction as toggleMessageReactionFn,
+  updateChannel as updateChannelFn,
+  updateParticipantBio as updateParticipantBioFn,
   updateProfile as updateProfileFn,
   uploadFile,
   type UploadFileInput,
@@ -114,6 +118,17 @@ export class ClubClient {
     return listMembers(this.conn(), this.callOpts());
   }
 
+  /** POST /participants/:id/kick — remove any participant (open model: anyone may
+   *  kick anyone). Revokes the target's key and soft-deletes their messages. */
+  kickParticipant(id: string): Promise<void> {
+    return kickParticipantFn(this.conn(), id, { timeoutMs: this.timeoutMs });
+  }
+
+  /** PATCH /participants/:id { bio } — set ANY participant's bio (open model). */
+  updateParticipantBio(id: string, bio: string): Promise<void> {
+    return updateParticipantBioFn(this.conn(), id, bio, { timeoutMs: this.timeoutMs });
+  }
+
   /** GET /channels — every channel, general first then most-recently-active first.
    *  Each channel carries `lastActivityAt` (null when empty) so a client can sort
    *  unread/active-first. There is no server-side read state. */
@@ -125,6 +140,19 @@ export class ClubClient {
    *  is the canonical slug. Returns the channel (newly created or pre-existing). */
   createChannel(name: string): Promise<Channel> {
     return createChannelFn(this.conn(), name, { timeoutMs: this.timeoutMs });
+  }
+
+  /** PATCH /channels/:slug { displayName } — rename a channel via its mutable
+   *  display name (the slug is immutable). Pass null to clear. Open-CRUD: any
+   *  participant may rename any channel. */
+  updateChannel(slug: string, displayName: string | null): Promise<Channel> {
+    return updateChannelFn(this.conn(), slug, displayName, { timeoutMs: this.timeoutMs });
+  }
+
+  /** DELETE /channels/:slug — delete a channel and cascade-clean its messages.
+   *  `general` is protected. Open-CRUD: any participant may delete any channel. */
+  deleteChannel(slug: string): Promise<void> {
+    return deleteChannelFn(this.conn(), slug, { timeoutMs: this.timeoutMs });
   }
 
   /** GET /me/mentions — the caller's UNREAD @-mentions, oldest first. */

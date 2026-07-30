@@ -333,6 +333,17 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_messages_channel_created ON messages(channel, created_at);
     `,
   },
+  {
+    version: 17,
+    description: 'channel display_name (mutable human label; slug stays the immutable key)',
+    // Channels are renamed via a display name rather than by changing the slug,
+    // because the slug is the key referenced by messages/SSE/mentions (renaming a
+    // slug would require rewriting every reference). display_name is nullable:
+    // NULL ⇒ clients render the slug. Existing rows backfill to NULL in place
+    // (zero data loss, no backfill script). ADD COLUMN is idempotent under the
+    // runner's "duplicate column name" guard.
+    sql: `ALTER TABLE channels ADD COLUMN display_name TEXT;`,
+  },
 ];
 
 db.exec(`
@@ -1297,6 +1308,8 @@ export function getFilesByIds(ids: string[]): FileRow[] {
  * @property created_at - Epoch-ms creation timestamp.
  * @property last_activity_at - Epoch-ms of the most recent message in this channel;
  *   `null` for empty channels. Drives "active-first" channel ordering.
+ * @property display_name - Mutable human label (`null` ⇒ render the slug). The slug
+ *   is the immutable key; renaming happens here.
  */
 export interface ChannelRow {
   id: string;
@@ -1304,6 +1317,8 @@ export interface ChannelRow {
   created_at: number;
   // created_at of the most recent message in this channel; NULL for an empty channel.
   last_activity_at: number | null;
+  // mutable human label; NULL ⇒ clients render the slug
+  display_name: string | null;
 }
 
 // All channels with their last-activity timestamp in one scan. `general` sorts
@@ -1312,11 +1327,11 @@ export interface ChannelRow {
 // messages — exactly what clients need for "active-first" ordering without a
 // second round-trip.
 const listChannelsStmt = db.prepare<[], ChannelRow>(
-  `SELECT r.id, r.slug, r.created_at,
+  `SELECT r.id, r.slug, r.created_at, r.display_name,
           MAX(m.created_at) AS last_activity_at
    FROM channels r
    LEFT JOIN messages m ON m.channel = r.slug
-   GROUP BY r.id, r.slug, r.created_at
+   GROUP BY r.id, r.slug, r.created_at, r.display_name
    ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`
 );
 
@@ -1365,8 +1380,8 @@ export function listChannels(): ChannelRow[] {
   return rows;
 }
 
-const channelBySlugStmt = db.prepare<[string], { id: string; slug: string; created_at: number }>(
-  `SELECT id, slug, created_at FROM channels WHERE slug = ?`
+const channelBySlugStmt = db.prepare<[string], { id: string; slug: string; created_at: number; display_name: string | null }>(
+  `SELECT id, slug, created_at, display_name FROM channels WHERE slug = ?`
 );
 
 // One-channel variant of listChannelsStmt: fetch a single channel's metadata plus its
@@ -1377,12 +1392,12 @@ const channelBySlugStmt = db.prepare<[string], { id: string; slug: string; creat
 // channel already exists. A targeted single-row query is O(1) with the
 // UNIQUE(slug) constraint.
 const channelBySlugWithActivityStmt = db.prepare<[string], ChannelRow | undefined>(`
-  SELECT r.id, r.slug, r.created_at,
+  SELECT r.id, r.slug, r.created_at, r.display_name,
          MAX(m.created_at) AS last_activity_at
    FROM channels r
    LEFT JOIN messages m ON m.channel = r.slug
    WHERE r.slug = ?
-   GROUP BY r.id, r.slug, r.created_at
+   GROUP BY r.id, r.slug, r.created_at, r.display_name
 `);
 
 // LRU cache keyed by slug for getChannelBySlug — a JS map hit beats a DB
@@ -1433,7 +1448,7 @@ const insertChannelStmt = db.prepare(
 // DB on first use, and on any future invalidation point (e.g. migration that
 // repopulates the channels table). Max size keeps memory bounded and preserves
 // eviction pressure on stale entries without allocating on every call.
-const channelCache = new Map<string, { id: string; slug: string; created_at: number }>();
+const channelCache = new Map<string, { id: string; slug: string; created_at: number; display_name: string | null }>();
 const CHANNEL_CACHE_MAX = 512;
 
 /** Ensure a channel with `slug` exists, creating it if missing. Idempotent: a
@@ -1450,7 +1465,7 @@ const CHANNEL_CACHE_MAX = 512;
 export function ensureChannel(
   slug: string,
   createdAt: number
-): { id: string; slug: string; created_at: number; created: boolean } {
+): { id: string; slug: string; created_at: number; display_name: string | null; created: boolean } {
   const hit = channelCache.get(slug);
   if (hit !== undefined) {
     // promote (LRU) without reallocating
@@ -1469,7 +1484,7 @@ export function ensureChannel(
   }
   const id = ulid();
   insertChannelStmt.run(id, slug, createdAt);
-  const row = { id, slug, created_at: createdAt };
+  const row = { id, slug, created_at: createdAt, display_name: null as string | null };
   channelCache.set(slug, row);
   return { ...row, created: true };
 }
@@ -1479,4 +1494,46 @@ export function ensureChannel(
  *  ensureChannel lookups read current state from the DB. */
 export function clearChannelCache(): void {
   channelCache.clear();
+}
+
+const updateChannelDisplayNameStmt = db.prepare<[string | null, string]>(
+  `UPDATE channels SET display_name = ? WHERE slug = ?`
+);
+
+/** Set a channel's mutable display name (pass `null` to clear → clients render the
+ *  slug). The slug itself never changes — it is the key referenced by
+ *  messages/SSE/mentions. Returns whether a row was actually updated (false ⇒ the
+ *  slug is unknown). The caller must invalidate the channel caches so the new
+ *  name shows on the next list/get. */
+export function updateChannelDisplayName(slug: string, displayName: string | null): boolean {
+  return updateChannelDisplayNameStmt.run(displayName, slug).changes > 0;
+}
+
+// Cascade-delete everything owned by a channel, in FK-safe order, then the channel
+// row itself. Runs in one transaction so a partial failure can't leave orphans.
+// `reactions.message_id` REFERENCES messages(id) (FK on, db.ts pragma), so
+// reactions must go before messages; mentions have no FK to messages but reference
+// the channel slug textually, so they are scoped by `channel = ?`.
+const deleteChannelTx = db.transaction((slug: string) => {
+  db.prepare(
+    `DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE channel = ?)`
+  ).run(slug);
+  db.prepare(`DELETE FROM mentions WHERE channel = ?`).run(slug);
+  db.prepare(`DELETE FROM messages WHERE channel = ?`).run(slug);
+  db.prepare(`DELETE FROM channels WHERE slug = ?`).run(slug);
+});
+
+/** Delete a channel and cascade-clean its messages, mentions, and reactions. The
+ *  seeded `general` channel is protected and never deleted (returns false); every
+ *  other channel may be removed by any participant (open-CRUD model). Returns
+ *  whether the channel was deleted (false ⇒ it was `general` or unknown). The
+ *  caller must invalidate the channel caches afterwards. */
+export function deleteChannel(slug: string): boolean {
+  if (slug === 'general') return false;
+  // Existence probe before the cascade so the return value is truthful without a
+  // post-delete re-read (the cascade DELETE itself reports changes, but mixing it
+  // with the FK-ordered multi-statement tx would muddy the signal).
+  if (channelBySlugStmt.get(slug) === undefined) return false;
+  deleteChannelTx(slug);
+  return true;
 }

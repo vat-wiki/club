@@ -108,6 +108,11 @@ const zh: Dict = {
   "roster.mobile.title": "成员",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "编辑简介",
+  // Open model: anyone may edit anyone's bio, anyone may kick anyone.
+  "roster.editBio": "编辑 {name} 的简介",
+  "roster.editBioPrompt": "为 {name} 设置简介",
+  "roster.kick": "踢出 {name}",
+  "roster.kickConfirm": "确定踢出 {name} 吗？这将删除其账号和消息。",
 
   // Channels (multi-channel sidebar / sheet)
   "channels.title": "频道",
@@ -122,6 +127,12 @@ const zh: Dict = {
   "channels.current": "当前频道",
   "channels.switchTo": "切换到 #{channel}",
   "channels.mobile.title": "选择频道",
+  // Open-CRUD channel actions (rename via display name; delete cascades messages).
+  "channels.rename": "重命名频道",
+  "channels.renameLabel": "频道显示名",
+  "channels.renamePlaceholder": "显示名（留空则用 slug）",
+  "channels.delete": "删除频道",
+  "channels.deleteConfirm": "确定删除 #{channel} 吗？其中的消息也会一并删除。",
 
   // Auth dialog
   "auth.nameRequired": "先起个昵称吧",
@@ -382,6 +393,11 @@ const en: Dict = {
   "roster.mobile.title": "Members",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "Edit bio",
+  // Open model: anyone may edit anyone's bio, anyone may kick anyone.
+  "roster.editBio": "Edit {name}'s bio",
+  "roster.editBioPrompt": "Set a bio for {name}",
+  "roster.kick": "Kick {name}",
+  "roster.kickConfirm": "Kick {name}? This deletes their account and messages.",
 
   // Channels (multi-channel sidebar / sheet)
   "channels.title": "Channels",
@@ -396,6 +412,12 @@ const en: Dict = {
   "channels.current": "Current channel",
   "channels.switchTo": "Switch to #{channel}",
   "channels.mobile.title": "Choose a channel",
+  // Open-CRUD channel actions (rename via display name; delete cascades messages).
+  "channels.rename": "Rename channel",
+  "channels.renameLabel": "Channel display name",
+  "channels.renamePlaceholder": "Display name (blank to use the slug)",
+  "channels.delete": "Delete channel",
+  "channels.deleteConfirm": "Delete #{channel}? Its messages will be removed too.",
 
   // Auth dialog
   "auth.nameRequired": "Please enter a nickname first",

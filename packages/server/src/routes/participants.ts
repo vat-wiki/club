@@ -9,8 +9,10 @@ import {
   type Participant,
   RecoverParticipantRequest,
   RotateKeyRequest,
+  UpdateProfileRequest,
 } from "@club/shared";
 
+import { requireAuth } from "../auth.js";
 import { hashKey } from "../crypto.js";
 import {
   getParticipantByKeyHash,
@@ -19,10 +21,11 @@ import {
   insertParticipant,
   invalidateParticipantNamesCache,
   softDeleteParticipantMessages,
+  updateParticipantBio,
   updateParticipantKey,
   updateParticipantRecover,
 } from "../db.js";
-import { jsonErr, parseJsonBody, withOptionalMiddleware } from "../lib.js";
+import { jsonErr, parseJsonBody, requireValidId, withOptionalMiddleware } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { invalidateParticipantNameMap } from "../mention.js";
 import { rateLimit } from "../rate-limit.js";
@@ -198,6 +201,21 @@ participants.post("/:id/rotate-key", requireJson, async (c) => {
   return c.json({ key: newPlainKey, recoverCode: newCode }, 200);
 });
 
+// Revoke a participant's credentials and soft-delete their authored content so
+// they can no longer authenticate and leave no traces in history. Shared by the
+// self-delete (DELETE /:id, two-factor) and kick (POST /:id/kick, open) paths —
+// the only difference between those is authorization, not the deletion effect.
+function purgeParticipant(id: string): void {
+  // Revoke both credentials (key_hash blanked → auth can never match; recover
+  // cleared so the account can't be recovered back to life).
+  updateParticipantKey(id, "");
+  updateParticipantRecover(id, null);
+  // Soft-delete authored content so the participant leaves no traces.
+  softDeleteParticipantMessages(id);
+  invalidateParticipantNamesCache();
+  invalidateParticipantNameMap();
+}
+
 // DELETE /participants/:id { password, recoverCode } -> 204
 // Permanently deletes the authenticated participant. Requires the current key
 // (Authorization header) PLUS the current recovery code in the body, giving a
@@ -222,11 +240,36 @@ participants.delete("/:id", requireJson, async (c) => {
   if (!safeEqualHex(hashKey(parsed.data.recoverCode), row.recover_hash)) {
     return jsonErr(c, "invalid recovery code", 403);
   }
-  // Revoke both credentials.
-  updateParticipantKey(me.id, "");
-  updateParticipantRecover(me.id, null);
-  // Soft-delete authored content so the participant leaves no traces.
-  softDeleteParticipantMessages(me.id);
+  purgeParticipant(me.id);
+  return c.body(null, 204);
+});
+
+// POST /participants/:id/kick -> 204
+// "Kick = account deleted" in the open model: ANY authenticated participant may
+// remove ANY other participant (or themselves). No second factor — the
+// permissionless design trades safety for simplicity (anyone can kick anyone).
+// The effect is identical to self-delete: credentials revoked + authored content
+// soft-deleted. Idempotent — kicking an unknown id still returns 204.
+participants.post("/:id/kick", requireAuth, (c) => {
+  const id = c.req.param("id");
+  const bad = requireValidId(c, id, "participant id");
+  if (bad) return bad.r;
+  purgeParticipant(id);
+  return c.body(null, 204);
+});
+
+// PATCH /participants/:id { bio } -> 204
+// Set ANY participant's bio. In the open model any authenticated participant may
+// edit anyone's self-introduction. Reuses the same `UpdateProfileRequest` schema
+// as PATCH /me (strips control chars, caps at MAX_BIO). The roster poll picks up
+// the new bio on the next /members fetch (the members cache is invalidated here).
+participants.patch("/:id", requireAuth, requireJson, async (c) => {
+  const id = c.req.param("id");
+  const bad = requireValidId(c, id, "participant id");
+  if (bad) return bad.r;
+  const parsed = await parseJsonBody(c, UpdateProfileRequest, "bad request");
+  if (!parsed.ok) return parsed.r;
+  updateParticipantBio(id, parsed.data.bio);
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
   return c.body(null, 204);

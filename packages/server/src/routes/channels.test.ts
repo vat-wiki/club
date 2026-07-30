@@ -217,10 +217,93 @@ describe("MR6 — GET /channels returns every channel with lastActivityAt", () =
 
     // Exact contract shape (camelCase, no snake_case leak).
     expect(Object.keys(loud).sort()).toEqual(
-      ["id", "slug", "createdAt", "lastActivityAt"].sort(),
+      ["id", "slug", "createdAt", "lastActivityAt", "displayName"].sort(),
     );
     // Ordering: general first.
     expect(list[0].slug).toBe("general");
+  });
+});
+
+// ── Channel rename (PATCH) + delete (DELETE): open CRUD ──────────────
+describe("channel rename + delete (open CRUD)", () => {
+  it("PATCH /channels/:slug sets displayName and returns the updated channel", async () => {
+    const key = await mint("rename-author");
+    await postMsg(key, "seed", "rename-me"); // auto-creates the channel
+    const res = await app.request("/channels/rename-me", {
+      method: "PATCH",
+      headers: auth(key),
+      body: JSON.stringify({ displayName: "Rename Me" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.slug).toBe("rename-me"); // slug immutable
+    expect(body.displayName).toBe("Rename Me");
+  });
+
+  it("PATCH /channels/:slug with null clears the display name", async () => {
+    const key = await mint("rename-clear");
+    await postMsg(key, "seed", "rename-clear");
+    await app.request("/channels/rename-clear", {
+      method: "PATCH",
+      headers: auth(key),
+      body: JSON.stringify({ displayName: "Temp" }),
+    });
+    const res = await app.request("/channels/rename-clear", {
+      method: "PATCH",
+      headers: auth(key),
+      body: JSON.stringify({ displayName: null }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).displayName).toBeNull();
+  });
+
+  it("PATCH /channels/:slug 404s on an unknown slug", async () => {
+    const key = await mint("rename-missing");
+    const res = await app.request("/channels/nope-not-here", {
+      method: "PATCH",
+      headers: auth(key),
+      body: JSON.stringify({ displayName: "X" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("DELETE /channels/:slug removes the channel and cascades its messages", async () => {
+    const key = await mint("delete-author");
+    await postMsg(key, "msg one", "delete-me");
+    await postMsg(key, "msg two", "delete-me");
+    expect((await getMsgs(key, "delete-me")).length).toBe(2);
+
+    const res = await app.request("/channels/delete-me", {
+      method: "DELETE",
+      headers: auth(key),
+    });
+    expect(res.status).toBe(204);
+
+    // Channel gone from the list, and its messages are gone too.
+    const list = await app.request("/channels", { headers: auth(key) });
+    expect((await list.json()).some((c: any) => c.slug === "delete-me")).toBe(false);
+    expect((await getMsgs(key, "delete-me")).length).toBe(0);
+  });
+
+  it("DELETE /channels/general is refused (409)", async () => {
+    const key = await mint("general-guard");
+    const res = await app.request("/channels/general", {
+      method: "DELETE",
+      headers: auth(key),
+    });
+    expect(res.status).toBe(409);
+    // general still present.
+    const list = await app.request("/channels", { headers: auth(key) });
+    expect((await list.json()).some((c: any) => c.slug === "general")).toBe(true);
+  });
+
+  it("DELETE /channels/:slug 404s on an unknown slug", async () => {
+    const key = await mint("delete-missing");
+    const res = await app.request("/channels/nope-not-here", {
+      method: "DELETE",
+      headers: auth(key),
+    });
+    expect(res.status).toBe(404);
   });
 });
 

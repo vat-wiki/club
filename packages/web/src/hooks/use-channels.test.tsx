@@ -43,8 +43,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   (api.channels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
-    { id: "r1", slug: "general", createdAt: 0, lastActivityAt: 100 },
-    { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: 200 },
+    { id: "r1", slug: "general", createdAt: 0, lastActivityAt: 100, displayName: null },
+    { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: 200, displayName: null },
   ]);
 });
 

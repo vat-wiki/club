@@ -20,7 +20,7 @@ import { useI18n } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ClubApiError, type ClubConn } from "@club/sdk";
-import type { ImageMime, Message, Participant } from "@club/shared";
+import { DEFAULT_CHANNEL, type ImageMime, type Message, type Participant } from "@club/shared";
 
 export default function App() {
   const { t } = useI18n();
@@ -162,6 +162,71 @@ export default function App() {
       void loadChannelHistory(conn, name);
     },
     [conn, channels, loadChannelHistory],
+  );
+
+  // Open-CRUD channel actions. Rename edits the mutable display name (slug stays);
+  // delete cascade-removes the channel's messages. Both refresh the channel list.
+  const handleRenameChannel = useCallback(
+    async (slug: string, displayName: string | null) => {
+      if (!conn) return;
+      try {
+        await api.updateChannel(conn, slug, displayName);
+        await channels.refreshChannels();
+      } catch {
+        /* transient — the channel list stays as-is */
+      }
+    },
+    [conn, channels],
+  );
+
+  const handleDeleteChannel = useCallback(
+    async (slug: string) => {
+      if (!conn) return;
+      try {
+        await api.deleteChannel(conn, slug);
+        // Deleting the focused channel falls back to general so the user isn't
+        // stranded on a ghost channel.
+        if (slug === channels.currentChannel) {
+          channels.switchChannel(DEFAULT_CHANNEL);
+          void loadChannelHistory(conn, DEFAULT_CHANNEL);
+        }
+        await channels.refreshChannels();
+      } catch {
+        /* transient */
+      }
+    },
+    [conn, channels, loadChannelHistory],
+  );
+
+  // Open-model roster actions: anyone may edit anyone's bio, anyone may kick
+  // anyone (kick = account deleted). Both refresh the roster on success.
+  const handleEditMemberBio = useCallback(
+    (p: Participant) => {
+      if (!conn) return;
+      const bio = window.prompt(t("roster.editBioPrompt", { name: p.name }), p.bio);
+      if (bio === null) return; // cancelled
+      void api
+        .updateParticipantBio(conn, p.id, bio)
+        .then(refreshMembers)
+        .catch(() => {
+          // Bio edits are surfaced via roster refresh; a failure just leaves the old text.
+        });
+    },
+    [conn, t, refreshMembers],
+  );
+
+  const handleKickMember = useCallback(
+    (p: Participant) => {
+      if (!conn) return;
+      if (!window.confirm(t("roster.kickConfirm", { name: p.name }))) return;
+      void api
+        .kickParticipant(conn, p.id)
+        .then(refreshMembers)
+        .catch(() => {
+          // Kick is reflected on the next roster poll; a failure just leaves the row briefly.
+        });
+    },
+    [conn, t, refreshMembers],
   );
 
   // Cross-channel mention toast → jump to the source channel + scroll/highlight the
@@ -388,7 +453,11 @@ export default function App() {
           unread={channels.unread}
           onSelectChannel={handleSwitchChannel}
           onCreateChannel={handleCreateChannel}
+          onRenameChannel={handleRenameChannel}
+          onDeleteChannel={handleDeleteChannel}
           onEditProfile={() => setEditProfileOpen(true)}
+          onEditBio={handleEditMemberBio}
+          onKick={handleKickMember}
         />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without

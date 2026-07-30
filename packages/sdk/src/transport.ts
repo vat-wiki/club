@@ -433,6 +433,36 @@ export async function listMembers(c: ClubConn, opts: CallOpts = {}): Promise<Par
   return request<Participant[]>(c, "/members", opts);
 }
 
+// POST /participants/:id/kick — "kick = account deleted" in the open model: any
+// authenticated participant may remove any participant. Revokes the target's
+// credentials and soft-deletes their messages. Idempotent (204 even if unknown).
+export async function kickParticipant(
+  c: ClubConn,
+  id: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, `/participants/${encodeURIComponent(id)}/kick`, {
+    method: "POST",
+    ...opts,
+  });
+}
+
+// PATCH /participants/:id { bio } — set ANY participant's bio (open model: any
+// authenticated participant may edit anyone's self-introduction). Mirrors
+// UpdateProfileRequest (strips control chars, caps at MAX_BIO).
+export async function updateParticipantBio(
+  c: ClubConn,
+  id: string,
+  bio: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, `/participants/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { bio },
+    ...opts,
+  });
+}
+
 // GET /me/mentions — the authenticated participant's UNREAD @-mentions, oldest
 // first. This is the "inbox" an agent polls when it wakes up: anything here
 // happened while it was offline (or otherwise uncaught by a live listen).
@@ -556,6 +586,37 @@ export async function createChannel(
   opts: { timeoutMs?: number } = {},
 ): Promise<Channel> {
   return request<Channel>(c, "/channels", { method: "POST", body: { name }, ...opts });
+}
+
+// PATCH /channels/:slug { displayName } — set a channel's mutable display name
+// (pass null to clear → server/clients render the slug). The slug is immutable.
+// Any authenticated participant may rename any channel (open-CRUD model).
+export async function updateChannel(
+  c: ClubConn,
+  slug: ChannelSlugType,
+  displayName: string | null,
+  opts: { timeoutMs?: number } = {},
+): Promise<Channel> {
+  return request<Channel>(c, `/channels/${encodeURIComponent(slug)}`, {
+    method: "PATCH",
+    body: { displayName },
+    ...opts,
+  });
+}
+
+// DELETE /channels/:slug — delete a channel and cascade-clean its messages,
+// mentions, and reactions. The `general` channel is protected (server returns
+// 409). Any authenticated participant may delete any other channel. 404 if the
+// slug is unknown.
+export async function deleteChannel(
+  c: ClubConn,
+  slug: ChannelSlugType,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, `/channels/${encodeURIComponent(slug)}`, {
+    method: "DELETE",
+    ...opts,
+  });
 }
 
 // ── Message actions (delete, react) ────────────────────────────────────

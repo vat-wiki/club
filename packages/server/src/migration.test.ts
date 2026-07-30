@@ -80,7 +80,7 @@ describe("MR1 — multi-channel migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
 
     raw.close();
   });
@@ -96,7 +96,7 @@ describe("MR1 — multi-channel migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
     // general still exactly one row (INSERT OR IGNORE is idempotent too).
     const count = raw
       .prepare<[], { n: number }>(
@@ -149,7 +149,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
     raw.close();
   });
 
@@ -163,7 +163,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
     raw.close();
   });
 });
@@ -192,7 +192,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
 
     // Populate data so EXPLAIN QUERY PLAN is meaningful.
     raw.exec(
@@ -239,7 +239,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
     raw.close();
   });
 });
@@ -293,7 +293,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
     raw.close();
   });
 
@@ -307,7 +307,59 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(16);
+    expect(version?.version).toBe(17);
+    raw.close();
+  });
+});
+
+describe("MR5 — channel display_name migration (v17)", () => {
+  it("adds a nullable display_name column to channels (existing rows backfill to NULL)", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw, 16); // pre-v17: channels has no display_name
+    // At v16 the column does not exist yet.
+    const colsBefore = raw
+      .prepare<[], { name: string }>("PRAGMA table_info(channels)")
+      .all()
+      .map((c) => c.name);
+    expect(colsBefore).not.toContain("display_name");
+
+    runMigrations(raw); // applies v17
+
+    const colsAfter = raw
+      .prepare<[], { name: string }>("PRAGMA table_info(channels)")
+      .all()
+      .map((c) => c.name);
+    expect(colsAfter).toContain("display_name");
+
+    // The seeded 'general' channel backfills to NULL display_name.
+    const general = raw
+      .prepare<[], { display_name: string | null }>(
+        "SELECT display_name FROM channels WHERE slug = 'general'",
+      )
+      .get();
+    expect(general?.display_name).toBeNull();
+
+    expect(
+      raw.prepare<[], { version: number }>("SELECT version FROM schema_version").get()
+        ?.version,
+    ).toBe(17);
+    raw.close();
+  });
+
+  it("is idempotent — re-running on an already-migrated db is a no-op", () => {
+    const path = tmpDb();
+    files.push(path);
+    const raw = new Database(path);
+    raw.exec(BASELINE_SCHEMA);
+    runMigrations(raw);
+    expect(() => runMigrations(raw)).not.toThrow();
+    expect(
+      raw.prepare<[], { version: number }>("SELECT version FROM schema_version").get()
+        ?.version,
+    ).toBe(17);
     raw.close();
   });
 });

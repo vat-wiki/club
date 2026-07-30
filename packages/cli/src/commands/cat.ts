@@ -1,6 +1,6 @@
 // club cat <file-id>
 //
-// Read a file attachment from a club room.
+// Read a file attachment from a club channel.
 //
 // Defaults to printing the download URL — the most common use case for a
 // human eyeballing a link. Use --content to parse documents into plain text

@@ -1,12 +1,12 @@
 import { Avatar } from "@/components/avatar";
-import { RoomList } from "@/components/room-list";
+import { ChannelList } from "@/components/channel-list";
 import { Separator } from "@/components/ui/separator";
-import type { RoomUnread } from "@/hooks/use-rooms";
+import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { sanitizeDisplayString } from "@/lib/sanitize";
 import { cn } from "@/lib/utils";
 
-import type { Participant, Room } from "@club/shared";
+import type { Channel,Participant } from "@club/shared";
 
 function Row({
   p,
@@ -143,21 +143,21 @@ export function Roster({
   members,
   selfId,
   onlineIds,
-  rooms,
-  currentRoom,
+  channels,
+  currentChannel,
   unread,
-  onSelectRoom,
-  onCreateRoom,
+  onSelectChannel,
+  onCreateChannel,
   onEditProfile,
 }: {
   members: Participant[];
   selfId?: string;
   onlineIds?: Set<string>;
-  rooms: Room[];
-  currentRoom: string;
-  unread: Record<string, RoomUnread>;
-  onSelectRoom: (slug: string) => void;
-  onCreateRoom: (name: string) => Promise<void>;
+  channels: Channel[];
+  currentChannel: string;
+  unread: Record<string, ChannelUnread>;
+  onSelectChannel: (slug: string) => void;
+  onCreateChannel: (name: string) => Promise<void>;
   /** Opens the bio editor for the self row. */
   onEditProfile?: () => void;
 }) {
@@ -171,14 +171,14 @@ export function Roster({
       tabIndex={0}
       className="hidden w-56 flex-none flex-col gap-4 overflow-y-auto border-r border-border bg-chrome p-3 scrollbar-thin outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring/40 md:flex"
     >
-      {/* Rooms are the primary navigation axis, so they sit on top; the roster
+      {/* Channels are the primary navigation axis, so they sit on top; the roster
           (global online presence) is secondary reference below. */}
-      <RoomList
-        rooms={rooms}
-        currentRoom={currentRoom}
+      <ChannelList
+        channels={channels}
+        currentChannel={currentChannel}
         unread={unread}
-        onSelect={onSelectRoom}
-        onCreate={onCreateRoom}
+        onSelect={onSelectChannel}
+        onCreate={onCreateChannel}
       />
       <Separator />
       <div aria-label={t("roster.onlineLabel")}>

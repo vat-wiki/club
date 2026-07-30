@@ -1,49 +1,49 @@
-import type { RoomUnread } from "@/hooks/use-rooms";
+import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Hash, Plus } from "lucide-react";
 import { type KeyboardEvent,useEffect, useRef, useState } from "react";
 
-import { type Room,ROOM_SLUG_REGEX } from "@club/shared";
+import { type Channel,CHANNEL_SLUG_REGEX } from "@club/shared";
 
-// One room row. The whole row is a <button> (keyboard-operable, focusable) so
-// switching rooms works with Tab + Enter/Space and gets a native focus ring.
-// `aria-current="page"` marks the focused room for SR navigation, complementing
+// One channel row. The whole row is a <button> (keyboard-operable, focusable) so
+// switching channels works with Tab + Enter/Space and gets a native focus ring.
+// `aria-current="page"` marks the focused channel for SR navigation, complementing
 // the visual "tuned-in" treatment (solid bg + mint signal bar).
-function RoomRow({
-  room,
+function ChannelRow({
+  channel,
   active,
   unread,
   mobile,
   onSelect,
 }: {
-  room: Room;
+  channel: Channel;
   active: boolean;
-  unread?: RoomUnread;
+  unread?: ChannelUnread;
   mobile?: boolean;
   onSelect: (slug: string) => void;
 }) {
   const t = useT();
   const count = unread?.count ?? 0;
   const mention = !!unread?.mention;
-  const isSystem = room.slug === "general";
+  const isSystem = channel.slug === "general";
 
-  // Build the accessible name so SR users hear the room + its unread state
+  // Build the accessible name so SR users hear the channel + its unread state
   // (color/number alone isn't enough — WCAG 1.4.1).
-  const labelParts = [`#${room.slug}`];
-  if (active) labelParts.push(t("rooms.current"));
+  const labelParts = [`#${channel.slug}`];
+  if (active) labelParts.push(t("channels.current"));
   if (count > 0) {
-    labelParts.push(mention ? t("rooms.unreadMention.aria", { count }) : t("rooms.unread.aria", { count }));
+    labelParts.push(mention ? t("channels.unreadMention.aria", { count }) : t("channels.unread.aria", { count }));
   }
   const ariaLabel = labelParts.join(" · ");
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(room.slug)}
+      onClick={() => onSelect(channel.slug)}
       aria-current={active ? "page" : undefined}
       aria-label={ariaLabel}
-      data-testid={`room-row-${room.slug}`}
+      data-testid={`channel-row-${channel.slug}`}
       className={cn(
         // Compact nav height on desktop (36px), bumped to a 44px touch target on
         // mobile (WCAG 2.5.5). mono reinforces "slug = addressable identifier".
@@ -54,9 +54,9 @@ function RoomRow({
             // "active channel" mark, mirroring the message-row pinged手法).
             "bg-accent font-medium text-foreground shadow-[inset_2px_0_0_0_hsl(var(--agent))]"
           : "text-muted-foreground hover:bg-accent/70 hover:text-foreground focus-visible:bg-accent/70 focus-visible:text-foreground focus-visible:outline-none",
-        // Cross-room @mention: amber left bar + faint wash (mirrors the message
+        // Cross-channel @mention: amber left bar + faint wash (mirrors the message
         // row's pinged treatment), so a glance at the sidebar shows "someone @-ed
-        // me there" even when the room isn't focused.
+        // me there" even when the channel isn't focused.
         !active && mention && "border-l-2 border-l-human/50 bg-human/5",
       )}
     >
@@ -67,13 +67,13 @@ function RoomRow({
           active
             ? "text-agent/80"
             : // `general` keeps a faint mint hash at rest to mark it as the system
-              // channel; other rooms use a dimmer neutral hash.
+              // channel; other channels use a dimmer neutral hash.
               isSystem
                 ? "text-agent/40"
                 : "text-muted-foreground/50",
         )}
       />
-      <span className="min-w-0 flex-1 truncate text-left">{room.slug}</span>
+      <span className="min-w-0 flex-1 truncate text-left">{channel.slug}</span>
       {count > 0 && (
         // Unread pill. Mint = generic new signal; amber = includes a @mention
         // (someone is calling you). tabular-nums keeps the digit width stable as
@@ -94,11 +94,11 @@ function RoomRow({
   );
 }
 
-// Inline new-room creation (design §1.5). The `+ new room` row flips into an
-// inline <input> on click — no dialog, no "join" ceremony (rooms are open
+// Inline new-channel creation (design §1.5). The `+ new channel` row flips into an
+// inline <input> on click — no dialog, no "join" ceremony (channels are open
 // channels). Slug is validated live against the shared regex; an illegal submit
 // shakes + goes destructive rather than blocking typing.
-function NewRoomRow({
+function NewChannelRow({
   mobile,
   onCreate,
 }: {
@@ -118,7 +118,7 @@ function NewRoomRow({
 
   const submit = async () => {
     const name = value.trim().toLowerCase();
-    if (!ROOM_SLUG_REGEX.test(name)) {
+    if (!CHANNEL_SLUG_REGEX.test(name)) {
       setInvalid(true);
       // Clear the shake flag after the animation so a subsequent edit can re-arm.
       window.setTimeout(() => setInvalid(false), 450);
@@ -127,7 +127,7 @@ function NewRoomRow({
     setBusy(true);
     try {
       await onCreate(name);
-      // Success: collapse back to the idle "+ new room" row.
+      // Success: collapse back to the idle "+ new channel" row.
       setValue("");
       setEditing(false);
     } catch {
@@ -144,23 +144,23 @@ function NewRoomRow({
     return (
       <div className="px-4 py-1.5">
         {/* Visually-hidden label gives the inline input an accessible name. */}
-        <label htmlFor="new-room-input" className="sr-only">
-          {t("rooms.newRoomLabel")}
+        <label htmlFor="new-channel-input" className="sr-only">
+          {t("channels.newChannelLabel")}
         </label>
         <input
           ref={inputRef}
-          id="new-room-input"
+          id="new-channel-input"
           value={value}
           disabled={busy}
-          data-testid="new-room-input"
+          data-testid="new-channel-input"
           // Slug allowed chars only: guide input at the keystroke layer too.
           inputMode="text"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          placeholder={t("rooms.newRoomPlaceholder")}
+          placeholder={t("channels.newChannelPlaceholder")}
           aria-invalid={invalid}
-          aria-describedby={invalid ? "new-room-hint" : undefined}
+          aria-describedby={invalid ? "new-channel-hint" : undefined}
           className={cn(
             "w-full border-b bg-transparent px-1 font-mono text-sm outline-none transition-colors duration-fast placeholder:text-muted-foreground/50 focus:border-agent",
             invalid ? "border-destructive text-destructive animate-shake" : "border-border",
@@ -187,11 +187,11 @@ function NewRoomRow({
         />
         {(invalid || busy) && (
           <p
-            id="new-room-hint"
+            id="new-channel-hint"
             role={invalid ? "alert" : "status"}
             className="mt-1 font-mono text-[10px] text-destructive"
           >
-            {busy ? t("rooms.newRoomBusy") : t("rooms.newRoomInvalid")}
+            {busy ? t("channels.newChannelBusy") : t("channels.newChannelInvalid")}
           </p>
         )}
       </div>
@@ -202,56 +202,56 @@ function NewRoomRow({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      data-testid="new-room-button"
+      data-testid="new-channel-button"
       className={cn(
         "flex w-full items-center gap-2 rounded-md font-mono text-sm text-muted-foreground/60 transition-colors duration-fast hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:bg-accent/70 focus-visible:text-foreground",
         mobile ? "min-h-[44px] px-4 py-1.5" : "min-h-[36px] px-4 py-1.5",
       )}
     >
       <Plus aria-hidden className="h-3.5 w-3.5 flex-none text-muted-foreground/50" />
-      <span className="text-muted-foreground/60">{t("rooms.newRoom")}</span>
+      <span className="text-muted-foreground/60">{t("channels.newChannel")}</span>
     </button>
   );
 }
 
-// The ROOMS section body — rendered inside the desktop sidebar AND the mobile
-// room sheet (the `mobile` flag bumps touch targets). A listbox-like group of
-// room buttons under a section heading.
-export function RoomList({
-  rooms,
-  currentRoom,
+// The CHANNELS section body — rendered inside the desktop sidebar AND the mobile
+// channel sheet (the `mobile` flag bumps touch targets). A listbox-like group of
+// channel buttons under a section heading.
+export function ChannelList({
+  channels,
+  currentChannel,
   unread,
   mobile,
   onSelect,
   onCreate,
 }: {
-  rooms: Room[];
-  currentRoom: string;
-  unread: Record<string, RoomUnread>;
+  channels: Channel[];
+  currentChannel: string;
+  unread: Record<string, ChannelUnread>;
   mobile?: boolean;
   onSelect: (slug: string) => void;
   onCreate: (name: string) => Promise<void>;
 }) {
   const t = useT();
   return (
-    <section className="space-y-1" aria-label={t("rooms.title")}>
+    <section className="space-y-1" aria-label={t("channels.title")}>
       <h2 className="px-4 pb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/85">
-        {t("rooms.title")}
+        {t("channels.title")}
       </h2>
-      {rooms.length === 0 ? (
-        // Loading/empty: keep the section present (the heading + new-room afford
+      {channels.length === 0 ? (
+        // Loading/empty: keep the section present (the heading + new-channel afford
         // it) rather than collapsing — matches the "list channels" mental model.
         <div className="space-y-1 px-4 py-1.5 font-mono text-xs text-muted-foreground/60">
-          {t("rooms.loading")}
+          {t("channels.loading")}
         </div>
       ) : (
         <div className="space-y-0.5">
-          {rooms.map((room) => (
-            <RoomRow
-              key={room.id}
-              room={room}
-              active={room.slug === currentRoom}
-              unread={unread[room.slug]}
+          {channels.map((channel) => (
+            <ChannelRow
+              key={channel.id}
+              channel={channel}
+              active={channel.slug === currentChannel}
+              unread={unread[channel.slug]}
               mobile={mobile}
               onSelect={onSelect}
             />
@@ -259,7 +259,7 @@ export function RoomList({
         </div>
       )}
       <div className="pt-0.5">
-        <NewRoomRow mobile={mobile} onCreate={onCreate} />
+        <NewChannelRow mobile={mobile} onCreate={onCreate} />
       </div>
     </section>
   );

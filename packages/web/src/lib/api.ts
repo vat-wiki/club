@@ -2,6 +2,7 @@ import { uploadImage } from "@/lib/upload";
 
 import { ClubClient, type ClubConn,request } from "@club/sdk";
 import type {
+  Channel,
   CreateMessageRequest,
   CreateParticipantResponse,
   DeleteAccountRequest,
@@ -10,7 +11,6 @@ import type {
   Participant,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
-  Room,
   RotateKeyRequest,
   UpdateProfileRequest,
   UploadFileResponse,
@@ -49,46 +49,46 @@ export interface ClubApi {
   updateProfile(c: ClubConn, bio: string): Promise<Participant>;
 
   /**
-   * GET /messages — recent history of a room.
+   * GET /messages — recent history of a channel.
    * @param since - Return messages after this id; omit to get the recent batch.
-   * @param room  - Scope to one room (server defaults to "general" when omitted).
+   * @param channel  - Scope to one channel (server defaults to "general" when omitted).
    */
-  messages(c: ClubConn, since?: string, room?: string): Promise<Message[]>;
+  messages(c: ClubConn, since?: string, channel?: string): Promise<Message[]>;
 
   /**
    * POST /messages — send a message.
    * @param content     - Message text.
    * @param attachmentIds - IDs of previously uploaded files (empty by default).
    * @param replyToId   - Optional id of the message being replied to.
-   * @param room        - Target room; defaults to "general". A valid but
-   *                      non-existent room is auto-created (PRD §9.4).
+   * @param channel        - Target channel; defaults to "general". A valid but
+   *                      non-existent channel is auto-created (PRD §9.4).
    */
   send(
     c: ClubConn,
     content: string,
     attachmentIds?: readonly string[],
     replyToId?: string,
-    room?: string,
+    channel?: string,
   ): Promise<Message>;
 
-  /** GET /members — roster of the room. */
+  /** GET /members — roster of the channel. */
   members(c: ClubConn): Promise<Participant[]>;
 
-  /** GET /rooms — every room, general first then most-recently-active first. */
-  rooms(c: ClubConn): Promise<Room[]>;
+  /** GET /channels — every channel, general first then most-recently-active first. */
+  channels(c: ClubConn): Promise<Channel[]>;
 
   /**
-   * POST /rooms { name } — create/ensure a room exists (idempotent).
-   * @param name - Canonical room slug.
+   * POST /channels { name } — create/ensure a channel exists (idempotent).
+   * @param name - Canonical channel slug.
    */
-  createRoom(c: ClubConn, name: string): Promise<Room>;
+  createChannel(c: ClubConn, name: string): Promise<Channel>;
 
   /**
    * GET /messages/search — substring search, newest first.
    * @param q    - Substring to search.
-   * @param room - Optional room scope; omit to search all rooms.
+   * @param channel - Optional channel scope; omit to search all channels.
    */
-  search(c: ClubConn, q: string, room?: string): Promise<Message[]>;
+  search(c: ClubConn, q: string, channel?: string): Promise<Message[]>;
 
   /** DELETE /messages/:id — soft-delete (recall) a message. */
   deleteMessage(c: ClubConn, id: string): Promise<void>;
@@ -101,12 +101,12 @@ export interface ClubApi {
 
   /**
    * POST /agents/thinking — report "I'm typing / processing".
-   * `room` scopes the indicator to that room's stream (PRD §5.1).
+   * `channel` scopes the indicator to that channel's stream (PRD §5.1).
    */
-  thinking(c: ClubConn, room?: string): Promise<void>;
+  thinking(c: ClubConn, channel?: string): Promise<void>;
 
   /** POST /agents/idle — stop the typing indicator. */
-  idle(c: ClubConn, room?: string): Promise<void>;
+  idle(c: ClubConn, channel?: string): Promise<void>;
 
   /**
    * POST /files (multipart) — upload an image/video/document.
@@ -129,7 +129,7 @@ function client(c: ClubConn): ClubClient {
 }
 
 /**
- * Default API facade with the standard room limit of 50 messages per batch.
+ * Default API facade with the standard channel limit of 50 messages per batch.
  *
  * Pass a `ClubConn` as the first arg to every method; this avoids holding
  * connection state at the module level and keeps the facade easily mockable
@@ -148,23 +148,23 @@ export const api: ClubApi = {
       body: { bio } satisfies UpdateProfileRequest,
     }),
 
-  // `room` scopes history to a room (default "general" server-side when omitted).
+  // `channel` scopes history to a channel (default "general" server-side when omitted).
   // `since` returns messages after an id; omitted here returns the recent batch.
-  messages: (c: ClubConn, since?: string, room?: string): Promise<Message[]> =>
-    client(c).messages({ since, room, limit: 50 }),
+  messages: (c: ClubConn, since?: string, channel?: string): Promise<Message[]> =>
+    client(c).messages({ since, channel, limit: 50 }),
 
   send: (
     c: ClubConn,
     content: string,
     attachmentIds: readonly string[] = [],
     replyToId?: string,
-    room?: string,
+    channel?: string,
   ): Promise<Message> => {
-    if (attachmentIds.length > 0 || replyToId || room) {
+    if (attachmentIds.length > 0 || replyToId || channel) {
       const body: CreateMessageRequest = {
         content,
         attachmentIds: [...attachmentIds],
-        room: room ?? "general",
+        channel: channel ?? "general",
         ...(replyToId ? { replyToId } : {}),
       };
       return request<Message>(c, "/messages", { method: "POST", body });
@@ -173,10 +173,10 @@ export const api: ClubApi = {
   },
 
   members: (c: ClubConn): Promise<Participant[]> => client(c).members(),
-  rooms: (c: ClubConn): Promise<Room[]> => client(c).rooms(),
-  createRoom: (c: ClubConn, name: string): Promise<Room> => client(c).createRoom(name),
-  search: (c: ClubConn, q: string, room?: string): Promise<Message[]> =>
-    client(c).search(q, room ? { room } : undefined),
+  channels: (c: ClubConn): Promise<Channel[]> => client(c).channels(),
+  createChannel: (c: ClubConn, name: string): Promise<Channel> => client(c).createChannel(name),
+  search: (c: ClubConn, q: string, channel?: string): Promise<Message[]> =>
+    client(c).search(q, channel ? { channel } : undefined),
   deleteMessage: (c: ClubConn, id: string): Promise<void> =>
     request<void>(c, `/messages/${encodeURIComponent(id)}`, { method: "DELETE" }),
   editMessage: (
@@ -193,9 +193,9 @@ export const api: ClubApi = {
       method: "POST",
       body: { emoji },
     }),
-  thinking: (c: ClubConn, room?: string): Promise<void> =>
-    client(c).reportAgentThinking(room),
-  idle: (c: ClubConn, room?: string): Promise<void> => client(c).reportAgentIdle(room),
+  thinking: (c: ClubConn, channel?: string): Promise<void> =>
+    client(c).reportAgentThinking(channel),
+  idle: (c: ClubConn, channel?: string): Promise<void> => client(c).reportAgentIdle(channel),
   uploadFile: (
     c: ClubConn,
     file: File,

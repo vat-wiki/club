@@ -12,12 +12,12 @@ import { cors } from "hono/cors";
 import { bodySizeGuard } from "./body-size-guard.js";
 import { getClientIp, rateLimit } from "./rate-limit.js";
 import { agents } from "./routes/agents.js";
+import { channels } from "./routes/channels.js";
 import { files } from "./routes/files.js";
 import { me } from "./routes/me.js";
 import { members } from "./routes/members.js";
 import { messages } from "./routes/messages.js";
 import { participants } from "./routes/participants.js";
-import { rooms } from "./routes/rooms.js";
 import { securityHeaders } from "./security-headers.js";
 import { heartbeatInterval } from "./stream.js";
 
@@ -49,7 +49,7 @@ app.use("*", securityHeaders);
 // Request-body size guard: reject oversized JSON bodies with 413 before
 // they are buffered into memory. Uploads (multipart) are bounded by a
 // per-kind cap in the files route; this cap protects the small-payload
-// JSON endpoints (messages, reactions, room creation, etc.) from a
+// JSON endpoints (messages, reactions, channel creation, etc.) from a
 // request-body DoS where an attacker advertises a multi-hundred-MB body.
 app.use("*", bodySizeGuard());
 
@@ -77,7 +77,7 @@ app.route("/messages", messages);
 app.route("/members", members);
 app.route("/files", files);
 app.route("/agents", agents);
-app.route("/rooms", rooms);
+app.route("/channels", channels);
 
 // Health check endpoint. Returns 200 with basic server status. This endpoint
 // is intentionally lightweight (no DB queries) so it can be used for liveness
@@ -100,7 +100,7 @@ const webDistDir = process.env.CLUB_WEB_DIST
   : resolve(__dirname, "public", "spa");
 if (existsSync(webDistDir)) {
   // Root serves the chat SPA, which decides what to show: a stored key logs
-  // straight into the room, and no key opens the auth dialog. Previously "/"
+  // straight into the channel, and no key opens the auth dialog. Previously "/"
   // did an unconditional redirect to "/join", which re-landed returning users
   // on the "mint a key" page even when they already had a valid key — so a
   // user who joined yesterday saw the sign-up form again today.

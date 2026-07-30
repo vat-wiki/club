@@ -32,8 +32,8 @@ class MockStream implements StreamHandle {
   onAgentThinking: (e: AgentThinkingEvent) => void = () => {};
   onAgentIdle: (e: AgentIdleEvent) => void = () => {};
   onPresence: (e: PresenceEvent) => void = () => {};
-  onMessageDeleted: (e: { id: string; room: string }) => void = () => {};
-  onReaction: (e: { messageId: string; room: string; reactions: Array<{ emoji: string; count: number }> }) => void = () => {};
+  onMessageDeleted: (e: { id: string; channel: string }) => void = () => {};
+  onReaction: (e: { messageId: string; channel: string; reactions: Array<{ emoji: string; count: number }> }) => void = () => {};
   onError: (err: Error) => void = () => {};
 }
 
@@ -73,7 +73,7 @@ const m1 = {
   participantId: "p1",
   authorName: "alice",
   content: "hi",
-  room: "general",
+  channel: "general",
   attachments: [],
   createdAt: 1000,
   deleted: false,
@@ -84,18 +84,18 @@ const m2 = {
   participantId: "p2",
   authorName: "bob",
   content: "hello",
-  room: "general",
+  channel: "general",
   attachments: [],
   createdAt: 2000,
   deleted: false,
 } satisfies Message;
 
-const mOtherRoom = {
+const mOtherChannel = {
   id: "m3",
   participantId: "p3",
   authorName: "carol",
   content: "ping",
-  room: "engineering",
+  channel: "engineering",
   attachments: [],
   createdAt: 3000,
   deleted: false,
@@ -150,37 +150,37 @@ describe("useMessageStream", () => {
       expect(result.current.messages).toHaveLength(1);
     });
 
-    it("routes a cross-room message to onIncoming but not the visible tail", () => {
+    it("routes a cross-channel message to onIncoming but not the visible tail", () => {
       const onIncoming = vi.fn();
       const { result } = renderHook(() =>
-        useMessageStream(conn, { currentRoom: "general", onIncoming }),
+        useMessageStream(conn, { currentChannel: "general", onIncoming }),
       );
       act(() => {
-        mockStream?.onMessage(mOtherRoom);
+        mockStream?.onMessage(mOtherChannel);
       });
-      expect(onIncoming).toHaveBeenCalledWith(mOtherRoom);
+      expect(onIncoming).toHaveBeenCalledWith(mOtherChannel);
       expect(result.current.messages).toEqual([]);
     });
   });
 
-  describe("room-scoped event filtering", () => {
-    it("forwards agent_thinking only for the focused room", () => {
+  describe("channel-scoped event filtering", () => {
+    it("forwards agent_thinking only for the focused channel", () => {
       const onThinking = vi.fn();
       renderHook(() =>
-        useMessageStream(conn, { currentRoom: "general", onAgentThinking: onThinking }),
+        useMessageStream(conn, { currentChannel: "general", onAgentThinking: onThinking }),
       );
       act(() => {
-        mockStream?.onAgentThinking({ participantId: "p1", name: "rex", room: "general" });
-        mockStream?.onAgentThinking({ participantId: "p2", name: "zoe", room: "engineering" });
+        mockStream?.onAgentThinking({ participantId: "p1", name: "rex", channel: "general" });
+        mockStream?.onAgentThinking({ participantId: "p2", name: "zoe", channel: "engineering" });
       });
       expect(onThinking).toHaveBeenCalledTimes(1);
-      expect(onThinking).toHaveBeenCalledWith({ participantId: "p1", name: "rex", room: "general" });
+      expect(onThinking).toHaveBeenCalledWith({ participantId: "p1", name: "rex", channel: "general" });
     });
 
-    it("forwards agent_thinking with no room to all focused rooms", () => {
+    it("forwards agent_thinking with no channel to all focused channels", () => {
       const onThinking = vi.fn();
       renderHook(() =>
-        useMessageStream(conn, { currentRoom: "general", onAgentThinking: onThinking }),
+        useMessageStream(conn, { currentChannel: "general", onAgentThinking: onThinking }),
       );
       act(() => {
         mockStream?.onAgentThinking({ participantId: "p1", name: "rex" });
@@ -188,38 +188,38 @@ describe("useMessageStream", () => {
       expect(onThinking).toHaveBeenCalledTimes(1);
     });
 
-    it("forwards agent_idle only for the focused room", () => {
+    it("forwards agent_idle only for the focused channel", () => {
       const onIdle = vi.fn();
       renderHook(() =>
-        useMessageStream(conn, { currentRoom: "general", onAgentIdle: onIdle }),
+        useMessageStream(conn, { currentChannel: "general", onAgentIdle: onIdle }),
       );
       act(() => {
-        mockStream?.onAgentIdle({ participantId: "p1", room: "general" });
-        mockStream?.onAgentIdle({ participantId: "p2", room: "engineering" });
+        mockStream?.onAgentIdle({ participantId: "p1", channel: "general" });
+        mockStream?.onAgentIdle({ participantId: "p2", channel: "engineering" });
       });
       expect(onIdle).toHaveBeenCalledTimes(1);
     });
 
-    it("marks a message deleted only in the focused room", () => {
-      const { result } = renderHook(() => useMessageStream(conn, { currentRoom: "general" }));
+    it("marks a message deleted only in the focused channel", () => {
+      const { result } = renderHook(() => useMessageStream(conn, { currentChannel: "general" }));
       act(() => {
         mockStream?.onMessage(m1);
-        mockStream?.onMessageDeleted({ id: "m1", room: "general" });
+        mockStream?.onMessageDeleted({ id: "m1", channel: "general" });
       });
       expect(result.current.messages[0].deleted).toBe(true);
 
       act(() => {
         mockStream?.onMessage(m2);
-        mockStream?.onMessageDeleted({ id: "m2", room: "engineering" });
+        mockStream?.onMessageDeleted({ id: "m2", channel: "engineering" });
       });
       expect(result.current.messages[1].deleted).toBe(false);
     });
 
-    it("updates reactions only in the focused room", () => {
-      const { result } = renderHook(() => useMessageStream(conn, { currentRoom: "general" }));
+    it("updates reactions only in the focused channel", () => {
+      const { result } = renderHook(() => useMessageStream(conn, { currentChannel: "general" }));
       act(() => {
         mockStream?.onMessage(m1);
-        mockStream?.onReaction({ messageId: "m1", room: "general", reactions: [{ emoji: "👍", count: 1 }] });
+        mockStream?.onReaction({ messageId: "m1", channel: "general", reactions: [{ emoji: "👍", count: 1 }] });
       });
       expect(result.current.messages[0].reactions).toEqual([{ emoji: "👍", count: 1 }]);
     });
@@ -338,17 +338,17 @@ describe("useMessageStream", () => {
     });
   });
 
-  describe("room switch", () => {
-    it("does NOT reconnect the stream when currentRoom changes", () => {
+  describe("channel switch", () => {
+    it("does NOT reconnect the stream when currentChannel changes", () => {
       const { rerender } = renderHook(
-        ({ currentRoom }: { currentRoom: string }) => useMessageStream(conn, { currentRoom }),
-        { initialProps: { currentRoom: "general" } },
+        ({ currentChannel }: { currentChannel: string }) => useMessageStream(conn, { currentChannel }),
+        { initialProps: { currentChannel: "general" } },
       );
       const streamBefore = mockStream;
       expect(streamBefore).not.toBeNull();
 
-      rerender({ currentRoom: "engineering" });
-      // The effect's deps are only the conn, so a room switch should leave
+      rerender({ currentChannel: "engineering" });
+      // The effect's deps are only the conn, so a channel switch should leave
       // the existing stream instance untouched.
       expect(mockStream).toBe(streamBefore);
     });

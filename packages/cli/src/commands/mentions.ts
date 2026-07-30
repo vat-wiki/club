@@ -29,7 +29,7 @@ export function formatMentionLine(m: Mention): string {
   const t = new Date(m.messageCreatedAt);
   const hh = String(t.getHours()).padStart(2, "0");
   const mm = String(t.getMinutes()).padStart(2, "0");
-  return `[${hh}:${mm}] @${m.authorName} in #${m.room}: ${m.content}  (msg=${m.messageId})`;
+  return `[${hh}:${mm}] @${m.authorName} in #${m.channel}: ${m.content}  (msg=${m.messageId})`;
 }
 
 export interface MentionsDeps {

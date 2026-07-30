@@ -1,12 +1,12 @@
 // club search <query>
 //
-// Search messages by content substring. Returns matching messages from all rooms
-// (or scoped to a specific room with --room), newest first.
+// Search messages by content substring. Returns matching messages from all channels
+// (or scoped to a specific channel with --channel), newest first.
 
 import { Command } from "commander";
 
 import { ClubClient, type Message } from "@club/sdk";
-import { clampPositive,DEFAULT_ROOM } from "@club/shared";
+import { clampPositive,DEFAULT_CHANNEL } from "@club/shared";
 
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
@@ -33,14 +33,14 @@ export function parseSearchLimit(raw: string | undefined): number {
 /** Dependency shape for `runSearch`, injected by the CLI action or by tests. */
 export interface SearchDeps {
   /** Simulate `ClubClient.search(query, opts)`. */
-  search: (query: string, opts: { room?: string; limit: number }) => Promise<Message[]>;
+  search: (query: string, opts: { channel?: string; limit: number }) => Promise<Message[]>;
   /** Server base URL, to resolve attachment urls to absolute in the output. */
   server?: string;
 }
 
 export interface SearchInput {
   query: string;
-  room?: string;
+  channel?: string;
   limit: number;
 }
 
@@ -53,7 +53,7 @@ export interface SearchInput {
 export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
   return (async () => {
     const results = await deps.search(input.query, {
-      room: input.room,
+      channel: input.channel,
       limit: input.limit,
     });
     if (results.length === 0) {
@@ -62,8 +62,8 @@ export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
     }
     console.log(`found ${results.length} message${results.length !== 1 ? "s" : ""}:`);
     for (const msg of [...results].reverse()) {
-      const roomTag = msg.room !== DEFAULT_ROOM ? `[#${msg.room}] ` : "";
-      console.log(`  ${roomTag}${formatMessage(msg, { server: deps.server })}`);
+      const channelTag = msg.channel !== DEFAULT_CHANNEL ? `[#${msg.channel}] ` : "";
+      console.log(`  ${channelTag}${formatMessage(msg, { server: deps.server })}`);
     }
   })();
 }
@@ -72,7 +72,7 @@ export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
  * Build the `club search` commander sub-command.
  *
  * Searches messages by content substring. Returns matching messages from all
- * rooms (or scoped to a specific room with `--room`), newest first. The limit
+ * channels (or scoped to a specific channel with `--channel`), newest first. The limit
  * is clamped to [1, 100] (default 20) via shared's `clampPositive` so the
  * floor/ceil primitive is not duplicated, while search retains its own lower
  * ceiling since searches are a heavier read path than reads.
@@ -83,14 +83,14 @@ export function makeSearchCommand(): Command {
   return new Command("search")
     .description("search messages by content (newest first)")
     .argument("<query>", "text to search for")
-    .option("--room <slug>", "scope to a specific room (default: all rooms)")
+    .option("--channel <slug>", "scope to a specific channel (default: all channels)")
     .option("--limit <n>", `max results (default: ${SEARCH_LIMIT_DEFAULT}, max: ${SEARCH_LIMIT_MAX})`, String(SEARCH_LIMIT_DEFAULT))
     .action(
-      withCatchExit(async (query: string, opts: { room?: string; limit?: string }) => {
+      withCatchExit(async (query: string, opts: { channel?: string; limit?: string }) => {
         const cfg = requireConfig();
         const client = new ClubClient(cfg);
         return runSearch(
-          { query: query.trim(), room: opts.room ?? undefined, limit: parseSearchLimit(opts.limit) },
+          { query: query.trim(), channel: opts.channel ?? undefined, limit: parseSearchLimit(opts.limit) },
           { search: (q, o) => client.search(q, o), server: cfg.server },
         );
       }),

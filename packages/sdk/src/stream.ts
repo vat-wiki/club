@@ -11,9 +11,9 @@
  * de-duplicating by ulid-based message id so overlap between the live buffer
  * and the catch-up query is delivered exactly once.
  *
- * Room scope: pass a single `room` or a `rooms[]` array to subscribe to only
- * those rooms; omit both for an all-rooms stream. Catch-up queries mirror the
- * same scope so a multi-room client never silently drops from rooms it doesn't
+ * Channel scope: pass a single `channel` or a `channels[]` array to subscribe to only
+ * those channels; omit both for an all-channels stream. Catch-up queries mirror the
+ * same scope so a multi-channel client never silently drops from channels it doesn't
  * re-fetch.
  *
  * All callbacks are optional — subscribe only to the events you care about.
@@ -37,7 +37,7 @@
 import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
 import { jitteredBackoff, parseRetryAfterMs, sleep } from "@club/shared";
 
-import { type ClubConn, listMessages, listRooms } from "./transport.js";
+import { type ClubConn, listChannels,listMessages } from "./transport.js";
 
 // ── Runtime type guards for SSE payloads ─────────────────────────────
 // Bare JSON.parse() casts ("as T") give no safety against malformed or
@@ -53,13 +53,13 @@ function isObj(v: unknown): v is Record<string, unknown> {
 function isAgentThinkingEvent(v: unknown): v is AgentThinkingEvent {
   if (!isObj(v)) return false;
   if (typeof v.participantId !== "string" || typeof v.name !== "string") return false;
-  return v.room === undefined || typeof v.room === "string";
+  return v.channel === undefined || typeof v.channel === "string";
 }
 
 function isAgentIdleEvent(v: unknown): v is AgentIdleEvent {
   if (!isObj(v)) return false;
   if (typeof v.participantId !== "string") return false;
-  return v.room === undefined || typeof v.room === "string";
+  return v.channel === undefined || typeof v.channel === "string";
 }
 
 function isPresenceEvent(v: unknown): v is PresenceEvent {
@@ -71,7 +71,7 @@ function isPresenceEvent(v: unknown): v is PresenceEvent {
 
 function isMessageDeletedEvent(v: unknown): v is MessageDeletedEvent {
   if (!isObj(v)) return false;
-  return typeof v.id === "string" && typeof v.room === "string";
+  return typeof v.id === "string" && typeof v.channel === "string";
 }
 
 function isReaction(v: unknown): v is { emoji: string; count: number } {
@@ -80,7 +80,7 @@ function isReaction(v: unknown): v is { emoji: string; count: number } {
 
 function isMessageReactionEvent(v: unknown): v is MessageReactionEvent {
   if (!isObj(v)) return false;
-  if (typeof v.messageId !== "string" || typeof v.room !== "string") return false;
+  if (typeof v.messageId !== "string" || typeof v.channel !== "string") return false;
   if (!Array.isArray(v.reactions)) return false;
   return v.reactions.every(isReaction);
 }
@@ -89,7 +89,7 @@ function isMessage(v: unknown): v is Message {
   if (!isObj(v)) return false;
   if (typeof v.id !== "string" || typeof v.participantId !== "string") return false;
   if (typeof v.authorName !== "string" || typeof v.content !== "string") return false;
-  if (typeof v.createdAt !== "number" || typeof v.room !== "string") return false;
+  if (typeof v.createdAt !== "number" || typeof v.channel !== "string") return false;
   if (v.attachments !== undefined && !Array.isArray(v.attachments)) return false;
   if (v.replyToId !== undefined && typeof v.replyToId !== "string") return false;
   if (v.deleted !== undefined && typeof v.deleted !== "boolean") return false;
@@ -142,10 +142,10 @@ export interface StreamOptions {
   onMessageDeleted?: (e: MessageDeletedEvent) => void;
   /** Fired when a reaction is toggled (`message_reaction` event). */
   onReaction?: (e: MessageReactionEvent) => void;
-  /** Subscribe to a single room only (room-scoped stream). */
-  room?: string;
-  /** Subscribe to multiple rooms. Ignored if `room` is set. */
-  rooms?: string[];
+  /** Subscribe to a single channel only (channel-scoped stream). */
+  channel?: string;
+  /** Subscribe to multiple channels. Ignored if `channel` is set. */
+  channels?: string[];
 }
 
 export interface StreamHandle {
@@ -181,12 +181,12 @@ const RECONNECT_CAP_MS = 15_000;
  * the live buffer. The id-based de-dup in `deliver()` then collapses any
  * overlap to exactly-once delivery.
  *
- * Catch-up for an all-rooms subscription is best-effort: if room enumeration
+ * Catch-up for an all-channels subscription is best-effort: if channel enumeration
  * fails the catch-up is skipped and the reopened live stream covers the gap.
  *
  * @example
  * ```ts
- * const { stop } = streamMessages(conn, (m) => render(m), { room: "general" });
+ * const { stop } = streamMessages(conn, (m) => render(m), { channel: "general" });
  * // later: stop();
  * ```
  */
@@ -199,19 +199,19 @@ export function streamMessages(
   const maxReconnects = opts.maxReconnects ?? Infinity;
   const base = opts.backoffMs ?? 500;
 
-  // Room filter for the stream: a single room, a set of rooms, or null = all.
-  // Drives both the /messages/stream?room=|?rooms= query and the catch-up
-  // fetches (which must mirror the subscription scope, else a multi-room client
+  // Channel filter for the stream: a single channel, a set of channels, or null = all.
+  // Drives both the /messages/stream?channel=|?channels= query and the catch-up
+  // fetches (which must mirror the subscription scope, else a multi-channel client
   // would only catch up general on reconnect).
-  const roomFilter: string[] | null = opts.room
-    ? [opts.room]
-    : opts.rooms && opts.rooms.length > 0
-      ? opts.rooms
+  const channelFilter: string[] | null = opts.channel
+    ? [opts.channel]
+    : opts.channels && opts.channels.length > 0
+      ? opts.channels
       : null;
-  const roomQuery = opts.room
-    ? `room=${encodeURIComponent(opts.room)}`
-    : opts.rooms && opts.rooms.length > 0
-      ? `rooms=${opts.rooms.map(encodeURIComponent).join(",")}`
+  const channelQuery = opts.channel
+    ? `channel=${encodeURIComponent(opts.channel)}`
+    : opts.channels && opts.channels.length > 0
+      ? `channels=${opts.channels.map(encodeURIComponent).join(",")}`
       : "";
 
   // One abort signal for the whole subscription lifetime; stop() aborts it,
@@ -266,7 +266,7 @@ export function streamMessages(
     const headers: Record<string, string> = { Accept: "text/event-stream" };
     if (c.key) headers.Authorization = `Bearer ${c.key}`;
     const res = await fetch(
-      `${c.server}/messages/stream${roomQuery ? "?" + roomQuery : ""}`,
+      `${c.server}/messages/stream${channelQuery ? "?" + channelQuery : ""}`,
       {
         headers,
         signal: fetchController.signal,
@@ -366,30 +366,30 @@ export function streamMessages(
   }
 
   // Fetch any messages missed while the stream was disconnected, scoped to
-  // the same room filter as the SSE connection. For an all-rooms
-  // subscription the room list is enumerated best-effort; if that fails the
+  // the same channel filter as the SSE connection. For an all-channels
+  // subscription the channel list is enumerated best-effort; if that fails the
   // catch-up is silently skipped (the reopened live stream covers the gap).
   async function catchUp(): Promise<void> {
     if (lastId === undefined) return; // nothing to resume from
-    // Catch up the gap per subscribed room: GET /messages is single-room, so a
-    // multi-room subscription fetches each room's new-since-cursor messages.
+    // Catch up the gap per subscribed channel: GET /messages is single-channel, so a
+    // multi-channel subscription fetches each channel's new-since-cursor messages.
     // ulid ids are globally monotonic, so the id-based de-dup in deliver()
     // collapses any overlap to exactly-once and lastId advances correctly
-    // across rooms. For an all-rooms subscription we first enumerate rooms
+    // across channels. For an all-channels subscription we first enumerate channels
     // (best-effort — a failure just skips catch-up, the live stream covers it).
-    let rooms: string[];
-    if (roomFilter !== null) {
-      rooms = roomFilter;
+    let channels: string[];
+    if (channelFilter !== null) {
+      channels = channelFilter;
     } else {
       try {
-        rooms = (await listRooms(c)).map((r) => r.slug);
+        channels = (await listChannels(c)).map((r) => r.slug);
       } catch {
         return;
       }
     }
-    for (const room of rooms) {
+    for (const channel of channels) {
       try {
-        const missed = await listMessages(c, { since: lastId, room });
+        const missed = await listMessages(c, { since: lastId, channel });
         for (const m of missed) deliver(m);
       } catch {
         /* best-effort; the reopened stream keeps delivering live messages */

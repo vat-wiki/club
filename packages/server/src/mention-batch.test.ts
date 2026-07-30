@@ -48,12 +48,12 @@ function seedParticipants(rows: typeof alice[]) {
   for (const r of rows) stmt.run(r.id, r.name, r.key_hash, r.created_at);
 }
 
-function seedMessage(id: string, authorId: string, room = "general") {
+function seedMessage(id: string, authorId: string, channel = "general") {
   const stmt = db.prepare(`
-    INSERT OR IGNORE INTO messages (id, participant_id, content, created_at, room)
+    INSERT OR IGNORE INTO messages (id, participant_id, content, created_at, channel)
     VALUES (?, ?, ?, ?, ?)
   `);
-  stmt.run(id, authorId, "hello @mentions", Date.now(), room);
+  stmt.run(id, authorId, "hello @mentions", Date.now(), channel);
 }
 
 describe("insertMentions", () => {
@@ -71,8 +71,8 @@ describe("insertMentions", () => {
     seedMessage("msg1", alice.id);
     const now = Date.now();
     const rows: MentionInsert[] = [
-      { id: "m1", messageId: "msg1", participantId: bob.id, authorId: alice.id, room: "general", createdAt: now },
-      { id: "m2", messageId: "msg1", participantId: carol.id, authorId: alice.id, room: "general", createdAt: now },
+      { id: "m1", messageId: "msg1", participantId: bob.id, authorId: alice.id, channel: "general", createdAt: now },
+      { id: "m2", messageId: "msg1", participantId: carol.id, authorId: alice.id, channel: "general", createdAt: now },
     ];
     expect(insertMentions(rows)).toBe(2);
   });
@@ -82,8 +82,8 @@ describe("insertMentions", () => {
     seedMessage("msg2", alice.id);
     const now = Date.now();
     const rows: MentionInsert[] = [
-      { id: "m1", messageId: "msg2", participantId: bob.id, authorId: alice.id, room: "general", createdAt: now },
-      { id: "m2", messageId: "msg2", participantId: bob.id, authorId: alice.id, room: "general", createdAt: now },
+      { id: "m1", messageId: "msg2", participantId: bob.id, authorId: alice.id, channel: "general", createdAt: now },
+      { id: "m2", messageId: "msg2", participantId: bob.id, authorId: alice.id, channel: "general", createdAt: now },
     ];
     expect(insertMentions(rows)).toBe(1);
   });
@@ -93,13 +93,13 @@ describe("insertMentions", () => {
     seedMessage("msg3", alice.id);
     const now = Date.now();
     insertMentions([
-      { id: "m1", messageId: "msg3", participantId: bob.id, authorId: alice.id, room: "general", createdAt: now },
-      { id: "m2", messageId: "msg3", participantId: carol.id, authorId: alice.id, room: "general", createdAt: now },
+      { id: "m1", messageId: "msg3", participantId: bob.id, authorId: alice.id, channel: "general", createdAt: now },
+      { id: "m2", messageId: "msg3", participantId: carol.id, authorId: alice.id, channel: "general", createdAt: now },
     ]);
     const unreadBob = getUnreadMentions(bob.id, 10);
     expect(unreadBob).toHaveLength(1);
     expect(unreadBob[0].author_id).toBe(alice.id);
-    expect(unreadBob[0].room).toBe("general");
+    expect(unreadBob[0].channel).toBe("general");
   });
 
   it("read marking works after batched insert", () => {
@@ -107,7 +107,7 @@ describe("insertMentions", () => {
     seedMessage("msg4", alice.id);
     const now = Date.now();
     insertMentions([
-      { id: "m1", messageId: "msg4", participantId: bob.id, authorId: alice.id, room: "general", createdAt: now },
+      { id: "m1", messageId: "msg4", participantId: bob.id, authorId: alice.id, channel: "general", createdAt: now },
     ]);
     markMentionRead("m1", now + 1);
     expect(getUnreadMentions(bob.id, 10)).toHaveLength(0);

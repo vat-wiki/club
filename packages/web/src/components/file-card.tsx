@@ -114,7 +114,7 @@ export function FileCard({ attachment }: { attachment: MessageAttachment }) {
         <Dialog open={previewing} onOpenChange={setPreviewing}>
           <DialogContent
             // Drop the default card chrome + max-w-lg; span almost the whole
-            // viewport so documents have room. showClose=false because we render
+            // viewport so documents have channel. showClose=false because we render
             // our own close in the header (keeps it aligned with the download).
             showClose={false}
             className="flex max-h-[90vh] w-[95vw] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:rounded-lg"

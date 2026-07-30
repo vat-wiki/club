@@ -4,12 +4,12 @@ import { describe, expect,it } from "vitest";
 import { z } from "zod";
 
 import {
-  isValidRoomSlug,
+  isValidChannelSlug,
   jsonErr,
   parseBearer,
   parseJsonBody,
   parseLimit,
-  requireValidRoomSlug,
+  requireValidChannelSlug,
   withOptionalMiddleware,
 } from "./lib.js";
 
@@ -142,95 +142,95 @@ describe("jsonErr", () => {
   });
 });
 
-// ── Room slug validation ─────────────────────────────────────────────
+// ── Channel slug validation ─────────────────────────────────────────────
 
 /**
  * Pure predicate, no Hono context — exercise the full shape of the contract
- * (`ROOM_SLUG_REGEX`) at every edge so the guard that protects SSE room fan-out
+ * (`CHANNEL_SLUG_REGEX`) at every edge so the guard that protects SSE channel fan-out
  * from CRLF injection never regresses.
  */
-describe("isValidRoomSlug (pure predicate)", () => {
+describe("isValidChannelSlug (pure predicate)", () => {
   it("accepts a single alphanumeric character", () => {
-    expect(isValidRoomSlug("a")).toBe(true);
-    expect(isValidRoomSlug("9")).toBe(true);
+    expect(isValidChannelSlug("a")).toBe(true);
+    expect(isValidChannelSlug("9")).toBe(true);
   });
 
   it("accepts lowercase letters, digits, and hyphens in any order", () => {
-    expect(isValidRoomSlug("general")).toBe(true);
-    expect(isValidRoomSlug("dev-tools")).toBe(true);
-    expect(isValidRoomSlug("room-1")).toBe(true);
-    expect(isValidRoomSlug("9abc")).toBe(true);
+    expect(isValidChannelSlug("general")).toBe(true);
+    expect(isValidChannelSlug("dev-tools")).toBe(true);
+    expect(isValidChannelSlug("channel-1")).toBe(true);
+    expect(isValidChannelSlug("9abc")).toBe(true);
   });
 
   it("accepts slugs up to the 30-character maximum", () => {
     const maxLen = "0123456789abcdef0123456789abcd"; // 30 chars
     expect(maxLen.length).toBe(30);
-    expect(isValidRoomSlug(maxLen)).toBe(true);
+    expect(isValidChannelSlug(maxLen)).toBe(true);
   });
 
   it("rejects a slug that is one character over the 30-character maximum", () => {
     const overMax = "0123456789abcdef0123456789abcde"; // 31 chars
     expect(overMax.length).toBe(31);
-    expect(isValidRoomSlug(overMax)).toBe(false);
+    expect(isValidChannelSlug(overMax)).toBe(false);
   });
 
   it("rejects an empty string", () => {
-    expect(isValidRoomSlug("")).toBe(false);
+    expect(isValidChannelSlug("")).toBe(false);
   });
 
   it("rejects a slug starting with a hyphen or underscore", () => {
-    expect(isValidRoomSlug("-bad")).toBe(false);
-    expect(isValidRoomSlug("--bad")).toBe(false);
-    expect(isValidRoomSlug("_private")).toBe(false);
+    expect(isValidChannelSlug("-bad")).toBe(false);
+    expect(isValidChannelSlug("--bad")).toBe(false);
+    expect(isValidChannelSlug("_private")).toBe(false);
   });
 
   it("rejects a slug that does not start with an alphanumeric character", () => {
-    expect(isValidRoomSlug("1")).toBe(true); // digit is valid
-    expect(isValidRoomSlug("-")).toBe(false);
+    expect(isValidChannelSlug("1")).toBe(true); // digit is valid
+    expect(isValidChannelSlug("-")).toBe(false);
   });
 
-  it("rejects uppercase letters (room slugs must be lowercase)", () => {
-    expect(isValidRoomSlug("General")).toBe(false);
-    expect(isValidRoomSlug("GEN")).toBe(false);
-    expect(isValidRoomSlug("gEn")).toBe(false);
+  it("rejects uppercase letters (channel slugs must be lowercase)", () => {
+    expect(isValidChannelSlug("General")).toBe(false);
+    expect(isValidChannelSlug("GEN")).toBe(false);
+    expect(isValidChannelSlug("gEn")).toBe(false);
   });
 
   it("rejects control characters and whitespace that can poison SSE fan-out", () => {
-    expect(isValidRoomSlug("room\n")).toBe(false);
-    expect(isValidRoomSlug("a\r\nb")).toBe(false);
-    expect(isValidRoomSlug("ok\tevent:hack")).toBe(false);
-    expect(isValidRoomSlug("ok\nevent:hack")).toBe(false);
-    expect(isValidRoomSlug(" room")).toBe(false); // leading space
-    expect(isValidRoomSlug("room ")).toBe(false); // trailing space
+    expect(isValidChannelSlug("channel\n")).toBe(false);
+    expect(isValidChannelSlug("a\r\nb")).toBe(false);
+    expect(isValidChannelSlug("ok\tevent:hack")).toBe(false);
+    expect(isValidChannelSlug("ok\nevent:hack")).toBe(false);
+    expect(isValidChannelSlug(" channel")).toBe(false); // leading space
+    expect(isValidChannelSlug("channel ")).toBe(false); // trailing space
   });
 
   it("rejects path separators and traversal tokens", () => {
-    expect(isValidRoomSlug("room/slash")).toBe(false);
-    expect(isValidRoomSlug("room\\back")).toBe(false);
-    expect(isValidRoomSlug("../etc")).toBe(false);
-    expect(isValidRoomSlug("room..name")).toBe(false);
+    expect(isValidChannelSlug("channel/slash")).toBe(false);
+    expect(isValidChannelSlug("channel\\back")).toBe(false);
+    expect(isValidChannelSlug("../etc")).toBe(false);
+    expect(isValidChannelSlug("channel..name")).toBe(false);
   });
 
   it("rejects special characters not in the allowed set", () => {
-    expect(isValidRoomSlug("room@domain")).toBe(false);
-    expect(isValidRoomSlug("room:name")).toBe(false);
-    expect(isValidRoomSlug("room?query")).toBe(false);
-    expect(isValidRoomSlug("room#frag")).toBe(false);
+    expect(isValidChannelSlug("channel@domain")).toBe(false);
+    expect(isValidChannelSlug("channel:name")).toBe(false);
+    expect(isValidChannelSlug("channel?query")).toBe(false);
+    expect(isValidChannelSlug("channel#frag")).toBe(false);
   });
 
   it("is deterministic for a large set of inputs (no random/DB side-effect)", () => {
     const inputs = ["general", "general", "a", "ok"];
     for (const s of inputs) {
-      const a = isValidRoomSlug(s);
-      const b = isValidRoomSlug(s);
+      const a = isValidChannelSlug(s);
+      const b = isValidChannelSlug(s);
       expect(a).toBe(b);
     }
   });
 });
 
 /**
- * `requireValidRoomSlug` is a Hono-Context wrapper around `isValidRoomSlug`.
- * Contract: it MUST produce the exact same boolean verdict as `isValidRoomSlug`,
+ * `requireValidChannelSlug` is a Hono-Context wrapper around `isValidChannelSlug`.
+ * Contract: it MUST produce the exact same boolean verdict as `isValidChannelSlug`,
  * or the two helpers can diverge and a caller that checks one but calls the other
  * (or vice versa) can silently allow a malicious slug through.
  *
@@ -240,33 +240,33 @@ describe("isValidRoomSlug (pure predicate)", () => {
  * real Hono app. The boolean verdict is indirectly proven by the wrapper
  * either returning a 400 response or undefined for each input.
  */
-describe("requireValidRoomSlug (Hono wrapper)", () => {
-  it("accepts valid room slugs and returns undefined", () => {
-    expect(requireValidRoomSlug({} as Context, "general")).toBeUndefined();
-    expect(requireValidRoomSlug({} as Context, "dev-tools")).toBeUndefined();
-    expect(requireValidRoomSlug({} as Context, "a")).toBeUndefined();
-    expect(requireValidRoomSlug({} as Context, "room123")).toBeUndefined();
+describe("requireValidChannelSlug (Hono wrapper)", () => {
+  it("accepts valid channel slugs and returns undefined", () => {
+    expect(requireValidChannelSlug({} as Context, "general")).toBeUndefined();
+    expect(requireValidChannelSlug({} as Context, "dev-tools")).toBeUndefined();
+    expect(requireValidChannelSlug({} as Context, "a")).toBeUndefined();
+    expect(requireValidChannelSlug({} as Context, "channel123")).toBeUndefined();
   });
 
-  it("rejects invalid slugs with a 400 JSON response, aligning with isValidRoomSlug", async () => {
+  it("rejects invalid slugs with a 400 JSON response, aligning with isValidChannelSlug", async () => {
     const app = new Hono();
     app.get("/", (c) => {
-      const bad = requireValidRoomSlug(c, "a\nb");
+      const bad = requireValidChannelSlug(c, "a\nb");
       if (bad) return bad.r;
       return c.text("ok");
     });
     const res = await app.request("/");
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "bad room slug" });
+    expect(await res.json()).toEqual({ error: "bad channel slug" });
   });
 
-  it("is perfectly aligned with isValidRoomSlug across a broad corpus", () => {
+  it("is perfectly aligned with isValidChannelSlug across a broad corpus", () => {
     const corpus = [
       "general",
       "a",
       "9",
       "a-b-c",
-      "room-1",
+      "channel-1",
       "9abc",
       "dev-tools",
       "short-",
@@ -278,28 +278,28 @@ describe("requireValidRoomSlug (Hono wrapper)", () => {
       "_private",
       "General",
       "GEN",
-      "room\n",
+      "channel\n",
       "a\r\nb",
       "ok\tevent:hack",
       "ok\nevent:hack",
-      "room/",
-      "room\\back",
+      "channel/",
+      "channel\\back",
       "../etc",
-      "room..name",
-      "room@domain",
-      " room",
-      "room ",
+      "channel..name",
+      "channel@domain",
+      " channel",
+      "channel ",
       "0123456789abcdef0123456789abcde", // 31 chars, over max
     ];
-    // Stub a Hono Context with the minimal surface requireValidRoomSlug needs:
+    // Stub a Hono Context with the minimal surface requireValidChannelSlug needs:
     // jsonErr(c, msg, status) calls c.json({ error: msg }, status), then the
     // returned Response is wrapped in { ok: false, r: Response }. The stub only
     // needs to accept the call — we assert the boolean verdict via the presence
     // or absence of the returned wrapper object.
     const stubCtx = { json: (_: unknown, __: number) => ({}) as Response } as Context;
     for (const s of corpus) {
-      const pure = isValidRoomSlug(s);
-      const wrapper = requireValidRoomSlug(stubCtx, s);
+      const pure = isValidChannelSlug(s);
+      const wrapper = requireValidChannelSlug(stubCtx, s);
       const verdict = wrapper === undefined;
       expect(verdict).toBe(pure);
     }

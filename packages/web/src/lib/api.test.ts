@@ -17,8 +17,8 @@ vi.mock("@club/sdk", () => {
     messages = vi.fn().mockResolvedValue([{}]);
     send = vi.fn().mockResolvedValue({});
     members = vi.fn().mockResolvedValue([{ id: "a1", name: "alice" }]);
-    rooms = vi.fn().mockResolvedValue([{ id: "general", name: "general", participants: [] }]);
-    createRoom = vi.fn().mockResolvedValue({ id: "general", name: "general", participants: [] });
+    channels = vi.fn().mockResolvedValue([{ id: "general", name: "general", participants: [] }]);
+    createChannel = vi.fn().mockResolvedValue({ id: "general", name: "general", participants: [] });
     search = vi.fn().mockResolvedValue([{}]);
     reportAgentThinking = vi.fn().mockResolvedValue(undefined);
     reportAgentIdle = vi.fn().mockResolvedValue(undefined);
@@ -77,12 +77,12 @@ describe("api facade — delegates to ClubClient", () => {
     expect(p).toEqual({ id: "a1", name: "alice" });
   });
 
-  it("messages() forwards since + room to ClubClient.messages()", async () => {
+  it("messages() forwards since + channel to ClubClient.messages()", async () => {
     await api.messages(conn, "msg-0", "dev");
     const inst = last();
     expect(inst.messages.mock.calls[0][0]).toMatchObject({
       since: "msg-0",
-      room: "dev",
+      channel: "dev",
       limit: 50,
     });
   });
@@ -92,20 +92,20 @@ describe("api facade — delegates to ClubClient", () => {
     expect(m).toEqual([{ id: "a1", name: "alice" }]);
   });
 
-  it("rooms() returns rooms", async () => {
-    const r = await api.rooms(conn);
+  it("channels() returns channels", async () => {
+    const r = await api.channels(conn);
     expect(r).toEqual([{ id: "general", name: "general", participants: [] }]);
   });
 
-  it("createRoom() forwards name and returns Room", async () => {
-    const r = await api.createRoom(conn, "dev");
+  it("createChannel() forwards name and returns Channel", async () => {
+    const r = await api.createChannel(conn, "dev");
     expect(r).toEqual({ id: "general", name: "general", participants: [] });
-    expect(last().createRoom.mock.calls[0][0]).toBe("dev");
+    expect(last().createChannel.mock.calls[0][0]).toBe("dev");
   });
 
-  it("search() forwards query + optional room", async () => {
+  it("search() forwards query + optional channel", async () => {
     await api.search(conn, "foo", "dev");
-    expect(last().search.mock.calls[0]).toEqual(["foo", { room: "dev" }]);
+    expect(last().search.mock.calls[0]).toEqual(["foo", { channel: "dev" }]);
   });
 
   it("thinking() calls reportAgentThinking", async () => {
@@ -136,7 +136,7 @@ describe("api.send — route selection", () => {
         body: expect.objectContaining({
           content: "hello",
           attachmentIds: ["att-1"],
-          room: "general",
+          channel: "general",
         }),
       }),
     );
@@ -152,13 +152,13 @@ describe("api.send — route selection", () => {
     );
   });
 
-  it("includes room in the body when provided", async () => {
+  it("includes channel in the body when provided", async () => {
     await api.send(conn, "hi", [], undefined, "dev");
     const { request } = await import("@club/sdk");
     expect(request).toHaveBeenCalledWith(
       expect.anything(),
       "/messages",
-      expect.objectContaining({ body: expect.objectContaining({ room: "dev" }) }),
+      expect.objectContaining({ body: expect.objectContaining({ channel: "dev" }) }),
     );
   });
 });

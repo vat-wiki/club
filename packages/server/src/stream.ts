@@ -29,33 +29,33 @@ type SSEEvent =
   | { event: "agent_thinking";        payload: AgentThinkingEvent }
   | { event: "agent_idle";            payload: AgentIdleEvent };
 
-// Subscriber registered at SSE connect time. `rooms` scopes which room-scoped
-// events the stream receives (null = all rooms); `dead` marks a client whose
+// Subscriber registered at SSE connect time. `channels` scopes which channel-scoped
+// events the stream receives (null = all channels); `dead` marks a client whose
 // SSE write failed so the fan-out loop can drop it in a single pass.
 interface Subscriber {
   stream: SSEStreamingApi;
   participant: { id: string; name: string };
-  rooms: Set<string> | null; // null = all rooms
+  channels: Set<string> | null; // null = all channels
   dead: boolean;
 }
 
 // Live SSE subscribers registered at connect time. The POST /messages route
 // pushes new messages here; subscribers are removed on abort. Each carries the
 // authed participant so presence (online/offline) can be broadcast on connect
-// and disconnect, and a `rooms` filter so the stream can be scoped to one or
-// more rooms (null = subscribed to all rooms).
+// and disconnect, and a `channels` filter so the stream can be scoped to one or
+// more channels (null = subscribed to all channels).
 const subscribers = new Set<Subscriber>();
-// Does a subscriber want events for `room`? `room === null` marks an unscoped
+// Does a subscriber want events for `channel`? `channel === null` marks an unscoped
 // event (presence) that reaches every subscriber regardless of their filter —
-// presence stays global by design (PRD §8.7: no per-room presence).
-function wantsRoom(sub: Subscriber, room: string | null): boolean {
-  if (room === null) return true;
-  if (sub.rooms === null) return true;
-  return sub.rooms.has(room);
+// presence stays global by design (PRD §8.7: no per-channel presence).
+function wantsChannel(sub: Subscriber, channel: string | null): boolean {
+  if (channel === null) return true;
+  if (sub.channels === null) return true;
+  return sub.channels.has(channel);
 }
 
-// Register an SSE subscriber and announce their presence to the room. `rooms`
-// scopes which room-scoped events this connection receives (null = all). Returns
+// Register an SSE subscriber and announce their presence to the channel. `channels`
+// scopes which channel-scoped events this connection receives (null = all). Returns
 // the unsubscribe fn (called on abort) which removes them and broadcasts
 // offline. The newcomer is also seeded with everyone currently online so the
 // roster can mark them live immediately rather than waiting for each to
@@ -63,9 +63,9 @@ function wantsRoom(sub: Subscriber, room: string | null): boolean {
 export function addSubscriber(
   s: SSEStreamingApi,
   participant: { id: string; name: string },
-  rooms: Set<string> | null
+  channels: Set<string> | null
 ): () => void {
-  const entry = { stream: s, participant, rooms, dead: false };
+  const entry = { stream: s, participant, channels, dead: false };
   subscribers.add(entry);
   const presence = (p: typeof participant, online: boolean) => ({
     participantId: p.id,
@@ -73,12 +73,12 @@ export function addSubscriber(
     online,
   });
   // Announce the newcomer's own online status to every live subscriber (global
-  // by design — presence is not room-scoped, PRD §8.7).
+  // by design — presence is not channel-scoped, PRD §8.7).
   broadcastPresence(presence(participant, true));
   // Seed the newcomer with everyone *already* online so the roster can mark
   // them live immediately instead of waiting for each to re-announce. Presence
   // is global (PRD §8.7), so every live subscriber is included regardless of
-  // room filter, and each frame is written ONLY into the newcomer's own stream
+  // channel filter, and each frame is written ONLY into the newcomer's own stream
   // — not re-broadcast to everyone. The client's onPresence handler consumes
   // these exactly like any other presence event. (This was previously omitted
   // on the mistaken belief that the client ignored other subscribers' frames;
@@ -112,7 +112,7 @@ function eventToFrame(e: SSEEvent): { event: string; data: string } {
 }
 
 // Push a named `presence` event (online/offline) to every live subscriber.
-// Presence is intentionally NOT room-scoped (room === null → all subscribers).
+// Presence is intentionally NOT channel-scoped (channel === null → all subscribers).
 export function broadcastPresence(e: PresenceEvent): void {
   writeAll(eventToFrame({ event: 'presence', payload: e }), null);
 }
@@ -120,37 +120,37 @@ export function broadcastPresence(e: PresenceEvent): void {
 // Push a named `message_deleted` event (recall). Clients mark the id recalled
 // rather than dropping the row, so replies/context still read coherently.
 export function broadcastDeleted(e: MessageDeletedEvent): void {
-  writeAll(eventToFrame({ event: 'message_deleted', payload: e }), e.room);
+  writeAll(eventToFrame({ event: 'message_deleted', payload: e }), e.channel);
 }
 
 // Push a named `message_reaction` event (refreshed aggregate after a toggle).
 export function broadcastReaction(e: MessageReactionEvent): void {
-  writeAll(eventToFrame({ event: 'message_reaction', payload: e }), e.room);
+  writeAll(eventToFrame({ event: 'message_reaction', payload: e }), e.channel);
 }
 
 // Push a `message` event (the default, unnamed event in SSE). Backwards
 // compatible: existing clients that parse only `data:` lines keep working.
 export function broadcast(msg: Message): void {
   const payload = JSON.stringify(msg);
-  writeAll({ data: payload }, msg.room);
+  writeAll({ data: payload }, msg.channel);
 }
 
 // Push a named `agent_thinking` event. Uses the SSE `event:` field so a client
 // branches on the event name; clients that don't know this event ignore it.
-// When `e.room` is present the event is scoped to that room's subscribers;
+// When `e.channel` is present the event is scoped to that channel's subscribers;
 // absent means an unscoped (legacy/global) report reaching everyone.
 export function broadcastAgentThinking(e: AgentThinkingEvent): void {
-  writeAll(eventToFrame({ event: 'agent_thinking', payload: e }), e.room ?? null);
+  writeAll(eventToFrame({ event: 'agent_thinking', payload: e }), e.channel ?? null);
 }
 
-// Push a named `agent_idle` event. `e.room` scopes the clear to the same room
+// Push a named `agent_idle` event. `e.channel` scopes the clear to the same channel
 // the agent was thinking in; absent → unscoped (reaches everyone).
 export function broadcastAgentIdle(e: AgentIdleEvent): void {
-  writeAll(eventToFrame({ event: 'agent_idle', payload: e }), e.room ?? null);
+  writeAll(eventToFrame({ event: 'agent_idle', payload: e }), e.channel ?? null);
 }
 
-// Underlying fan-out: write one SSE frame to every live subscriber whose room
-// filter matches `room` (null = unscoped event → everyone). Failures mark the
+// Underlying fan-out: write one SSE frame to every live subscriber whose channel
+// filter matches `channel` (null = unscoped event → everyone). Failures mark the
 // subscriber dead and drop it. Collect dead subscribers synchronously in an
 // array so the traversal of `subscribers` is not mutated concurrently; remove
 // them after the loop in one pass. This avoids a subtle race where a later
@@ -164,12 +164,12 @@ export function broadcastAgentIdle(e: AgentIdleEvent): void {
 // every subscriber must get its own stable reference.)
 function writeAll(
   frame: { event?: string; data: string },
-  room: string | null
+  channel: string | null
 ): void {
   const dead: Subscriber[] = [];
   for (const sub of subscribers) {
     if (sub.dead) continue;
-    if (!wantsRoom(sub, room)) continue;
+    if (!wantsChannel(sub, channel)) continue;
     void sub.stream.writeSSE(frame).catch(() => {
       sub.dead = true;
       dead.push(sub);
@@ -208,10 +208,10 @@ const THINKING_TTL_MS = 45 * 1000; // ~45s — lost-contact fallback (not reply 
 interface ThinkingEntry {
   participantId: string;
   name: string;
-  // Room the agent reported thinking in, or null for an unscoped (legacy)
+  // Channel the agent reported thinking in, or null for an unscoped (legacy)
   // report. Carried onto the eventual `agent_idle` so the clear reaches the same
-  // room-scoped subscribers that saw the indicator light up.
-  room: string | null;
+  // channel-scoped subscribers that saw the indicator light up.
+  channel: string | null;
   expiresAt: number;
 }
 
@@ -223,25 +223,25 @@ const thinking = new Map<string, ThinkingEntry>();
 /** Record (or refresh) that `participantId` is thinking. Returns whether this
  *  is a NEW entry (true) vs a TTL refresh of an existing one (false). Callers
  *  only broadcast `agent_thinking` on a fresh entry to avoid noisy re-broadcasts
- *  when an already-thinking agent is re-mentioned. `room` scopes the indicator
- *  to that room's stream when provided; null/omitted = unscoped (global). */
+ *  when an already-thinking agent is re-mentioned. `channel` scopes the indicator
+ *  to that channel's stream when provided; null/omitted = unscoped (global). */
 export function markThinking(
   participantId: string,
   name: string,
-  room: string | null = null
+  channel: string | null = null
 ): boolean {
   const fresh = !thinking.has(participantId);
   thinking.set(participantId, {
     participantId,
     name,
-    room,
+    channel,
     expiresAt: Date.now() + THINKING_TTL_MS,
   });
   return fresh;
 }
 
 /** Clear the thinking state for `participantId`, returning the entry (so the
- *  caller can broadcast `agent_idle` into the right room) or null if it wasn't
+ *  caller can broadcast `agent_idle` into the right channel) or null if it wasn't
  *  thinking. A redundant idle report is thus a no-op on the wire. */
 export function markThinkingIdle(participantId: string): ThinkingEntry | null {
   const entry = thinking.get(participantId);
@@ -257,8 +257,8 @@ export function isThinking(participantId: string): boolean {
 
 // Reap expired thinking entries, broadcasting agent_idle for each so a dead
 // agent's indicator can't get stuck on. Runs on the same heartbeat that pings
-// idle SSE connections. The idle event carries the entry's room so the clear
-// reaches the same room-scoped subscribers.
+// idle SSE connections. The idle event carries the entry's channel so the clear
+// reaches the same channel-scoped subscribers.
 function reapExpiredThinking(): void {
   const now = Date.now();
   for (const [id, entry] of thinking) {
@@ -266,7 +266,7 @@ function reapExpiredThinking(): void {
       thinking.delete(id);
       broadcastAgentIdle({
         participantId: id,
-        ...(entry.room ? { room: entry.room } : {}),
+        ...(entry.channel ? { channel: entry.channel } : {}),
       });
     }
   }

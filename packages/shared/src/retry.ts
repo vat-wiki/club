@@ -13,7 +13,7 @@
  * Decide whether an HTTP response should be retried.
  *
  * Only idempotent GET requests are ever retried: POST /messages or
- * POST /rooms would duplicate the write on retry. Within the allowed
+ * POST /channels would duplicate the write on retry. Within the allowed
  * methods, only rate-limit (429) and server errors (>= 500) are retried.
  * Client errors such as 401 or 404 are propagated immediately because
  * retrying them cannot succeed without caller input.

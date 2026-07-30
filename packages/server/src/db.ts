@@ -2,7 +2,7 @@
  * @module club-serve/db
  *
  * SQLite data-access layer for the club backend. All read/write paths —
- * messages, participants, rooms, reactions, mentions, files — flow through the
+ * messages, participants, channels, reactions, mentions, files — flow through the
  * exported functions in this module. HTTP routes, CLI, and MCP only import from
  * here; no caller should reach into `db` directly.
  *
@@ -17,10 +17,10 @@
  * - **Soft-delete.** `messages.deleted` is a 1/0 flag; recalled messages stay
  *   in the table and are filtered at the query layer. Row-level auth (the
  *   caller must be the author) guards the recall path.
- * - **Cache invalidate hooks.** Frequent-read tables (participants, rooms)
+ * - **Cache invalidate hooks.** Frequent-read tables (participants, channels)
  *   are cached in JS. Callers that mutate those tables must call the
  *   corresponding `invalidate*Cache` function immediately after the write.
- * - **Idempotent writes.** `insertParticipant`, `ensureRoom`, key/recover
+ * - **Idempotent writes.** `insertParticipant`, `ensureChannel`, key/recover
  *   rotations use `INSERT OR REPLACE` / `UPDATE WHERE EXISTS` so retry-safe
  *   callers (recovery flows) can't double-create rows.
  *
@@ -30,7 +30,7 @@
  *
  * Row interfaces ({@link MessageRow}, {@link ParticipantRow},
  * {@link ParticipantRecoverRow}, {@link MentionRow}, {@link MentionByIdRow},
- * {@link MentionInsert}, {@link FileRow}, {@link RoomRow}) mirror the SQLite
+ * {@link MentionInsert}, {@link FileRow}, {@link ChannelRow}) mirror the SQLite
  * column set exactly so callers never carry implicit shape knowledge.
  *
  * @example
@@ -48,7 +48,7 @@ import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
-import { escapeLike, type Reaction, type RoomSlugType } from '@club/shared';
+import { type ChannelSlugType,escapeLike, type Reaction } from '@club/shared';
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 
@@ -230,7 +230,7 @@ const migrations: Migration[] = [
     description: 'index reactions on message_id for lookups and fan-out',
     // `getReactionsForMessage`, `getReactionsForMessages`, and `toggleReaction`
     // all query `reactions` by `message_id`. Without this index every read does a
-    // full table scan — linear in total reaction count. As the room ages the
+    // full table scan — linear in total reaction count. As the channel ages the
     // reactions table grows faster than the messages table (multiple reactions
     // per message), so the read path for history/stream was the hidden N-per-row
     // cost. The index lets every reaction lookup become a constant-time index
@@ -310,6 +310,29 @@ const migrations: Migration[] = [
     // stored value is always single-line.
     sql: `ALTER TABLE participants ADD COLUMN bio TEXT NOT NULL DEFAULT '';`,
   },
+  {
+    version: 16,
+    description: 'rename room -> channel (rooms table, messages.room, mentions.room, indexes)',
+    // The domain concept historically named "room" is renamed to "channel"
+    // throughout the codebase - a club instance is the "room"; the topic
+    // channels within it are channels, not rooms. This migration renames the
+    // `rooms` table to `channels` and the `room` column on `messages` and
+    // `mentions` to `channel`, and replaces the two room-named indexes with
+    // channel-named ones. RENAME TABLE / RENAME COLUMN preserve all data in
+    // place (zero data loss, no backfill). SQLite >=3.25 supports RENAME
+    // COLUMN; better-sqlite3 bundles 3.49. Historical v7/v11 keep their
+    // `room`/`rooms` SQL so the shipped chain is self-consistent; v16 is the
+    // cutover.
+    sql: `
+      ALTER TABLE rooms RENAME TO channels;
+      ALTER TABLE messages RENAME COLUMN room TO channel;
+      ALTER TABLE mentions RENAME COLUMN room TO channel;
+      DROP INDEX IF EXISTS idx_messages_room;
+      DROP INDEX IF EXISTS idx_messages_room_created;
+      CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel);
+      CREATE INDEX IF NOT EXISTS idx_messages_channel_created ON messages(channel, created_at);
+    `,
+  },
 ];
 
 db.exec(`
@@ -383,7 +406,7 @@ runMigrations(db);
  * @property attachments - JSON-encoded `MessageAttachment[]`; `null`/`""` means none.
  * @property reply_to_id - ULID of the replied-to message, or `null`.
  * @property deleted - `1` if recalled (soft-deleted), otherwise `0`.
- * @property room - Canonical room slug; `"general"` for backfilled pre-multi-room rows.
+ * @property channel - Canonical channel slug; `"general"` for backfilled pre-multi-channel rows.
  * @property edited_at - Epoch-ms of the most recent edit, or `null` when never edited.
  * @property edited_count - Number of successful edits (0 when never edited).
  */
@@ -397,7 +420,7 @@ export interface MessageRow {
   attachments: string | null; // JSON-encoded MessageAttachment[]; NULL/"" = none
   reply_to_id: string | null; // id of the message this one replies to, or NULL
   deleted: number; // 1 if recalled (soft-deleted), else 0
-  room: RoomSlugType; // canonical room slug; "general" for backfilled rows
+  channel: ChannelSlugType; // canonical channel slug; "general" for backfilled rows
   edited_at: number | null; // epoch-ms of most recent edit, or null
   edited_count: number; // successful edit count; 0 when never edited
 }
@@ -407,11 +430,11 @@ export interface MessageRow {
 // one edit rather than hunting six prepared statements for stale aliases.
 // Consumers compose it with their own WHERE / ORDER BY / LIMIT clauses.
 const messageProjectionSql =
-  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.room, m.edited_at, m.edited_count, ' +
+  'SELECT m.id, m.content, m.created_at, m.rowid, m.attachments, m.reply_to_id, m.deleted, m.channel, m.edited_at, m.edited_count, ' +
   '       p.id AS participant_id, p.name AS author_name FROM messages m JOIN participants p ON p.id = m.participant_id';
 
 const insertMessageStmt = db.prepare(
-  `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, room)
+  `INSERT INTO messages (id, participant_id, content, created_at, attachments, reply_to_id, channel)
    VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
 
@@ -426,7 +449,7 @@ const insertMessageStmt = db.prepare(
  * @param createdAt - Message timestamp in epoch ms.
  * @param attachments - Optional JSON array of attachment ids, or `null`.
  * @param replyToId - Optional id of the replied-to message, or `null`.
- * @param room - Room slug the message belongs to.
+ * @param channel - Channel slug the message belongs to.
  */
 export function insertMessage(
   id: string,
@@ -435,9 +458,9 @@ export function insertMessage(
   createdAt: number,
   attachments: string | null,
   replyToId: string | null,
-  room: RoomSlugType
+  channel: ChannelSlugType
 ): void {
-  insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, room);
+  insertMessageStmt.run(id, participantId, content, createdAt, attachments, replyToId, channel);
 }
 
 const allParticipantsSelectStmt = db.prepare<[], { id: string; name: string; bio: string; created_at: number }>(
@@ -452,7 +475,7 @@ const participantsRowsCache = new Map<
 >();
 const PARTICIPANTS_CACHE_KEY = Symbol('participantsCache');
 
-/** All participants, newest first. Used by the room-member list endpoint.
+/** All participants, newest first. Used by the channel-member list endpoint.
  *
  * Performance: serves from a small LRU in JS so frequent roster polls
  * (presence-aware UI clients) skip the DB. The cache is invalidated via
@@ -473,11 +496,11 @@ export function clearParticipantsCache(): void {
 }
 
 const afterStmt = db.prepare<[number, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`
+  `${messageProjectionSql} WHERE m.rowid > ? AND m.channel = ? ORDER BY m.rowid ASC LIMIT ?`
 );
 
 const recentStmt = db.prepare<[string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.room = ? ORDER BY m.rowid DESC LIMIT ?`
+  `${messageProjectionSql} WHERE m.channel = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 const sinceStmt = db.prepare<[string], { rowid: number }>(
@@ -485,17 +508,17 @@ const sinceStmt = db.prepare<[string], { rowid: number }>(
 );
 
 const sinceMessagesStmt = db.prepare<[number, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.rowid > ? AND m.room = ? ORDER BY m.rowid ASC LIMIT ?`
+  `${messageProjectionSql} WHERE m.rowid > ? AND m.channel = ? ORDER BY m.rowid ASC LIMIT ?`
 );
 
-/** Messages with `rowid > rowid` in the given room, newest first. Backs the
+/** Messages with `rowid > rowid` in the given channel, newest first. Backs the
  * "load more recent" SSE / polling path on the history tail. */
-export function getMessagesAfter(rowid: number, room: RoomSlugType, limit: number): MessageRow[] {
-  return afterStmt.all(rowid, room, limit);
+export function getMessagesAfter(rowid: number, channel: ChannelSlugType, limit: number): MessageRow[] {
+  return afterStmt.all(rowid, channel, limit);
 }
 
-/** Most recent messages in the given room, **oldest first** within the page. Backs the initial
- * history fetch when a client opens a room for the first time.
+/** Most recent messages in the given channel, **oldest first** within the page. Backs the initial
+ * history fetch when a client opens a channel for the first time.
  *
  * Note the ordering: the DB query returns rows newest-first (DESC on rowid),
  * but the result is reversed so consumers (and the list/search routes) receive
@@ -503,11 +526,11 @@ export function getMessagesAfter(rowid: number, room: RoomSlugType, limit: numbe
  * ordered oldest→newest" — callers like GET /messages expect the oldest row
  * first so pagination with `since` works against the tail of the page.
  */
-export function getRecentMessages(room: RoomSlugType, limit: number): MessageRow[] {
-  return recentStmt.all(room, limit).reverse();
+export function getRecentMessages(channel: ChannelSlugType, limit: number): MessageRow[] {
+  return recentStmt.all(channel, limit).reverse();
 }
 
-/** Messages published after the one with id `sinceId`, scoped to `room`,
+/** Messages published after the one with id `sinceId`, scoped to `channel`,
  * oldest→newest. Returns `{ rowid, messages }` so the caller can advance the
  * cursor. Returns `{ rowid: 0, messages: [] }` when `sinceId` is unknown.
  *
@@ -516,66 +539,66 @@ export function getRecentMessages(room: RoomSlugType, limit: number): MessageRow
  * even if clocks skew.
  *
  * @param sinceId - ULID message id to fetch messages after.
- * @param room - Room slug.
+ * @param channel - Channel slug.
  * @param limit - Page size.
  * @returns Current cursor rowid and the next page of messages.
  */
 export function getMessagesSince(
   sinceId: string,
-  room: RoomSlugType,
+  channel: ChannelSlugType,
   limit: number
 ): { rowid: number; messages: MessageRow[] } {
   const row = sinceStmt.get(sinceId);
   if (!row) return { rowid: 0, messages: [] as MessageRow[] };
-  return { rowid: row.rowid, messages: sinceMessagesStmt.all(row.rowid, room, limit) };
+  return { rowid: row.rowid, messages: sinceMessagesStmt.all(row.rowid, channel, limit) };
 }
 
 const beforeStmt = db.prepare<[number, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.rowid < ? AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`
+  `${messageProjectionSql} WHERE m.rowid < ? AND m.channel = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 /** Messages older than `beforeId`, chronologic (oldest→newest within the page).
  *  Backs the "scroll up to load earlier history" UI — the mirror of
  *  getMessagesSince: take the N rows with rowid < beforeId's (DESC to grab the
  *  nearest older ones), then reverse to ascending. Returns [] if beforeId is
- *  unknown (e.g. it was just deleted). Scoped to `room`. */
-export function getMessagesBeforeId(beforeId: string, room: RoomSlugType, limit: number): MessageRow[] {
+ *  unknown (e.g. it was just deleted). Scoped to `channel`. */
+export function getMessagesBeforeId(beforeId: string, channel: ChannelSlugType, limit: number): MessageRow[] {
   const row = sinceStmt.get(beforeId);
   if (!row) return [];
-  return beforeStmt.all(row.rowid, room, limit).reverse();
+  return beforeStmt.all(row.rowid, channel, limit).reverse();
 }
 
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
   `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' ORDER BY m.rowid DESC LIMIT ?`
 );
 
-const searchRoomStmt = db.prepare<[string, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' AND m.room = ? ORDER BY m.rowid DESC LIMIT ?`
+const searchChannelStmt = db.prepare<[string, string, number], MessageRow>(
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' AND m.channel = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 /** Messages whose content contains `q` (substring via LIKE), newest first.
- *  Backs the search box. When `room` is null/empty the search spans all rooms;
- *  otherwise it is scoped to that room.
+ *  Backs the search box. When `channel` is null/empty the search spans all channels;
+ *  otherwise it is scoped to that channel.
  *
  *  The user-supplied `q` is escaped so `%` / `_` / `\\` are treated as
  *  literal characters (no LIKE wildcard injection).
  */
-export function searchMessages(q: string, room: RoomSlugType | null, limit: number): MessageRow[] {
+export function searchMessages(q: string, channel: ChannelSlugType | null, limit: number): MessageRow[] {
   const escaped = `%${escapeLike(q)}%`;
-  return room ? searchRoomStmt.all(escaped, room, limit) : searchAllStmt.all(escaped, limit);
+  return channel ? searchChannelStmt.all(escaped, channel, limit) : searchAllStmt.all(escaped, limit);
 }
 
-/** The room a message lives in. Used to room-scope `message_deleted` / `message_reaction`
+/** The channel a message lives in. Used to channel-scope `message_deleted` / `message_reaction`
  * SSE fan-out — the delete/reaction routes know only the id, and a message's
- * room never changes. Returns `undefined` when the id is unknown.
+ * channel never changes. Returns `undefined` when the id is unknown.
  *
  * @param id - ULID message id.
  */
-const messageRoomStmt = db.prepare<[string], { room: string }>(
-  `SELECT room FROM messages WHERE id = ?`
+const messageChannelStmt = db.prepare<[string], { channel: string }>(
+  `SELECT channel FROM messages WHERE id = ?`
 );
-export function getMessageRoom(id: string): string | undefined {
-  return messageRoomStmt.get(id)?.room;
+export function getMessageChannel(id: string): string | undefined {
+  return messageChannelStmt.get(id)?.channel;
 }
 
 // Reuses messageProjectionSql so the persisted-read-back contract stays in
@@ -604,17 +627,17 @@ const deleteStmt = db.prepare<[string, string]>(
 );
 
 /** Soft-delete (recall) a message. Only the author may (participant_id check).
- *  Returns `{ ok: boolean, room: string | undefined }`. The room is returned
+ *  Returns `{ ok: boolean, channel: string | undefined }`. The channel is returned
  *  so the caller can scope the SSE `message_deleted` broadcast without a
- *  second `SELECT room FROM messages` round-trip.
+ *  second `SELECT channel FROM messages` round-trip.
  *
  *  @returns ok is false when the row was not found, not owned by the caller,
- *    or already recalled; room is always populated on success.
+ *    or already recalled; channel is always populated on success.
  */
-export function deleteMessage(id: string, participantId: string): { ok: boolean; room: string | undefined } {
-  const room = getMessageRoom(id);
+export function deleteMessage(id: string, participantId: string): { ok: boolean; channel: string | undefined } {
+  const channel = getMessageChannel(id);
   const ok = deleteStmt.run(id, participantId).changes > 0;
-  return { ok, room };
+  return { ok, channel };
 }
 
 const updateMessageStmt = db.prepare<[string, number, string, string]>(
@@ -626,19 +649,19 @@ const updateMessageStmt = db.prepare<[string, number, string, string]>(
  * Update a message's content, recording the edit.
  *
  * Only the author may edit (`participant_id` check). Returns `{ ok: boolean,
- * room: string | undefined }` so the caller can scope the SSE fan-out.
+ * channel: string | undefined }` so the caller can scope the SSE fan-out.
  *
  * @returns `ok` is false when the row was not found, not owned by the caller,
- *   or already recalled; `room` is always populated on success.
+ *   or already recalled; `channel` is always populated on success.
  */
 export function updateMessage(
   id: string,
   participantId: string,
   content: string,
-): { ok: boolean; room: string | undefined } {
-  const room = getMessageRoom(id);
+): { ok: boolean; channel: string | undefined } {
+  const channel = getMessageChannel(id);
   const ok = updateMessageStmt.run(content, Date.now(), id, participantId).changes > 0;
-  return { ok, room };
+  return { ok, channel };
 }
 
 const removeReactionStmt = db.prepare<[string, string, string]>(
@@ -668,7 +691,7 @@ export function getReactionsForMessage(messageId: string): Reaction[] {
  * chunk size. Reactions are queried frequently during history renders, so
  * fixed-arity statements are prepared once and reused. Chunking guarantees
  * O(messages / chunk) index seeks instead of one unbounded scan, and prevents
- * SQL length blow-up when a room's history page contains hundreds of messages.
+ * SQL length blow-up when a channel's history page contains hundreds of messages.
  */
 const REACTIONS_BATCH_SIZE = 50;
 const reactionsBatchCache = new Map<
@@ -708,21 +731,21 @@ export function getReactionsForMessages(messageIds: string[]): Map<string, React
 }
 
 /** Toggle a reaction (remove if present, add if absent). Returns the refreshed
- *  aggregate along with the message's room, so the caller can scope the SSE
- *  `message_reaction` broadcast without a second `SELECT room FROM messages`
+ *  aggregate along with the message's channel, so the caller can scope the SSE
+ *  `message_reaction` broadcast without a second `SELECT channel FROM messages`
  *  round-trip on the hot path.
  *
- *  @returns `{ reactions, room }` — room is always populated for a known id.
+ *  @returns `{ reactions, channel }` — channel is always populated for a known id.
  */
 export function toggleReaction(
   messageId: string,
   participantId: string,
   emoji: string
-): { reactions: Reaction[]; room: string | undefined } {
-  const room = getMessageRoom(messageId);
+): { reactions: Reaction[]; channel: string | undefined } {
+  const channel = getMessageChannel(messageId);
   const removed = removeReactionStmt.run(messageId, participantId, emoji).changes > 0;
   if (!removed) addReactionStmt.run(messageId, participantId, emoji);
-  return { reactions: getReactionsForMessage(messageId), room };
+  return { reactions: getReactionsForMessage(messageId), channel };
 }
 
 export interface ParticipantRow {
@@ -844,7 +867,7 @@ export function updateParticipantBio(id: string, bio: string): void {
 /**
  * Soft-delete every message authored by a participant, plus any mentions
  * associated with them, so the participant's content vanishes from history
- * without destroying room integrity.
+ * without destroying channel integrity.
  *
  * @returns the number of messages removed.
  */
@@ -874,7 +897,7 @@ export function softDeleteParticipantMessages(participantId: string): number {
  * @property content - The message body (stored so the inbox can render context
  *   even after the message is recalled).
  * @property read_at - Epoch-ms when the owner marked this read; `null` = unread.
- * @property room - Room slug of the source message (deep-link source).
+ * @property channel - Channel slug of the source message (deep-link source).
  */
 export interface MentionRow {
   id: string;
@@ -885,7 +908,7 @@ export interface MentionRow {
   content: string;
   message_created_at: number;
   read_at: number | null;
-  room: string; // room the mentioning message was posted in (deep-link source)
+  channel: string; // channel the mentioning message was posted in (deep-link source)
 }
 
 const allParticipantsStmt = db.prepare<[], { id: string; name: string }>(
@@ -957,25 +980,25 @@ export function invalidateParticipantNamesCache(): void {
 
 const insertMentionStmt = db.prepare(
   `INSERT OR IGNORE INTO mentions
-     (id, message_id, participant_id, author_id, room, read_at, created_at)
+     (id, message_id, participant_id, author_id, channel, read_at, created_at)
    VALUES (?, ?, ?, ?, ?, NULL, ?)`
 );
 
 /**
  * Insert one inbox row. `INSERT OR IGNORE` so a duplicate (same message +
  * recipient) is silently dropped rather than throwing — matches the UNIQUE
- * constraint intent. Returns whether a row was actually inserted. `room` is the
- * room the mentioning message was posted in, so the recipient can deep-link.
+ * constraint intent. Returns whether a row was actually inserted. `channel` is the
+ * channel the mentioning message was posted in, so the recipient can deep-link.
  */
 export function insertMention(
   id: string,
   messageId: string,
   participantId: string,
   authorId: string,
-  room: string,
+  channel: string,
   createdAt: number
 ): boolean {
-  return insertMentionStmt.run(id, messageId, participantId, authorId, room, createdAt).changes > 0;
+  return insertMentionStmt.run(id, messageId, participantId, authorId, channel, createdAt).changes > 0;
 }
 
 /** Batch-insert mention inbox rows inside a single transaction. Replaces the
@@ -997,7 +1020,7 @@ export function insertMention(
  * @property messageId - ULID of the source message.
  * @property participantId - ID of the participant being @-mentioned.
  * @property authorId - ID of the message author.
- * @property room - Room slug of the source message.
+ * @property channel - Channel slug of the source message.
  * @property createdAt - Epoch-ms timestamp of the source message.
  */
 export interface MentionInsert {
@@ -1005,7 +1028,7 @@ export interface MentionInsert {
   messageId: string;
   participantId: string;
   authorId: string;
-  room: string;
+  channel: string;
   createdAt: number;
 }
 
@@ -1013,7 +1036,7 @@ const insertMentionBatchTx = db.transaction((rows: MentionInsert[]) => {
   let inserted = 0;
   for (const r of rows) {
     inserted += insertMentionStmt.run(
-      r.id, r.messageId, r.participantId, r.authorId, r.room, r.createdAt,
+      r.id, r.messageId, r.participantId, r.authorId, r.channel, r.createdAt,
     ).changes;
   }
   return inserted;
@@ -1028,7 +1051,7 @@ const unreadMentionsStmt = db.prepare<[string, number], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
            p.name AS author_name,
            m.content AS content, m.created_at AS message_created_at,
-           mn.read_at, mn.room
+           mn.read_at, mn.channel
     FROM mentions mn
     JOIN messages m ON m.id = mn.message_id
     JOIN participants p ON p.id = mn.author_id
@@ -1070,7 +1093,7 @@ const mentionFullStmt = db.prepare<[string], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
           p.name AS author_name,
           m.content AS content, m.created_at AS message_created_at,
-          mn.read_at, mn.room
+          mn.read_at, mn.channel
    FROM mentions mn
    JOIN messages m ON m.id = mn.message_id
    JOIN participants p ON p.id = mn.author_id
@@ -1254,206 +1277,206 @@ export function getFilesByIds(ids: string[]): FileRow[] {
   return result;
 }
 
-// ── Rooms (multi-room) ───────────────────────────────────────────────
+// ── Channels (multi-channel) ───────────────────────────────────────────────
 //
-// Rooms are open topic channels (PRD §4.1). The `rooms` table is the canonical
+// Channels are open topic channels (PRD §4.1). The `channels` table is the canonical
 // slug registry; messages/mentions carry the slug directly (no FK by design —
-// a room's slug is immutable and stable, and messages may reference a room
+// a channel's slug is immutable and stable, and messages may reference a channel
 // before its registry row is observably present in a race, though in practice
-// POST /messages ensures the room exists first). `general` is the seeded system
+// POST /messages ensures the channel exists first). `general` is the seeded system
 // row and is always present.
 
 /**
- * DB row for a chat room. `general` is the seeded system row and is always
- * present. New rooms are created by `POST /rooms` or
- * {@link ensureRoom} (called by `POST /messages` if the target room doesn't
+ * DB row for a chat channel. `general` is the seeded system row and is always
+ * present. New channels are created by `POST /channels` or
+ * {@link ensureChannel} (called by `POST /messages` if the target channel doesn't
  * exist yet).
  *
- * @property id - ULID room id.
+ * @property id - ULID channel id.
  * @property slug - Public key (URL-safe, lower-case, `^[a-z0-9][a-z0-9-]{0,29}$`).
  * @property created_at - Epoch-ms creation timestamp.
- * @property last_activity_at - Epoch-ms of the most recent message in this room;
- *   `null` for empty rooms. Drives "active-first" room ordering.
+ * @property last_activity_at - Epoch-ms of the most recent message in this channel;
+ *   `null` for empty channels. Drives "active-first" channel ordering.
  */
-export interface RoomRow {
+export interface ChannelRow {
   id: string;
   slug: string;
   created_at: number;
-  // created_at of the most recent message in this room; NULL for an empty room.
+  // created_at of the most recent message in this channel; NULL for an empty channel.
   last_activity_at: number | null;
 }
 
-// All rooms with their last-activity timestamp in one scan. `general` sorts
-// first, then most-recently-active first, then empty rooms (NULL activity) last
-// by created_at. The LEFT JOIN + MAX yields NULL activity for rooms with no
+// All channels with their last-activity timestamp in one scan. `general` sorts
+// first, then most-recently-active first, then empty channels (NULL activity) last
+// by created_at. The LEFT JOIN + MAX yields NULL activity for channels with no
 // messages — exactly what clients need for "active-first" ordering without a
 // second round-trip.
-const listRoomsStmt = db.prepare<[], RoomRow>(
+const listChannelsStmt = db.prepare<[], ChannelRow>(
   `SELECT r.id, r.slug, r.created_at,
           MAX(m.created_at) AS last_activity_at
-   FROM rooms r
-   LEFT JOIN messages m ON m.room = r.slug
+   FROM channels r
+   LEFT JOIN messages m ON m.channel = r.slug
    GROUP BY r.id, r.slug, r.created_at
    ORDER BY (r.slug = 'general') DESC, last_activity_at DESC, r.created_at ASC`
 );
 
-// LRU cache keyed by a module symbol for the full rooms list. GET /rooms is
-// a read-heavy endpoint (room list UI tabs, sidebar refresh, presence sync)
+// LRU cache keyed by a module symbol for the full channels list. GET /channels is
+// a read-heavy endpoint (channel list UI tabs, sidebar refresh, presence sync)
 // yet the underlying data is a full-table scan + LEFT JOIN + MAX aggregation.
-// Rooms are created far less often than they are listed, so an in-memory
+// Channels are created far less often than they are listed, so an in-memory
 // snapshot skips the DB on the common path. The cache is invalidated via
-// invalidateRoomsCache (called by POST /rooms on creation) and shared with
-// clearRoomCache for operational consistency (seed/migration scripts call the
+// invalidateChannelsCache (called by POST /channels on creation) and shared with
+// clearChannelCache for operational consistency (seed/migration scripts call the
 // same hook for both the single-slug LRU and this list cache).
-const listRoomsCache = new Map<
+const listChannelsCache = new Map<
   symbol,
-  ReturnType<typeof listRoomsStmt.all>
+  ReturnType<typeof listChannelsStmt.all>
 >();
-const ROOMS_CACHE_KEY = Symbol('roomsCache');
+const CHANNELS_CACHE_KEY = Symbol('channelsCache');
 
-/** Invalidate the rooms list cache. Called on every room create/drop so the
+/** Invalidate the channels list cache. Called on every channel create/drop so the
  * next list request re-reads the authoritative data from the DB. Shared with
- * clearRoomCache so seed/migration scripts and explicit drops need a single
+ * clearChannelCache so seed/migration scripts and explicit drops need a single
  * hook. */
-export function invalidateRoomsCache(): void {
-  listRoomsCache.delete(ROOMS_CACHE_KEY);
-  clearRoomCache();
-  invalidateRoomBySlugCache();
+export function invalidateChannelsCache(): void {
+  listChannelsCache.delete(CHANNELS_CACHE_KEY);
+  clearChannelCache();
+  invalidateChannelBySlugCache();
 }
 
-/** All rooms with their last-activity timestamp in one scan. `general` sorts
- * first, then most-recently-active first, then empty rooms (NULL activity)
- * last by created_at. The LEFT JOIN + MAX yields NULL activity for rooms with
+/** All channels with their last-activity timestamp in one scan. `general` sorts
+ * first, then most-recently-active first, then empty channels (NULL activity)
+ * last by created_at. The LEFT JOIN + MAX yields NULL activity for channels with
  * no messages — exactly what clients need for "active-first" ordering without a
  * second round-trip.
  *
  * Performance: served from a small in-memory snapshot on the hot path. A
  * fresh SELECT + aggregation is only issued on the very first request and after
  * an explicit create/drop that invalidates the cache. Call
- * invalidateRoomsCache after room mutations.
+ * invalidateChannelsCache after channel mutations.
  *
- * @returns Room rows, active-first. `general` always first when it has activity.
+ * @returns Channel rows, active-first. `general` always first when it has activity.
  */
-export function listRooms(): RoomRow[] {
-  const hit = listRoomsCache.get(ROOMS_CACHE_KEY);
+export function listChannels(): ChannelRow[] {
+  const hit = listChannelsCache.get(CHANNELS_CACHE_KEY);
   if (hit !== undefined) return hit;
-  const rows = listRoomsStmt.all();
-  listRoomsCache.set(ROOMS_CACHE_KEY, rows);
+  const rows = listChannelsStmt.all();
+  listChannelsCache.set(CHANNELS_CACHE_KEY, rows);
   return rows;
 }
 
-const roomBySlugStmt = db.prepare<[string], { id: string; slug: string; created_at: number }>(
-  `SELECT id, slug, created_at FROM rooms WHERE slug = ?`
+const channelBySlugStmt = db.prepare<[string], { id: string; slug: string; created_at: number }>(
+  `SELECT id, slug, created_at FROM channels WHERE slug = ?`
 );
 
-// One-room variant of listRoomsStmt: fetch a single room's metadata plus its
-// last-activity timestamp in one query. Used by POST /rooms after a
-// already-existing slug is re-read. Replaces listRooms().find(slug), which
-// scans the entire rooms table with a LEFT JOIN + MAX aggregation for every
-// request — linear in room count and wasteful on the common path where the
-// room already exists. A targeted single-row query is O(1) with the
+// One-channel variant of listChannelsStmt: fetch a single channel's metadata plus its
+// last-activity timestamp in one query. Used by POST /channels after a
+// already-existing slug is re-read. Replaces listChannels().find(slug), which
+// scans the entire channels table with a LEFT JOIN + MAX aggregation for every
+// request — linear in channel count and wasteful on the common path where the
+// channel already exists. A targeted single-row query is O(1) with the
 // UNIQUE(slug) constraint.
-const roomBySlugWithActivityStmt = db.prepare<[string], RoomRow | undefined>(`
+const channelBySlugWithActivityStmt = db.prepare<[string], ChannelRow | undefined>(`
   SELECT r.id, r.slug, r.created_at,
          MAX(m.created_at) AS last_activity_at
-   FROM rooms r
-   LEFT JOIN messages m ON m.room = r.slug
+   FROM channels r
+   LEFT JOIN messages m ON m.channel = r.slug
    WHERE r.slug = ?
    GROUP BY r.id, r.slug, r.created_at
 `);
 
-// LRU cache keyed by slug for getRoomBySlug — a JS map hit beats a DB
-// lookup on the hot path (e.g. POST /rooms re-reading an existing room after
-// ensureRoom, GET /rooms/{slug}, and presence sync). Rooms are created far
+// LRU cache keyed by slug for getChannelBySlug — a JS map hit beats a DB
+// lookup on the hot path (e.g. POST /channels re-reading an existing channel after
+// ensureChannel, GET /channels/{slug}, and presence sync). Channels are created far
 // less often than they are looked up, so a bounded in-memory snapshot skips
-// the SQL on the common path. Shared invalidation with invalidateRoomsCache
-// (called on room create/drop) keeps both lookups consistent.
-const roomBySlugCache = new Map<string, RoomRow | undefined>();
-const ROOM_BY_SLUG_CACHE_MAX = 512;
+// the SQL on the common path. Shared invalidation with invalidateChannelsCache
+// (called on channel create/drop) keeps both lookups consistent.
+const channelBySlugCache = new Map<string, ChannelRow | undefined>();
+const CHANNEL_BY_SLUG_CACHE_MAX = 512;
 
-/** Invalidate the per-slug room cache. Called on every room create/drop so
- * the next getRoomBySlug re-reads the authoritative data from the DB. */
-export function invalidateRoomBySlugCache(): void {
-  roomBySlugCache.clear();
+/** Invalidate the per-slug channel cache. Called on every channel create/drop so
+ * the next getChannelBySlug re-reads the authoritative data from the DB. */
+export function invalidateChannelBySlugCache(): void {
+  channelBySlugCache.clear();
 }
 
-/** Look up a single room by slug, including its last-activity timestamp.
+/** Look up a single channel by slug, including its last-activity timestamp.
  *  Returns undefined when the slug is not in the registry.
  *
  *  Performance: single-row targeted query using the UNIQUE(slug) constraint;
- *  avoids the full-table scan + aggregation that listRooms().find(slug) would
- *  require. Results are cached in a bounded LRU and invalidated on room
+ *  avoids the full-table scan + aggregation that listChannels().find(slug) would
+ *  require. Results are cached in a bounded LRU and invalidated on channel
  *  create/drop, so subsequent lookups for the same slug are O(1) in JS.
- *  Same output shape as listRooms() so toRoom() can handle both.
+ *  Same output shape as listChannels() so toChannel() can handle both.
  *
- *  @param slug - Canonical room slug (validated by the caller).
- *  @returns Room row with lastActivityAt, or undefined.
+ *  @param slug - Canonical channel slug (validated by the caller).
+ *  @returns Channel row with lastActivityAt, or undefined.
  */
-export function getRoomBySlug(slug: string): RoomRow | undefined {
-  if (roomBySlugCache.has(slug)) return roomBySlugCache.get(slug);
-  const row = roomBySlugWithActivityStmt.get(slug);
-  if (roomBySlugCache.size >= ROOM_BY_SLUG_CACHE_MAX) {
-    const first = roomBySlugCache.keys().next().value;
-    if (first !== undefined) roomBySlugCache.delete(first);
+export function getChannelBySlug(slug: string): ChannelRow | undefined {
+  if (channelBySlugCache.has(slug)) return channelBySlugCache.get(slug);
+  const row = channelBySlugWithActivityStmt.get(slug);
+  if (channelBySlugCache.size >= CHANNEL_BY_SLUG_CACHE_MAX) {
+    const first = channelBySlugCache.keys().next().value;
+    if (first !== undefined) channelBySlugCache.delete(first);
   }
-  roomBySlugCache.set(slug, row);
+  channelBySlugCache.set(slug, row);
   return row;
 }
 
-const insertRoomStmt = db.prepare(
-  `INSERT OR IGNORE INTO rooms (id, slug, created_at) VALUES (?, ?, ?)`
+const insertChannelStmt = db.prepare(
+  `INSERT OR IGNORE INTO channels (id, slug, created_at) VALUES (?, ?, ?)`
 );
 
-// LRU cache keyed by slug for ensureRoom — a JS map hit beats a DB lookup on
-// the hot path (every POST /messages probes the same room that already exists).
-// Invalidate on explicit room creation so a brand-new slug is re-read from the
+// LRU cache keyed by slug for ensureChannel — a JS map hit beats a DB lookup on
+// the hot path (every POST /messages probes the same channel that already exists).
+// Invalidate on explicit channel creation so a brand-new slug is re-read from the
 // DB on first use, and on any future invalidation point (e.g. migration that
-// repopulates the rooms table). Max size keeps memory bounded and preserves
+// repopulates the channels table). Max size keeps memory bounded and preserves
 // eviction pressure on stale entries without allocating on every call.
-const roomCache = new Map<string, { id: string; slug: string; created_at: number }>();
-const ROOM_CACHE_MAX = 512;
+const channelCache = new Map<string, { id: string; slug: string; created_at: number }>();
+const CHANNEL_CACHE_MAX = 512;
 
-/** Ensure a room with `slug` exists, creating it if missing. Idempotent: a
+/** Ensure a channel with `slug` exists, creating it if missing. Idempotent: a
  *  pre-check (cached in most cases) returns the existing row; INSERT guards the
- *  rare race of two concurrent creates. Returns the room plus `created`
+ *  rare race of two concurrent creates. Returns the channel plus `created`
  *  (true iff this call actually inserted the row) so the route can pick 201 vs
  *  200.
  *
- *  Performance: lookups for rooms that already exist are served from a small LRU
+ *  Performance: lookups for channels that already exist are served from a small LRU
  *  in JS, avoiding a full `SELECT` on every call. The cache is bounded to
- *  ROOM_CACHE_MAX entries and invalidated on explicit drop; newly-inserted slugs
- *  are cached once so subsequent ensureRoom calls for the same room are O(1).
+ *  CHANNEL_CACHE_MAX entries and invalidated on explicit drop; newly-inserted slugs
+ *  are cached once so subsequent ensureChannel calls for the same channel are O(1).
  */
-export function ensureRoom(
+export function ensureChannel(
   slug: string,
   createdAt: number
 ): { id: string; slug: string; created_at: number; created: boolean } {
-  const hit = roomCache.get(slug);
+  const hit = channelCache.get(slug);
   if (hit !== undefined) {
     // promote (LRU) without reallocating
-    roomCache.delete(slug);
-    roomCache.set(slug, hit);
+    channelCache.delete(slug);
+    channelCache.set(slug, hit);
     return { ...hit, created: false };
   }
-  const existing = roomBySlugStmt.get(slug);
+  const existing = channelBySlugStmt.get(slug);
   if (existing) {
-    if (roomCache.size >= ROOM_CACHE_MAX) {
-      const first = roomCache.keys().next().value;
-      if (first !== undefined) roomCache.delete(first);
+    if (channelCache.size >= CHANNEL_CACHE_MAX) {
+      const first = channelCache.keys().next().value;
+      if (first !== undefined) channelCache.delete(first);
     }
-    roomCache.set(slug, existing);
+    channelCache.set(slug, existing);
     return { ...existing, created: false };
   }
   const id = ulid();
-  insertRoomStmt.run(id, slug, createdAt);
+  insertChannelStmt.run(id, slug, createdAt);
   const row = { id, slug, created_at: createdAt };
-  roomCache.set(slug, row);
+  channelCache.set(slug, row);
   return { ...row, created: true };
 }
 
-/** Explicitly drop the entire room slug cache. Call after operations that
- *  repopulate the rooms table (migrations, seed scripts) so subsequent
- *  ensureRoom lookups read current state from the DB. */
-export function clearRoomCache(): void {
-  roomCache.clear();
+/** Explicitly drop the entire channel slug cache. Call after operations that
+ *  repopulate the channels table (migrations, seed scripts) so subsequent
+ *  ensureChannel lookups read current state from the DB. */
+export function clearChannelCache(): void {
+  channelCache.clear();
 }

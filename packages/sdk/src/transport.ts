@@ -1,4 +1,6 @@
 import type {
+  Channel,
+  ChannelSlugType,
   CreateMessageRequest,
   CreateParticipantRequest,
   CreateParticipantResponse,
@@ -9,8 +11,6 @@ import type {
   Reaction,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
-  Room,
-  RoomSlugType,
   UpdateProfileRequest,
   UploadFileResponse,
 } from "@club/shared";
@@ -233,8 +233,8 @@ export async function listMessages(
   if (opts.since) params.set("since", opts.since);
   if (opts.before) params.set("before", opts.before);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.room) params.set("room", opts.room);
-  const { since: _s, before: _b, limit: _l, room: _r, ...callOpts } = opts;
+  if (opts.channel) params.set("channel", opts.channel);
+  const { since: _s, before: _b, limit: _l, channel: _r, ...callOpts } = opts;
   const qs = params.toString();
   return request<Message[]>(c, `/messages${qs ? "?" + qs : ""}`, callOpts);
 }
@@ -242,9 +242,9 @@ export async function listMessages(
 export async function sendMessage(
   c: ClubConn,
   content: string,
-  opts: { attachmentIds?: string[]; replyToId?: string; room?: RoomSlugType; timeoutMs?: number } = {},
+  opts: { attachmentIds?: string[]; replyToId?: string; channel?: ChannelSlugType; timeoutMs?: number } = {},
 ): Promise<Message> {
-  // Backward compatible: when no attachmentIds/replyToId/room are supplied the
+  // Backward compatible: when no attachmentIds/replyToId/channel are supplied the
   // body is just { content } exactly as before. With any, the body carries them.
   const body: Partial<CreateMessageRequest> = { content };
   if (opts.attachmentIds && opts.attachmentIds.length > 0) {
@@ -253,8 +253,8 @@ export async function sendMessage(
   if (opts.replyToId) {
     body.replyToId = opts.replyToId;
   }
-  if (opts.room) {
-    body.room = opts.room;
+  if (opts.channel) {
+    body.channel = opts.channel;
   }
   return request<Message>(c, "/messages", {
     method: "POST",
@@ -263,17 +263,17 @@ export async function sendMessage(
   });
 }
 
-// GET /messages/search?q=&room=&limit= — substring search, newest first. `room`
-// is optional: omit to search across all rooms, pass a slug to scope it.
+// GET /messages/search?q=&channel=&limit= — substring search, newest first. `channel`
+// is optional: omit to search across all channels, pass a slug to scope it.
 export async function searchMessages(
   c: ClubConn,
-  opts: { q: string; room?: string; limit?: number } & CallOpts,
+  opts: { q: string; channel?: string; limit?: number } & CallOpts,
 ): Promise<Message[]> {
   const params = new URLSearchParams();
   params.set("q", opts.q);
-  if (opts.room) params.set("room", opts.room);
+  if (opts.channel) params.set("channel", opts.channel);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  const { q: _q, room: _r, limit: _l, ...callOpts } = opts;
+  const { q: _q, channel: _r, limit: _l, ...callOpts } = opts;
   return request<Message[]>(c, `/messages/search?${params.toString()}`, callOpts);
 }
 
@@ -508,7 +508,7 @@ export async function recoverParticipant(
 //
 // An agent reports its own "I'm processing a @mention" / "I'm done" state; the
 // server relays it to every SSE subscriber as a named event (agent_thinking /
-// agent_idle) so the room can show a typing indicator. The participant is taken
+// agent_idle) so the channel can show a typing indicator. The participant is taken
 // from the authed key, so the body is empty. Both endpoints return 204.
 //
 // Contract for callers:
@@ -525,37 +525,37 @@ export async function recoverParticipant(
 
 export async function reportAgentThinking(
   c: ClubConn,
-  opts: { room?: string; timeoutMs?: number } = {},
+  opts: { channel?: string; timeoutMs?: number } = {},
 ): Promise<void> {
-  const body = opts.room ? { room: opts.room } : {};
+  const body = opts.channel ? { channel: opts.channel } : {};
   await request<null>(c, "/agents/thinking", { method: "POST", body, ...opts });
 }
 
 export async function reportAgentIdle(
   c: ClubConn,
-  opts: { room?: string; timeoutMs?: number } = {},
+  opts: { channel?: string; timeoutMs?: number } = {},
 ): Promise<void> {
-  const body = opts.room ? { room: opts.room } : {};
+  const body = opts.channel ? { channel: opts.channel } : {};
   await request<null>(c, "/agents/idle", { method: "POST", body, ...opts });
 }
 
-// ── Rooms (multi-room) ──────────────────────────────────────────────
+// ── Channels (multi-channel) ──────────────────────────────────────────────
 
-// GET /rooms — every room, general first then most-recently-active first. Each
-// room carries lastActivityAt (null when empty) so clients can sort unread/
+// GET /channels — every channel, general first then most-recently-active first. Each
+// channel carries lastActivityAt (null when empty) so clients can sort unread/
 // active-first without a second round-trip.
-export async function listRooms(c: ClubConn, opts: CallOpts = {}): Promise<Room[]> {
-  return request<Room[]>(c, "/rooms", opts);
+export async function listChannels(c: ClubConn, opts: CallOpts = {}): Promise<Channel[]> {
+  return request<Channel[]>(c, "/channels", opts);
 }
 
-// POST /rooms { name } — create/ensure a room exists. Idempotent: posting an
-// existing slug returns that room without error. `name` is the canonical slug.
-export async function createRoom(
+// POST /channels { name } — create/ensure a channel exists. Idempotent: posting an
+// existing slug returns that channel without error. `name` is the canonical slug.
+export async function createChannel(
   c: ClubConn,
-  name: RoomSlugType,
+  name: ChannelSlugType,
   opts: { timeoutMs?: number } = {},
-): Promise<Room> {
-  return request<Room>(c, "/rooms", { method: "POST", body: { name }, ...opts });
+): Promise<Channel> {
+  return request<Channel>(c, "/channels", { method: "POST", body: { name }, ...opts });
 }
 
 // ── Message actions (delete, react) ────────────────────────────────────

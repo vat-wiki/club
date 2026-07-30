@@ -91,7 +91,7 @@ describe("GET /me/mentions (mention inbox)", () => {
         "content",
         "messageCreatedAt",
         "readAt",
-        "room",
+        "channel",
       ].sort(),
     );
   });

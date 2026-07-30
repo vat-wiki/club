@@ -10,17 +10,17 @@ import type { Message } from "@club/shared";
  * Inline message search bar. Debounces the query and calls `GET /messages/search`,
  * rendering results in a dropdown beneath the input.
  *
- * - Scoped to `room` when provided; searches the whole workspace when omitted.
+ * - Scoped to `channel` when provided; searches the whole workspace when omitted.
  * - Fire-and-forget: errors are swallowed (search is best-effort discovery,
  *   not a critical path).
  * - Stays open while the user types; closes when cleared.
  *
  * @param props.conn - Active connection; null disconnects the search input.
- * @param props.room - Optional room slug to scope the search.
+ * @param props.channel - Optional channel slug to scope the search.
  *
  * @module @club/web/components/search-bar
  */
-export function SearchBar({ conn, room }: { conn: ClubConn | null; room?: string }) {
+export function SearchBar({ conn, channel }: { conn: ClubConn | null; channel?: string }) {
   const t = useT();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Message[]>([]);
@@ -33,13 +33,13 @@ export function SearchBar({ conn, room }: { conn: ClubConn | null; room?: string
     }
     const h = setTimeout(async () => {
       try {
-        setResults(await api.search(conn, q, room));
+        setResults(await api.search(conn, q, channel));
       } catch {
         setResults([]);
       }
     }, 300);
     return () => clearTimeout(h);
-  }, [conn, q, room]);
+  }, [conn, q, channel]);
 
   return (
     <div className="relative flex-none border-b border-border/60 px-4 py-1.5 sm:px-6">

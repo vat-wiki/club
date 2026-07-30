@@ -17,14 +17,14 @@ function msg(over: Partial<Message> = {}): Message {
     authorName: "alice",
     content: "hello",
     createdAt: 1_700_000_000_000,
-    room: "general",
+    channel: "general",
     ...over,
   };
 }
 
 describe("formatForInject", () => {
   it("渲染成 club 通知:来源 + 房间 + 消息 id,严格单行", () => {
-    const m = msg({ content: "你好", room: "dev", authorName: "rex" });
+    const m = msg({ content: "你好", channel: "dev", authorName: "rex" });
     expect(formatForInject(m)).toBe(
       `🔔 club 发来一条通知 · #dev · ${m.id} · 是否查看/回复由你定`,
     );
@@ -32,13 +32,13 @@ describe("formatForInject", () => {
 
   it("正文不外发:agent 想看自己 club read,是否响应由 agent 定", () => {
     const secret = "这条正文不该被注入 @bot";
-    const out = formatForInject(msg({ content: secret, room: "dev" }));
+    const out = formatForInject(msg({ content: secret, channel: "dev" }));
     expect(out).not.toContain(secret);
     expect(out).not.toContain("@bot");
   });
 
   it("严格单行,无换行/制表符(TUI 输入框回车即提交)", () => {
-    const out = formatForInject(msg({ room: "dev" }));
+    const out = formatForInject(msg({ channel: "dev" }));
     expect(out).not.toMatch(/\r|\n|\t/);
   });
 });

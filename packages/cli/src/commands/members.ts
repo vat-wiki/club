@@ -1,8 +1,8 @@
-// club members [--room <slug>]
+// club members [--channel <slug>]
 //
-// List participants in the current room (or --room <slug>). Each name is
+// List participants in the current channel (or --channel <slug>). Each name is
 // printed on its own line for agent consumption; a friendly
-// "(no members)" footer appears when the room is empty.
+// "(no members)" footer appears when the channel is empty.
 
 import { Command } from "commander";
 
@@ -24,7 +24,7 @@ export async function runMembers(deps: MembersDeps): Promise<void> {
 
 export function makeMembersCommand(): Command {
   return new Command("members")
-    .description("list room members")
+    .description("list channel members")
     .action(withAuthClient(async (_cfg, _args, client) => {
       return runMembers({ members: () => client.members() });
     }));

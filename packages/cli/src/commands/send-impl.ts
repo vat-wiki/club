@@ -17,8 +17,8 @@ export interface SendDeps {
   uploadVideo: (conn: ClubConn, path: string) => Promise<{ id: string }>;
   /** Upload one local document path → attachment id. Throws on any pre-flight failure. */
   uploadDocument: (conn: ClubConn, path: string) => Promise<{ id: string }>;
-  /** Send the composed message (text + attachment ids) into `room`. */
-  send: (content: string, attachmentIds?: string[], room?: string) => Promise<Message>;
+  /** Send the composed message (text + attachment ids) into `channel`. */
+  send: (content: string, attachmentIds?: string[], channel?: string) => Promise<Message>;
 }
 
 export interface SendInput {
@@ -27,8 +27,8 @@ export interface SendInput {
   videos?: string[]; // raw video paths (optional; image-only callers omit it)
   documents?: string[]; // raw document paths (pdf/docx/xlsx/md)
   conn: ClubConn;
-  /** Room to post into; resolved by the caller (flag → config default → general). */
-  room?: string;
+  /** Channel to post into; resolved by the caller (flag → config default → general). */
+  channel?: string;
 }
 
 export interface SendResult {
@@ -77,7 +77,7 @@ export async function runSend(
   await deps.send(
     content,
     attachmentIds.length > 0 ? attachmentIds : undefined,
-    input.room,
+    input.channel,
   );
   return { attachmentIds };
 }

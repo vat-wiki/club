@@ -1,8 +1,8 @@
-// club read [--room <slug>] [--since <id>] [--before <id>] [--limit <n>]
+// club read [--channel <slug>] [--since <id>] [--before <id>] [--limit <n>]
 //
 // Fetch and print messages. --since anchors to a message id (newer history),
 // --before goes older, --limit caps the response (1-500, default 20).
-// Defaults to general unless -r/--room is explicit.
+// Defaults to general unless -r/--channel is explicit.
 
 import { Command } from "commander";
 
@@ -10,7 +10,7 @@ import type { ClubClient, Message } from "@club/sdk";
 
 import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
-import { defaultRoom, requireConfig } from "../config.js";
+import { defaultChannel, requireConfig } from "../config.js";
 import { parseLimit } from "../limit.js";
 
 export interface ReadOpts {
@@ -20,8 +20,8 @@ export interface ReadOpts {
   before?: string;
   /** Maximum number of messages to fetch. */
   limit: string;
-  /** Room slug; defaults to general (DEFAULT_ROOM) when omitted. */
-  room?: string;
+  /** Channel slug; defaults to general (DEFAULT_CHANNEL) when omitted. */
+  channel?: string;
 }
 
 export interface ReadDeps {
@@ -31,14 +31,14 @@ export interface ReadDeps {
   formatMessage: (m: Message) => string;
   /** Parse a numeric `--limit` argument. */
   parseLimit: (s: string) => number;
-  /** Default room fallback when no `--room` is passed. */
-  defaultRoom: () => string;
+  /** Default channel fallback when no `--channel` is passed. */
+  defaultChannel: () => string;
 }
 
 /**
- * Fetch and print recent messages for a room (one-shot).
+ * Fetch and print recent messages for a channel (one-shot).
  *
- * @param opts - Parsed CLI options (`since`, `before`, `limit`, `room`).
+ * @param opts - Parsed CLI options (`since`, `before`, `limit`, `channel`).
  * @param deps - Injected dependencies for testability.
  */
 export async function runRead(
@@ -50,7 +50,7 @@ export async function runRead(
     since: opts.since,
     before: opts.before,
     limit: deps.parseLimit(opts.limit),
-    room: opts.room ?? deps.defaultRoom(),
+    channel: opts.channel ?? deps.defaultChannel(),
   });
   for (const m of msgs) console.log(deps.formatMessage(m));
   if (msgs.length === 0) console.log("(no messages)");
@@ -59,9 +59,9 @@ export async function runRead(
 /**
  * Build the `club read` commander sub-command.
  *
- * Fetches and prints messages from a room (one-shot). Supports
+ * Fetches and prints messages from a channel (one-shot). Supports
  * pagination anchors (`--since` / `--before`) and a configurable `--limit`
- * (1-500, default 20). Defaults to general unless `-r`/`--room` is explicit.
+ * (1-500, default 20). Defaults to general unless `-r`/`--channel` is explicit.
  *
  * @returns A configured `Command` instance to register with the CLI program.
  */
@@ -72,8 +72,8 @@ export function makeReadCommand(): Command {
     .option("--before <id>", "show messages before this message id (older history)")
     .option("--limit <n>", "number of messages", "20")
     .option(
-      "-r, --room <slug>",
-      "read from this room (default: general)",
+      "-r, --channel <slug>",
+      "read from this channel (default: general)",
     )
     .action(
       withCatchExit(
@@ -84,7 +84,7 @@ export function makeReadCommand(): Command {
             getClient: () => new ClubClient(cfg),
             formatMessage: (m) => formatMessage(m, { server: cfg.server }),
             parseLimit,
-            defaultRoom: () => defaultRoom(),
+            defaultChannel: () => defaultChannel(),
           });
         },
       ),

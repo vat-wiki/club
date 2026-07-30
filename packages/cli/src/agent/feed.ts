@@ -20,7 +20,7 @@ export interface FeedOptions {
   /** 注入器(通常是 QueuedInjector)。 */
   inject: Enqueuer;
   /** 只订阅这个房间(默认:所有房间)。 */
-  room?: string;
+  channel?: string;
   /**
    * 只投递 @<mention> 的消息(默认:投递所有非自己发的消息)。
    * 用于"只被 @ 时才唤醒 agent"。
@@ -48,7 +48,7 @@ export interface FeedOptions {
  * 天然无换行/超长风险。
  */
 export function formatForInject(m: Message): string {
-  return `🔔 club 发来一条通知 · #${m.room} · ${m.id} · 是否查看/回复由你定`;
+  return `🔔 club 发来一条通知 · #${m.channel} · ${m.id} · 是否查看/回复由你定`;
 }
 
 /**
@@ -80,7 +80,7 @@ export function startFeed(client: ClubClient, opts: FeedOptions): () => void {
   const streamOpts: Parameters<ClubClient["stream"]>[1] = {
     onError: opts.onError,
   };
-  if (opts.room) streamOpts.room = opts.room;
+  if (opts.channel) streamOpts.channel = opts.channel;
 
   const handle = client.stream((m: Message) => {
     if (!shouldDeliver(m, { meId: opts.meId, mention: opts.mention })) return;

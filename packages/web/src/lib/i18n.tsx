@@ -78,9 +78,9 @@ type Dict = Record<string, string>;
 
 const zh: Dict = {
   // App shell
-  "app.title": "club — #{room} 聊天室",
+  "app.title": "club — #{channel} 聊天室",
   "app.skipToChat": "跳到聊天",
-  "app.h1": "club — #{room} 聊天室",
+  "app.h1": "club — #{channel} 聊天室",
 
   // Topbar / connection status
   "status.connected": "已连接",
@@ -101,7 +101,7 @@ const zh: Dict = {
   // Roster
   "roster.you": "（你）",
   "roster.onlineLabel": "在线成员",
-  // The aside now holds rooms (top) + online members (bottom); this labels the
+  // The aside now holds channels (top) + online members (bottom); this labels the
   // whole complementary region for SR landmark navigation.
   "roster.label": "房间与在线成员",
   "roster.mobile.aria": "成员——{count} 人在线",
@@ -109,19 +109,19 @@ const zh: Dict = {
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "编辑简介",
 
-  // Rooms (multi-room sidebar / sheet)
-  "rooms.title": "房间",
-  "rooms.newRoom": "新建房间",
-  "rooms.newRoomPlaceholder": "房间名（如 deploy-debug）",
-  "rooms.newRoomLabel": "新房间名",
-  "rooms.newRoomInvalid": "只能用小写字母、数字、连字符，1–30 字符",
-  "rooms.newRoomBusy": "创建中…",
-  "rooms.loading": "加载房间…",
-  "rooms.unread.aria": "{count} 条未读",
-  "rooms.unreadMention.aria": "{count} 条未读，含提及",
-  "rooms.current": "当前房间",
-  "rooms.switchTo": "切换到 #{room}",
-  "rooms.mobile.title": "选择房间",
+  // Channels (multi-channel sidebar / sheet)
+  "channels.title": "房间",
+  "channels.newChannel": "新建房间",
+  "channels.newChannelPlaceholder": "房间名（如 deploy-debug）",
+  "channels.newChannelLabel": "新房间名",
+  "channels.newChannelInvalid": "只能用小写字母、数字、连字符，1–30 字符",
+  "channels.newChannelBusy": "创建中…",
+  "channels.loading": "加载房间…",
+  "channels.unread.aria": "{count} 条未读",
+  "channels.unreadMention.aria": "{count} 条未读，含提及",
+  "channels.current": "当前房间",
+  "channels.switchTo": "切换到 #{channel}",
+  "channels.mobile.title": "选择房间",
 
   // Auth dialog
   "auth.nameRequired": "先起个昵称吧",
@@ -233,8 +233,8 @@ const zh: Dict = {
   "profile.saving": "保存中…",
 
   // Composer
-  "composer.label": "给 #{room} 发消息",
-  "composer.placeholder": "给 #{room} 发条消息…",
+  "composer.label": "给 #{channel} 发消息",
+  "composer.placeholder": "给 #{channel} 发条消息…",
   "composer.send": "发送",
   "composer.sendFailed": "发送失败——请检查网络后重试",
   "composer.hint": "回车发送 · shift+回车换行",
@@ -292,10 +292,10 @@ const zh: Dict = {
   "msg.sentAt": "{time} 发送",
   "msg.disconnected": "连接已断开——正在重连",
   "msg.connecting": "正在接入…",
-  "msg.empty.title": "#{room} 频道已开启。",
+  "msg.empty.title": "#{channel} 频道已开启。",
   "msg.empty.body": "还没有任何消息。说点什么开场吧——人和 agent 在同一个频道。",
-  "msg.loadingRoom": "正在加载 #{room} 的消息…",
-  "msg.logLabel": "#{room} 的消息",
+  "msg.loadingChannel": "正在加载 #{channel} 的消息…",
+  "msg.logLabel": "#{channel} 的消息",
   // Optimistic-send delivery states shown inline on the sender's own bubble.
   "msg.sending": "发送中…",
   "msg.sendFailed": "发送失败",
@@ -334,9 +334,9 @@ const zh: Dict = {
   "typing.labelTwo": "{names} 正在输入…",
   "typing.labelMany": "{names} 等 {count} 人正在输入…",
 
-  // Cross-room @mention toast (P1)
+  // Cross-channel @mention toast (P1)
   "toast.mention.prefix": "在频道里提及了你",
-  "toast.mention.aria": "{author} 在 #{room} 提及了你。点击前往。",
+  "toast.mention.aria": "{author} 在 #{channel} 提及了你。点击前往。",
 
   // Date
   "date.today": "今天",
@@ -347,9 +347,9 @@ const zh: Dict = {
 
 const en: Dict = {
   // App shell
-  "app.title": "club — #{room} chat",
+  "app.title": "club — #{channel} chat",
   "app.skipToChat": "Skip to chat",
-  "app.h1": "club — #{room} chat room",
+  "app.h1": "club — #{channel} chat channel",
 
   // Topbar / connection status
   "status.connected": "Connected",
@@ -370,31 +370,31 @@ const en: Dict = {
   // Roster
   "roster.you": "(you)",
   "roster.onlineLabel": "Online members",
-  "roster.label": "Rooms and online members",
+  "roster.label": "Channels and online members",
   "roster.mobile.aria": "Members — {count} online",
   "roster.mobile.title": "Members",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "Edit bio",
 
-  // Rooms (multi-room sidebar / sheet)
-  "rooms.title": "Rooms",
-  "rooms.newRoom": "new room",
-  "rooms.newRoomPlaceholder": "room name (e.g. deploy-debug)",
-  "rooms.newRoomLabel": "New room name",
-  "rooms.newRoomInvalid": "Use lowercase letters, digits, hyphens; 1–30 chars",
-  "rooms.newRoomBusy": "Creating…",
-  "rooms.loading": "Loading rooms…",
-  "rooms.unread.aria": "{count} unread",
-  "rooms.unreadMention.aria": "{count} unread, includes mentions",
-  "rooms.current": "Current room",
-  "rooms.switchTo": "Switch to #{room}",
-  "rooms.mobile.title": "Choose a room",
+  // Channels (multi-channel sidebar / sheet)
+  "channels.title": "Channels",
+  "channels.newChannel": "new channel",
+  "channels.newChannelPlaceholder": "channel name (e.g. deploy-debug)",
+  "channels.newChannelLabel": "New channel name",
+  "channels.newChannelInvalid": "Use lowercase letters, digits, hyphens; 1–30 chars",
+  "channels.newChannelBusy": "Creating…",
+  "channels.loading": "Loading channels…",
+  "channels.unread.aria": "{count} unread",
+  "channels.unreadMention.aria": "{count} unread, includes mentions",
+  "channels.current": "Current channel",
+  "channels.switchTo": "Switch to #{channel}",
+  "channels.mobile.title": "Choose a channel",
 
   // Auth dialog
   "auth.nameRequired": "Please enter a nickname first",
   "auth.pasteRequired": "Please paste your login key",
   "auth.keyUnrecognized": "This key wasn't recognized — please check and retry",
-  "auth.desc.create": "Pick a nickname to join the room.",
+  "auth.desc.create": "Pick a nickname to join the channel.",
   "auth.desc.paste": "Enter with an existing login key.",
   "auth.field.nickname": "Nickname",
   "auth.field.nicknamePlaceholder": "3–20 chars: letters / digits / _ / -",
@@ -432,7 +432,7 @@ const en: Dict = {
   // Key reveal (post-create)
   "keyReveal.title": "Save your login key and recovery code",
   "keyReveal.desc":
-    "The login key gets you into the room; the recovery code is your only way back if the key is ever lost. Save both somewhere safe — club doesn't store them for you, and a lost key can only be recovered via the recovery code.",
+    "The login key gets you into the channel; the recovery code is your only way back if the key is ever lost. Save both somewhere safe — club doesn't store them for you, and a lost key can only be recovered via the recovery code.",
   "keyReveal.label": "Your login key",
   "keyReveal.formatHint": "The key is a fixed prefix plus a random token — every key is freshly generated, so don't worry about matching a format.",
   "keyReveal.recoverLabel": "Your recovery code",
@@ -443,11 +443,11 @@ const en: Dict = {
   "keyReveal.copyFailed": "Copy failed — please select the text above manually to copy it.",
   "keyReveal.copyAnnounced": "Login key copied to clipboard",
   "keyReveal.copyRecoverAnnounced": "Recovery code copied to clipboard",
-  "keyReveal.saved": "Saved both — enter the room",
+  "keyReveal.saved": "Saved both — enter the channel",
   "keyReveal.recovered.title": "Recovery succeeded — save your new key and recovery code",
   "keyReveal.recovered.desc":
     "These are the freshly-rotated key and recovery code issued on recovery. Your OLD key and OLD recovery code are both invalidated. Save the new pair below — next time you clear cache, switch browsers, or lose the key, only the new recovery code can get you back in.",
-  "keyReveal.recovered.saved": "Saved both — enter the room",
+  "keyReveal.recovered.saved": "Saved both — enter the channel",
 
   // View key dialog
   "viewKey.trigger.aria": "View your login key",
@@ -494,8 +494,8 @@ const en: Dict = {
   "profile.saving": "Saving…",
 
   // Composer
-  "composer.label": "Send a message to #{room}",
-  "composer.placeholder": "Send a message to #{room}…",
+  "composer.label": "Send a message to #{channel}",
+  "composer.placeholder": "Send a message to #{channel}…",
   "composer.send": "Send",
   "composer.sendFailed": "Send failed — please check your network and retry",
   "composer.hint": "Enter to send · shift+enter for newline",
@@ -551,11 +551,11 @@ const en: Dict = {
   "msg.sentAt": "Sent at {time}",
   "msg.disconnected": "Connection lost — reconnecting",
   "msg.connecting": "Connecting…",
-  "msg.empty.title": "#{room} — the channel is open.",
+  "msg.empty.title": "#{channel} — the channel is open.",
   "msg.empty.body":
     "No messages yet. Say something to start — humans and agents share the same channel.",
-  "msg.loadingRoom": "Loading messages in #{room}…",
-  "msg.logLabel": "Messages in #{room}",
+  "msg.loadingChannel": "Loading messages in #{channel}…",
+  "msg.logLabel": "Messages in #{channel}",
   "msg.sending": "Sending…",
   "msg.sendFailed": "Send failed",
   "msg.loadingMore": "Loading more…",
@@ -589,9 +589,9 @@ const en: Dict = {
   "typing.labelTwo": "{names} are typing…",
   "typing.labelMany": "{names} and {count} more are typing…",
 
-  // Cross-room @mention toast (P1)
+  // Cross-channel @mention toast (P1)
   "toast.mention.prefix": "mentioned you in",
-  "toast.mention.aria": "{author} mentioned you in #{room}. Click to go there.",
+  "toast.mention.aria": "{author} mentioned you in #{channel}. Click to go there.",
 
   // Date
   "date.today": "Today",

@@ -30,7 +30,7 @@ export function Composer({
   members,
   selfId,
   conn,
-  room,
+  channel,
   replyTo,
   onReplyClear,
 }: {
@@ -43,8 +43,8 @@ export function Composer({
   /** Active connection — needed to authorize multipart uploads (POST /files).
    *  Optional so tests/preview can mount the composer without a server. */
   conn?: ClubConn | null;
-  /** Room the composer posts into (drives the placeholder/label + typing scope). */
-  room?: string;
+  /** Channel the composer posts into (drives the placeholder/label + typing scope). */
+  channel?: string;
   /** Message being replied to (composer shows a quote preview); null normally. */
   replyTo?: Message | null;
   /** Clear the reply target (cancel reply mode). */
@@ -326,17 +326,17 @@ export function Composer({
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportTyping = useCallback(() => {
     if (!conn) return;
-    void api.thinking(conn, room).catch(() => {
+    void api.thinking(conn, channel).catch(() => {
       // Thinking reports are best-effort presence; a failed report is harmless.
     });
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => {
-      void api.idle(conn, room).catch(() => {
+      void api.idle(conn, channel).catch(() => {
         // Idle report is best-effort presence; a failure is harmless.
       });
       typingTimer.current = null;
     }, 2500);
-  }, [conn, room]);
+  }, [conn, channel]);
   useEffect(() => () => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
   }, []);
@@ -368,7 +368,7 @@ export function Composer({
       markSent();
       // Message landed — stop the typing indicator.
       if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (conn) void api.idle(conn, room).catch(() => {
+      if (conn) void api.idle(conn, channel).catch(() => {
         // Idle report is best-effort presence; a failure is harmless.
       });
     } catch {
@@ -565,7 +565,7 @@ export function Composer({
         // Drop target for image files. We MUST preventDefault on dragover and
         // drop: otherwise the browser treats a dropped image as a URL the user
         // wants to navigate to — replacing the whole page and booting them out
-        // of the room (plan §5 / 王体验取证). Only intercept when the drag
+        // of the channel (plan §5 / 王体验取证). Only intercept when the drag
         // actually carries files, so plain text drags keep working.
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files")) e.preventDefault();
@@ -655,7 +655,7 @@ export function Composer({
         {/* Visually-hidden label gives the textarea an accessible name; the
             placeholder alone is not a substitute (WCAG 1.3.1 / 3.3.2). */}
         <label htmlFor="composer-input" className="sr-only">
-          {t("composer.label", { room: room ?? "general" })}
+          {t("composer.label", { channel: channel ?? "general" })}
         </label>
         {/* Textarea + chip row share a single flex column so the chips sit
             directly under the text (still inside the mint-bordered bar) while
@@ -668,7 +668,7 @@ export function Composer({
           rows={1}
           disabled={disabled}
           data-testid="composer-input"
-          placeholder={t("composer.placeholder", { room: room ?? "general" })}
+          placeholder={t("composer.placeholder", { channel: channel ?? "general" })}
           // The textarea dissolves into the input-bar container: transparent
           // background (inherits the container's bg-card) and no border of its
           // own, so the container edge is the single, clean input boundary

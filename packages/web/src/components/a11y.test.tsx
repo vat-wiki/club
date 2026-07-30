@@ -1,4 +1,4 @@
-import type { MentionToast } from "@/hooks/use-rooms";
+import type { MentionToast } from "@/hooks/use-channels";
 import { withI18n } from "@/test/i18n-wrap";
 import { render } from "@testing-library/react";
 import type { AxeResults, RunOptions } from "axe-core";
@@ -10,13 +10,13 @@ import type { Message, Participant } from "@club/shared";
 
 import { AuthDialog } from "./auth-dialog";
 import { BootScreen } from "./boot-screen";
+import { ChannelList } from "./channel-list";
 import { Composer } from "./composer";
 import { KeyRevealDialog } from "./key-reveal-dialog";
 import { MentionToasts } from "./mention-toast";
 import { MessageList } from "./message-list";
 import { MobileRoster } from "./mobile-roster";
 import { RecoverDialog } from "./recover-dialog";
-import { RoomList } from "./room-list";
 import { Roster } from "./roster";
 import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { Topbar } from "./topbar";
@@ -87,7 +87,7 @@ const messages: Message[] = [
     authorName: "alice",
     content: "hello world",
     createdAt: Date.now(),
-    room: "general",
+    channel: "general",
   },
   {
     id: "m2",
@@ -95,23 +95,23 @@ const messages: Message[] = [
     authorName: "bot",
     content: "hi @alice",
     createdAt: Date.now(),
-    room: "general",
+    channel: "general",
   },
 ];
 
-// A couple of rooms + a no-op switch/create so the room-aware components render
+// A couple of channels + a no-op switch/create so the channel-aware components render
 // fully under axe without dragging in real data fetching.
-const rooms = [
+const channels = [
   { id: "r1", slug: "general", createdAt: 0, lastActivityAt: Date.now() },
   { id: "r2", slug: "deploy-debug", createdAt: 0, lastActivityAt: Date.now() },
 ];
 const noop = async () => {};
-const roomNav = {
-  rooms,
-  currentRoom: "general",
+const channelNav = {
+  channels,
+  currentChannel: "general",
   unread: {},
-  onSelectRoom: () => {},
-  onCreateRoom: noop,
+  onSelectChannel: () => {},
+  onCreateChannel: noop,
 };
 
 describe("a11y (axe-core, WCAG 2.1 AA)", () => {
@@ -124,7 +124,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   });
 
   it("Roster has no violations", async () => {
-    await expectNoViolations(<Roster members={members} selfId={me.id} {...roomNav} />);
+    await expectNoViolations(<Roster members={members} selfId={me.id} {...channelNav} />);
   });
 
   it("Topbar has no violations", async () => {
@@ -135,7 +135,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         members={members}
         selfId={me.id}
         key_={TEST_KEY}
-        {...roomNav}
+        {...channelNav}
         onSignOutRequest={() => {}}
       />,
     );
@@ -143,15 +143,15 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MessageList has no violations (with messages)", async () => {
     await expectNoViolations(
-      <MessageList messages={messages} me={me} members={members} status="connected" room="general" />,
+      <MessageList messages={messages} me={me} members={members} status="connected" channel="general" />,
     );
   });
 
-  it("RoomList has no violations", async () => {
+  it("ChannelList has no violations", async () => {
     await expectNoViolations(
-      <RoomList
-        rooms={rooms}
-        currentRoom="general"
+      <ChannelList
+        channels={channels}
+        currentChannel="general"
         unread={{ "deploy-debug": { count: 2, mention: true } }}
         onSelect={() => {}}
         onCreate={async () => {}}
@@ -161,7 +161,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("MentionToasts have no violations", async () => {
     const toasts: MentionToast[] = [
-      { id: "t1", messageId: "m1", room: "deploy-debug", authorName: "claude", content: "hey @alice" },
+      { id: "t1", messageId: "m1", channel: "deploy-debug", authorName: "claude", content: "hey @alice" },
     ];
     await expectNoViolations(
       <MentionToasts toasts={toasts} onActivate={() => {}} onDismiss={() => {}} />,
@@ -244,7 +244,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
 
   it("KeyRevealDialog (recovery mode) has no violations", async () => {
     // Rotated-credentials variant — same layout, different copy. The recovery
-    // flow MUST surface the new key + recovery code before entering the room
+    // flow MUST surface the new key + recovery code before entering the channel
     // (P0-1). Verify the rotated-mode dialog is still accessible.
     await expectNoViolationsPortal(
       <KeyRevealDialog
@@ -343,7 +343,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
           members={members}
           selfId={me.id}
           key_={TEST_KEY}
-          {...roomNav}
+          {...channelNav}
           onSignOutRequest={() => {}}
         />,
       ),
@@ -366,7 +366,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
           members={members}
           selfId={me.id}
           key_={TEST_KEY}
-          {...roomNav}
+          {...channelNav}
           onSignOutRequest={() => {}}
         />,
       ),

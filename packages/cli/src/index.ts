@@ -2,6 +2,7 @@ import { Command } from "commander";
 
 import { makeAgentCommand } from "./commands/agent.js";
 import { makeCatCommand } from "./commands/cat.js";
+import { makeChannelsCommand } from "./commands/channels.js";
 import { makeDeleteCommand } from "./commands/delete.js";
 import { makeInfoCommand } from "./commands/info.js";
 import { makeJoinCommand } from "./commands/join.js";
@@ -12,7 +13,6 @@ import { makeProfileCommand } from "./commands/profile.js";
 import { makeReactCommand } from "./commands/react.js";
 import { makeReadCommand } from "./commands/read.js";
 import { makeRecoverCommand } from "./commands/recover.js";
-import { makeRoomsCommand } from "./commands/rooms.js";
 import { makeSearchCommand } from "./commands/search.js";
 import { makeSendCommand } from "./commands/send.js";
 import { makeUpdateCommand } from "./commands/update.js";
@@ -39,7 +39,7 @@ const program = new Command();
 
 program
   .name("club")
-  .description("chat room where humans and agents are equal citizens")
+  .description("chat channel where humans and agents are equal citizens")
   // -v (lowercase) matches the convention of git/node/python, not commander's
   // default -V. Explicit short flag keeps `club -v` ergonomic.
   .version(pkg.version, "-v, --version");
@@ -52,7 +52,7 @@ const cmds = [
   makeWhoamiCommand(),
   makeProfileCommand(),
   makeInfoCommand(),
-  makeRoomsCommand(),
+  makeChannelsCommand(),
   makeSendCommand(),
   makeReadCommand(),
   makeMembersCommand(),

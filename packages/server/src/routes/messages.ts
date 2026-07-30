@@ -4,7 +4,7 @@ import { ulid } from "ulid";
 
 import {
   CreateMessageRequest,
-  DEFAULT_ROOM,
+  DEFAULT_CHANNEL,
   EditMessageRequest,
   isValidId,
   type Message,
@@ -19,11 +19,11 @@ import { parseAttachments } from "./attachment-cache.js";
 import { requireAuth } from "../auth.js";
 import {
   deleteMessage,
-  ensureRoom,
+  ensureChannel,
   getAllParticipantNames,
   getFilesByIds,
   getMessageById,
-  getMessageRoom,
+  getMessageChannel,
   getMessagesBeforeId,
   getMessagesSince,
   getReactionsForMessage,
@@ -37,7 +37,7 @@ import {
   toggleReaction,
   updateMessage,
 } from "../db.js";
-import { getRoomQuery, jsonErr, parseJsonBody, parseLimit, requireValidId, requireValidRoomSlug } from "../lib.js";
+import { getChannelQuery, jsonErr, parseJsonBody, parseLimit, requireValidChannelSlug,requireValidId } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
 import { rateLimit } from "../rate-limit.js";
@@ -123,7 +123,7 @@ function toMessage(
     authorName: r.author_name,
     content: r.content,
     createdAt: r.created_at,
-    room: r.room,
+    channel: r.channel,
   };
   const attachments = parseAttachments(r.attachments);
   if (attachments) msg.attachments = attachments;
@@ -146,13 +146,13 @@ function toMessage(
 messages.post("/", requireJson, writeGuard, async (c) => {
   const parsed = await parseJsonBody(c, CreateMessageRequest, "bad request");
   if (!parsed.ok) return parsed.r;
-  const { content, attachmentIds, replyToId, room } = parsed.data;
+  const { content, attachmentIds, replyToId, channel } = parsed.data;
   // Security: validate `replyToId` server-side. If the client supplies a
-  // replyToId that doesn't exist OR points to a message in a different room,
+  // replyToId that doesn't exist OR points to a message in a different channel,
   // we must reject it. Otherwise an attacker can reply-to-phantom-message
-  // (information leak / confusion vector) or reply across rooms, creating
-  // cross-room thread injection that confuses UI clients which assume a
-  // thread stays within its room. The Zod schema only enforces length
+  // (information leak / confusion vector) or reply across channels, creating
+  // cross-channel thread injection that confuses UI clients which assume a
+  // thread stays within its channel. The Zod schema only enforces length
   // (min 1, max 64), so we must also reject malformed ids (spaces, slashes,
   // control chars) before touching the DB — the same hygiene applied to
   // since/before query params in GET /messages.
@@ -160,12 +160,12 @@ messages.post("/", requireJson, writeGuard, async (c) => {
     if (!isValidId(replyToId)) {
       return jsonErr(c, "bad replyToId", 400);
     }
-    const replyRoom = getMessageRoom(replyToId);
-    if (!replyRoom) {
+    const replyChannel = getMessageChannel(replyToId);
+    if (!replyChannel) {
       return jsonErr(c, "reply target not found", 404);
     }
-    if (replyRoom !== room) {
-      return jsonErr(c, "reply target not in room", 400);
+    if (replyChannel !== channel) {
+      return jsonErr(c, "reply target not in channel", 400);
     }
   }
   // Sanitize the message body once at ingestion. The sanitized copy is the
@@ -221,11 +221,11 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   const me = c.get("participant");
   const id = ulid();
   const createdAt = Date.now();
-  // Auto-create the room if it doesn't exist yet (PRD §9.4: posting into a
-  // non-existent-but-valid room builds it — "build" and "enter" are the same
+  // Auto-create the channel if it doesn't exist yet (PRD §9.4: posting into a
+  // non-existent-but-valid channel builds it — "build" and "enter" are the same
   // action in the open model). "general" always already exists from the
   // migration seed, so the common path is a no-op.
-  ensureRoom(room, createdAt);
+  ensureChannel(channel, createdAt);
   insertMessage(
     id,
     me.id,
@@ -233,7 +233,7 @@ messages.post("/", requireJson, writeGuard, async (c) => {
     createdAt,
     attachments.length > 0 ? JSON.stringify(attachments) : null,
     replyToId ?? null,
-    room,
+    channel,
   );
 
   // Persist a per-participant inbox row for everyone @-mentioned in the text.
@@ -242,8 +242,8 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   // an offline recipient still finds the mention on next poll. We do NOT
   // exclude the author: the client-side `listen --mention` matcher doesn't
   // either, so the inbox must agree with what a live listen would have caught.
-  // Each mention carries `room` so a cross-room @mention can deep-link the
-  // recipient to the source room + message (MR11).
+  // Each mention carries `channel` so a cross-channel @mention can deep-link the
+  // recipient to the source channel + message (MR11).
   const mentioned = extractMentionedParticipants(
     cleanContent,
     getAllParticipantNames(),
@@ -253,7 +253,7 @@ messages.post("/", requireJson, writeGuard, async (c) => {
     messageId: id,
     participantId: m.id,
     authorId: me.id,
-    room,
+    channel,
     createdAt,
   }));
   if (mentionRows.length > 0) insertMentions(mentionRows);
@@ -264,7 +264,7 @@ messages.post("/", requireJson, writeGuard, async (c) => {
     authorName: me.name,
     content: cleanContent,
     createdAt,
-    room,
+    channel,
   };
   if (attachments.length > 0) msg.attachments = attachments;
   if (replyToId) msg.replyToId = replyToId;
@@ -275,25 +275,25 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   // reports idle. Category-blind: any participant who reported thinking (an
   // agent processing a @mention OR a human typing) is cleared on post — the
   // safety net for a client that crashes right after posting, so its own idle
-  // report never fires. The idle event carries the room they were thinking in
-  // (if any) so the clear reaches the same room-scoped subscribers that saw it.
+  // report never fires. The idle event carries the channel they were thinking in
+  // (if any) so the clear reaches the same channel-scoped subscribers that saw it.
   const entry = markThinkingIdle(me.id);
   if (entry) {
     broadcastAgentIdle({
       participantId: me.id,
-      ...(entry.room ? { room: entry.room } : {}),
+      ...(entry.channel ? { channel: entry.channel } : {}),
     });
   }
   return c.json(msg, 201);
 });
 
-// GET /messages?room=<slug>&since=<id>&before=<id>&limit=<n> -> Message[]
-// (chronologic). `room` defaults to "general" for backward compatibility — an
+// GET /messages?channel=<slug>&since=<id>&before=<id>&limit=<n> -> Message[]
+// (chronologic). `channel` defaults to "general" for backward compatibility — an
 // old client that omits it sees the general history exactly as before.
 messages.get("/", (c) => {
-  const roomOrErr = getRoomQuery(c);
-  if (!roomOrErr.ok) return roomOrErr.r;
-  const { room } = roomOrErr;
+  const channelOrErr = getChannelQuery(c);
+  if (!channelOrErr.ok) return channelOrErr.r;
+  const { channel } = channelOrErr;
   const since = c.req.query("since");
   const before = c.req.query("before");
   const limit = parseLimit(c.req.query("limit"));
@@ -309,10 +309,10 @@ messages.get("/", (c) => {
   // `since`; they aren't combined in practice, but if both appear we serve the
   // backward page so the UI's "load earlier" never accidentally pulls newer.
   const rows = before
-    ? getMessagesBeforeId(before, room, limit)
+    ? getMessagesBeforeId(before, channel, limit)
     : since
-      ? getMessagesSince(since, room, limit).messages
-      : getRecentMessages(room, limit);
+      ? getMessagesSince(since, channel, limit).messages
+      : getRecentMessages(channel, limit);
   const messageIds = rows.map((r) => r.id);
   const reactionsMap = getReactionsForMessages(messageIds);
   // `toMessage` uses reactionsMap.has(r.id) to distinguish "batched (maybe
@@ -327,20 +327,20 @@ messages.get("/", (c) => {
 // and is rarely useful; capping avoids O(n) pattern construction on huge input.
 const SEARCH_QUERY_MAX = 500;
 
-// GET /messages/search?q=<text>&room=<slug>&limit=<n> -> Message[] (newest first)
-// `room` is optional: omit to search across all rooms, pass a slug to scope it.
+// GET /messages/search?q=<text>&channel=<slug>&limit=<n> -> Message[] (newest first)
+// `channel` is optional: omit to search across all channels, pass a slug to scope it.
 messages.get("/search", (c) => {
   const raw = (c.req.query("q") ?? "").trim();
   if (!raw) return c.json([]);
   const q = raw.length > SEARCH_QUERY_MAX ? raw.slice(0, SEARCH_QUERY_MAX) : raw;
   const limit = parseLimit(c.req.query("limit"));
-  const rawRoom = c.req.query("room")?.trim();
-  if (rawRoom !== undefined) {
-    const bad = requireValidRoomSlug(c, rawRoom);
+  const rawChannel = c.req.query("channel")?.trim();
+  if (rawChannel !== undefined) {
+    const bad = requireValidChannelSlug(c, rawChannel);
     if (bad) return bad.r;
   }
-  const room = rawRoom ?? null;
-  const rows = searchMessages(q, room, limit);
+  const channel = rawChannel ?? null;
+  const rows = searchMessages(q, channel, limit);
   const messageIds = rows.map((r) => r.id);
   const reactionsMap = getReactionsForMessages(messageIds);
   // `toMessage` uses reactionsMap.has(r.id) to distinguish "batched (maybe
@@ -352,17 +352,17 @@ messages.get("/search", (c) => {
 // DELETE /messages/:id -> 204 (recall). Only the author may (participant_id
 // check in deleteMessage). Broadcasts `message_deleted` so every client hides
 // the content and shows a "recalled" placeholder instead. The event carries the
-// message's room so the fan-out stays room-scoped (a client watching another
-// room never sees the recall). Soft-delete keeps the row, so the room is still
+// message's channel so the fan-out stays channel-scoped (a client watching another
+// channel never sees the recall). Soft-delete keeps the row, so the channel is still
 // readable after the successful update.
 messages.delete("/:id", writeGuard, (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
   const bad = requireValidId(c, id, "message id");
   if (bad) return bad.r;
-  const { ok, room } = deleteMessage(id, me.id);
+  const { ok, channel } = deleteMessage(id, me.id);
   if (!ok) return jsonErr(c, "not found", 404);
-  broadcastDeleted({ id, room: room ?? DEFAULT_ROOM });
+  broadcastDeleted({ id, channel: channel ?? DEFAULT_CHANNEL });
   return c.body(null, 204);
 });
 
@@ -391,13 +391,13 @@ messages.patch("/:id", requireJson, writeGuard, async (c) => {
   const msg: Message = toMessage(row);
   // SSE stream carries no native `message_edited` event yet; clients will
   // pick up the change on their next history poll or when the author's SSE
-  // page lands and refreshes the room history. TODO: broadcast edited event.
+  // page lands and refreshes the channel history. TODO: broadcast edited event.
   return c.json(msg, 200);
 });
 
 // POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
 // `message_reaction` with the refreshed aggregate so all clients update. The
-// event carries the message's room so the fan-out stays room-scoped.
+// event carries the message's channel so the fan-out stays channel-scoped.
 messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
@@ -422,46 +422,46 @@ messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   }
   const trimmed = emoji.trim();
   if (!trimmed) return jsonErr(c, "bad emoji");
-  const { reactions, room } = toggleReaction(id, me.id, trimmed);
-  broadcastReaction({ messageId: id, reactions: reactions as Reaction[], room: room ?? DEFAULT_ROOM } satisfies MessageReactionEvent);
+  const { reactions, channel } = toggleReaction(id, me.id, trimmed);
+  broadcastReaction({ messageId: id, reactions: reactions as Reaction[], channel: channel ?? DEFAULT_CHANNEL } satisfies MessageReactionEvent);
   return c.body(null, 204);
 });
 
-// GET /messages/stream  (SSE) — live message feed, optionally room-scoped.
-// `?room=<slug>` subscribes to a single room; `?rooms=a,b` to several; omitted
-// subscribes to all rooms. Room-scoped events (message / message_deleted /
+// GET /messages/stream  (SSE) — live message feed, optionally channel-scoped.
+// `?channel=<slug>` subscribes to a single channel; `?channels=a,b` to several; omitted
+// subscribes to all channels. Channel-scoped events (message / message_deleted /
 // message_reaction / agent_thinking / agent_idle) are filtered server-side so a
-// client focused on room A never pays for room B's traffic (MR10). Presence
-// stays global (PRD §8.7) — a roster is connection-level, not per-room.
+// client focused on channel A never pays for channel B's traffic (MR10). Presence
+// stays global (PRD §8.7) — a roster is connection-level, not per-channel.
 messages.get("/stream", (c) => {
-  // Parse the room filter into a Set (or null = all rooms). An explicit but
-  // empty filter (e.g. `?rooms=` with no valid slugs) is treated as "all",
-  // matching the forgiving spirit of the single-room `?room=` default.
-  const roomParam = c.req.query("room")?.trim();
-  const roomsParam = c.req.query("rooms")?.trim();
-  // Validate every supplied room slug before wiring it into the SSE
+  // Parse the channel filter into a Set (or null = all channels). An explicit but
+  // empty filter (e.g. `?channels=` with no valid slugs) is treated as "all",
+  // matching the forgiving spirit of the single-channel `?channel=` default.
+  const channelParam = c.req.query("channel")?.trim();
+  const channelsParam = c.req.query("channels")?.trim();
+  // Validate every supplied channel slug before wiring it into the SSE
   // fan-out. Invalid slugs (containing newlines, slashes, etc.) would
   // otherwise be injected verbatim into `addSubscriber`'s Set and could
   // break SSE framing. Each split name is validated through the same
-  // centralized `requireValidRoomSlug` validator used by POST /rooms.
-  if (roomParam !== undefined) {
-    const bad = requireValidRoomSlug(c, roomParam);
+  // centralized `requireValidChannelSlug` validator used by POST /channels.
+  if (channelParam !== undefined) {
+    const bad = requireValidChannelSlug(c, channelParam);
     if (bad) return bad.r;
   }
-  let roomSet: Set<string> | null = null;
-  if (roomParam !== undefined || roomsParam !== undefined) {
-    const names = (roomsParam ?? roomParam ?? "")
+  let channelSet: Set<string> | null = null;
+  if (channelParam !== undefined || channelsParam !== undefined) {
+    const names = (channelsParam ?? channelParam ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
     for (const n of names) {
-      const bad = requireValidRoomSlug(c, n);
+      const bad = requireValidChannelSlug(c, n);
       if (bad) return bad.r;
     }
-    roomSet = names.length > 0 ? new Set(names) : null;
+    channelSet = names.length > 0 ? new Set(names) : null;
   }
   return streamSSE(c, async (stream) => {
-    const unsubscribe = addSubscriber(stream, c.get("participant"), roomSet);
+    const unsubscribe = addSubscriber(stream, c.get("participant"), channelSet);
     stream.onAbort(() => {
       unsubscribe();
     });

@@ -34,7 +34,7 @@ export function RecoverDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   // Fired with the freshly reissued key (and, for future surfacing, the new
-  // recovery code) once recovery succeeds. The app persists + enters the room.
+  // recovery code) once recovery succeeds. The app persists + enters the channel.
   onRecovered: (key: string, recoverCode: string) => void;
 }) {
   const t = useT();

@@ -10,8 +10,8 @@ import { SearchBar } from "@/components/search-bar";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 import { Topbar } from "@/components/topbar";
 import { TypingIndicator } from "@/components/typing-indicator";
+import { type MentionToast,useChannels } from "@/hooks/use-channels";
 import { useMessageStream } from "@/hooks/use-message-stream";
-import { type MentionToast,useRooms } from "@/hooks/use-rooms";
 import { useTypingAgents } from "@/hooks/use-typing-agents";
 import { useVisualViewportHeight } from "@/hooks/use-visual-viewport-height";
 import { api } from "@/lib/api";
@@ -53,33 +53,33 @@ export default function App() {
   // which used to silently clearConn() and bounce the user to onboarding with no
   // explanation (and, on a transient server hiccup, cost them their credential).
   // Now we keep the key and surface a retryable error screen instead (P0-2).
-  // Null once we're past boot (entered the room OR there was no stored key).
+  // Null once we're past boot (entered the channel OR there was no stored key).
   const [bootStatus, setBootStatus] = useState<"loading" | "error" | null>(!!conn ? "loading" : null);
   // Bumped on each manual retry to force the boot effect to re-run (and to reset
   // BootScreen's auto-retry counter). The effect deps include this nonce.
   const [bootRetryNonce, setBootRetryNonce] = useState(0);
 
   const typing = useTypingAgents(me?.id);
-  // Multi-room: room list, the focused room (persisted), per-room unread, and
-  // cross-room @mention toasts. The stream below subscribes to ALL rooms and
-  // routes each message: focused-room → visible tail, others → unread/toast.
-  const rooms = useRooms(conn, me?.name);
-  // Mirror the focused room into a ref so validateConn (a boot-time callback
-  // whose deps must NOT include the room, or it'd re-trigger boot on every
+  // Multi-channel: channel list, the focused channel (persisted), per-channel unread, and
+  // cross-channel @mention toasts. The stream below subscribes to ALL channels and
+  // routes each message: focused-channel → visible tail, others → unread/toast.
+  const channels = useChannels(conn, me?.name);
+  // Mirror the focused channel into a ref so validateConn (a boot-time callback
+  // whose deps must NOT include the channel, or it'd re-trigger boot on every
   // switch) reads the latest value.
-  const currentRoomRef = useRef(rooms.currentRoom);
-  currentRoomRef.current = rooms.currentRoom;
+  const currentChannelRef = useRef(channels.currentChannel);
+  currentChannelRef.current = channels.currentChannel;
 
   const { messages, status, setMessages, loadMore, loadingMore, onlineIds } = useMessageStream(me ? conn : null, {
-    currentRoom: rooms.currentRoom,
-    onIncoming: rooms.recordIncoming,
+    currentChannel: channels.currentChannel,
+    onIncoming: channels.recordIncoming,
     onAgentThinking: typing.onThinking,
     onAgentIdle: typing.onIdle,
   });
-  // True while a room's initial history is being fetched (switch = "换台"); the
+  // True while a channel's initial history is being fetched (switch = "换台"); the
   // MessageList shows a shimmer skeleton instead of flashing empty-then-pop.
-  const [loadingRoom, setLoadingRoom] = useState(false);
-  // A message id to deep-link to (from a cross-room mention toast); cleared once
+  const [loadingChannel, setLoadingChannel] = useState(false);
+  // A message id to deep-link to (from a cross-channel mention toast); cleared once
   // the MessageList has scrolled to + highlighted it.
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
 
@@ -94,7 +94,7 @@ export default function App() {
 
   // Validate a stored key against /me and load the first history batch. Shared
   // by the initial boot and by every retry (manual + auto-backoff + online
-  // event). On success: enter the room. On failure: flip to the error state —
+  // event). On success: enter the channel. On failure: flip to the error state —
   // but NEVER clearConn(): the key stays in localStorage so a later retry can
   // succeed once the server is reachable again.
   const validateConn = useCallback(
@@ -104,9 +104,9 @@ export default function App() {
         const m = await api.me(c);
         setMe(m);
         setAuthOpen(false);
-        // Load the focused room's history (defaults to general for a fresh
-        // client; a returning client resumes its last room from localStorage).
-        const history = await api.messages(c, undefined, currentRoomRef.current);
+        // Load the focused channel's history (defaults to general for a fresh
+        // client; a returning client resumes its last channel from localStorage).
+        const history = await api.messages(c, undefined, currentChannelRef.current);
         setMessages(history);
         setBootStatus(null);
         void refreshMembers();
@@ -117,56 +117,56 @@ export default function App() {
     [refreshMembers, setMessages],
   );
 
-  // Load one room's initial history. Shared by the boot path and every room
+  // Load one channel's initial history. Shared by the boot path and every channel
   // switch: clear the old tail, fetch, swap in. The MessageList is keyed by the
-  // room so it remounts and plays the 180ms cross-fade; loadingRoom routes the
+  // channel so it remounts and plays the 180ms cross-fade; loadingChannel routes the
   // empty moment to a shimmer skeleton instead of the empty state.
-  const loadRoomHistory = useCallback(
-    async (c: ClubConn, room: string) => {
-      setLoadingRoom(true);
+  const loadChannelHistory = useCallback(
+    async (c: ClubConn, channel: string) => {
+      setLoadingChannel(true);
       try {
         setMessages([]);
-        const history = await api.messages(c, undefined, room);
+        const history = await api.messages(c, undefined, channel);
         setMessages(history);
       } catch {
         /* transient — the live stream keeps delivering new messages */
       } finally {
-        setLoadingRoom(false);
+        setLoadingChannel(false);
       }
     },
     [setMessages],
   );
 
-  const handleSwitchRoom = useCallback(
-    (room: string) => {
-      if (!conn || room === rooms.currentRoom) return;
-      rooms.switchRoom(room);
-      void loadRoomHistory(conn, room);
+  const handleSwitchChannel = useCallback(
+    (channel: string) => {
+      if (!conn || channel === channels.currentChannel) return;
+      channels.switchChannel(channel);
+      void loadChannelHistory(conn, channel);
     },
-    [conn, rooms, loadRoomHistory],
+    [conn, channels, loadChannelHistory],
   );
 
-  const handleCreateRoom = useCallback(
+  const handleCreateChannel = useCallback(
     async (name: string) => {
       if (!conn) return;
-      // createRoom is idempotent and switches focus to the new room; load its
+      // createChannel is idempotent and switches focus to the new channel; load its
       // (empty) history so the empty state renders cleanly.
-      await rooms.createRoom(name);
-      void loadRoomHistory(conn, name);
+      await channels.createChannel(name);
+      void loadChannelHistory(conn, name);
     },
-    [conn, rooms, loadRoomHistory],
+    [conn, channels, loadChannelHistory],
   );
 
-  // Cross-room mention toast → jump to the source room + scroll/highlight the
+  // Cross-channel mention toast → jump to the source channel + scroll/highlight the
   // message. The MessageList retries the highlight as history loads, so setting
   // the target before the fetch resolves is safe.
   const handleToastActivate = useCallback(
     (toast: MentionToast) => {
-      handleSwitchRoom(toast.room);
+      handleSwitchChannel(toast.channel);
       setHighlightMessageId(toast.messageId);
-      rooms.dismissToastsForRoom(toast.room);
+      channels.dismissToastsForChannel(toast.channel);
     },
-    [handleSwitchRoom, rooms],
+    [handleSwitchChannel, channels],
   );
 
   // boot: validate stored key (initial + on every retry nonce bump).
@@ -253,7 +253,7 @@ export default function App() {
       authorName: me.name,
       content,
       createdAt: Date.now(),
-      room: rooms.currentRoom,
+      channel: channels.currentChannel,
       status: "sending",
       ...(replyToId ? { replyToId } : {}),
       // Only the upload id is known client-side, so synthesize a displayable
@@ -271,7 +271,7 @@ export default function App() {
     setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
     try {
-      const real = await api.send(conn, content, attachmentIds, replyToId, rooms.currentRoom);
+      const real = await api.send(conn, content, attachmentIds, replyToId, channels.currentChannel);
       setMessages((prev) => {
         // SSE may have already delivered the confirmed copy — the server
         // broadcasts the new message and can beat the POST response back to
@@ -324,10 +324,10 @@ export default function App() {
     setAuthOpen(true);
   };
 
-  // Keep the document title in sync with the active language + focused room.
+  // Keep the document title in sync with the active language + focused channel.
   useEffect(() => {
-    document.title = t("app.title", { room: rooms.currentRoom });
-  }, [t, rooms.currentRoom]);
+    document.title = t("app.title", { channel: channels.currentChannel });
+  }, [t, channels.currentChannel]);
 
   return (
     <div className="flex h-full flex-col">
@@ -348,11 +348,11 @@ export default function App() {
           selfId={me.id}
           onlineIds={onlineIds}
           key_={getKey()}
-          currentRoom={rooms.currentRoom}
-          rooms={rooms.sortedRooms}
-          unread={rooms.unread}
-          onSelectRoom={handleSwitchRoom}
-          onCreateRoom={handleCreateRoom}
+          currentChannel={channels.currentChannel}
+          channels={channels.sortedChannels}
+          unread={channels.unread}
+          onSelectChannel={handleSwitchChannel}
+          onCreateChannel={handleCreateChannel}
           onSignOutRequest={() => setSignOutOpen(true)}
           onEditProfile={() => setEditProfileOpen(true)}
         />
@@ -363,36 +363,36 @@ export default function App() {
           members={members}
           selfId={me?.id}
           onlineIds={onlineIds}
-          rooms={rooms.sortedRooms}
-          currentRoom={rooms.currentRoom}
-          unread={rooms.unread}
-          onSelectRoom={handleSwitchRoom}
-          onCreateRoom={handleCreateRoom}
+          channels={channels.sortedChannels}
+          currentChannel={channels.currentChannel}
+          unread={channels.unread}
+          onSelectChannel={handleSwitchChannel}
+          onCreateChannel={handleCreateChannel}
           onEditProfile={() => setEditProfileOpen(true)}
         />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
               duplicating the visible topbar wordmark. */}
-          <h1 className="sr-only">{t("app.h1", { room: rooms.currentRoom })}</h1>
+          <h1 className="sr-only">{t("app.h1", { channel: channels.currentChannel })}</h1>
           {/* First-load gate. While bootStatus is set we render the boot screen
               (loading spinner OR retryable error) instead of the message list +
               composer, so a server-down on reload never silently wipes the key
-              or strands the user in the empty state. Once null, the room shows. */}
+              or strands the user in the empty state. Once null, the channel shows. */}
           {bootStatus ? (
             <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} />
           ) : (
             <>
-              <SearchBar conn={conn} room={rooms.currentRoom} />
-              {/* key={room} forces a remount on switch → 180ms cross-fade. */}
+              <SearchBar conn={conn} channel={channels.currentChannel} />
+              {/* key={channel} forces a remount on switch → 180ms cross-fade. */}
               <MessageList
-                key={rooms.currentRoom}
+                key={channels.currentChannel}
                 ref={messageListRef}
                 messages={messages}
                 me={me}
                 members={members}
                 status={status}
-                room={rooms.currentRoom}
-                loadingRoom={loadingRoom}
+                channel={channels.currentChannel}
+                loadingChannel={loadingChannel}
                 highlightMessageId={highlightMessageId}
                 onHighlightConsumed={() => setHighlightMessageId(null)}
                 onLoadMore={loadMore}
@@ -410,7 +410,7 @@ export default function App() {
                 members={members}
                 selfId={me?.id}
                 conn={conn}
-                room={rooms.currentRoom}
+                channel={channels.currentChannel}
                 replyTo={replyTo}
                 onReplyClear={() => setReplyTo(null)}
               />
@@ -419,12 +419,12 @@ export default function App() {
         </main>
       </div>
 
-      {/* Cross-room @mention toasts (P1). Live regardless of which panel is open;
-          clicking jumps to the source room + message. */}
+      {/* Cross-channel @mention toasts (P1). Live regardless of which panel is open;
+          clicking jumps to the source channel + message. */}
       <MentionToasts
-        toasts={rooms.toasts}
+        toasts={channels.toasts}
         onActivate={handleToastActivate}
-        onDismiss={rooms.dismissToast}
+        onDismiss={channels.dismissToast}
       />
 
       {/* Account created toast (P0-7: non-blocking, shows recover code after registration) */}

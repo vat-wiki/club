@@ -1,6 +1,6 @@
-// club send [text...] [--stdin] [--image <path>] [--video <path>] [--file <path>] [--room <slug>]
+// club send [text...] [--stdin] [--image <path>] [--video <path>] [--file <path>] [--channel <slug>]
 //
-// Send a message into the current room (or --room <slug>). Accepts a literal
+// Send a message into the current channel (or --channel <slug>). Accepts a literal
 // string, or reads from stdin when piped / --stdin. Attach up to 8 images,
 // videos, or document files via --image / --video / --file (repeatable).
 // Delegates the upload+send orchestration to send-impl so the commander
@@ -12,7 +12,7 @@ import { ClubClient } from "@club/sdk";
 import { uploadDocumentFile,uploadImageFile, uploadVideoFile } from "@club/sdk/node";
 
 import { runSend, type SendDeps } from "./send-impl.js";
-import { defaultRoom, requireConfig } from "../config.js";
+import { defaultChannel, requireConfig } from "../config.js";
 import { readStream } from "../stdin.js";
 
 // Collect repeated flags into an array (commander coercion). Spread-copy avoids
@@ -25,7 +25,7 @@ const collect = (v: string, acc: string[]) => [...acc, v];
  *
  * Accepts a literal text argument, or reads from stdin when piped / `--stdin`.
  * Attach up to 8 images, videos, or documents via repeatable `--image` / `--video`
- * / `--file <path>` flags, and optionally target a specific room with `--room`.
+ * / `--file <path>` flags, and optionally target a specific channel with `--channel`.
  * Delegates the upload+send orchestration to `send-impl` so this action stays
  * thin and unit-testable.
  *
@@ -34,7 +34,7 @@ const collect = (v: string, acc: string[]) => [...acc, v];
 export function makeSendCommand(): Command {
   return new Command("send")
     .description(
-      'send a message — `club send "hi"`, `echo hi | club send` (auto-detects pipe), attach files with `--image` / `--video` / `--file <path>` (repeatable, ≤8 total), or target a room with `--room <slug>`',
+      'send a message — `club send "hi"`, `echo hi | club send` (auto-detects pipe), attach files with `--image` / `--video` / `--file <path>` (repeatable, ≤8 total), or target a channel with `--channel <slug>`',
     )
     .argument("[text...]", "message text (omit if piping or sending files only)")
     .option("--stdin", "read message body from stdin (auto-detected when piped)")
@@ -57,8 +57,8 @@ export function makeSendCommand(): Command {
       [] as string[],
     )
     .option(
-      "-r, --room <slug>",
-      "post to this room (default: general)",
+      "-r, --channel <slug>",
+      "post to this channel (default: general)",
     )
     .action(
       async (
@@ -68,7 +68,7 @@ export function makeSendCommand(): Command {
           image?: string[];
           video?: string[];
           file?: string[];
-          room?: string;
+          channel?: string;
         },
       ) => {
         // Auto-detect stdin: when no text args and stdin is piped, read it.
@@ -84,13 +84,13 @@ export function makeSendCommand(): Command {
 
         const cfg = requireConfig();
         const client = new ClubClient(cfg);
-        const room = opts.room ?? defaultRoom();
+        const channel = opts.channel ?? defaultChannel();
 
         const deps: SendDeps = {
           uploadImage: (conn, p) => uploadImageFile(conn, p),
           uploadVideo: (conn, p) => uploadVideoFile(conn, p),
           uploadDocument: (conn, p) => uploadDocumentFile(conn, p),
-          send: (c, ids, r) => client.send(c, ids, r ? { room: r } : undefined),
+          send: (c, ids, r) => client.send(c, ids, r ? { channel: r } : undefined),
         };
 
         await runSend(
@@ -100,7 +100,7 @@ export function makeSendCommand(): Command {
             videos: opts.video ?? [],
             documents: opts.file ?? [],
             conn: cfg,
-            room,
+            channel,
           },
           deps,
         );

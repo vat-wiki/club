@@ -22,7 +22,7 @@ describe("runMembers", () => {
     expect(log).toHaveBeenLastCalledWith("bob");
   });
 
-  it("prints the empty-room footer when there are no members", async () => {
+  it("prints the empty-channel footer when there are no members", async () => {
     const deps: MembersDeps = { members: vi.fn().mockResolvedValue([]) };
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await runMembers(deps);
@@ -31,7 +31,7 @@ describe("runMembers", () => {
     expect(log).toHaveBeenCalledWith("(no members)");
   });
 
-  it("does not print the empty-room footer when there is at least one member", async () => {
+  it("does not print the empty-channel footer when there is at least one member", async () => {
     const deps: MembersDeps = { members: vi.fn().mockResolvedValue([alice]) };
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await runMembers(deps);

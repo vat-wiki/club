@@ -144,12 +144,12 @@ type MessageListProps = {
   me: Participant | null;
   members: Participant[];
   status: Status;
-  /** Slug of the focused room — drives the empty-state + log-region labels. */
-  room?: string;
-  /** True while a room's initial history is being fetched (switch=换台). Shows a
+  /** Slug of the focused channel — drives the empty-state + log-region labels. */
+  channel?: string;
+  /** True while a channel's initial history is being fetched (switch=换台). Shows a
    *  shimmer skeleton so the area never flashes empty-then-pop. */
-  loadingRoom?: boolean;
-  /** A message id to scroll to + briefly highlight (cross-room @mention deep-link). */
+  loadingChannel?: boolean;
+  /** A message id to scroll to + briefly highlight (cross-channel @mention deep-link). */
   highlightMessageId?: string | null;
   /** Cleared by the caller after the highlight lands (so it doesn't re-fire). */
   onHighlightConsumed?: () => void;
@@ -202,7 +202,7 @@ function MessageRow({
   // burst reads as one block instead of repeating the header on every line.
   // The exact send time is still reachable via the row's hover title.
   grouped?: boolean;
-  /** Briefly tinted after a cross-room @mention deep-link lands here. */
+  /** Briefly tinted after a cross-channel @mention deep-link lands here. */
   highlighted?: boolean;
   /** Click "reply" → enter composer reply mode quoting this message. */
   onReply?: (m: Message) => void;
@@ -247,7 +247,7 @@ function MessageRow({
           grouped ? "pt-0.5 pb-1.5" : "py-1.5",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
-          // Cross-room mention deep-link: a transient amber wash (~1.2s) when
+          // Cross-channel mention deep-link: a transient amber wash (~1.2s) when
           // the user jumps here from a toast. Reuses the pinged palette.
           highlighted && "bg-human/5",
         )}
@@ -372,7 +372,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, room, loadingRoom, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onReact },
+  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onReact },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -458,9 +458,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     }
   }, [items.length, virtualizer]);
 
-  // Cross-room @mention deep-link: scroll to the target message and briefly
+  // Cross-channel @mention deep-link: scroll to the target message and briefly
   // highlight it (bg wash, ~1.2s) so the user sees what called them over. The
-  // target message may not be in the list yet (it lands when the room's history
+  // target message may not be in the list yet (it lands when the channel's history
   // fetch resolves after switching), so the effect retries as items grow until
   // it finds the id; a consumed-ref guards against re-firing once it's landed.
   const itemsRef = useRef(items);
@@ -527,19 +527,19 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {banner}
-        {/* 180ms cross-fade on room switch (design §2.1): the key on the wrapper
+        {/* 180ms cross-fade on channel switch (design §2.1): the key on the wrapper
             remounts this subtree, playing a gentle fade-in + translateY(4px→0)
-            so switching rooms reads as "换台", not a hard cut. */}
+            so switching channels reads as "换台", not a hard cut. */}
         <div
-          key={room}
+          key={channel}
           className="flex flex-1 animate-in fade-in slide-in-from-bottom-1 items-center justify-center p-6 sm:p-10"
           style={{ animationDuration: "180ms", animationTimingFunction: "cubic-bezier(0.16,1,0.3,1)" }}
         >
-          {loadingRoom ? (
+          {loadingChannel ? (
             // Network-slow / first-fetch: shimmer skeleton bubbles keep the
             // container height stable instead of flashing the empty state then
             // popping in history. aria-busy announces the load to SR users.
-            <div aria-busy="true" aria-label={t("msg.loadingRoom", { room: room ?? "general" })} className="w-full max-w-md space-y-3">
+            <div aria-busy="true" aria-label={t("msg.loadingChannel", { channel: channel ?? "general" })} className="w-full max-w-md space-y-3">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="flex items-end gap-2.5" style={{ alignItems: i % 2 ? "flex-end" : undefined, flexDirection: i % 2 ? "row-reverse" : undefined }}>
                   <div className="h-6 w-6 flex-none rounded-full bg-muted" />
@@ -552,7 +552,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
             </div>
           ) : (
             <div className="max-w-xs text-center">
-              <div className="font-display text-2xl font-semibold tracking-tight">{t("msg.empty.title", { room: room ?? "general" })}</div>
+              <div className="font-display text-2xl font-semibold tracking-tight">{t("msg.empty.title", { channel: channel ?? "general" })}</div>
               <div className="mx-auto mt-3 h-px w-8 bg-agent/60" aria-hidden />
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                 {t("msg.empty.body")}
@@ -568,12 +568,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   return (
     <div
-      // Room switch = "换台": a keyed remount (key={room} at the caller) plays a
+      // Channel switch = "换台": a keyed remount (key={channel} at the caller) plays a
       // 180ms cross-fade + translateY(4px→0) on this subtree. 180ms is the
       // switch sweet spot (faster than message entrance's 320ms — switching is an
       // active gesture and should feel snappy). topbar/composer/searchbar aren't
       // in this subtree, so they stay rock-steady during the swap.
-      key={room}
+      key={channel}
       className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-bottom-1"
       style={{ animationDuration: "180ms", animationTimingFunction: "cubic-bezier(0.16,1,0.3,1)" }}
     >
@@ -595,7 +595,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         // users hear new messages arrive without leaving the composer. The
         // visible label is hidden but names the region for SR navigation.
         role="log"
-        aria-label={t("msg.logLabel", { room: room ?? "general" })}
+        aria-label={t("msg.logLabel", { channel: channel ?? "general" })}
         aria-live="polite"
         aria-relevant="additions"
         // Make the scroll region keyboard-focusable (WCAG 2.1.1 + axe

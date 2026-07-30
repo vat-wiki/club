@@ -54,7 +54,7 @@ describe("POST /messages sanitization", () => {
     // copy, not the raw payload. Use before=<sentinel> to pull the latest
     // message without a race.
     const res = await app.request(
-      `/messages?room=general&limit=1`,
+      `/messages?channel=general&limit=1`,
       { method: "GET", headers: auth(key) },
     );
     expect(res.status).toBe(200);

@@ -6,10 +6,10 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterAll,describe, expect, it } from "vitest";
 
-// MR1 — data model + migration. We stand up a pre-room ("v6") db on an
+// MR1 — data model + migration. We stand up a pre-channel ("v6") db on an
 // isolated connection (independent of the CLUB_DB singleton the route tests
 // use), then drive the v6→v7 upgrade via the exported runner and assert:
-// existing messages backfill to room='general', the rooms table + general row
+// existing messages backfill to channel='general', the channels table + general row
 // appear, schema_version reaches 7, and re-running the runner is a no-op.
 
 // A temp file PER scenario so each can build its own v6 db fresh.
@@ -38,15 +38,15 @@ process.env.CLUB_DB = singletonDb;
 // pure helpers that operate on whatever Database you hand them.
 const { runMigrations, BASELINE_SCHEMA } = await import("./db.js");
 
-describe("MR1 — multi-room migration (v6 → v7)", () => {
-  it("backfills existing messages to room='general' and seeds the general room", () => {
+describe("MR1 — multi-channel migration (v6 → v7)", () => {
+  it("backfills existing messages to channel='general' and seeds the general channel", () => {
     const path = tmpDb();
     files.push(path);
     const raw = new Database(path);
     raw.exec(BASELINE_SCHEMA);
-    // Apply everything UP TO v6 (so room migration 7 has NOT run yet).
+    // Apply everything UP TO v6 (so channel migration 7 has NOT run yet).
     runMigrations(raw, 6);
-    // Simulate a pre-room world: a participant + a message with NO room column.
+    // Simulate a pre-channel world: a participant + a message with NO channel column.
     raw.exec(
       `INSERT INTO participants (id, name, kind, key_hash, created_at)
          VALUES ('p1', 'neo', 'human', 'h', 1000);`,
@@ -55,24 +55,24 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
       `INSERT INTO messages (id, participant_id, content, created_at)
          VALUES ('m1', 'p1', 'hello old world', 2000);`,
     );
-    // Sanity: at v6 there is no room column yet.
+    // Sanity: at v6 there is no channel column yet.
     const colsBefore = raw
       .prepare<[], { name: string }>("PRAGMA table_info(messages)")
       .all()
       .map((c) => c.name);
-    expect(colsBefore).not.toContain("room");
+    expect(colsBefore).not.toContain("channel");
 
     // Now run the full chain — applies v7.
     runMigrations(raw);
 
     const msg = raw
-      .prepare<[], { room: string }>("SELECT room FROM messages WHERE id = 'm1'")
+      .prepare<[], { channel: string }>("SELECT channel FROM messages WHERE id = 'm1'")
       .get();
-    expect(msg?.room).toBe("general"); // backfilled in place, zero data loss
+    expect(msg?.channel).toBe("general"); // backfilled in place, zero data loss
 
     const general = raw
       .prepare<[], { slug: string; id: string }>(
-        "SELECT id, slug FROM rooms WHERE slug = 'general'",
+        "SELECT id, slug FROM channels WHERE slug = 'general'",
       )
       .get();
     expect(general).toEqual({ id: "general", slug: "general" });
@@ -80,7 +80,7 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
 
     raw.close();
   });
@@ -90,24 +90,24 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
     files.push(path);
     const raw = new Database(path);
     raw.exec(BASELINE_SCHEMA);
-    runMigrations(raw); // applies the full chain (1..11) on a fresh db
+    runMigrations(raw); // applies the full chain (1..16) on a fresh db
 
     expect(() => runMigrations(raw)).not.toThrow(); // second start-up → no-op
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
     // general still exactly one row (INSERT OR IGNORE is idempotent too).
     const count = raw
       .prepare<[], { n: number }>(
-        "SELECT COUNT(*) AS n FROM rooms WHERE slug = 'general'",
+        "SELECT COUNT(*) AS n FROM channels WHERE slug = 'general'",
       )
       .get();
     expect(count?.n).toBe(1);
     raw.close();
   });
 
-  it("a freshly created message defaults to room='general' when none given", () => {
+  it("a freshly created message defaults to channel='general' when none given", () => {
     const path = tmpDb();
     files.push(path);
     const raw = new Database(path);
@@ -117,15 +117,15 @@ describe("MR1 — multi-room migration (v6 → v7)", () => {
       `INSERT INTO participants (id, name, key_hash, created_at)
          VALUES ('p2', 'trinity', 'h', 1);`,
     );
-    // Insert WITHOUT specifying room — the column default must kick in.
+    // Insert WITHOUT specifying channel — the column default must kick in.
     raw.exec(
       `INSERT INTO messages (id, participant_id, content, created_at)
          VALUES ('m2', 'p2', 'default me', 5);`,
     );
     const msg = raw
-      .prepare<[], { room: string }>("SELECT room FROM messages WHERE id = 'm2'")
+      .prepare<[], { channel: string }>("SELECT channel FROM messages WHERE id = 'm2'")
       .get();
-    expect(msg?.room).toBe("general");
+    expect(msg?.channel).toBe("general");
     raw.close();
   });
 });
@@ -149,7 +149,7 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
     raw.close();
   });
 
@@ -163,13 +163,13 @@ describe("MR1b — category-blind migration (v9): drops participant.kind", () =>
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
     raw.close();
   });
 });
 
 describe("MR3 — performance indexes migration (v11)", () => {
-  it("creates key_hash, name, and room-created indexes", () => {
+  it("creates key_hash, name, and channel-created indexes", () => {
     const path = tmpDb();
     files.push(path);
     const raw = new Database(path);
@@ -179,7 +179,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     for (const idxName of [
       "idx_participants_key_hash",
       "idx_participants_name",
-      "idx_messages_room_created",
+      "idx_messages_channel_created",
     ]) {
       const idx = raw
         .prepare<[], { name: string }>(
@@ -192,7 +192,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
 
     // Populate data so EXPLAIN QUERY PLAN is meaningful.
     raw.exec(
@@ -200,7 +200,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
          VALUES ('p1','a','h',1);`,
     );
     raw.exec(
-      `INSERT INTO messages (id, participant_id, content, created_at, room)
+      `INSERT INTO messages (id, participant_id, content, created_at, channel)
          VALUES ('m1','p1','hi',1,'general');`,
     );
 
@@ -239,7 +239,7 @@ describe("MR3 — performance indexes migration (v11)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
     raw.close();
   });
 });
@@ -267,7 +267,7 @@ describe("MR2 — reactions index migration (v10)", () => {
       VALUES ('p1','a','h',1),('p2','b','h',2);
     `);
     raw.exec(`
-      INSERT INTO messages (id, participant_id, content, created_at, room)
+      INSERT INTO messages (id, participant_id, content, created_at, channel)
       VALUES ('m1','p1','hi',1,'general'),
              ('m2','p1','by',2,'general');
     `);
@@ -293,7 +293,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
     raw.close();
   });
 
@@ -307,7 +307,7 @@ describe("MR2 — reactions index migration (v10)", () => {
     const version = raw
       .prepare<[], { version: number }>("SELECT version FROM schema_version")
       .get();
-    expect(version?.version).toBe(15);
+    expect(version?.version).toBe(16);
     raw.close();
   });
 });

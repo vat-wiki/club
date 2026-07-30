@@ -4,27 +4,27 @@
 
 import { Command } from "commander";
 
-import type { Participant, Room } from "@club/shared";
+import type { Channel,Participant } from "@club/shared";
 
 import { withAuthClient } from "../client-factory.js";
-import { defaultRoom } from "../config.js";
+import { defaultChannel } from "../config.js";
 
 export interface InfoDeps {
   /** Simulate `ClubClient.me()`. */
   me: () => Promise<Participant>;
-  /** Simulate `ClubClient.rooms()`. */
-  rooms: () => Promise<Room[]>;
+  /** Simulate `ClubClient.channels()`. */
+  channels: () => Promise<Channel[]>;
   /** Simulate `ClubClient.members()`. */
   members: () => Promise<Participant[]>;
 }
 
 interface DisplayOpts {
   server: string;
-  currentRoom: string;
+  currentChannel: string;
 }
 
 /**
- * Print the participant identity, current room, all rooms with activity,
+ * Print the participant identity, current channel, all channels with activity,
  * and the member roster.
  */
 export async function runInfo(
@@ -32,24 +32,24 @@ export async function runInfo(
   deps: InfoDeps,
   now = Date.now(),
 ): Promise<void> {
-  const [me, rooms, members] = await Promise.all([
+  const [me, channels, members] = await Promise.all([
     deps.me(),
-    deps.rooms(),
+    deps.channels(),
     deps.members(),
   ]);
 
   console.log(`You: ${me.name} (id=${me.id})`);
   console.log(`Server: ${opts.server}`);
-  console.log(`Current room: #${opts.currentRoom}`);
-  console.log(`Total rooms: ${rooms.length}`);
+  console.log(`Current channel: #${opts.currentChannel}`);
+  console.log(`Total channels: ${channels.length}`);
   console.log(`Total members: ${members.length}`);
 
-  console.log(`\nRooms:`);
-  for (const r of rooms) {
+  console.log(`\nChannels:`);
+  for (const r of channels) {
     const active = r.lastActivityAt
       ? `active ${Math.floor((now - r.lastActivityAt) / 60000)}m ago`
       : "empty";
-    const tag = r.slug === opts.currentRoom ? "*" : " ";
+    const tag = r.slug === opts.currentChannel ? "*" : " ";
     console.log(` ${tag}#${r.slug} ${active}`);
   }
 
@@ -60,27 +60,27 @@ export async function runInfo(
 }
 
 /**
- * Build the room-display label for a room slug. Returns "empty" when the
- * room has never seen a message, otherwise "active <N>m ago".
+ * Build the channel-display label for a channel slug. Returns "empty" when the
+ * channel has never seen a message, otherwise "active <N>m ago".
  */
-export function roomDisplayLabel(room: Room, now = Date.now()): string {
-  if (room.lastActivityAt == null) return "empty";
-  return `active ${Math.floor((now - room.lastActivityAt) / 60000)}m ago`;
+export function channelDisplayLabel(channel: Channel, now = Date.now()): string {
+  if (channel.lastActivityAt == null) return "empty";
+  return `active ${Math.floor((now - channel.lastActivityAt) / 60000)}m ago`;
 }
 
 export function makeInfoCommand(): Command {
   return new Command("info")
     .description("show current session info")
     .action(withAuthClient(async (cfg, _args, client) => {
-      // defaultRoom() falls back to "general" when the config room is unset;
-      // this is the canonical current room for a fresh login.
-      const currentRoom = defaultRoom();
+      // defaultChannel() falls back to "general" when the config channel is unset;
+      // this is the canonical current channel for a fresh login.
+      const currentChannel = defaultChannel();
 
       return runInfo(
-        { server: cfg.server, currentRoom },
+        { server: cfg.server, currentChannel },
         {
           me: () => client.me(),
-          rooms: () => client.rooms(),
+          channels: () => client.channels(),
           members: () => client.members(),
         },
       );

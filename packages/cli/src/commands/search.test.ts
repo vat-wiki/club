@@ -7,11 +7,11 @@ import { runSearch, type SearchDeps } from "./search.js";
 const baseMessage: Omit<Message, "id" | "createdAt"> = {
   participantId: "p_1",
   content: "hello",
-  room: "general",
+  channel: "general",
 };
 
-function msg(id: string, room = "general", content = "hello"): Message {
-  return { ...baseMessage, id, content, room, createdAt: Date.now() };
+function msg(id: string, channel = "general", content = "hello"): Message {
+  return { ...baseMessage, id, content, channel, createdAt: Date.now() };
 }
 
 function makeDeps(over: Partial<SearchDeps> = {}): SearchDeps {
@@ -36,13 +36,13 @@ describe("runSearch", () => {
     expect(console.log).toHaveBeenCalledWith('no results for "missing"');
   });
 
-  it("passes the trimmed query, room and limit through to deps.search", async () => {
+  it("passes the trimmed query, channel and limit through to deps.search", async () => {
     const deps = makeDeps({
       search: vi.fn().mockResolvedValue([msg("m1")]),
     });
-    await runSearch({ query: "  foo  ", room: "dev", limit: 20 }, deps);
+    await runSearch({ query: "  foo  ", channel: "dev", limit: 20 }, deps);
     expect(deps.search).toHaveBeenCalledWith("  foo  ", {
-      room: "dev",
+      channel: "dev",
       limit: 20,
     });
   });
@@ -80,7 +80,7 @@ describe("runSearch", () => {
     expect(idxOld).toBeLessThan(idxNew);
   });
 
-  it("prefers non-general messages with a #[room] tag", async () => {
+  it("prefers non-general messages with a #[channel] tag", async () => {
     const deps = makeDeps({
       search: vi.fn().mockResolvedValue([msg("m1", "dev", "hi")]),
     });

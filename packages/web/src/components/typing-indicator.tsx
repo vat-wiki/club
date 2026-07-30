@@ -45,7 +45,7 @@ export function TypingIndicator({ agents }: { agents: readonly TypingAgent[] }) 
   const t = useT();
   if (agents.length === 0) return null;
   // Compose a readable label: "rex is thinking…" or "rex and ana are thinking…".
-  // Capped at 2 names; "+N" for the rest to avoid overflow on a crowded room.
+  // Capped at 2 names; "+N" for the rest to avoid overflow on a crowded channel.
   const names = agents.slice(0, 2).map((a) => a.name);
   const extra = agents.length - names.length;
   const label =

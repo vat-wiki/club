@@ -17,7 +17,7 @@ export type BootStatus = "loading" | "error";
 //     listener so recovery is self-healing once the network returns — the user
 //     doesn't have to babysit a manual retry button.
 //
-// The "live stream dropped" case (after successfully entering the room) is a
+// The "live stream dropped" case (after successfully entering the channel) is a
 // different concern handled by useMessageStream + the message-list banner; this
 // component only owns the *initial* connect.
 

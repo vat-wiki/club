@@ -1,13 +1,13 @@
 import { Avatar } from "@/components/avatar";
-import type { MentionToast } from "@/hooks/use-rooms";
+import type { MentionToast } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-// A single cross-room @mention toast. Slides in from the bottom, auto-dismisses
+// A single cross-channel @mention toast. Slides in from the bottom, auto-dismisses
 // after ~6s, and pauses on hover/focus so keyboard + pointer users both get a
-// fair chance to click the deep-link. Clicking jumps to the source room + message.
+// fair chance to click the deep-link. Clicking jumps to the source channel + message.
 function Toast({
   toast,
   onActivate,
@@ -44,7 +44,7 @@ function Toast({
 
   const ariaLabel = t("toast.mention.aria", {
     author: toast.authorName,
-    room: toast.room,
+    channel: toast.channel,
   });
 
   return (
@@ -72,7 +72,7 @@ function Toast({
         <span className="block truncate text-xs text-foreground">
           <span className="font-medium">{toast.authorName}</span>{" "}
           <span className="text-muted-foreground">{t("toast.mention.prefix")}</span>{" "}
-          <span className="font-mono text-human">#{toast.room}</span>
+          <span className="font-mono text-human">#{toast.channel}</span>
         </span>
         <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-muted-foreground">
           {toast.content}
@@ -85,7 +85,7 @@ function Toast({
 
 // The toast stack: fixed bottom-right, above the composer, pointer-events-none
 // on the wrapper so the dead space doesn't intercept clicks. role=status +
-// aria-live=polite announces new cross-room mentions to SR users without
+// aria-live=polite announces new cross-channel mentions to SR users without
 // stealing focus.
 export function MentionToasts({
   toasts,

@@ -6,10 +6,10 @@ import { runSend, type SendDeps } from "./send-impl.js";
 // interaction (image AND video) so we can assert order + arguments.
 function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
   uploads: string[];
-  sent: { content: string; attachmentIds?: string[]; room?: string }[];
+  sent: { content: string; attachmentIds?: string[]; channel?: string }[];
 } {
   const uploads: string[] = [];
-  const sent: { content: string; attachmentIds?: string[]; room?: string }[] = [];
+  const sent: { content: string; attachmentIds?: string[]; channel?: string }[] = [];
   const base: SendDeps & { uploads: string[]; sent: typeof sent } = {
     uploads,
     sent,
@@ -25,15 +25,15 @@ function makeDeps(over: Partial<SendDeps> = {}): SendDeps & {
       uploads.push(p);
       return { id: "att_" + p };
     },
-    send: async (content, attachmentIds, room) => {
-      sent.push({ content, attachmentIds, room });
+    send: async (content, attachmentIds, channel) => {
+      sent.push({ content, attachmentIds, channel });
       return {
         id: "msg_1",
         participantId: "p_1",
         authorName: "test",
         content,
         createdAt: 1,
-        room,
+        channel,
       };
     },
   };
@@ -179,18 +179,18 @@ describe("runSend", () => {
     expect(deps.sent).toEqual([]); // no partial send
   });
 
-  it("threads the room through to send (posts to the resolved room)", async () => {
+  it("threads the channel through to send (posts to the resolved channel)", async () => {
     const deps = makeDeps();
     await runSend(
-      { content: "hi", images: [], conn: CONN, room: "deploy-debug" },
+      { content: "hi", images: [], conn: CONN, channel: "deploy-debug" },
       deps,
     );
-    expect(deps.sent).toEqual([{ content: "hi", attachmentIds: undefined, room: "deploy-debug" }]);
+    expect(deps.sent).toEqual([{ content: "hi", attachmentIds: undefined, channel: "deploy-debug" }]);
   });
 
-  it("passes room: undefined when no room is set (server then defaults to general)", async () => {
+  it("passes channel: undefined when no channel is set (server then defaults to general)", async () => {
     const deps = makeDeps();
     await runSend({ content: "hi", images: [], conn: CONN }, deps);
-    expect(deps.sent[0]?.room).toBeUndefined();
+    expect(deps.sent[0]?.channel).toBeUndefined();
   });
 });

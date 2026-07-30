@@ -3,14 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClubApiError, computeBackoff, shouldRetry } from "@club/shared";
 
 import {
+  createChannel,
   createParticipant,
-  createRoom,
   deleteMessage,
   getFile,
   getMe,
+  listChannels,
   listMentions,
   listMessages,
-  listRooms,
   markMentionRead,
   markMentionsRead,
   recoverParticipant,
@@ -106,16 +106,16 @@ describe("sendMessage", () => {
     await sendMessage({ server: "http://x", key: "k" }, "hi");
   });
 
-  it("includes room in the body when supplied", async () => {
+  it("includes channel in the body when supplied", async () => {
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       expect(JSON.parse(init.body as string)).toEqual({
         content: "hello",
-        room: "build",
+        channel: "build",
       });
-      return jsonRes({ id: "m1", content: "hello", room: "build" });
+      return jsonRes({ id: "m1", content: "hello", channel: "build" });
     });
     globalThis.fetch = fetchMock as typeof fetch;
-    await sendMessage({ server: "http://x", key: "k" }, "hello", { room: "build" });
+    await sendMessage({ server: "http://x", key: "k" }, "hello", { channel: "build" });
   });
 
   it("includes replyToId in the body when supplied", async () => {
@@ -306,22 +306,22 @@ describe("request retry / timeout", () => {
 });
 
 describe("searchMessages", () => {
-  it("sends GET /messages/search with q, room, and limit params", async () => {
+  it("sends GET /messages/search with q, channel, and limit params", async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      expect(String(url)).toBe("http://x/messages/search?q=hello&room=build&limit=10");
+      expect(String(url)).toBe("http://x/messages/search?q=hello&channel=build&limit=10");
       return jsonRes([{ id: "m1" }]);
     });
     globalThis.fetch = fetchMock as typeof fetch;
 
     const msgs = await searchMessages({ server: "http://x", key: "k" }, {
       q: "hello",
-      room: "build",
+      channel: "build",
       limit: 10,
     });
     expect(msgs).toHaveLength(1);
   });
 
-  it("omits room when not provided", async () => {
+  it("omits channel when not provided", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       expect(String(url)).toBe("http://x/messages/search?q=test");
       return jsonRes([]);
@@ -460,14 +460,14 @@ describe("reportAgentThinking", () => {
     await reportAgentThinking({ server: "http://x", key: "agent1" });
   });
 
-  it("includes room in body when supplied", async () => {
+  it("includes channel in body when supplied", async () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      expect(JSON.parse(init.body as string)).toEqual({ room: "build" });
+      expect(JSON.parse(init.body as string)).toEqual({ channel: "build" });
       return new Response(null, { status: 204 });
     });
     globalThis.fetch = fetchMock as typeof fetch;
 
-    await reportAgentThinking({ server: "http://x", key: "agent1" }, { room: "build" });
+    await reportAgentThinking({ server: "http://x", key: "agent1" }, { channel: "build" });
   });
 });
 
@@ -484,8 +484,8 @@ describe("reportAgentIdle", () => {
   });
 });
 
-describe("listRooms", () => {
-  it("GETs /rooms and returns sorted rooms", async () => {
+describe("listChannels", () => {
+  it("GETs /channels and returns sorted channels", async () => {
     const fetchMock = vi.fn(async () => {
       return jsonRes([
         { slug: "general", lastActivityAt: null },
@@ -495,23 +495,23 @@ describe("listRooms", () => {
     });
     globalThis.fetch = fetchMock as typeof fetch;
 
-    const rooms = await listRooms({ server: "http://x", key: "k" });
-    expect(rooms).toHaveLength(3);
-    expect(rooms[0].slug).toBe("general");
+    const channels = await listChannels({ server: "http://x", key: "k" });
+    expect(channels).toHaveLength(3);
+    expect(channels[0].slug).toBe("general");
   });
 });
 
-describe("createRoom", () => {
-  it("POSTs to /rooms with name and returns room", async () => {
+describe("createChannel", () => {
+  it("POSTs to /channels with name and returns channel", async () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      expect(String(url)).toBe("http://x/rooms");
-      expect(JSON.parse(init.body as string)).toEqual({ name: "new-room" });
-      return jsonRes({ slug: "new-room", lastActivityAt: null });
+      expect(String(url)).toBe("http://x/channels");
+      expect(JSON.parse(init.body as string)).toEqual({ name: "new-channel" });
+      return jsonRes({ slug: "new-channel", lastActivityAt: null });
     });
     globalThis.fetch = fetchMock as typeof fetch;
 
-    const room = await createRoom({ server: "http://x", key: "k" }, "new-room");
-    expect(room.slug).toBe("new-room");
+    const channel = await createChannel({ server: "http://x", key: "k" }, "new-channel");
+    expect(channel.slug).toBe("new-channel");
   });
 });
 

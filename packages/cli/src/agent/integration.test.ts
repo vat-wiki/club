@@ -20,8 +20,8 @@ describe("integration: feed -> queue -> inject", () => {
     const qi = new QueuedInjector((t: string) => { injected.push(t); return true; });
     const stop = startFeed(fakeClient, { inject: { enqueue: (t) => qi.enqueue(t) }, meId: "p_me" });
 
-    handler!({ id: "m1", participantId: "p_me", authorName: "me", content: "我自己", createdAt: 0, room: "dev" } as Message);
-    handler!({ id: "m2", participantId: "p_a", authorName: "alice", content: "帮我\n看下\t日志", createdAt: 0, room: "dev" } as Message);
+    handler!({ id: "m1", participantId: "p_me", authorName: "me", content: "我自己", createdAt: 0, channel: "dev" } as Message);
+    handler!({ id: "m2", participantId: "p_a", authorName: "alice", content: "帮我\n看下\t日志", createdAt: 0, channel: "dev" } as Message);
 
     vi.advanceTimersByTime(IDLE_QUIET_MS + 10);
 
@@ -39,7 +39,7 @@ describe("integration: feed -> queue -> inject", () => {
     let enqueued = 0;
     const stop = startFeed(fakeClient, { inject: { enqueue: () => { enqueued++; } }, meId: "p_me" });
     stop();
-    handler?.({ id: "m1", participantId: "p_a", authorName: "a", content: "x", createdAt: 0, room: "r" } as Message);
+    handler?.({ id: "m1", participantId: "p_a", authorName: "a", content: "x", createdAt: 0, channel: "r" } as Message);
     vi.advanceTimersByTime(IDLE_QUIET_MS + 10);
     expect(enqueued).toBe(0);
   });

@@ -13,13 +13,13 @@ process.env.CLUB_DB = dbPath;
 
 const { me } = await import("./me.js");
 const { participants } = await import("./participants.js");
-const { rooms } = await import("./rooms.js");
+const { channels } = await import("./channels.js");
 const { messages } = await import("./messages.js");
 
 const app = new Hono();
 app.route("/participants", participants);
 app.route("/me", me);
-app.route("/rooms", rooms);
+app.route("/channels", channels);
 app.route("/messages", messages);
 
 afterAll(() => {
@@ -56,8 +56,8 @@ function auth(key: string) {
   return { headers: { Authorization: `Bearer ${key}` } };
 }
 
-async function createRoom(creatorKey: string, name: string): Promise<string> {
-  const res = await app.request("/rooms", {
+async function createChannel(creatorKey: string, name: string): Promise<string> {
+  const res = await app.request("/channels", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${creatorKey}`,
@@ -75,7 +75,7 @@ async function createRoom(creatorKey: string, name: string): Promise<string> {
 async function postMention(
   authorKey: string,
   recipientName: string,
-  room: string,
+  channel: string,
 ): Promise<void> {
   const res = await app.request("/messages", {
     method: "POST",
@@ -83,7 +83,7 @@ async function postMention(
       Authorization: `Bearer ${authorKey}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ content: `hello @${recipientName}`, room }),
+    body: JSON.stringify({ content: `hello @${recipientName}`, channel }),
   });
   expect(res.status).toBe(201);
 }
@@ -147,11 +147,11 @@ describe("GET /me/mentions", () => {
   it("returns unread mentions ordered oldest first", async () => {
     const recipient = await mintParticipant(nextName("mentions-oldest-recip"));
     const author = await mintParticipant(nextName("mentions-oldest-author"));
-    const room = await createRoom(author.key, nextName("oldest-room"));
+    const channel = await createChannel(author.key, nextName("oldest-channel"));
     // Two @-mentions in two separate messages; the API creates mention rows
     // with valid FK references.
-    await postMention(author.key, recipient.name, room);
-    await postMention(author.key, recipient.name, room);
+    await postMention(author.key, recipient.name, channel);
+    await postMention(author.key, recipient.name, channel);
     const res = await app.request("/me/mentions", auth(recipient.key));
     expect(res.status).toBe(200);
     const list = await res.json();
@@ -183,9 +183,9 @@ describe("POST /me/mentions/:id/read", () => {
     const author = await mintParticipant(nextName("mentions-own-author"));
     const bob = await mintParticipant(nextName("mentions-own-bob"));
     const alice = await mintParticipant(nextName("mentions-own-alice"));
-    const room = await createRoom(author.key, nextName("own-test-room"));
+    const channel = await createChannel(author.key, nextName("own-test-channel"));
     // Author mentions alice; bob tries to read that mention.
-    await postMention(author.key, alice.name, room);
+    await postMention(author.key, alice.name, channel);
     const mentions = await (await app.request("/me/mentions", auth(alice.key))).json();
     const target = mentions[0];
     const res = await app.request(`/me/mentions/${target.id}/read`, {
@@ -198,8 +198,8 @@ describe("POST /me/mentions/:id/read", () => {
   it("marks a mention as read and returns the updated shape", async () => {
     const author = await mintParticipant(nextName("mentions-read-author"));
     const recipient = await mintParticipant(nextName("mentions-read-recip"));
-    const room = await createRoom(author.key, nextName("read-test-room"));
-    await postMention(author.key, recipient.name, room);
+    const channel = await createChannel(author.key, nextName("read-test-channel"));
+    await postMention(author.key, recipient.name, channel);
     const mentions = await (await app.request("/me/mentions", auth(recipient.key))).json();
     const id = mentions[0].id;
     const res = await app.request(`/me/mentions/${id}/read`, {
@@ -216,8 +216,8 @@ describe("POST /me/mentions/:id/read", () => {
   it("returns 409 when the mention was already read", async () => {
     const author = await mintParticipant(nextName("mentions-409-author"));
     const recipient = await mintParticipant(nextName("mentions-409-recip"));
-    const room = await createRoom(author.key, nextName("409-test-room"));
-    await postMention(author.key, recipient.name, room);
+    const channel = await createChannel(author.key, nextName("409-test-channel"));
+    await postMention(author.key, recipient.name, channel);
     const mentions = await (await app.request("/me/mentions", auth(recipient.key))).json();
     const id = mentions[0].id;
     // Read it once
@@ -262,9 +262,9 @@ describe("POST /me/mentions/read (batch)", () => {
     const author = await mintParticipant(nextName("mentions-batch-author"));
     const alice = await mintParticipant(nextName("mentions-batch-a"));
     const bob = await mintParticipant(nextName("mentions-batch-b"));
-    const room = await createRoom(author.key, nextName("batch-test-room"));
-    await postMention(author.key, alice.name, room);
-    await postMention(author.key, bob.name, room);
+    const channel = await createChannel(author.key, nextName("batch-test-channel"));
+    await postMention(author.key, alice.name, channel);
+    await postMention(author.key, bob.name, channel);
     const aliceMentions = await (
       await app.request("/me/mentions", auth(alice.key))
     ).json();

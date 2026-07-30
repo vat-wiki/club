@@ -19,12 +19,12 @@ process.env.CLUB_DB = dbPath;
 
 const { messages } = await import("./routes/messages.js");
 const { participants } = await import("./routes/participants.js");
-const { rooms } = await import("./routes/rooms.js");
+const { channels } = await import("./routes/channels.js");
 
 const app = new Hono();
 app.route("/participants", participants);
 app.route("/messages", messages);
-app.route("/rooms", rooms);
+app.route("/channels", channels);
 
 afterAll(() => {
   for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true });
@@ -44,12 +44,12 @@ function auth(key: string) {
 async function postMsg(
   key: string,
   content: string,
-  room = "general",
+  channel = "general",
 ): Promise<any> {
   const res = await app.request("/messages", {
     method: "POST",
     headers: auth(key),
-    body: JSON.stringify({ content, room }),
+    body: JSON.stringify({ content, channel }),
   });
   return { status: res.status, body: await res.json() };
 }
@@ -70,19 +70,19 @@ describe("getReactionsForMessages — large-history chunking", () => {
     const p2 = await mint("batch-p2");
     const p3 = await mint("batch-p3");
 
-    // 120 messages in a dedicated room ⇒ GET /messages?limit=200 will return
+    // 120 messages in a dedicated channel ⇒ GET /messages?limit=200 will return
     // all of them in one page. 120 > 2 × 50 (the batch size), so at least 3
     // IN-clause batches fire.
-    const room = "batch-room";
-    await app.request("/rooms", {
+    const channel = "batch-channel";
+    await app.request("/channels", {
       method: "POST",
       headers: auth(admin),
-      body: JSON.stringify({ name: room }),
+      body: JSON.stringify({ name: channel }),
     });
 
     const sent: { id: string; content: string }[] = [];
     for (let i = 0; i < 120; i++) {
-      const r = await postMsg(admin, `msg ${i}`, room);
+      const r = await postMsg(admin, `msg ${i}`, channel);
       expect(r.status).toBe(201);
       sent.push(r.body);
     }
@@ -97,8 +97,8 @@ describe("getReactionsForMessages — large-history chunking", () => {
       await react(p3, msg.id, "🎉"); // different emoji ⇒ count 1
     }
 
-    // Fetch the full history via GET /messages?room=room&limit=200.
-    const res = await app.request(`/messages?room=${room}&limit=200`, {
+    // Fetch the full history via GET /messages?channel=channel&limit=200.
+    const res = await app.request(`/messages?channel=${channel}&limit=200`, {
       headers: auth(admin),
     });
     expect(res.status).toBe(200);
@@ -130,13 +130,13 @@ describe("getReactionsForMessages — large-history chunking", () => {
 
   it("tolerates an empty message list (no-op)", async () => {
     const key = await mint("batch-empty");
-    const emptyRoom = "batch-empty";
-    await app.request("/rooms", {
+    const emptyChannel = "batch-empty";
+    await app.request("/channels", {
       method: "POST",
       headers: auth(key),
-      body: JSON.stringify({ name: emptyRoom }),
+      body: JSON.stringify({ name: emptyChannel }),
     });
-    const res = await app.request(`/messages?room=${emptyRoom}&limit=20`, {
+    const res = await app.request(`/messages?channel=${emptyChannel}&limit=20`, {
       headers: auth(key),
     });
     expect(res.status).toBe(200);

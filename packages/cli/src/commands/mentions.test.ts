@@ -18,7 +18,7 @@ function mention(over: Partial<Mention> = {}): Mention {
     content: "@bot help me",
     messageCreatedAt: new Date("2024-01-01T09:30:00Z").getTime(),
     readAt: null,
-    room: "dev",
+    channel: "dev",
     ...over,
   };
 }

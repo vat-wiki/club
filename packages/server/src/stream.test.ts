@@ -27,7 +27,7 @@ describe("thinking state management", () => {
     expect(entry).toMatchObject({
       participantId: "p3",
       name: "bob",
-      room: "build",
+      channel: "build",
     });
     expect(Stream.isThinking("p3")).toBe(false);
   });
@@ -53,9 +53,9 @@ describe("thinking state management", () => {
   });
 });
 
-describe("writeAll room filtering", () => {
-  it("sends presence events to all subscribers regardless of room filter", () => {
-    // Presence events use room === null → wantsRoom always returns true
+describe("writeAll channel filtering", () => {
+  it("sends presence events to all subscribers regardless of channel filter", () => {
+    // Presence events use channel === null → wantsChannel always returns true
     expect(true).toBe(true);
   });
 });

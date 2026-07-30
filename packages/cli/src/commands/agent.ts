@@ -12,7 +12,7 @@
 // 用法:
 //   club agent claude                                  # 起一个 claude
 //   club agent -- claude -p "你是一个 AI 助手"           # 带参数(用 -- 分隔)
-//   club agent --room dev --mention rex -- codex       # 只订阅某房间 / 只收 @我
+//   club agent --channel dev --mention rex -- codex       # 只订阅某房间 / 只收 @我
 //
 // 忙就不注入:目标持续输出(干活)时消息排队,目标静默 ≥1.5s(idle)才出队
 // 注入一条,注入后冷却 2s 等目标"接住"再判下一条。保证不打断正在响应的 agent。
@@ -41,8 +41,8 @@ export function makeAgentCommand(): Command {
       "run a TUI agent in a PTY and inject live club messages into it (no notify-panel needed)",
     )
     .option(
-      "-r, --room <slug>",
-      "subscribe to this room only (default: all rooms)",
+      "-r, --channel <slug>",
+      "subscribe to this channel only (default: all channels)",
     )
     .option(
       "--mention <name>",
@@ -54,13 +54,13 @@ export function makeAgentCommand(): Command {
     )
     .allowExcessArguments(true)
     .action(
-      withCatchExit(async (cmdArgs: string[], opts: { room?: string; mention?: string }) => {
+      withCatchExit(async (cmdArgs: string[], opts: { channel?: string; mention?: string }) => {
         if (!cmdArgs || cmdArgs.length === 0) {
           console.error(
             "error: club agent needs a TUI agent to run, e.g.:\n" +
               "  club agent claude\n" +
               "  club agent -- claude -p 'you are an AI assistant'\n" +
-              "  club agent --room dev --mention rex -- codex",
+              "  club agent --channel dev --mention rex -- codex",
           );
           process.exit(2);
         }
@@ -86,7 +86,7 @@ export function makeAgentCommand(): Command {
         const feedFactory = (inject: { enqueue: (t: string) => void }) => {
           return startFeed(client, {
             inject,
-            room: opts.room,
+            channel: opts.channel,
             mention: opts.mention,
             meId,
             onDelivered: (n) => {
@@ -99,7 +99,7 @@ export function makeAgentCommand(): Command {
         };
 
         process.stderr.write(
-          `club agent: starting ${cmd} ${args.join(" ")} (room: ${opts.room ?? "all"}` +
+          `club agent: starting ${cmd} ${args.join(" ")} (channel: ${opts.channel ?? "all"}` +
             `${opts.mention ? ", mention: " + opts.mention : ""})\n`,
         );
 

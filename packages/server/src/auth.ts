@@ -44,7 +44,7 @@ declare module "hono" {
  * leaked credential. The per-key limiter does.
  *
  * The middleware is used as `app.use("/", requireAuth)` in every route module
- * (participants, messages, rooms, …), so a single change here propagates to
+ * (participants, messages, channels, …), so a single change here propagates to
  * every protected endpoint.
  *
  * @see parseBearer (in `@club/shared`) — pure parsing, unit-tested there.

@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { DEFAULT_ROOM, isValidId, parseQueryLimit, ROOM_SLUG_REGEX } from "@club/shared";
+import { CHANNEL_SLUG_REGEX,DEFAULT_CHANNEL, isValidId, parseQueryLimit } from "@club/shared";
 
 /**
  * Send a `{ error: message }` JSON response with the given status. Centralises
@@ -133,58 +133,58 @@ export function requireValidId(
 }
 
 /**
- * Validate a room slug against the canonical `ROOM_SLUG_REGEX`.
+ * Validate a channel slug against the canonical `CHANNEL_SLUG_REGEX`.
  *
  * Pure (no Hono Context) so the check can be unit-tested in isolation.
  */
-export function isValidRoomSlug(slug: string): boolean {
-  return ROOM_SLUG_REGEX.test(slug);
+export function isValidChannelSlug(slug: string): boolean {
+  return CHANNEL_SLUG_REGEX.test(slug);
 }
 
 /**
- * Reject a request with a 400 error when the room slug is invalid.
+ * Reject a request with a 400 error when the channel slug is invalid.
  *
- * A room slug MUST match `ROOM_SLUG_REGEX` (`^[a-z0-9][a-z0-9-]{0,29}$`)
- * — the same contract that POST /rooms enforces. Arbitrary query-param values
- * must be rejected rather than passed through, because room slugs end up in
- * SSE `room` fan-out and untrusted characters (notably newlines) enable CRLF
+ * A channel slug MUST match `CHANNEL_SLUG_REGEX` (`^[a-z0-9][a-z0-9-]{0,29}$`)
+ * — the same contract that POST /channels enforces. Arbitrary query-param values
+ * must be rejected rather than passed through, because channel slugs end up in
+ * SSE `channel` fan-out and untrusted characters (notably newlines) enable CRLF
  * injection into the SSE wire format.
  */
-export function requireValidRoomSlug(
+export function requireValidChannelSlug(
   c: Context,
   slug: string,
 ): { ok: false; r: Response } | undefined {
-  if (!isValidRoomSlug(slug)) {
-    return { ok: false, r: jsonErr(c, "bad room slug") };
+  if (!isValidChannelSlug(slug)) {
+    return { ok: false, r: jsonErr(c, "bad channel slug") };
   }
   return undefined;
 }
 
 /**
- * Parse the `room` query parameter into a validated slug, defaulting to
- * `DEFAULT_ROOM` when absent.
+ * Parse the `channel` query parameter into a validated slug, defaulting to
+ * `DEFAULT_CHANNEL` when absent.
  *
  * Consolidates the repeated "trim, default-if-absent, validate, early-return"
  * sequence seen in list/search/stream routes into a single guard so the route
  * handler reads like a single line rather than four.
  *
- * @returns `{ ok: false, r }` on an invalid slug, or `{ ok: true, room: string }`
- *   with the canonical slug (at least `DEFAULT_ROOM`).
+ * @returns `{ ok: false, r }` on an invalid slug, or `{ ok: true, channel: string }`
+ *   with the canonical slug (at least `DEFAULT_CHANNEL`).
  *
  * @example
  * ```ts
- * const roomOrErr = getRoomQuery(c);
- * if (!roomOrErr.ok) return roomOrErr.r;
- * const { room } = roomOrErr;
+ * const channelOrErr = getChannelQuery(c);
+ * if (!channelOrErr.ok) return channelOrErr.r;
+ * const { channel } = channelOrErr;
  * ```
  */
-export function getRoomQuery(
+export function getChannelQuery(
   c: Context,
-): { ok: false; r: Response } | { ok: true; room: string } {
-  const raw = (c.req.query("room") ?? DEFAULT_ROOM).trim();
-  const bad = requireValidRoomSlug(c, raw);
+): { ok: false; r: Response } | { ok: true; channel: string } {
+  const raw = (c.req.query("channel") ?? DEFAULT_CHANNEL).trim();
+  const bad = requireValidChannelSlug(c, raw);
   if (bad) return { ok: false, r: bad.r };
-  return { ok: true, room: raw };
+  return { ok: true, channel: raw };
 }
 
 /**

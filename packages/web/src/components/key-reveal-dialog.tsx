@@ -15,7 +15,7 @@ import { useEffect } from "react";
 // the key yet — it only does so once the user clicks "I've saved it". This is
 // the deliberate friction point: the login key is the entry credential and the
 // recovery code is the only way back if the key is ever lost, so we show BOTH
-// and force the user to record them before entering the room (PRD §7.1 AC1).
+// and force the user to record them before entering the channel (PRD §7.1 AC1).
 
 const KEY_LIVE = "key-reveal-key-status";
 const RECOVER_LIVE = "key-reveal-recover-status";
@@ -122,7 +122,7 @@ export function KeyRevealDialog({
   key_: string;
   recoverCode: string;
   // Called once the user acknowledges they've saved both. The app then
-  // persists the key and enters the room.
+  // persists the key and enters the channel.
   onSaved: () => void;
   recovered?: boolean;
 }) {

@@ -107,7 +107,7 @@ describe("POST /participants — input security", () => {
 
 // ── Auth middleware boundary ──────────────────────────────────────
 // requireAuth is wired as app.use("*", requireAuth) in every route
-// module (messages, rooms, members, files, agents). The POST /participants
+// module (messages, channels, members, files, agents). The POST /participants
 // endpoint is the only route that doesn't require auth — so we test
 // the auth boundary on the messages route here. This verifies:
 //   • missing Authorization header → 401

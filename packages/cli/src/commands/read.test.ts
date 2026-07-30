@@ -6,7 +6,7 @@ import { type ReadDeps,runRead } from "./read.js";
 
 const MSG1: Message = {
   id: "msg_1",
-  roomId: "general",
+  channelId: "general",
   participantId: "u1",
   participantName: "alice",
   content: "hello",
@@ -18,7 +18,7 @@ function freshDeps(overrides: Partial<ReadDeps> = {}): ReadDeps {
     getClient: vi.fn(),
     formatMessage: vi.fn((m: Message) => `[${m.participantName}] ${m.content}`),
     parseLimit: vi.fn((s: string) => Number(s)),
-    defaultRoom: vi.fn(() => "general"),
+    defaultChannel: vi.fn(() => "general"),
     ...overrides,
   };
 }
@@ -39,7 +39,7 @@ describe("runRead", () => {
       since: undefined,
       before: undefined,
       limit: 50,
-      room: "general",
+      channel: "general",
     });
   });
 
@@ -53,27 +53,27 @@ describe("runRead", () => {
       since: "msg_a",
       before: "msg_b",
       limit: 20,
-      room: "general",
+      channel: "general",
     });
   });
 
-  it("uses --room when supplied, otherwise falls back to defaultRoom", async () => {
+  it("uses --channel when supplied, otherwise falls back to defaultChannel", async () => {
     const client = { messages: vi.fn().mockResolvedValue([]) } as unknown as ClubClient;
     const deps = freshDeps({ getClient: vi.fn(() => client) });
 
-    await runRead({ limit: "5", room: "dev" }, deps);
-    expect(deps.defaultRoom).not.toHaveBeenCalled();
+    await runRead({ limit: "5", channel: "dev" }, deps);
+    expect(deps.defaultChannel).not.toHaveBeenCalled();
     expect(client.messages).toHaveBeenLastCalledWith(
-      expect.objectContaining({ room: "dev" }),
+      expect.objectContaining({ channel: "dev" }),
     );
 
     // reset calls
     (client.messages as any).mockClear();
-    (deps.defaultRoom as any).mockClear();
+    (deps.defaultChannel as any).mockClear();
     await runRead({ limit: "5" }, deps);
-    expect(deps.defaultRoom).toHaveBeenCalledTimes(1);
+    expect(deps.defaultChannel).toHaveBeenCalledTimes(1);
     expect(client.messages).toHaveBeenLastCalledWith(
-      expect.objectContaining({ room: "general" }),
+      expect.objectContaining({ channel: "general" }),
     );
   });
 

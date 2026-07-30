@@ -43,10 +43,11 @@ export interface Message {
   authorName: string;
   content: string;
   createdAt: number;
-  // Canonical room slug this message belongs to. Every message lives in exactly
-  // one room; the default/system room is "general". Old clients/requests that
-  // omit room land here, so the field is always present on server-sourced rows.
-  room: RoomSlugType;
+  // Canonical channel slug this message belongs to. Every message lives in
+  // exactly one channel; the default/system channel is "general". Old
+  // clients/requests that omit channel land here, so the field is always
+  // present on server-sourced rows.
+  channel: ChannelSlugType;
   // Images attached to the message; absent/empty = a plain text message
   // (backward compatible — old clients/rows simply have none). MVP scope: an
   // image is a *shareable/displayable* carrier, symmetric for humans and agents
@@ -119,7 +120,7 @@ export type AttachmentMime = z.infer<typeof AttachmentMime>;
  *
  * The `id` is a server-generated unguessable random slug that doubles as the
  * public `/files/{id}` path. Serving is intentionally unauthenticated — `<img src>`
- * cannot carry the bearer header, and club is a single room whose history every
+ * cannot carry the bearer header, and club is a single channel whose history every
  * member sees anyway. The server is the sole source of truth for dimensions;
  * clients only echo `id`s back, so they can't be forged.
  */
@@ -156,9 +157,10 @@ export interface Mention {
   content: string;
   messageCreatedAt: number;
   readAt: number | null;
-  // The room the mentioning message was posted in, so a cross-room @mention can
-  // deep-link the recipient straight to that room + message. Always present.
-  room: RoomSlugType;
+  // The channel the mentioning message was posted in, so a cross-channel
+  // @mention can deep-link the recipient straight to that channel + message.
+  // Always present.
+  channel: ChannelSlugType;
 }
 
 // ── API request/response shapes ─────────────────────────────────────
@@ -243,59 +245,59 @@ export const UpdateProfileRequest = z
   .strict();
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 
-// ── Rooms (multi-room) ──────────────────────────────────────────────
+// ── Channels (multi-channel) ──────────────────────────────────────────────
 //
-// A room is an open topic channel — NOT an access-control boundary. Every
-// authed participant reads/writes every room equally (PRD §4.1). Rooms are
-// addressed by a stable canonical slug. `general` is the seeded system room;
-// it always exists and is the default when a request omits room.
+// A channel is an open topic channel — NOT an access-control boundary. Every
+// authed participant reads/writes every channel equally (PRD §4.1). Channels are
+// addressed by a stable canonical slug. `general` is the seeded system channel;
+// it always exists and is the default when a request omits channel.
 
-/** Room slug regex: 1–30 chars of lowercase alphanumerics and hyphens, starting with alphanumeric */
-export const ROOM_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,29}$/;
-export const RoomSlug = z
+/** Channel slug regex: 1–30 chars of lowercase alphanumerics and hyphens, starting with alphanumeric */
+export const CHANNEL_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,29}$/;
+export const ChannelSlug = z
   .string()
   .regex(
-    ROOM_SLUG_REGEX,
-    "room name must be 1-30 chars of [a-z0-9-], starting alphanumeric",
+    CHANNEL_SLUG_REGEX,
+    "channel name must be 1-30 chars of [a-z0-9-], starting alphanumeric",
   );
 
-/** Room slug type — used by SDK/CLI callers who need the schema value as a TS type. */
-export type RoomSlugType = z.infer<typeof RoomSlug>;
+/** Channel slug type — used by SDK/CLI callers who need the schema value as a TS type. */
+export type ChannelSlugType = z.infer<typeof ChannelSlug>;
 
 /**
- * Request options for any server call that may be room-scoped.
+ * Request options for any server call that may be channel-scoped.
  *
  * Kept as a named type so SDK/CLI callers and server route handlers agree on
- * the room argument shape: omitting `room` defaults to `DEFAULT_ROOM` on the
- * server, and when present the slug is validated against `RoomSlug`.
+ * the channel argument shape: omitting `channel` defaults to `DEFAULT_CHANNEL` on the
+ * server, and when present the slug is validated against `ChannelSlug`.
  */
-export interface RoomScoped {
-  room?: RoomSlugType;
+export interface ChannelScoped {
+  channel?: ChannelSlugType;
 }
 
 /**
- * One room in the list returned by GET /rooms.
+ * One channel in the list returned by GET /channels.
  *
- * `lastActivityAt` is the created_at of the most recent message in the room
- * (null for an empty room) so clients can sort "unread-first,
+ * `lastActivityAt` is the created_at of the most recent message in the channel
+ * (null for an empty channel) so clients can sort "unread-first,
  * most-recently-active-first" without an extra round-trip. There is no
  * server-side read state — unread is tracked client-side (PRD §5.2).
  */
-export interface Room {
+export interface Channel {
   id: string;
-  slug: RoomSlugType;
+  slug: ChannelSlugType;
   createdAt: number;
   lastActivityAt: number | null;
 }
 
-// POST /rooms { name } — create/ensure a room exists. Idempotent: posting an
-// existing slug returns that room without error. `name` is the canonical slug;
+// POST /channels { name } — create/ensure a channel exists. Idempotent: posting an
+// existing slug returns that channel without error. `name` is the canonical slug;
 // there is no separate display name this phase (PRD §8.6).
-/** Request body for POST /rooms — create or ensure a room exists (idempotent) */
-export const CreateRoomRequest = z.object({
-  name: RoomSlug,
+/** Request body for POST /channels — create or ensure a channel exists (idempotent) */
+export const CreateChannelRequest = z.object({
+  name: ChannelSlug,
 });
-export type CreateRoomRequest = z.infer<typeof CreateRoomRequest>;
+export type CreateChannelRequest = z.infer<typeof CreateChannelRequest>;
 
 /**
  * Response from POST /participants.
@@ -350,7 +352,7 @@ export interface RotateKeyResponse {
 // Delete an existing participant. Requires the current key (Authorization
 // header) plus the recovery code in the body — two-factor on the high-stakes
 // path. Soft-deletes the participant row, revokes the key, and soft-deletes
-// all authored messages so room history stays intact.
+// all authored messages so channel history stays intact.
 /** Request body for DELETE /participants/:id — delete account */
 export const DeleteAccountRequest = z.object({
   password: z.string().min(1),
@@ -359,16 +361,16 @@ export const DeleteAccountRequest = z.object({
 export type DeleteAccountRequest = z.infer<typeof DeleteAccountRequest>;
 
 // ── Domain constants ─────────────────────────────────────────────────
-// Shared across CLI, SDK, and server so the default/system room slug never
-// drifts between packages. Kept in `types.ts` so it lives next to the room-
+// Shared across CLI, SDK, and server so the default/system channel slug never
+// drifts between packages. Kept in `types.ts` so it lives next to the channel-
 // related type definitions.
 
-/** Canonical slug of the system/default room. Seeded by the migration; the
- *   value every client, route, and command falls back to when no room is
+/** Canonical slug of the system/default channel. Seeded by the migration; the
+ *   value every client, route, and command falls back to when no channel is
  *   chosen.
- * @see https://club-docs/rooms/#general
+ * @see https://club-docs/channels/#general
  */
-export const DEFAULT_ROOM = "general";
+export const DEFAULT_CHANNEL = "general";
 
 // ── Content limits ─────────────────────────────────────────────────────
 // Shared constants so client pre-flight checks and server validation never drift.
@@ -399,11 +401,11 @@ export const CreateMessageRequest = z.object({
   content: z.string().max(MAX_MESSAGE_CONTENT).default(""),
   attachmentIds: z.array(z.string().min(1).max(64)).max(MAX_IMAGES_PER_MESSAGE).default([]),
   replyToId: z.string().min(1).max(64).optional(),
-  // Room to post into; defaults to the shared `DEFAULT_ROOM` slug for
+  // Channel to post into; defaults to the shared `DEFAULT_CHANNEL` slug for
   // backward compatibility. Must be a valid slug; posting to a non-existent
-  // (but valid) room auto-creates it (PRD §9.4) — "build" and "enter" are
+  // (but valid) channel auto-creates it (PRD §9.4) — "build" and "enter" are
   // the same action in the open model.
-  room: RoomSlug.default(DEFAULT_ROOM),
+  channel: ChannelSlug.default(DEFAULT_CHANNEL),
 });
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequest>;
 
@@ -422,9 +424,9 @@ export interface ListMessagesQuery {
   since?: string; // message id — return messages after this one
   before?: string; // message id — return messages BEFORE this one (older history; scroll-up pagination)
   limit?: number;
-  // Room to scope to; omitted → "general" on the server (backward compatible).
-  // Typed as RoomSlugType so callers can't accidentally pass a non-canonical slug.
-  room?: RoomSlugType;
+  // Channel to scope to; omitted → "general" on the server (backward compatible).
+  // Typed as ChannelSlugType so callers can't accidentally pass a non-canonical slug.
+  channel?: ChannelSlugType;
 }
 
 /** Generic error response shape returned by the API on any failure */
@@ -452,13 +454,13 @@ export interface ApiError {
 // client can render the indicator without a roster join (matches how `message`
 // events denormalize authorName). The event name retains an "agent" legacy but
 // the mechanism is kind-agnostic: any participant (an agent processing a
-// @mention OR a human typing) reports and is shown as "typing". `room`, when
-// present, scopes the indicator to that room's stream; absent means an unscoped
+// @mention OR a human typing) reports and is shown as "typing". `channel`, when
+// present, scopes the indicator to that channel's stream; absent means an unscoped
 // (legacy/global) report that reaches all subscribers.
 export interface AgentThinkingEvent {
   participantId: string;
   name: string;
-  room?: RoomSlugType;
+  channel?: ChannelSlugType;
 }
 
 /**
@@ -466,19 +468,19 @@ export interface AgentThinkingEvent {
  *
  * Just the id — the client removes it from its thinking set. Emitted on:
  * reply posted (server-detected), agent-reported done/error, or server TTL
- * expiry (crashed/offline agent). `room` mirrors the room the agent was
+ * expiry (crashed/offline agent). `channel` mirrors the channel the agent was
  * thinking in so the clear event reaches the same stream.
  */
 export interface AgentIdleEvent {
   participantId: string;
-  room?: RoomSlugType;
+  channel?: ChannelSlugType;
 }
 
 /**
  * SSE `event: presence` payload.
  *
  * Broadcast on connect (online: true) and disconnect (online: false) so the
- * roster can tell who's actually in the room right now from historical
+ * roster can tell who's actually in the channel right now from historical
  * registrations. A newcomer is also seeded with the current online set on
  * connect (server-side, see stream.ts).
  */
@@ -493,12 +495,12 @@ export interface PresenceEvent {
  *
  * The author recalled a message; clients mark that id recalled (hide content,
  * show a "recalled" placeholder) rather than removing the row entirely
- * (so replies/context still make sense). `room` lets the stream fan-out stay
- * room-scoped (a client watching room B does not receive a recall from room A).
+ * (so replies/context still make sense). `channel` lets the stream fan-out stay
+ * channel-scoped (a client watching channel B does not receive a recall from channel A).
  */
 export interface MessageDeletedEvent {
   id: string;
-  room: RoomSlugType;
+  channel: ChannelSlugType;
 }
 
 /** One emoji reaction aggregate on a message */
@@ -511,25 +513,25 @@ export interface Reaction {
  * SSE `event: message_reaction` payload.
  *
  * A reaction was toggled; carries the refreshed aggregate so clients just swap
- * it in. `room` keeps the fan-out room-scoped (a client watching room B does not
+ * it in. `channel` keeps the fan-out channel-scoped (a client watching channel B does not
  * receive a reaction from A).
  */
 export interface MessageReactionEvent {
   messageId: string;
   reactions: Reaction[];
-  room: RoomSlugType;
+  channel: ChannelSlugType;
 }
 
 // Body for POST /agents/thinking and POST /agents/idle — the agent reports its
 // own status. Auth-required (the participant reports itself; the key identifies
-// who). Only the optional `room` is accepted: when present the thinking/idle
-// event is scoped to that room's stream; absent means unscoped (legacy/global).
+// who). Only the optional `channel` is accepted: when present the thinking/idle
+// event is scoped to that channel's stream; absent means unscoped (legacy/global).
 // The participant is taken from the authed key, so a client can't forge another
 // agent's status.
 /** Request body for POST /agents/thinking and POST /agents/idle — report agent status */
 export const AgentStatusRequest = z
   .object({
-    room: RoomSlug.optional(),
+    channel: ChannelSlug.optional(),
   })
   .strict();
 export type AgentStatusRequest = z.infer<typeof AgentStatusRequest>;

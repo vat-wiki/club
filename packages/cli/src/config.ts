@@ -4,9 +4,9 @@ import { dirname, join, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { DEFAULT_ROOM } from "@club/shared";
+import { DEFAULT_CHANNEL } from "@club/shared";
 
-export { DEFAULT_ROOM };
+export { DEFAULT_CHANNEL };
 
 export interface ClubConfig {
   server: string;
@@ -14,22 +14,22 @@ export interface ClubConfig {
 }
 
 // Validates the on-disk config shape. server/key must be non-empty strings.
-// NOTE: a legacy `room` field (written by the removed `club enter` command)
-// is tolerated and stripped on load — there is no longer any notion of a
-// "current/default room" in config; commands always default to DEFAULT_ROOM
-// unless `--room` is given explicitly.
+// NOTE: a legacy `room` field (written by the removed `club enter` command,
+// before the room->channel rename) is tolerated and stripped on load – there
+// is no longer any notion of a "current/default channel" in config; commands
+// always default to DEFAULT_CHANNEL unless `--channel` is given explicitly.
 const ConfigSchema = z.object({
   server: z.string().min(1),
   key: z.string().min(1),
 });
 
 /**
- * The implicit default room when no `--room` is passed. Always `general`.
- * There is no longer a per-config "current room" — pass `--room` explicitly
+ * The implicit default channel when no `--channel` is passed. Always `general`.
+ * There is no longer a per-config "current channel" — pass `--channel` explicitly
  * to target anything else.
  */
-export function defaultRoom(): string {
-  return DEFAULT_ROOM;
+export function defaultChannel(): string {
+  return DEFAULT_CHANNEL;
 }
 
 // ~/.club/config.json by default; CLUB_CONFIG points elsewhere.

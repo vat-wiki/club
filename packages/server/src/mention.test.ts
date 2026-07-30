@@ -63,7 +63,7 @@ describe("extractMentionedParticipants", () => {
     // mention of "al". The rule is shared with cli/mcp through @club/shared.
     expect(extractMentionedParticipants("ping @alicia", [P("1", "al")])).toEqual([]);
     expect(extractMentionedParticipants("see @editorial", [P("1", "ed")])).toEqual([]);
-    // CJK prefix collision that actually occurred in the room: 走查-体验 is a
+    // CJK prefix collision that actually occurred in the channel: 走查-体验 is a
     // prefix of 走查-体验2, so @走查-体验2 must ping only 走查-体验2, not 走查-体验.
     const roster = [P("1", "走查-体验"), P("2", "走查-体验2")];
     expect(extractMentionedParticipants("@走查-体验2 看下", roster)).toEqual([

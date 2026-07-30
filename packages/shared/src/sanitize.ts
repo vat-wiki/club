@@ -19,7 +19,7 @@
  *
  * @see id.ts — id-level validation (different axis: format, not character
  *           control).
- * @see rooms.ts requireValidRoomSlug — room slug validation.
+ * @see channels.ts requireValidChannelSlug — channel slug validation.
  */
 
 /**

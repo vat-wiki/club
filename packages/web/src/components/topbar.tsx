@@ -1,16 +1,16 @@
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { MobileRoomSheet } from "@/components/mobile-room-sheet";
+import { MobileChannelSheet } from "@/components/mobile-channel-sheet";
 import { MobileRoster } from "@/components/mobile-roster";
 import { MobileTopbarMenu } from "@/components/mobile-topbar-menu";
 import { Button } from "@/components/ui/button";
 import { ViewKeyDialog } from "@/components/view-key-dialog";
-import type { RoomUnread } from "@/hooks/use-rooms";
+import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ChevronDown, LogOut, Radio } from "lucide-react";
 import { useState } from "react";
 
-import type { Participant, Room } from "@club/shared";
+import type { Channel,Participant } from "@club/shared";
 
 export type Status = "connecting" | "connected" | "lost";
 
@@ -25,7 +25,7 @@ const statusKey: Record<Status, string> = {
   lost: "status.reconnecting",
 };
 
-function RoomBadge({ room, clickable }: { room: string; clickable?: boolean }) {
+function ChannelBadge({ channel, clickable }: { channel: string; clickable?: boolean }) {
   return (
     <span
       className={cn(
@@ -34,7 +34,7 @@ function RoomBadge({ room, clickable }: { room: string; clickable?: boolean }) {
       )}
     >
       <span className="text-muted-foreground/60">#</span>
-      <span className="max-w-[10ch] truncate">{room}</span>
+      <span className="max-w-[10ch] truncate">{channel}</span>
       {clickable && <ChevronDown aria-hidden className="h-3 w-3 text-muted-foreground/70" />}
     </span>
   );
@@ -47,11 +47,11 @@ export function Topbar({
   selfId,
   key_,
   onlineIds,
-  currentRoom,
-  rooms,
+  currentChannel,
+  channels,
   unread,
-  onSelectRoom,
-  onCreateRoom,
+  onSelectChannel,
+  onCreateChannel,
   onSignOutRequest,
   onEditProfile,
 }: {
@@ -61,11 +61,11 @@ export function Topbar({
   selfId?: string;
   onlineIds?: Set<string>;
   key_: string | null;
-  currentRoom: string;
-  rooms: Room[];
-  unread: Record<string, RoomUnread>;
-  onSelectRoom: (slug: string) => void;
-  onCreateRoom: (name: string) => Promise<void>;
+  currentChannel: string;
+  channels: Channel[];
+  unread: Record<string, ChannelUnread>;
+  onSelectChannel: (slug: string) => void;
+  onCreateChannel: (name: string) => Promise<void>;
   onSignOutRequest: () => void;
   /** Opens the bio editor for the self row (passed through to the mobile roster). */
   onEditProfile?: () => void;
@@ -83,25 +83,25 @@ export function Topbar({
 
       <div className="flex flex-none items-center">
         <div className="md:hidden">
-          <MobileRoomSheet
+          <MobileChannelSheet
             trigger={
               <button
                 type="button"
-                aria-label={t("rooms.switchTo", { room: currentRoom })}
+                aria-label={t("channels.switchTo", { channel: currentChannel })}
                 className="tap-target rounded-full outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <RoomBadge room={currentRoom} clickable />
+                <ChannelBadge channel={currentChannel} clickable />
               </button>
             }
-            rooms={rooms}
-            currentRoom={currentRoom}
+            channels={channels}
+            currentChannel={currentChannel}
             unread={unread}
-            onSelect={onSelectRoom}
-            onCreate={onCreateRoom}
+            onSelect={onSelectChannel}
+            onCreate={onCreateChannel}
           />
         </div>
         <span className="hidden md:inline-flex">
-          <RoomBadge room={currentRoom} />
+          <ChannelBadge channel={currentChannel} />
         </span>
       </div>
 

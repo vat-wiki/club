@@ -3,7 +3,7 @@
  *
  * The Zod schema enforces only length (min 1, max 64). Before this was added,
  * malformed ids (spaces, slashes, control chars) passed Zod and reached
- * getMessageRoom(), producing a silent 404 that looked like a missing message
+ * getMessageChannel(), producing a silent 404 that looked like a missing message
  * rather than invalid input. These tests confirm the endpoint now rejects
  * malformed replyToId with 400 at the format-validation stage.
  */
@@ -90,7 +90,7 @@ describe("POST /messages — replyToId format validation", () => {
     });
   }
 
-  it("accepts a well-formed replyToId pointing to an existing message in the same room", async () => {
+  it("accepts a well-formed replyToId pointing to an existing message in the same channel", async () => {
     const res = await app.request("/messages", {
       method: "POST",
       headers: auth(key),

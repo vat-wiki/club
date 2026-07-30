@@ -1,29 +1,29 @@
-import { RoomList } from "@/components/room-list";
+import { ChannelList } from "@/components/channel-list";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import type { RoomUnread } from "@/hooks/use-rooms";
+import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { type ReactNode,useState } from "react";
 
-import type { Room } from "@club/shared";
+import type { Channel } from "@club/shared";
 
-// Mobile room selector: on small screens the desktop sidebar is hidden, so the
-// topbar's room badge opens this bottom sheet with the ROOMS list + new-room
-// affordance. Selecting a room switches focus and closes the sheet.
+// Mobile channel selector: on small screens the desktop sidebar is hidden, so the
+// topbar's channel badge opens this bottom sheet with the CHANNELS list + new-channel
+// affordance. Selecting a channel switches focus and closes the sheet.
 //
-// The trigger (the room badge) is passed in by the topbar so the badge stays the
+// The trigger (the channel badge) is passed in by the topbar so the badge stays the
 // single visual element across breakpoints; this component just owns the sheet.
-export function MobileRoomSheet({
+export function MobileChannelSheet({
   trigger,
-  rooms,
-  currentRoom,
+  channels,
+  currentChannel,
   unread,
   onSelect,
   onCreate,
 }: {
   trigger: ReactNode;
-  rooms: Room[];
-  currentRoom: string;
-  unread: Record<string, RoomUnread>;
+  channels: Channel[];
+  currentChannel: string;
+  unread: Record<string, ChannelUnread>;
   onSelect: (slug: string) => void;
   onCreate: (name: string) => Promise<void>;
 }) {
@@ -40,15 +40,15 @@ export function MobileRoomSheet({
         // top only. Mirrors the mobile-roster sheet手法 but anchored bottom.
         className="bottom-0 left-0 top-auto h-auto max-h-[80dvh] w-full max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-lg border-t border-border p-0 data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full sm:rounded-t-lg"
       >
-        <DialogTitle className="sr-only">{t("rooms.mobile.title")}</DialogTitle>
+        <DialogTitle className="sr-only">{t("channels.mobile.title")}</DialogTitle>
         <div className="flex flex-col gap-3 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] scrollbar-thin">
           <h2 className="font-display text-sm font-semibold tracking-tight">
-            {t("rooms.mobile.title")}
+            {t("channels.mobile.title")}
             <span className="text-agent">.</span>
           </h2>
-          <RoomList
-            rooms={rooms}
-            currentRoom={currentRoom}
+          <ChannelList
+            channels={channels}
+            currentChannel={currentChannel}
             unread={unread}
             mobile
             onSelect={(slug) => {

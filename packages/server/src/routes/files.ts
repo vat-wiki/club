@@ -149,7 +149,7 @@ export function detectAndVerifyMime(
 export const files = new Hono();
 
 // All mutations (upload) require auth; GET /files/:id is intentionally open
-// (see plan §3): <img src> can't carry a bearer header, and club's single room
+// (see plan §3): <img src> can't carry a bearer header, and club's single channel
 // is already visible to every member — an unguessable id is sufficient.
 files.post("/", requireAuth, async (c) => {
   let body: Record<string, unknown>;
@@ -206,7 +206,7 @@ files.post("/", requireAuth, async (c) => {
   const filename = typeof file.name === "string" ? sanitizeFilename(file.name) : null;
 
   // Read once into a buffer. For video/document this can reach tens of MB —
-  // acceptable for club's single-room, low-concurrency profile. The write below
+  // acceptable for club's single-channel, low-concurrency profile. The write below
   // is async by design to avoid blocking the event loop on disk I/O.
   const buf = Buffer.from(await file.arrayBuffer());
 

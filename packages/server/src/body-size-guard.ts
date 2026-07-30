@@ -2,7 +2,7 @@ import { createMiddleware } from "hono/factory";
 
 // Default maximum request body size. Uploads (multipart) are handled by the
 // files route with a much higher per-kind cap, but JSON routes that accept
-// message content, reactions, room creation, etc. are all bounded by this.
+// message content, reactions, channel creation, etc. are all bounded by this.
 // 5 MB is large enough for any realistic JSON payload while capping a
 // request-body DoS where an attacker feeds a multi-hundred-MB body that
 // forces the server to buffer it into memory before the route handler runs.

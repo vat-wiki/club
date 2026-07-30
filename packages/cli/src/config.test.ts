@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach,beforeEach, describe, expect, it } from "vitest";
 
-import { configPath, defaultRoom, loadConfig, parseConfig, saveConfig } from "./config.js";
+import { configPath, defaultChannel, loadConfig, parseConfig, saveConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {
@@ -47,14 +47,14 @@ describe("parseConfig", () => {
     expect(parseConfig("[]")).toBeNull();
   });
 
-  it("strips a legacy `room` field (written by the removed `club enter`)", () => {
+  it("strips a legacy `room` field (written by the removed `club enter`, pre-rename)", () => {
     const raw = JSON.stringify({
       server: "http://localhost:6200",
       key: "club_human_abc",
       room: "deploy-debug",
     });
-    // room is no longer part of the config shape; an old config carrying it
-    // is still valid, but the field is dropped on load.
+    // room is no longer part of the config shape (and predates the room->channel
+    // rename); an old config carrying it is still valid, but the field is dropped on load.
     expect(parseConfig(raw)).toEqual({
       server: "http://localhost:6200",
       key: "club_human_abc",
@@ -67,9 +67,9 @@ describe("parseConfig", () => {
   });
 });
 
-describe("defaultRoom", () => {
-  it("always returns general (no per-config current room anymore)", () => {
-    expect(defaultRoom()).toBe("general");
+describe("defaultChannel", () => {
+  it("always returns general (no per-config current channel anymore)", () => {
+    expect(defaultChannel()).toBe("general");
   });
 });
 

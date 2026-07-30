@@ -1,9 +1,9 @@
 // Tests for the `club send` command's action wiring — how the Commander action
-// resolves room, builds the SendDeps bridge, and calls runSend. Distinct from
+// resolves channel, builds the SendDeps bridge, and calls runSend. Distinct from
 // send-impl.test.ts which covers the pure delegation logic in runSend.
 //
 // send.ts is the core CLI entrypoint (post a message), so its action wiring
-// — default room resolution, dependency bridge construction — is a high-value
+// — default channel resolution, dependency bridge construction — is a high-value
 // integration surface to pin with tests.
 //
 // We extract the action logic into runSendCommand so it can be unit-tested
@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ClubClient, type SendResponse } from "@club/sdk";
-import type { Participant as _Participant, Room as _Room } from "@club/shared";
+import type { Channel as _Channel,Participant as _Participant } from "@club/shared";
 
 import { runSend, type SendDeps } from "./send-impl.js";
 import type { ClubConfig } from "../config.js";
@@ -24,9 +24,9 @@ interface CommandDeps {
   clientSend: (
     c: string,
     ids?: string[],
-    opts?: { room?: string },
+    opts?: { channel?: string },
   ) => Promise<SendResponse>;
-  defaultRoom: (c: ClubConfig) => string;
+  defaultChannel: (c: ClubConfig) => string;
   uploadImage: (conn: ClubConfig, p: string) => Promise<{ id: string }>;
   uploadVideo: (conn: ClubConfig, p: string) => Promise<{ id: string }>;
   uploadDocument: (conn: ClubConfig, p: string) => Promise<{ id: string }>;
@@ -43,7 +43,7 @@ export interface SendCommandInput {
     image?: string[];
     video?: string[];
     file?: string[];
-    room?: string;
+    channel?: string;
   };
 }
 
@@ -52,7 +52,7 @@ export async function runSendCommand(
   deps: CommandDeps,
 ): Promise<SendResponse> {
   const content = input.text.join(" ").trim();
-  const room = input.opts.room ?? deps.defaultRoom(deps.cfg);
+  const channel = input.opts.channel ?? deps.defaultChannel(deps.cfg);
   const _client = new ClubClient(deps.cfg);
 
   const sendDeps: SendDeps = {
@@ -63,7 +63,7 @@ export async function runSendCommand(
       deps.clientSend(
         c,
         ids,
-        r ? { room: r } : undefined,
+        r ? { channel: r } : undefined,
       ),
   };
 
@@ -74,7 +74,7 @@ export async function runSendCommand(
       videos: input.opts.video ?? [],
       documents: input.opts.file ?? [],
       conn: deps.cfg,
-      room,
+      channel,
     },
     sendDeps,
   );
@@ -88,11 +88,11 @@ function makeDeps(over: Partial<CommandDeps> = {}): CommandDeps {
       authorName: "test",
       content: c,
       createdAt: 1,
-      room: opts?.room,
+      channel: opts?.channel,
       attachmentIds: ids,
     }) as SendResponse,
   );
-  const defaultRoom = vi.fn().mockReturnValue("general");
+  const defaultChannel = vi.fn().mockReturnValue("general");
   const uploadImage = vi.fn().mockImplementation(async (_conn, p) => ({
     id: "att_" + p,
   }));
@@ -103,9 +103,9 @@ function makeDeps(over: Partial<CommandDeps> = {}): CommandDeps {
     id: "att_" + p,
   }));
   return {
-    cfg: { server: "http://localhost:6200", key: "club_x", room: "general" },
+    cfg: { server: "http://localhost:6200", key: "club_x", channel: "general" },
     clientSend,
-    defaultRoom,
+    defaultChannel,
     uploadImage,
     uploadVideo,
     uploadDocument,
@@ -114,30 +114,30 @@ function makeDeps(over: Partial<CommandDeps> = {}): CommandDeps {
 }
 
 describe("runSendCommand (send action wiring)", () => {
-  it("resolves to the default room when no --room is provided", async () => {
+  it("resolves to the default channel when no --channel is provided", async () => {
     const deps = makeDeps();
     await runSendCommand(
       { text: ["hello"], opts: {} },
       deps,
     );
-    expect(deps.defaultRoom).toHaveBeenCalledWith(deps.cfg);
+    expect(deps.defaultChannel).toHaveBeenCalledWith(deps.cfg);
     expect(deps.clientSend).toHaveBeenCalledWith(
       "hello",
       undefined,
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
-  it("uses --room when provided, ignoring the default room", async () => {
+  it("uses --channel when provided, ignoring the default channel", async () => {
     const deps = makeDeps();
     await runSendCommand(
-      { text: ["hi"], opts: { room: "dev" } },
+      { text: ["hi"], opts: { channel: "dev" } },
       deps,
     );
     expect(deps.clientSend).toHaveBeenCalledWith(
       "hi",
       undefined,
-      { room: "dev" },
+      { channel: "dev" },
     );
   });
 
@@ -150,7 +150,7 @@ describe("runSendCommand (send action wiring)", () => {
     expect(deps.clientSend).toHaveBeenCalledWith(
       "hello world",
       undefined,
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
@@ -163,7 +163,7 @@ describe("runSendCommand (send action wiring)", () => {
     expect(deps.clientSend).toHaveBeenCalledWith(
       "hi",
       undefined,
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
@@ -180,7 +180,7 @@ describe("runSendCommand (send action wiring)", () => {
     expect(deps.clientSend).toHaveBeenCalledWith(
       "look",
       ["att_a.png"],
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
@@ -194,7 +194,7 @@ describe("runSendCommand (send action wiring)", () => {
     expect(deps.clientSend).toHaveBeenCalledWith(
       "watch",
       ["att_a.mp4"],
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
@@ -208,7 +208,7 @@ describe("runSendCommand (send action wiring)", () => {
     expect(deps.clientSend).toHaveBeenCalledWith(
       "doc",
       ["att_a.pdf"],
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
@@ -224,17 +224,17 @@ describe("runSendCommand (send action wiring)", () => {
     expect(deps.clientSend).toHaveBeenCalledWith(
       "mix",
       ["att_a.png", "att_b.mp4", "att_c.pdf"],
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
-  it("passes room: undefined when no room arg (server defaults to general)", async () => {
+  it("passes channel: undefined when no channel arg (server defaults to general)", async () => {
     const deps = makeDeps();
     await runSendCommand({ text: ["hi"], opts: {} }, deps);
     expect(deps.clientSend).toHaveBeenCalledWith(
       "hi",
       undefined,
-      { room: "general" },
+      { channel: "general" },
     );
   });
 
@@ -291,7 +291,7 @@ describe("runSendCommand (send action wiring)", () => {
     expect(capturedConn).toEqual({
       server: "http://localhost:6200",
       key: "club_x",
-      room: "general",
+      channel: "general",
     });
   });
 });

@@ -4,13 +4,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serve } from "@hono/node-server";
-import { getConnInfo } from "@hono/node-server/conninfo";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import { bodySizeGuard } from "./body-size-guard.js";
-import { getClientIp, rateLimit } from "./rate-limit.js";
+import { clientIpKey, rateLimit } from "./rate-limit.js";
 import { agents } from "./routes/agents.js";
 import { channels } from "./routes/channels.js";
 import { files } from "./routes/files.js";
@@ -26,21 +25,14 @@ const joinHtmlPath = resolve(__dirname, "public", "join.html");
 
 const app = new Hono();
 
-// Whether to trust forwarding headers (X-Forwarded-For / X-Real-IP) when
-// resolving the client IP for rate limiting. Enable ONLY behind a trusted
-// reverse proxy (nginx/caddy) that overwrites these headers — otherwise the
-// socket address is the source of truth and spoofable headers must be ignored.
-// Caveat: bare Docker port-publishing sets no XFF, so flipping this on without
-// a proxy does NOT restore per-client buckets — the limiter still collapses
-// every connection onto the proxy/gateway IP. Put a proxy that sets
-// X-Forwarded-For in front, then set TRUSTED_PROXY=true.
-const trustedProxy = process.env.TRUSTED_PROXY === "true";
-
 // Global rate limiter: 120 requests per minute per IP (generous for read paths).
+// `clientIpKey` (from rate-limit.ts) resolves the real client IP via the socket
+// address — or X-Forwarded-For when TRUSTED_PROXY=true — so the bucket is per
+// client, not a single shared site-wide bucket.
 app.use("*", rateLimit({
   max: 120,
   windowMs: 60_000,
-  key: (c) => getClientIp(c, () => getConnInfo(c), trustedProxy),
+  key: clientIpKey,
 }));
 
 // Security headers: CSP, HSTS, X-Content-Type-Options, etc.

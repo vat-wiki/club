@@ -12,6 +12,38 @@
 // relying on `setTimeout`. Production code calls `Date.now` directly.
 // Exported only for tests; underscore prefix signals "private API".
 
+import { getConnInfo } from "@hono/node-server/conninfo";
+
+// Whether to trust forwarding headers (X-Forwarded-For / X-Real-IP) when
+// resolving the client IP for rate limiting. Enable ONLY behind a trusted
+// reverse proxy (nginx/caddy) that overwrites these headers - otherwise the
+// socket address is the source of truth and spoofable headers must be ignored.
+// Caveat: bare Docker port-publishing sets no XFF, so flipping this on without
+// a proxy does NOT restore per-client buckets - the limiter still collapses
+// every connection onto the proxy/gateway IP. Put a proxy that sets
+// X-Forwarded-For in front, then set TRUSTED_PROXY=true.
+//
+// Single source of truth for the whole server (global limiter + the write-path
+// limiters in routes/messages.ts and routes/participants.ts) so they all agree
+// on what "client IP" means.
+export const trustedProxy = process.env.TRUSTED_PROXY === "true";
+
+/**
+ * Production client-IP key extractor for `rateLimit({ key })`.
+ *
+ * Wires the real `getConnInfo` (socket address) together with the
+ * `trustedProxy` flag into `getClientIp`. This is what every production
+ * limiter MUST pass as `key` - otherwise `rateLimit` falls back to
+ * `getClientIp(c)` with no `getConnInfo`, which returns `"unknown"`, collapsing
+ * EVERY caller onto a single shared bucket (e.g. the 15/min write cap becomes a
+ * 15/min cap for the whole site, so concurrent users trip 429s and POST
+ * /messages "often fails"). The global limiter in index.ts and the per-route
+ * limiters all use this so their buckets key off the real client IP.
+ */
+export function clientIpKey(c: import("hono").Context): string {
+  return getClientIp(c, () => getConnInfo(c), trustedProxy);
+}
+
 interface Bucket {
   // Last moment the window started (used to decide when it expires).
   windowStart: number;

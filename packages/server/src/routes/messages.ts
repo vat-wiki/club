@@ -40,7 +40,7 @@ import {
 import { getChannelQuery, jsonErr, parseJsonBody, parseLimit, requireValidChannelSlug,requireValidId } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
-import { rateLimit } from "../rate-limit.js";
+import { clientIpKey, rateLimit } from "../rate-limit.js";
 import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction, markThinkingIdle } from "../stream.js";
 
 export const messages = new Hono();
@@ -52,10 +52,13 @@ messages.use("*", requireAuth);
 // enough for abuse on writes (spam, reaction-flooding, recall-storming). 15/min
 // per IP keeps legitimate use unaffected while making scripted abuse impractical.
 // Disabled in test mode (NODE_ENV=test) so e2e suites don't hit the ceiling.
+// `key: clientIpKey` is mandatory: without it the limiter keys on "unknown" and
+// the 15/min cap collapses to a single site-wide bucket (concurrent users trip
+// 429s and POST /messages "often fails").
 const isTest = process.env.NODE_ENV === "test";
 const writeLimiter = isTest
   ? undefined
-  : rateLimit({ max: 15, windowMs: 60_000 });
+  : rateLimit({ max: 15, windowMs: 60_000, key: clientIpKey });
 
 // Typed identity middleware so the write-path guard can conditionally use
 // writeLimiter or a no-op at compile time (Hono's variadic overload needs a

@@ -28,7 +28,7 @@ import {
 import { jsonErr, parseJsonBody, requireValidId, withOptionalMiddleware } from "../lib.js";
 import { requireJson } from "../lib/json-content-type.js";
 import { invalidateParticipantNameMap } from "../mention.js";
-import { rateLimit } from "../rate-limit.js";
+import { clientIpKey, rateLimit } from "../rate-limit.js";
 
 export const participants = new Hono();
 
@@ -39,10 +39,12 @@ export const participants = new Hono();
 // impractical to enumerate names or hammer recovery attempts.
 // Disabled in test mode (NODE_ENV=test) so tests can exercise these endpoints
 // without hitting the rate ceiling.
+// `key: clientIpKey` keys the bucket on the real client IP; without it the cap
+// collapses to a single site-wide "unknown" bucket.
 const isTest = process.env.NODE_ENV === "test";
 const authLimiter = isTest
   ? undefined
-  : rateLimit({ max: 10, windowMs: 60_000 });
+  : rateLimit({ max: 10, windowMs: 60_000, key: clientIpKey });
 
 // Generate a single-use key. Plaintext returned exactly once. The key carries
 // only the `club_` namespace prefix — no participant kind, since club no longer

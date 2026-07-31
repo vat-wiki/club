@@ -591,6 +591,28 @@ export function getMessagesBeforeId(beforeId: string, channel: ChannelSlugType, 
   return beforeStmt.all(row.rowid, channel, limit).reverse();
 }
 
+/** Context window around `aroundId`: a few messages BEFORE it, the anchor
+ *  itself, then a few AFTER - oldest->newest. Backs `club read --around <id>`
+ *  so a reader (human or agent) landing on a message id sees the surrounding
+ *  conversation, not just the forward tail `--since` would give.
+ *
+ *  Splits `limit` as `floor(limit/2)` before + the anchor + the rest after, so
+ *  the page biases slightly toward earlier context (the gap `--since` leaves).
+ *  Returns [] when the anchor is unknown or lives in another channel - same
+ *  "unknown id -> empty" contract as getMessagesBeforeId / getMessagesSince.
+ *
+ *  Reuses the before/since prepared statements + getMessageById (which already
+ *  joins the author projection); no new SQL. */
+export function getMessagesAround(aroundId: string, channel: ChannelSlugType, limit: number): MessageRow[] {
+  const anchor = getMessageById(aroundId);
+  if (!anchor) return [];
+  if (anchor.channel !== channel) return [];
+  const half = Math.floor(limit / 2);
+  const before = half > 0 ? beforeStmt.all(anchor.rowid, channel, half).reverse() : [];
+  const after = limit - 1 - half > 0 ? sinceMessagesStmt.all(anchor.rowid, channel, limit - 1 - half) : [];
+  return [...before, anchor, ...after];
+}
+
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
   `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' ORDER BY m.rowid DESC LIMIT ?`
 );

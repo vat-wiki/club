@@ -57,6 +57,21 @@ describe("runRead", () => {
     });
   });
 
+  it("passes --around through to the client", async () => {
+    const client = { messages: vi.fn().mockResolvedValue([]) } as unknown as ClubClient;
+    const deps = freshDeps({ getClient: vi.fn(() => client) });
+
+    await runRead({ limit: "20", around: "msg_x" }, deps);
+
+    expect(client.messages).toHaveBeenCalledWith({
+      since: undefined,
+      before: undefined,
+      around: "msg_x",
+      limit: 20,
+      channel: "general",
+    });
+  });
+
   it("uses --channel when supplied, otherwise falls back to defaultChannel", async () => {
     const client = { messages: vi.fn().mockResolvedValue([]) } as unknown as ClubClient;
     const deps = freshDeps({ getClient: vi.fn(() => client) });

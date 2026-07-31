@@ -172,7 +172,8 @@ export class ClubClient {
   }
 
   /** GET /messages — recent history of a channel; `since` returns messages after
-   *  an id, `before` returns older messages before an id (scroll-up pagination).
+   *  an id, `before` returns older messages before an id (scroll-up pagination),
+   *  `around` returns context around an id (a few before + the anchor + a few after).
    *  `channel` scopes to a channel (default "general" server-side when omitted). */
   messages(opts: ListMessagesQuery = {}): Promise<Message[]> {
     return listMessages(this.conn(), { ...opts, ...this.callOpts() });

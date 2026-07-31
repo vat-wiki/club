@@ -24,6 +24,7 @@ import {
   getFilesByIds,
   getMessageById,
   getMessageChannel,
+  getMessagesAround,
   getMessagesBeforeId,
   getMessagesSince,
   getReactionsForMessage,
@@ -110,6 +111,29 @@ function requireValidBeforeQuery(
   const before = c.req.query("before");
   if (before !== undefined) {
     const bad = requireValidId(c, before, "before id");
+    if (bad) return bad.r;
+  }
+  return undefined;
+}
+
+/**
+ * Validate that `around` is a non-empty query parameter.
+ *
+ * Same contract as `requireValidSinceQuery` / `requireValidBeforeQuery`:
+ * `around` is optional (omit → paginated/recent history), but when supplied it
+ * must look like a valid message id before the DB is consulted. This keeps the
+ * context-window entry point consistent with the `since` / `before` paths and
+ * with the id-bearing delete/reaction routes.
+ *
+ * @returns `{ error, status }` to use as an early return, or `undefined` when
+ *   `around` is absent or valid.
+ */
+function requireValidAroundQuery(
+  c: Context,
+): Response | undefined {
+  const around = c.req.query("around");
+  if (around !== undefined) {
+    const bad = requireValidId(c, around, "around id");
     if (bad) return bad.r;
   }
   return undefined;
@@ -290,7 +314,7 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   return c.json(msg, 201);
 });
 
-// GET /messages?channel=<slug>&since=<id>&before=<id>&limit=<n> -> Message[]
+// GET /messages?channel=<slug>&since=<id>&before=<id>&around=<id>&limit=<n> -> Message[]
 // (chronologic). `channel` defaults to "general" for backward compatibility — an
 // old client that omits it sees the general history exactly as before.
 messages.get("/", (c) => {
@@ -299,23 +323,31 @@ messages.get("/", (c) => {
   const { channel } = channelOrErr;
   const since = c.req.query("since");
   const before = c.req.query("before");
+  const around = c.req.query("around");
   const limit = parseLimit(c.req.query("limit"));
-  // Validate `since`/`before` query params before any DB call. The dedicated
-  // helpers (requireValidSinceQuery / requireValidBeforeQuery) wrap the
-  // id-format check so the route reads like a single guard list; see their
-  // JSDoc for why invalid ids are rejected up-front rather than passed through.
+  // Validate `since`/`before`/`around` query params before any DB call. The dedicated
+  // helpers (requireValidSinceQuery / requireValidBeforeQuery /
+  // requireValidAroundQuery) wrap the id-format check so the route reads like a
+  // single guard list; see their JSDoc for why invalid ids are rejected up-front
+  // rather than passed through.
   const badSince = requireValidSinceQuery(c);
   if (badSince) return badSince;
   const badBefore = requireValidBeforeQuery(c);
   if (badBefore) return badBefore;
-  // `before` (older history, scroll-up pagination) takes precedence over
-  // `since`; they aren't combined in practice, but if both appear we serve the
-  // backward page so the UI's "load earlier" never accidentally pulls newer.
-  const rows = before
-    ? getMessagesBeforeId(before, channel, limit)
-    : since
-      ? getMessagesSince(since, channel, limit).messages
-      : getRecentMessages(channel, limit);
+  const badAround = requireValidAroundQuery(c);
+  if (badAround) return badAround;
+  // `around` (context window: a few before + the anchor + a few after) takes
+  // precedence over `before`/`since`; the three are distinct pagination modes
+  // and aren't combined in practice. If several appear we serve the context
+  // window — a reader asking for context around an id wants that, not a
+  // one-sided page.
+  const rows = around
+    ? getMessagesAround(around, channel, limit)
+    : before
+      ? getMessagesBeforeId(before, channel, limit)
+      : since
+        ? getMessagesSince(since, channel, limit).messages
+        : getRecentMessages(channel, limit);
   const messageIds = rows.map((r) => r.id);
   const reactionsMap = getReactionsForMessages(messageIds);
   // `toMessage` uses reactionsMap.has(r.id) to distinguish "batched (maybe

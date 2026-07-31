@@ -232,9 +232,10 @@ export async function listMessages(
   const params = new URLSearchParams();
   if (opts.since) params.set("since", opts.since);
   if (opts.before) params.set("before", opts.before);
+  if (opts.around) params.set("around", opts.around);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.channel) params.set("channel", opts.channel);
-  const { since: _s, before: _b, limit: _l, channel: _r, ...callOpts } = opts;
+  const { since: _s, before: _b, around: _a, limit: _l, channel: _r, ...callOpts } = opts;
   const qs = params.toString();
   return request<Message[]>(c, `/messages${qs ? "?" + qs : ""}`, callOpts);
 }

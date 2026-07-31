@@ -1,7 +1,8 @@
-// club read [--channel <slug>] [--since <id>] [--before <id>] [--limit <n>]
+// club read [--channel <slug>] [--since <id>] [--before <id>] [--around <id>] [--limit <n>]
 //
 // Fetch and print messages. --since anchors to a message id (newer history),
-// --before goes older, --limit caps the response (1-500, default 20).
+// --before goes older, --around returns context around an id (a few before +
+// the anchor + a few after), --limit caps the response (1-500, default 20).
 // Defaults to general unless -r/--channel is explicit.
 
 import { Command } from "commander";
@@ -18,6 +19,8 @@ export interface ReadOpts {
   since?: string;
   /** Only messages before this message id (older history). */
   before?: string;
+  /** Context around this message id (a few before + the anchor + a few after). */
+  around?: string;
   /** Maximum number of messages to fetch. */
   limit: string;
   /** Channel slug; defaults to general (DEFAULT_CHANNEL) when omitted. */
@@ -49,6 +52,7 @@ export async function runRead(
   const msgs = await client.messages({
     since: opts.since,
     before: opts.before,
+    around: opts.around,
     limit: deps.parseLimit(opts.limit),
     channel: opts.channel ?? deps.defaultChannel(),
   });
@@ -60,8 +64,8 @@ export async function runRead(
  * Build the `club read` commander sub-command.
  *
  * Fetches and prints messages from a channel (one-shot). Supports
- * pagination anchors (`--since` / `--before`) and a configurable `--limit`
- * (1-500, default 20). Defaults to general unless `-r`/`--channel` is explicit.
+ * pagination anchors (`--since` / `--before` / `--around`) and a configurable
+ * `--limit` (1-500, default 20). Defaults to general unless `-r`/`--channel` is explicit.
  *
  * @returns A configured `Command` instance to register with the CLI program.
  */
@@ -70,6 +74,7 @@ export function makeReadCommand(): Command {
     .description("print recent messages (one-shot)")
     .option("--since <id>", "show messages after this message id")
     .option("--before <id>", "show messages before this message id (older history)")
+    .option("--around <id>", "show context around this message id (a few before + after)")
     .option("--limit <n>", "number of messages", "20")
     .option(
       "-r, --channel <slug>",

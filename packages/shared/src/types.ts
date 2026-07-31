@@ -438,6 +438,7 @@ export type UploadFileResponse = MessageAttachment;
 export interface ListMessagesQuery {
   since?: string; // message id — return messages after this one
   before?: string; // message id — return messages BEFORE this one (older history; scroll-up pagination)
+  around?: string; // message id — return context: a few BEFORE this one + the anchor + a few AFTER
   limit?: number;
   // Channel to scope to; omitted → "general" on the server (backward compatible).
   // Typed as ChannelSlugType so callers can't accidentally pass a non-canonical slug.

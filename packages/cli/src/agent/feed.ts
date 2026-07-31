@@ -39,7 +39,8 @@ export interface FeedOptions {
  *
  * club 的职责只是告诉 agent「有事找你」;要不要 `club read` 取正文、要不要
  * 回复,是 agent 自己的事。所以注入文本只是一条通知头:来源(club)、房间、
- * 消息 id(供 agent 拉上下文 `club read --since <id>`),外加一句「是否查看/
+ * 消息 id(供 agent 拉上下文 `club read --around <id>`(取前后几条上下文)
+ * 或 `--since <id>`(只看后续)),外加一句「是否查看/
  * 回复由你定」把可选性讲死 —— 避免把 `@bot 去做X` 这种正文直接灌进去,被
  * agent 当成必须执行的任务。
  *

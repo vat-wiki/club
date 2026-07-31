@@ -2,8 +2,8 @@
 # club 镜像版本管理（npm semver）+ staging 部署脚本。
 #
 # 发新版本（两步）：
-#   1. npm version patch           # 或 minor / major；bump package.json + 自动 commit + 打 git tag v0.x.y
-#   2. ./scripts/deploy.sh build   # 读 package.json 版本 → 建 club:<版本> → 写 TEST_TAG → 重启 test(:6600)
+#   1. ./scripts/version.sh patch  # 或 minor / major；bump root+server 到同一版本 + 自动 commit + 打 git tag v0.x.y
+#   2. ./scripts/deploy.sh build   # 读 package.json 版本 → 装 club-serve@<版本> 建镜像 → 写 TEST_TAG → 重启 test(:6600)
 # 验证 OK 后：
 #   ./scripts/deploy.sh promote            # 把 test 验证通过的版本推广到 prod(:6500)
 #   ./scripts/deploy.sh rollback <版本>    # prod 回滚到指定旧版本（旧镜像需仍在本地）
@@ -22,7 +22,7 @@ set_tag()  { ensure_env "$1"; sed -i "s|^$1=.*|$1=$2|" .env; }
 case "${1:-}" in
   build)
     VER="$(node -p "require('./package.json').version")"
-    docker build -t "club:$VER" -t club:latest .
+    docker build --build-arg CLUB_VERSION="$VER" -t "club:$VER" -t club:latest .
     # 首次部署时 .env 可能刚从 .env.example 初始化，PROD_TAG 还是空——
     # 用当前 VER 兠底，避免 docker-compose 的 :? 插值报错。后续 promote 会改写 PROD_TAG。
     [ -n "$(read_tag CLUB_PROD_TAG)" ] || set_tag CLUB_PROD_TAG "$VER"
@@ -45,7 +45,7 @@ case "${1:-}" in
     ;;
   *)
     echo "用法: $0 {build|promote|rollback <版本>}"
-    echo "发新版本前先：npm version patch|minor|major"
+    echo "发新版本前先：./scripts/version.sh patch|minor|major"
     exit 1
     ;;
 esac

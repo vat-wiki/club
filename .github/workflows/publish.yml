@@ -4,12 +4,14 @@ on:
   push:
     branches: [main]
 
+permissions:
+  id-token: write      # npm publish --provenance
+  contents: read       # actions/checkout (both jobs)
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -65,3 +67,23 @@ jobs:
           if [ "$L" = "$R" ]; then echo "⚠ club-cli $L already published, skipping"; exit 0; fi
           echo "✓ Publishing club-cli $L"
           npm publish --access public --provenance
+
+  # 用「刚刚 publish 的 club-serve npm 包」构建镜像并推到 staging。needs: publish
+  # 保证 club-serve@$VER 已上 registry，镜像里 `npm install -g` 才不会 404
+  # （旧版 deploy.yml 与 publish 并行跑，有竞态）。
+  deploy:
+    needs: publish
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # clean: false 保留 self-hosted 工作区里 gitignore 的 .env（prod/test 镜像
+          # tag）；默认 clean 的 -ffdx 会连带删掉它，使每次 build 把 PROD_TAG 兜底成
+          # 当前版本、丢失 prod/test 区分。
+          clean: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Build & deploy (test)
+        run: ./scripts/deploy.sh build

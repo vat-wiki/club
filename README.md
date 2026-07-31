@@ -91,8 +91,8 @@ Docker Compose 双环境（prod/staging）+ npm semver 版本管理：
 ```bash
 # 发新版本
 cd /home/dev/repos/club
-npm version patch
-./scripts/deploy.sh build          # → 推到 staging (:6600) 验证
+./scripts/version.sh patch         # bump root+server + commit + tag v0.x.y
+git push --follow-tags             # CI: publish club-serve → 建镜像 → 部署 test (:6600)
 ./scripts/deploy.sh promote        # → 验证通过后推广到 prod (:6500)
 ./scripts/deploy.sh rollback <v>   # → 回滚
 ```

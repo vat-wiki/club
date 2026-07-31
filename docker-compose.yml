@@ -5,7 +5,7 @@
 # 旧版本镜像不会被覆盖，回滚就是改 .env 里 PROD_TAG 再 up。
 #
 # 日常流程（用脚本，别手改）：
-#   npm version patch                   # 先 bump 版本（自动 commit + 打 git tag v0.x.y）
+#   ./scripts/version.sh patch                   # 先 bump 版本（自动 commit + 打 git tag v0.x.y）
 #   ./scripts/deploy.sh build           # 建 club:<版本> → 写 TEST_TAG → 重启 test(:6600)
 #   ./scripts/deploy.sh promote         # 把 test 验证通过的版本推广到 prod(:6500)
 #   ./scripts/deploy.sh rollback <版本> # prod 回滚到指定版本

@@ -254,6 +254,7 @@ interface MockXHR {
   open: ReturnType<typeof vi.fn>;
   setRequestHeader: (k: string, v: string) => void;
   send: ReturnType<typeof vi.fn>;
+  abort: ReturnType<typeof vi.fn>;
   onload?: () => void;
   onerror?: () => void;
   ontimeout?: () => void;
@@ -272,6 +273,7 @@ function mkXHR(): MockXHR {
     open: vi.fn(),
     setRequestHeader: vi.fn() as (k: string, v: string) => void,
     send: vi.fn(),
+    abort: vi.fn(),
     upload: { onprogress: vi.fn<(e: ProgressEvent) => void>() },
     headers: {},
     sentBody: null,
@@ -290,6 +292,12 @@ function withXHR<T>(factory: (xhr: MockXHR) => Promise<T> | T): Promise<T> {
   xhr.send = vi.fn((body: unknown) => {
     xhr.sentBody = body as FormData;
     xhr.sendWasCalled = true;
+  });
+  // Real xhr.abort() fires onabort; mirror that so the timeout path can be
+  // exercised end-to-end (the timer calls abort -> onabort -> reject).
+  xhr.abort = vi.fn(() => {
+    xhr.calledAbort = true;
+    xhr.onabort?.();
   });
   _setCreateXHR(() => xhr as unknown as XMLHttpRequest);
   return Promise.resolve(factory(xhr)).finally(() => {
@@ -400,11 +408,33 @@ describe("upload helpers — uploadImage (XHR path)", () => {
     });
   });
 
-  it("throws ClubApiError on abort (from explicit AbortController)", async () => {
+  it("throws ClubApiError when the XHR is aborted", async () => {
     await withXHR(async (xhr) => {
       const p = uploadImage(conn, img);
       xhr.onabort!();
       await expect(p).rejects.toThrow("upload timeout");
     });
+  });
+
+  it("aborts the XHR after timeoutMs so a stalled upload rejects instead of spinning forever", async () => {
+    // Regression: the timer used to call controller.abort() on an AbortController
+    // that was never wired to the XHR, so a stalled upload (no onload, no onerror)
+    // left the chip spinning "uploading" forever. Now the timer calls xhr.abort().
+    vi.useFakeTimers();
+    try {
+      await withXHR(async (xhr) => {
+        // Server never responds: neither onload nor onerror fires.
+        const p = uploadImage(conn, img, { timeoutMs: 5_000 });
+        // Attach a handler before advancing the timer so the rejection that the
+        // timer triggers (abort -> onabort -> reject) isn't briefly unhandled.
+        p.catch(() => {});
+        expect(xhr.sendWasCalled).toBe(true);
+        await vi.advanceTimersByTimeAsync(5_000);
+        expect(xhr.calledAbort).toBe(true);
+        await expect(p).rejects.toThrow("upload timeout");
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

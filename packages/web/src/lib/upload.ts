@@ -198,13 +198,20 @@ export async function uploadImage(
   const formData = new FormData();
   formData.append('file', file);
 
-  const controller = new AbortController();
   const timeoutMs = opts.timeoutMs ?? 30_000;
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
   const xhr = createXHR();
   const headers: Record<string, string> = {};
   if (conn.key) headers.Authorization = `Bearer ${conn.key}`;
+
+  // Abort the XHR once timeoutMs elapses. XHR has no AbortSignal, so the timer
+  // must call xhr.abort() directly (an AbortController does nothing here - XHR
+  // doesn't read its signal, so the previous controller.abort() was a no-op and
+  // xhr.timeout was never set, leaving ontimeout/onabort as dead code). Without
+  // this, an upload whose response never comes back (e.g. lost behind a reverse
+  // proxy, or a stalled connection) resolves neither onload nor onerror, so the
+  // composer's chip would spin "uploading" forever. xhr.abort() fires onabort ->
+  // rejects below -> the chip flips to its retryable error state.
+  const timer = setTimeout(() => xhr.abort(), timeoutMs);
 
   try {
     xhr.open('POST', `${conn.server}/files`);

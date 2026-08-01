@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach,beforeEach, describe, expect, it } from "vitest";
 
-import { configPath, defaultChannel, loadConfig, parseConfig, saveConfig, clearConfig } from "./config.js";
+import { clearConfig,configPath, defaultChannel, loadConfig, parseConfig, saveConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {

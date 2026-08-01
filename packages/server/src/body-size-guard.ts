@@ -42,10 +42,7 @@ export function bodySizeGuard(maxBytes = DEFAULT_MAX_BODY_BYTES) {
     // type arrives as "multipart/form-data; boundary=...", matched
     // case-insensitively.
     const contentType = c.req.header("content-type");
-    if (
-      contentType != null &&
-      contentType.toLowerCase().includes("multipart/form-data")
-    ) {
+    if (contentType?.toLowerCase().includes("multipart/form-data")) {
       await next();
       return;
     }

@@ -11,9 +11,9 @@ import { Command } from "commander";
 import { ClubClient } from "@club/sdk";
 import type { Message } from "@club/shared";
 
+import { formatMessage } from "./format.js";
 import { withCatchExit } from "../catch-exit.js";
 import { requireConfig } from "../config.js";
-import { formatMessage } from "./format.js";
 import { readStream } from "../stdin.js";
 
 export interface EditDeps {

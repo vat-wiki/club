@@ -51,9 +51,7 @@ export function bodySizeGuard(maxBytes = DEFAULT_MAX_BODY_BYTES) {
     // per-kind check runs. The content type arrives as
     // "multipart/form-data; boundary=...", matched case-insensitively.
     const contentType = c.req.header("content-type");
-    const isMultipart =
-      contentType != null &&
-      contentType.toLowerCase().includes("multipart/form-data");
+    const isMultipart = !!contentType?.toLowerCase().includes("multipart/form-data");
     const effectiveMax = isMultipart ? MULTIPART_MAX_BODY_BYTES : maxBytes;
 
     // Fast-path: trust a sane Content-Length header and fail-fast without

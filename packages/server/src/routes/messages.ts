@@ -523,7 +523,7 @@ messages.get("/stream", (c) => {
           event: "error",
           data: JSON.stringify({ error: "too many concurrent connections" }),
         })
-        .catch(() => {});
+        .catch(() => undefined);
       return;
     }
     stream.onAbort(() => {

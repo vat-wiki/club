@@ -79,7 +79,7 @@ export default function App() {
   // onMessageEdited needs setMessages (returned by the hook below), so we delegate
   // through a ref assigned once setMessages is available. The hook reads
   // onMessageEdited via its own ref on every render, so the delegate stays current.
-  const handleMessageEditedRef = useRef<(e: MessageEditedEvent) => void>(() => {});
+  const handleMessageEditedRef = useRef<(e: MessageEditedEvent) => void>(() => undefined);
   const { messages, status, setMessages, loadMore, loadingMore, onlineIds } = useMessageStream(me ? conn : null, {
     currentChannel: channels.currentChannel,
     onIncoming: channels.recordIncoming,

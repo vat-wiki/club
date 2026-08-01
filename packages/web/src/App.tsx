@@ -2,11 +2,11 @@ import { AccountCreatedToast } from "@/components/account-created-toast";
 import { AuthDialog } from "@/components/auth-dialog";
 import { BootScreen } from "@/components/boot-screen";
 import { Composer } from "@/components/composer";
-import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { MentionToasts } from "@/components/mention-toast";
 import { MessageList, type MessageListHandle } from "@/components/message-list";
 import { Roster } from "@/components/roster";
 import { SearchBar } from "@/components/search-bar";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 import { Topbar } from "@/components/topbar";
 import { TypingIndicator } from "@/components/typing-indicator";
@@ -37,10 +37,8 @@ export default function App() {
   const [members, setMembers] = useState<Participant[]>([]);
   const [authOpen, setAuthOpen] = useState(!conn);
   const [signOutOpen, setSignOutOpen] = useState(false);
-  // Bio editor (self-introduction). Opened from the roster's self row. Saving
-  // PATCHes /me and refreshes the roster so the new bio shows immediately
-  // instead of waiting for the 8s polling tick.
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  // Full-screen Settings overlay (channels/members/account/language management).
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Account created toast state (P0-7: non-blocking toast instead of blocking reveal)
   const [accountCreatedToast, setAccountCreatedToast] = useState<{
     recoverCode: string;
@@ -199,34 +197,31 @@ export default function App() {
   );
 
   // Open-model roster actions: anyone may edit anyone's bio, anyone may kick
-  // anyone (kick = account deleted). Both refresh the roster on success.
-  const handleEditMemberBio = useCallback(
-    (p: Participant) => {
+  // anyone (kick = account deleted). Both refresh the roster on success. These
+  // are invoked from the Settings overlay; confirmation for kick is handled by
+  // the Settings ConfirmDialog, so this handler just performs the action.
+  const handleSaveMemberBio = useCallback(
+    async (p: Participant, bio: string) => {
       if (!conn) return;
-      const bio = window.prompt(t("roster.editBioPrompt", { name: p.name }), p.bio);
-      if (bio === null) return; // cancelled
-      void api
-        .updateParticipantBio(conn, p.id, bio)
-        .then(refreshMembers)
-        .catch(() => {
-          // Bio edits are surfaced via roster refresh; a failure just leaves the old text.
-        });
+      // Throw on failure so the inline BioEditor surfaces the error and stays
+      // open for a retry.
+      await api.updateParticipantBio(conn, p.id, bio);
+      void refreshMembers();
     },
-    [conn, t, refreshMembers],
+    [conn, refreshMembers],
   );
 
   const handleKickMember = useCallback(
-    (p: Participant) => {
+    async (p: Participant) => {
       if (!conn) return;
-      if (!window.confirm(t("roster.kickConfirm", { name: p.name }))) return;
-      void api
-        .kickParticipant(conn, p.id)
-        .then(refreshMembers)
-        .catch(() => {
-          // Kick is reflected on the next roster poll; a failure just leaves the row briefly.
-        });
+      try {
+        await api.kickParticipant(conn, p.id);
+        void refreshMembers();
+      } catch {
+        // Kick is reflected on the next roster poll; a failure just leaves the row briefly.
+      }
     },
-    [conn, t, refreshMembers],
+    [conn, refreshMembers],
   );
 
   // Cross-channel mention toast → jump to the source channel + scroll/highlight the
@@ -427,19 +422,16 @@ export default function App() {
 
       {me && (
         <Topbar
-          meName={me.name}
           status={status}
           members={members}
           selfId={me.id}
           onlineIds={onlineIds}
-          key_={getKey()}
           currentChannel={channels.currentChannel}
           channels={channels.sortedChannels}
           unread={channels.unread}
           onSelectChannel={handleSwitchChannel}
           onCreateChannel={handleCreateChannel}
-          onSignOutRequest={() => setSignOutOpen(true)}
-          onEditProfile={() => setEditProfileOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       )}
 
@@ -453,11 +445,6 @@ export default function App() {
           unread={channels.unread}
           onSelectChannel={handleSwitchChannel}
           onCreateChannel={handleCreateChannel}
-          onRenameChannel={handleRenameChannel}
-          onDeleteChannel={handleDeleteChannel}
-          onEditProfile={() => setEditProfileOpen(true)}
-          onEditBio={handleEditMemberBio}
-          onKick={handleKickMember}
         />
         <main id="main" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
           {/* Visually-hidden h1 gives the view a heading for SR users without
@@ -538,7 +525,7 @@ export default function App() {
         onRecovered={handleRecovered}
       />
 
-      {/* Confirm before wiping the key from this machine. */}
+      {/* Confirm before wiping the key from this machine. Opened from Settings. */}
       <SignOutConfirmDialog
         open={signOutOpen}
         onOpenChange={setSignOutOpen}
@@ -546,13 +533,23 @@ export default function App() {
         onConfirm={performSignOut}
       />
 
-      {/* Edit own bio / self-introduction (category-blind). Opened from the
-          roster's self row on both desktop and mobile. */}
-      <EditProfileDialog
-        open={editProfileOpen}
-        onOpenChange={setEditProfileOpen}
-        currentBio={me?.bio ?? ""}
-        onSave={handleSaveBio}
+      {/* Full-screen Settings: channels/members/account/language management.
+          Opened from the topbar gear (desktop) or the mobile "more" menu. */}
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        me={me}
+        members={members}
+        selfId={me?.id}
+        onlineIds={onlineIds}
+        channels={channels.sortedChannels}
+        key_={getKey()}
+        onSaveMyBio={handleSaveBio}
+        onSaveMemberBio={handleSaveMemberBio}
+        onSignOutRequest={() => setSignOutOpen(true)}
+        onRenameChannel={handleRenameChannel}
+        onDeleteChannel={handleDeleteChannel}
+        onKickMember={handleKickMember}
       />
     </div>
   );

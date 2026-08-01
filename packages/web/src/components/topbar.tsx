@@ -1,13 +1,10 @@
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileChannelSheet } from "@/components/mobile-channel-sheet";
 import { MobileRoster } from "@/components/mobile-roster";
 import { MobileTopbarMenu } from "@/components/mobile-topbar-menu";
-import { Button } from "@/components/ui/button";
-import { ViewKeyDialog } from "@/components/view-key-dialog";
 import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ChevronDown, LogOut, Radio } from "lucide-react";
+import { ChevronDown, Radio, Settings } from "lucide-react";
 import { useState } from "react";
 
 import type { Channel,Participant } from "@club/shared";
@@ -41,34 +38,28 @@ function ChannelBadge({ channel, clickable }: { channel: string; clickable?: boo
 }
 
 export function Topbar({
-  meName,
   status,
   members,
   selfId,
-  key_,
   onlineIds,
   currentChannel,
   channels,
   unread,
   onSelectChannel,
   onCreateChannel,
-  onSignOutRequest,
-  onEditProfile,
+  onOpenSettings,
 }: {
-  meName: string | null;
   status: Status;
   members: Participant[];
   selfId?: string;
   onlineIds?: Set<string>;
-  key_: string | null;
   currentChannel: string;
   channels: Channel[];
   unread: Record<string, ChannelUnread>;
   onSelectChannel: (slug: string) => void;
   onCreateChannel: (name: string) => Promise<void>;
-  onSignOutRequest: () => void;
-  /** Opens the bio editor for the self row (passed through to the mobile roster). */
-  onEditProfile?: () => void;
+  /** Opens the full-screen Settings overlay. */
+  onOpenSettings: () => void;
 }) {
   const t = useT();
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -112,9 +103,8 @@ export function Topbar({
         status={status}
         members={members}
         onlineIds={onlineIds}
-        key_={key_}
-        onSignOutRequest={onSignOutRequest}
         onOpenRoster={() => setRosterOpen(true)}
+        onOpenSettings={onOpenSettings}
       />
 
       {/* Mobile roster sheet (triggered from the menu, not a topbar button) */}
@@ -123,13 +113,12 @@ export function Topbar({
         selfId={selfId}
         onlineIds={onlineIds}
         onlineCount={onlineIds?.size ?? members.length}
-        key_={key_}
         open={rosterOpen}
         onOpenChange={setRosterOpen}
-        onEditProfile={onEditProfile}
       />
 
-      {/* Desktop: full set of top-right icons (hidden on mobile) */}
+      {/* Desktop: connection status + a single settings gear. Management
+          (channels/members/account/language) all live behind the gear now. */}
       <span
         className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground md:inline-flex"
         role="status"
@@ -142,28 +131,16 @@ export function Topbar({
 
       <span aria-hidden className="h-4 w-px flex-none bg-border md:inline-flex" />
 
-      <LanguageSwitcher />
-
-      <ViewKeyDialog key_={key_} />
-
-      <Button
-        variant="outline"
-        className="tap-target hidden gap-1.5 px-2.5 active:bg-accent md:inline-flex md:px-3"
-        onClick={onSignOutRequest}
-        aria-label={t("topbar.signOut.aria", {
-          name: meName ?? t("topbar.signOut.switchIdentity"),
-        })}
-        title={t("topbar.signOut.title")}
-        data-testid="sign-out-button"
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        aria-label={t("settings.open.aria")}
+        title={t("settings.title")}
+        data-testid="settings-trigger"
+        className="tap-target inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:inline-flex"
       >
-        <span className="max-w-[6ch] truncate font-mono text-xs sm:max-w-[10ch]">
-          {meName ?? t("topbar.signOut.short")}
-        </span>
-        <span aria-hidden className="hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
-          {t("topbar.signOut.label")}
-        </span>
-        <LogOut className="h-3.5 w-3.5" aria-hidden />
-      </Button>
+        <Settings className="h-4 w-4" aria-hidden />
+      </button>
     </header>
   );
 }

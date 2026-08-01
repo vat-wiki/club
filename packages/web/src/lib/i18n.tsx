@@ -243,6 +243,32 @@ const zh: Dict = {
   "profile.save": "保存",
   "profile.saving": "保存中…",
 
+  // Settings (full-screen management hub). Channel/member management, account
+  // (bio/key/sign-out) and language all live here; the sidebar lists go back to
+  // pure navigation. See components/settings-dialog.tsx.
+  "settings.open.aria": "打开设置",
+  "settings.title": "设置",
+  "settings.account": "账号",
+  "settings.channels": "频道",
+  "settings.members": "成员",
+  "settings.language": "语言",
+  "settings.account.bio": "我的简介",
+  "settings.account.noBio": "未设置简介",
+  "settings.account.key": "登录密钥",
+  "settings.account.signOut": "退出登录",
+  "settings.channel.system": "系统频道，不可删除",
+
+  // Reusable inline bio editor (account self + member rows share it).
+  "bio.edit": "编辑简介",
+  "bio.empty": "未设置",
+
+  // Reusable destructive confirm dialog (delete channel / kick member).
+  "common.cancel": "取消",
+  "common.delete": "删除",
+  "common.kick": "踢出",
+  "confirm.deleteChannel.title": "删除频道",
+  "confirm.kick.title": "踢出成员",
+
   // Composer
   "composer.label": "给 #{channel} 发消息",
   "composer.placeholder": "给 #{channel} 发条消息…",
@@ -521,6 +547,30 @@ const en: Dict = {
   "profile.cancel": "Cancel",
   "profile.save": "Save",
   "profile.saving": "Saving…",
+
+  // Settings (full-screen management hub).
+  "settings.open.aria": "Open settings",
+  "settings.title": "Settings",
+  "settings.account": "Account",
+  "settings.channels": "Channels",
+  "settings.members": "Members",
+  "settings.language": "Language",
+  "settings.account.bio": "My bio",
+  "settings.account.noBio": "No bio set",
+  "settings.account.key": "Login key",
+  "settings.account.signOut": "Sign out",
+  "settings.channel.system": "System channel, can't delete",
+
+  // Reusable inline bio editor.
+  "bio.edit": "Edit bio",
+  "bio.empty": "Not set",
+
+  // Reusable destructive confirm dialog.
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.kick": "Kick",
+  "confirm.deleteChannel.title": "Delete channel",
+  "confirm.kick.title": "Kick member",
 
   // Composer
   "composer.label": "Send a message to #{channel}",

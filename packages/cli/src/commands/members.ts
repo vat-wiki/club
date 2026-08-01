@@ -1,6 +1,6 @@
-// club members [--channel <slug>]
+// club members
 //
-// List participants in the current channel (or --channel <slug>). Each member
+// List all members (global roster). Each member
 // is printed on its own line for agent consumption - name first, with the
 // member's bio (when set) appended so participants are easier to tell apart;
 // a friendly "(no members)" footer appears when the channel is empty.
@@ -40,7 +40,7 @@ export async function runMembers(deps: MembersDeps): Promise<void> {
 
 export function makeMembersCommand(): Command {
   return new Command("members")
-    .description("list channel members")
+    .description("list all members (global roster)")
     .action(withAuthClient(async (_cfg, _args, client) => {
       return runMembers({ members: () => client.members() });
     }));

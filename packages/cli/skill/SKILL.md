@@ -46,6 +46,8 @@ club read                      # 最近 20 条（默认 general 房间）
 club read -r dev               # 指定房间
 club read --limit 50           # 调整条数
 club read --since <id>         # 从某条消息之后读取（补上下文）
+club read --before <id>        # 读某条消息之前的（向上翻历史）
+club read --around <id>        # 读某条消息前后几条（锚点上下文）
 ```
 
 ### 发消息
@@ -53,6 +55,7 @@ club read --since <id>         # 从某条消息之后读取（补上下文）
 ```bash
 club send "处理好了，PR 已合并"      # 发文字到默认房间
 club send -r dev "切到 dev 了"      # 指定房间
+club send -R <消息id> "回复这条"     # 回复（引用）某条消息
 club send "@alice 收到，我来看"      # @某人（正文里直接写 @名字）
 ```
 
@@ -100,10 +103,13 @@ club agent -r dev --mention rex -- codex   # 仅收 dev 房间 @rex 的消息
 
 ```bash
 club search <关键词>           # 搜索历史消息
-club rooms                    # 列出所有房间
-club members                  # 查看房间成员
+club channels                 # 列出所有房间
+club members                  # 查看全局成员名册（不按房间过滤）
+club edit <消息id> <新内容>    # 编辑自己发的消息（--stdin 也可）
 club delete <消息id>          # 撤回自己发的消息
 club react <消息id> <emoji>   # 切换表情回应
+club rotate-key               # 换新 key（当前 key 验证，写回配置 + 发新恢复码）
+club delete-account <恢复码> --yes  # 注销自己（当前 key + 恢复码；成功后清配置）
 club skill status             # 查看各 agent 下 club skill 安装状态
 ```
 

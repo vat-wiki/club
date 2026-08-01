@@ -12,7 +12,6 @@ import { AuthDialog } from "./auth-dialog";
 import { BootScreen } from "./boot-screen";
 import { ChannelList } from "./channel-list";
 import { Composer } from "./composer";
-import { KeyRevealDialog } from "./key-reveal-dialog";
 import { MentionToasts } from "./mention-toast";
 import { MessageList } from "./message-list";
 import { MobileRoster } from "./mobile-roster";
@@ -228,32 +227,6 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   it("AuthDialog has no violations", async () => {
     await expectNoViolationsPortal(
       <AuthDialog open onCreated={() => {}} onAuthed={() => {}} />,
-    );
-  });
-
-  it("KeyRevealDialog has no violations", async () => {
-    await expectNoViolationsPortal(
-      <KeyRevealDialog
-        open
-        key_={TEST_KEY}
-        recoverCode="club_recover_test"
-        onSaved={() => {}}
-      />,
-    );
-  });
-
-  it("KeyRevealDialog (recovery mode) has no violations", async () => {
-    // Rotated-credentials variant — same layout, different copy. The recovery
-    // flow MUST surface the new key + recovery code before entering the channel
-    // (P0-1). Verify the rotated-mode dialog is still accessible.
-    await expectNoViolationsPortal(
-      <KeyRevealDialog
-        open
-        recovered
-        key_={TEST_KEY}
-        recoverCode="club_recover_rotated"
-        onSaved={() => {}}
-      />,
     );
   });
 

@@ -5,7 +5,9 @@ import { makeBioCommand } from "./commands/bio.js";
 import { makeCatCommand } from "./commands/cat.js";
 import { makeChannelCommand } from "./commands/channel.js";
 import { makeChannelsCommand } from "./commands/channels.js";
+import { makeDeleteAccountCommand } from "./commands/delete-account.js";
 import { makeDeleteCommand } from "./commands/delete.js";
+import { makeEditCommand } from "./commands/edit.js";
 import { makeInfoCommand } from "./commands/info.js";
 import { makeJoinCommand } from "./commands/join.js";
 import { makeKickCommand } from "./commands/kick.js";
@@ -16,6 +18,7 @@ import { makeProfileCommand } from "./commands/profile.js";
 import { makeReactCommand } from "./commands/react.js";
 import { makeReadCommand } from "./commands/read.js";
 import { makeRecoverCommand } from "./commands/recover.js";
+import { makeRotateKeyCommand } from "./commands/rotate-key.js";
 import { makeSearchCommand } from "./commands/search.js";
 import { makeSendCommand } from "./commands/send.js";
 import { makeSkillCommand } from "./commands/skill.js";
@@ -66,6 +69,9 @@ const cmds = [
   makeRecoverCommand(),
   makeSearchCommand(),
   makeDeleteCommand(),
+  makeEditCommand(),
+  makeRotateKeyCommand(),
+  makeDeleteAccountCommand(),
   makeKickCommand(),
   makeReactCommand(),
   makeCatCommand(),

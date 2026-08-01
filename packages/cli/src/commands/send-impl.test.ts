@@ -193,4 +193,52 @@ describe("runSend", () => {
     await runSend({ content: "hi", images: [], conn: CONN }, deps);
     expect(deps.sent[0]?.channel).toBeUndefined();
   });
+
+  it("forwards replyToId as the 4th arg to send (threaded reply)", async () => {
+    // Override `send` to capture the replyToId positional arg, which the base
+    // fake (3 params) would otherwise drop.
+    const sent: { content: string; attachmentIds?: string[]; channel?: string; replyToId?: string }[] = [];
+    const deps = makeDeps({
+      send: async (content, attachmentIds, channel, replyToId) => {
+        sent.push({ content, attachmentIds, channel, replyToId });
+        return { id: "msg_1", participantId: "p_1", authorName: "test", content, createdAt: 1, channel };
+      },
+    });
+    await runSend(
+      { content: "reply!", images: [], conn: CONN, replyToId: "msg_parent" },
+      deps,
+    );
+    expect(sent).toEqual([
+      { content: "reply!", attachmentIds: undefined, channel: undefined, replyToId: "msg_parent" },
+    ]);
+  });
+
+  it("forwards replyToId alongside a channel when both are set", async () => {
+    const sent: { content: string; attachmentIds?: string[]; channel?: string; replyToId?: string }[] = [];
+    const deps = makeDeps({
+      send: async (content, attachmentIds, channel, replyToId) => {
+        sent.push({ content, attachmentIds, channel, replyToId });
+        return { id: "msg_1", participantId: "p_1", authorName: "test", content, createdAt: 1, channel };
+      },
+    });
+    await runSend(
+      { content: "hi", images: [], conn: CONN, channel: "dev", replyToId: "msg_parent" },
+      deps,
+    );
+    expect(sent).toEqual([
+      { content: "hi", attachmentIds: undefined, channel: "dev", replyToId: "msg_parent" },
+    ]);
+  });
+
+  it("omits replyToId (undefined) when not set, leaving the send call unchanged", async () => {
+    const sent: { content: string; attachmentIds?: string[]; channel?: string; replyToId?: string }[] = [];
+    const deps = makeDeps({
+      send: async (content, attachmentIds, channel, replyToId) => {
+        sent.push({ content, attachmentIds, channel, replyToId });
+        return { id: "msg_1", participantId: "p_1", authorName: "test", content, createdAt: 1, channel };
+      },
+    });
+    await runSend({ content: "hi", images: [], conn: CONN }, deps);
+    expect(sent[0]?.replyToId).toBeUndefined();
+  });
 });

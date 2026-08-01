@@ -2,10 +2,12 @@ import { AccountCreatedToast } from "@/components/account-created-toast";
 import { AuthDialog } from "@/components/auth-dialog";
 import { BootScreen } from "@/components/boot-screen";
 import { Composer } from "@/components/composer";
+import { DeleteAccountDialog } from "@/components/delete-account-dialog";
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { MentionToasts } from "@/components/mention-toast";
 import { MessageList, type MessageListHandle } from "@/components/message-list";
 import { Roster } from "@/components/roster";
+import { RotateKeyDialog } from "@/components/rotate-key-dialog";
 import { SearchBar } from "@/components/search-bar";
 import { SignOutConfirmDialog } from "@/components/sign-out-confirm-dialog";
 import { Topbar } from "@/components/topbar";
@@ -14,13 +16,13 @@ import { type MentionToast,useChannels } from "@/hooks/use-channels";
 import { useMessageStream } from "@/hooks/use-message-stream";
 import { useTypingAgents } from "@/hooks/use-typing-agents";
 import { useVisualViewportHeight } from "@/hooks/use-visual-viewport-height";
-import { api } from "@/lib/api";
+import { api, rawDeleteAccount, rawRotateKey } from "@/lib/api";
 import { API_URL, clearConn, getKey,loadConn, saveConn, saveRecoverCode } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ClubApiError, type ClubConn } from "@club/sdk";
-import { DEFAULT_CHANNEL, type ImageMime, type Message, type Participant } from "@club/shared";
+import { ClubApiError, ClubClient, type ClubConn } from "@club/sdk";
+import { DEFAULT_CHANNEL, type ImageMime, type Message, type MessageEditedEvent, type Participant } from "@club/shared";
 
 export default function App() {
   const { t } = useI18n();
@@ -41,9 +43,17 @@ export default function App() {
   // PATCHes /me and refreshes the roster so the new bio shows immediately
   // instead of waiting for the 8s polling tick.
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  // Account created toast state (P0-7: non-blocking toast instead of blocking reveal)
+  // Rotate-key / delete-account confirm dialogs (account settings). Opened from
+  // the topbar (desktop) and the mobile topbar menu.
+  const [rotateKeyOpen, setRotateKeyOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  // Account created toast state (P0-7: non-blocking toast instead of blocking
+  // reveal). Also reused post-rotate-key to surface the new recovery code, in
+  // which case title/message override the default account-created copy.
   const [accountCreatedToast, setAccountCreatedToast] = useState<{
     recoverCode: string;
+    title?: string;
+    message?: string;
   } | null>(null);
   // The message being replied to (puts the composer in "reply" mode with a
   // quote preview); null in normal compose mode.
@@ -70,12 +80,35 @@ export default function App() {
   const currentChannelRef = useRef(channels.currentChannel);
   currentChannelRef.current = channels.currentChannel;
 
+  // onMessageEdited needs setMessages (returned by the hook below), so we delegate
+  // through a ref assigned once setMessages is available. The hook reads
+  // onMessageEdited via its own ref on every render, so the delegate stays current.
+  const handleMessageEditedRef = useRef<(e: MessageEditedEvent) => void>(() => {});
   const { messages, status, setMessages, loadMore, loadingMore, onlineIds } = useMessageStream(me ? conn : null, {
     currentChannel: channels.currentChannel,
     onIncoming: channels.recordIncoming,
     onAgentThinking: typing.onThinking,
     onAgentIdle: typing.onIdle,
+    onMessageEdited: (e) => handleMessageEditedRef.current(e),
   });
+  // Swap the edited message in by id (content/attachments/editedAt), preserving
+  // the row + any client-only optimistic status. Dedup by id (an edit for an id
+  // not in the visible list - e.g. another channel - is a no-op; the hook already
+  // filters by channel before forwarding).
+  handleMessageEditedRef.current = (e: MessageEditedEvent) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === e.message.id
+          ? {
+              ...m,
+              content: e.message.content,
+              attachments: e.message.attachments,
+              editedAt: e.message.editedAt,
+            }
+          : m,
+      ),
+    );
+  };
   // True while a channel's initial history is being fetched (switch = "换台"); the
   // MessageList shows a shimmer skeleton instead of flashing empty-then-pop.
   const [loadingChannel, setLoadingChannel] = useState(false);
@@ -399,6 +432,81 @@ export default function App() {
     }
   };
 
+  // Edit one of the current user's own messages. PATCH /messages/:id returns the
+  // refreshed Message (with editedAt); swap it in locally. The SSE message_edited
+  // event confirms the edit to ALL clients (including this one - dedup by id).
+  // Throws on server error (empty/whitespace, not yours, already recalled) so the
+  // inline editor can surface it and keep editing.
+  const handleEdit = async (id: string, content: string) => {
+    if (!conn) return;
+    const updated = await api.editMessage(conn, id, content);
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+  };
+
+  // A highlight target (cross-channel @mention deep-link) isn't in the loaded
+  // history window - fetch context around it so the MessageList can scroll to +
+  // highlight it. Merges the returned context (a few before + the anchor + a few
+  // after) into the visible list, de-duped by id and kept in chronological order.
+  const handleNeedAround = async (id: string) => {
+    if (!conn) return;
+    try {
+      const ctx = await new ClubClient(conn).messages({
+        around: id,
+        channel: currentChannelRef.current,
+      });
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.id));
+        const fresh = ctx.filter((m) => !existing.has(m.id));
+        if (fresh.length === 0) return prev;
+        return [...prev, ...fresh].sort(
+          (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
+        );
+      });
+    } catch {
+      /* target may not exist / transient - the highlight just won't land */
+    }
+  };
+
+  // Rotate the current participant's login key. The current key is invalidated;
+  // the server returns a fresh key + recovery code. Persist the new key (the user
+  // stays logged in) + recovery code, then surface the new recovery code via the
+  // post-creation toast (reused with a rotate-specific title/message).
+  const handleRotateKey = async () => {
+    if (!conn || !me || !conn.key) return;
+    const { key: newKey, recoverCode } = await rawRotateKey(
+      conn.server,
+      me.id,
+      conn.key,
+      conn.key,
+    );
+    saveConn(newKey);
+    saveRecoverCode(recoverCode);
+    setConn({ server: API_URL, key: newKey });
+    setAccountCreatedToast({
+      recoverCode,
+      title: t("rotateKey.success.title"),
+      message: t("rotateKey.success.message"),
+    });
+  };
+
+  // Self-delete the current account (two-factor: current key as password, sent
+  // automatically; recovery code entered by the user). On success, clear all
+  // local state and return to the auth dialog - mirroring performSignOut.
+  const handleDeleteAccount = async (recoverCode: string) => {
+    if (!conn || !me || !conn.key) return;
+    await rawDeleteAccount(conn.server, me.id, conn.key, {
+      password: conn.key,
+      recoverCode,
+    });
+    clearConn();
+    setConn(null);
+    setMe(null);
+    setMessages([]);
+    setMembers([]);
+    setDeleteAccountOpen(false);
+    setAuthOpen(true);
+  };
+
   const performSignOut = () => {
     clearConn();
     setConn(null);
@@ -440,6 +548,8 @@ export default function App() {
           onCreateChannel={handleCreateChannel}
           onSignOutRequest={() => setSignOutOpen(true)}
           onEditProfile={() => setEditProfileOpen(true)}
+          onRotateKeyRequest={() => setRotateKeyOpen(true)}
+          onDeleteAccountRequest={() => setDeleteAccountOpen(true)}
         />
       )}
 
@@ -488,7 +598,9 @@ export default function App() {
                 loadingMore={loadingMore}
                 onReply={setReplyTo}
                 onDelete={handleDelete}
+                onEdit={handleEdit}
                 onReact={handleReact}
+                onNeedAround={handleNeedAround}
               />
               {typing.agents.length > 0 && (
                 <TypingIndicator agents={typing.agents} />
@@ -516,10 +628,13 @@ export default function App() {
         onDismiss={channels.dismissToast}
       />
 
-      {/* Account created toast (P0-7: non-blocking, shows recover code after registration) */}
+      {/* Account created toast (P0-7: non-blocking, shows recover code after
+          registration). Also reused post-rotate-key (title/message override). */}
       {accountCreatedToast && (
         <AccountCreatedToast
           recoverCode={accountCreatedToast.recoverCode}
+          title={accountCreatedToast.title}
+          message={accountCreatedToast.message}
           onDismiss={() => setAccountCreatedToast(null)}
         />
       )}
@@ -553,6 +668,22 @@ export default function App() {
         onOpenChange={setEditProfileOpen}
         currentBio={me?.bio ?? ""}
         onSave={handleSaveBio}
+      />
+
+      {/* Rotate login key (account settings). Invalidates the current key; the
+          new key is auto-saved and the new recovery code is shown via the toast. */}
+      <RotateKeyDialog
+        open={rotateKeyOpen}
+        onOpenChange={setRotateKeyOpen}
+        onRotate={handleRotateKey}
+      />
+
+      {/* Self-delete account (account settings). Destructive: two-factor (current
+          key + recovery code); clears state + returns to auth on success. */}
+      <DeleteAccountDialog
+        open={deleteAccountOpen}
+        onOpenChange={setDeleteAccountOpen}
+        onDelete={handleDeleteAccount}
       />
     </div>
   );

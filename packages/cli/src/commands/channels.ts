@@ -1,8 +1,8 @@
 // club channels
 //
 // List every channel (general first, then most-recently-active first — the server's
-// GET /channels ordering). The current/default channel (from `club enter`, in config)
-// is marked with ` *` so a user can see where their next `club send` lands.
+// GET /channels ordering). The default channel (general) is marked with ` *`
+// so a user can see where their next `club send` lands.
 
 import { Command } from "commander";
 

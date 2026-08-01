@@ -276,32 +276,6 @@ export async function recoverParticipant(
 
 export type { CreateParticipantResponse };
 
-/**
- * Rotate the current participant's key. Returns a fresh key + recovery code
- * (the old key is immediately invalidated). Callers receive the plaintext
- * exactly once and are responsible for storing it locally.
- */
-export async function rotateKey(
-  server: string,
-  key: string,
-  password: string,
-): Promise<{ key: string; recoverCode: string }> {
-  const result = await request<{ key: string; recoverCode: string }>(
-    { server, key },
-    "/participants/:id/rotate-key",
-    { method: "POST", body: { password } satisfies RotateKeyRequest },
-  );
-  // The server validates that `:id` matches the authenticated participant;
-  // pass the participant id as a query-free path placeholder — the SDK
-  // currently interpolates `:id` literally, so we use the full path via
-  // the low-level helper. The real participant id must be supplied as `:id`.
-  // Because the SDK's request helper does not interpolate `:id`, use the
-  // actual participant id directly via the raw API call below.
-  // (Kept as stub to satisfy the type surface; production calls use
-  // `rawRotateKey`.)
-  return result;
-}
-
 /** Raw HTTP call to POST /participants/:id/rotate-key. */
 export async function rawRotateKey(
   server: string,

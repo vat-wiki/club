@@ -5,13 +5,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /**
  * Non-blocking toast shown after successful account creation.
  * Displays the backup code with copy/download buttons and auto-dismisses.
+ * Optionally override the title/message (e.g. for post-rotate-key, which reuses
+ * this toast to surface the new recovery code).
  */
 export function AccountCreatedToast({
   recoverCode,
   onDismiss,
+  title,
+  message,
 }: {
   recoverCode: string;
   onDismiss: () => void;
+  /** Override the default title (defaults to the account-created string). */
+  title?: string;
+  /** Override the default message (defaults to the account-created string). */
+  message?: string;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -67,10 +75,10 @@ export function AccountCreatedToast({
           {/* Content */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground">
-              {t("accountCreated.title")}
+              {title ?? t("accountCreated.title")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {t("accountCreated.message")}
+              {message ?? t("accountCreated.message")}
             </p>
 
             {/* Backup code display */}

@@ -63,6 +63,11 @@ export interface Message {
   // content is hidden; broadcast as a `message_deleted` event so every client
   // marks it recalled.
   deleted?: boolean;
+  // Unix timestamp (ms) of the most recent edit, or absent when the message was
+  // never edited. Populated server-side from the `edited_at` column; surfaced so
+  // clients can render an "(edited)" affordance. Broadcast as part of the
+  // refreshed Message on a `message_edited` event.
+  editedAt?: number;
   // Aggregate emoji reactions on this message (emoji → count). Absent = none.
   reactions?: Reaction[];
   // Client-only delivery status for the optimistic send UI. Absent on every
@@ -366,8 +371,8 @@ export interface RotateKeyResponse {
 
 // Delete an existing participant. Requires the current key (Authorization
 // header) plus the recovery code in the body — two-factor on the high-stakes
-// path. Soft-deletes the participant row, revokes the key, and soft-deletes
-// all authored messages so channel history stays intact.
+// path. Deactivates the account (revokes credentials, hides from roster);
+// authored messages are preserved so channel history stays intact.
 /** Request body for DELETE /participants/:id — delete account */
 export const DeleteAccountRequest = z.object({
   password: z.string().min(1),
@@ -516,6 +521,19 @@ export interface PresenceEvent {
  */
 export interface MessageDeletedEvent {
   id: string;
+  channel: ChannelSlugType;
+}
+
+/**
+ * SSE `event: message_edited` payload.
+ *
+ * The author edited a message; carries the refreshed Message so clients swap it
+ * in by id (replacing content/attachments/editedAt). `channel` keeps the fan-out
+ * channel-scoped (a client watching channel B does not receive an edit from
+ * channel A), mirroring `message_deleted` / `message_reaction`.
+ */
+export interface MessageEditedEvent {
+  message: Message;
   channel: ChannelSlugType;
 }
 

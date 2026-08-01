@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach,beforeEach, describe, expect, it } from "vitest";
 
-import { configPath, defaultChannel, loadConfig, parseConfig, saveConfig } from "./config.js";
+import { configPath, defaultChannel, loadConfig, parseConfig, saveConfig, clearConfig } from "./config.js";
 
 describe("parseConfig", () => {
   it("returns the config when server and key are present", () => {
@@ -121,6 +121,33 @@ describe("configPath / saveConfig / loadConfig", () => {
     // parseConfig, so an empty server/key round-trips to null ("not logged in")
     // rather than a half-formed config that crashes downstream.
     saveConfig({ server: "", key: "club_x" });
+    expect(loadConfig()).toBeNull();
+  });
+});
+
+describe("clearConfig", () => {
+  const prevConfig = process.env.CLUB_CONFIG;
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "club-cfg-"));
+    process.env.CLUB_CONFIG = join(dir, "config.json");
+  });
+
+  afterEach(() => {
+    process.env.CLUB_CONFIG = prevConfig;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("removes an existing config file (logs the caller out)", () => {
+    saveConfig({ server: "http://localhost:6200", key: "club_human_abc" });
+    expect(loadConfig()).not.toBeNull();
+    clearConfig();
+    expect(loadConfig()).toBeNull();
+  });
+
+  it("is a no-op when no config file exists", () => {
+    expect(() => clearConfig()).not.toThrow();
     expect(loadConfig()).toBeNull();
   });
 });

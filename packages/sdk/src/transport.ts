@@ -4,6 +4,7 @@ import type {
   CreateMessageRequest,
   CreateParticipantRequest,
   CreateParticipantResponse,
+  DeleteAccountRequest,
   ListMessagesQuery,
   Mention,
   Message,
@@ -11,6 +12,7 @@ import type {
   Reaction,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
+  RotateKeyResponse,
   UpdateProfileRequest,
   UploadFileResponse,
 } from "@club/shared";
@@ -436,7 +438,7 @@ export async function listMembers(c: ClubConn, opts: CallOpts = {}): Promise<Par
 
 // POST /participants/:id/kick — "kick = account deleted" in the open model: any
 // authenticated participant may remove any participant. Revokes the target's
-// credentials and soft-deletes their messages. Idempotent (204 even if unknown).
+// credentials and deactivates their account (messages preserved). Idempotent (204 even if unknown).
 export async function kickParticipant(
   c: ClubConn,
   id: string,
@@ -530,6 +532,40 @@ export async function recoverParticipant(
 ): Promise<RecoverParticipantResponse> {
   return request<RecoverParticipantResponse>(c, "/participants/recover", {
     method: "POST",
+    body: input,
+    ...opts,
+  });
+}
+
+// POST /participants/:id/rotate-key { password } - rotate the authenticated
+// participant's key. The caller must present the current key (Authorization
+// header) AND echo it as `password` in the body. On success the old key is
+// invalidated and a fresh key + fresh recovery code are issued (returned once).
+export async function rotateKey(
+  c: ClubConn,
+  id: string,
+  password: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<RotateKeyResponse> {
+  return request<RotateKeyResponse>(c, `/participants/${encodeURIComponent(id)}/rotate-key`, {
+    method: "POST",
+    body: { password },
+    ...opts,
+  });
+}
+
+// DELETE /participants/:id { password, recoverCode } - self-delete the
+// authenticated participant's account (two-factor: current key + recovery
+// code). Soft-deletes the account (revokes credentials, hides from roster) but
+// preserves authored messages. Returns 204.
+export async function deleteAccount(
+  c: ClubConn,
+  id: string,
+  input: DeleteAccountRequest,
+  opts: { timeoutMs?: number } = {},
+): Promise<void> {
+  await request<null>(c, `/participants/${encodeURIComponent(id)}`, {
+    method: "DELETE",
     body: input,
     ...opts,
   });
@@ -631,6 +667,23 @@ export async function deleteMessage(
 ): Promise<void> {
   await request<null>(c, `/messages/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    ...opts,
+  });
+}
+
+// PATCH /messages/:id { content } - edit a message's text. Only the author may
+// edit; the server re-sanitizes content and rejects empty/whitespace. Returns
+// the refreshed Message (with editedAt set) on success, 404 if not found / not
+// yours / already recalled.
+export async function editMessage(
+  c: ClubConn,
+  id: string,
+  content: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<Message> {
+  return request<Message>(c, `/messages/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { content },
     ...opts,
   });
 }

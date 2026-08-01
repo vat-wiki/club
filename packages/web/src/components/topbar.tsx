@@ -7,7 +7,7 @@ import { ViewKeyDialog } from "@/components/view-key-dialog";
 import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ChevronDown, LogOut, Radio } from "lucide-react";
+import { ChevronDown, LogOut, Radio, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import type { Channel,Participant } from "@club/shared";
@@ -54,6 +54,8 @@ export function Topbar({
   onCreateChannel,
   onSignOutRequest,
   onEditProfile,
+  onRotateKeyRequest,
+  onDeleteAccountRequest,
 }: {
   meName: string | null;
   status: Status;
@@ -69,6 +71,10 @@ export function Topbar({
   onSignOutRequest: () => void;
   /** Opens the bio editor for the self row (passed through to the mobile roster). */
   onEditProfile?: () => void;
+  /** Open the rotate-key confirm dialog (account settings). */
+  onRotateKeyRequest?: () => void;
+  /** Open the delete-account confirm dialog (account settings). */
+  onDeleteAccountRequest?: () => void;
 }) {
   const t = useT();
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -115,6 +121,8 @@ export function Topbar({
         key_={key_}
         onSignOutRequest={onSignOutRequest}
         onOpenRoster={() => setRosterOpen(true)}
+        onRotateKeyRequest={onRotateKeyRequest}
+        onDeleteAccountRequest={onDeleteAccountRequest}
       />
 
       {/* Mobile roster sheet (triggered from the menu, not a topbar button) */}
@@ -145,6 +153,31 @@ export function Topbar({
       <LanguageSwitcher />
 
       <ViewKeyDialog key_={key_} />
+
+      {/* Desktop: rotate key + delete account (hidden on mobile - the mobile
+          menu has its own entries). Compact icon buttons matching view-key. */}
+      {onRotateKeyRequest && (
+        <button
+          type="button"
+          onClick={onRotateKeyRequest}
+          aria-label={t("rotateKey.open")}
+          title={t("rotateKey.open")}
+          className="tap-target hidden items-center justify-center rounded-md border border-border bg-transparent px-2 text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:inline-flex"
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      )}
+      {onDeleteAccountRequest && (
+        <button
+          type="button"
+          onClick={onDeleteAccountRequest}
+          aria-label={t("deleteAccount.open")}
+          title={t("deleteAccount.open")}
+          className="tap-target hidden items-center justify-center rounded-md border border-border bg-transparent px-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:inline-flex"
+        >
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      )}
 
       <Button
         variant="outline"

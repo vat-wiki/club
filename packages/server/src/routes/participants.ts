@@ -180,9 +180,11 @@ participants.post(
 // header AND send it again as `password` in the body, so the browser cannot
 // be silently used to rotate a key without the logged-in session's active key.
 // Plaintext key + recovery code returned exactly once; never persisted.
-participants.post("/:id/rotate-key", requireJson, async (c) => {
+participants.post("/:id/rotate-key", requireAuth, requireJson, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
+  const bad = requireValidId(c, id, "participant id");
+  if (bad) return bad.r;
   if (id !== me.id) return jsonErr(c, "not found", 404);
   const parsed = await parseJsonBody(c, RotateKeyRequest, "bad request");
   if (!parsed.ok) return parsed.r;
@@ -222,9 +224,11 @@ function deactivateParticipant(id: string): void {
 // code in the body, giving a high-stakes operation a second factor. Revokes
 // the key + recovery hash and marks the account deleted so it drops out of the
 // roster; authored messages are preserved so history stays intact.
-participants.delete("/:id", requireJson, async (c) => {
+participants.delete("/:id", requireAuth, requireJson, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
+  const bad = requireValidId(c, id, "participant id");
+  if (bad) return bad.r;
   if (id !== me.id) return jsonErr(c, "not found", 404);
   const parsed = await parseJsonBody(c, DeleteAccountRequest, "bad request");
   if (!parsed.ok) return parsed.r;

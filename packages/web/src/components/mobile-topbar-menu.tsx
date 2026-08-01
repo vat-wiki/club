@@ -4,7 +4,7 @@ import { useCopy } from "@/hooks/use-copy";
 import { LANG_LABEL, LANGS, useI18n } from "@/lib/i18n";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { Check, ChevronDown, Copy, Key, LogOut, MoreVertical, Radio, Users } from "lucide-react";
+import { Check, ChevronDown, Copy, Key, LogOut, MoreVertical, Radio, RefreshCw, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 
 import type { Participant } from "@club/shared";
@@ -35,6 +35,10 @@ type Props = {
   key_: string | null;
   onSignOutRequest: () => void;
   onOpenRoster: () => void;
+  /** Open the rotate-key confirm dialog (account settings). */
+  onRotateKeyRequest?: () => void;
+  /** Open the delete-account confirm dialog (account settings). */
+  onDeleteAccountRequest?: () => void;
 };
 
 export function MobileTopbarMenu({
@@ -44,6 +48,8 @@ export function MobileTopbarMenu({
   key_,
   onSignOutRequest,
   onOpenRoster,
+  onRotateKeyRequest,
+  onDeleteAccountRequest,
 }: Props) {
   const t = useT();
   const { lang, setLang } = useI18n();
@@ -121,6 +127,38 @@ export function MobileTopbarMenu({
         <span className="text-muted-foreground">{t("viewKey.open")}</span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
       </button>
+
+      {/* Rotate key */}
+      {onRotateKeyRequest && (
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70"
+          onClick={() => {
+            setMenuOpen(false);
+            onRotateKeyRequest();
+          }}
+        >
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <RefreshCw className="h-4 w-4" aria-hidden />
+            {t("rotateKey.open")}
+          </span>
+        </button>
+      )}
+
+      {/* Delete account (destructive) */}
+      {onDeleteAccountRequest && (
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+          onClick={() => {
+            setMenuOpen(false);
+            onDeleteAccountRequest();
+          }}
+        >
+          <Trash2 className="h-4 w-4" aria-hidden />
+          {t("deleteAccount.open")}
+        </button>
+      )}
 
       <div className="h-px bg-border" />
 

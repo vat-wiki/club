@@ -1,10 +1,10 @@
-// club send [text...] [--stdin] [--image <path>] [--video <path>] [--file <path>] [--channel <slug>]
+// club send [text...] [--stdin] [--image <path>] [--video <path>] [--file <path>] [--channel <slug>] [--reply <id>]
 //
 // Send a message into the current channel (or --channel <slug>). Accepts a literal
 // string, or reads from stdin when piped / --stdin. Attach up to 8 images,
-// videos, or document files via --image / --video / --file (repeatable).
-// Delegates the upload+send orchestration to send-impl so the commander
-// action stays thin and unit-testable.
+// videos, or document files via --image / --video / --file (repeatable). Quote a
+// message with --reply <id> (threaded reply). Delegates the upload+send
+// orchestration to send-impl so the commander action stays thin and unit-testable.
 
 import { Command } from "commander";
 
@@ -25,9 +25,10 @@ const collect = (v: string, acc: string[]) => [...acc, v];
  *
  * Accepts a literal text argument, or reads from stdin when piped / `--stdin`.
  * Attach up to 8 images, videos, or documents via repeatable `--image` / `--video`
- * / `--file <path>` flags, and optionally target a specific channel with `--channel`.
- * Delegates the upload+send orchestration to `send-impl` so this action stays
- * thin and unit-testable.
+ * / `--file <path>` flags, optionally target a specific channel with `--channel`,
+ * and optionally quote a message with `--reply <id>` (threaded reply). Delegates
+ * the upload+send orchestration to `send-impl` so this action stays thin and
+ * unit-testable.
  *
  * @returns A configured `Command` instance to register with the CLI program.
  */
@@ -60,6 +61,10 @@ export function makeSendCommand(): Command {
       "-r, --channel <slug>",
       "post to this channel (default: general)",
     )
+    .option(
+      "-R, --reply <id>",
+      "reply to a message id (quotes it as a threaded reply)",
+    )
     .action(
       async (
         text: string[],
@@ -69,6 +74,7 @@ export function makeSendCommand(): Command {
           video?: string[];
           file?: string[];
           channel?: string;
+          reply?: string;
         },
       ) => {
         // Auto-detect stdin: when no text args and stdin is piped, read it.
@@ -90,7 +96,14 @@ export function makeSendCommand(): Command {
           uploadImage: (conn, p) => uploadImageFile(conn, p),
           uploadVideo: (conn, p) => uploadVideoFile(conn, p),
           uploadDocument: (conn, p) => uploadDocumentFile(conn, p),
-          send: (c, ids, r) => client.send(c, ids, r ? { channel: r } : undefined),
+          // Bridge the positional SendDeps.send to the SDK's opts shape: only
+          // include channel/replyToId when set, so a plain send hits the legacy
+          // { content } body path (matches client.send's own spreading).
+          send: (c, ids, ch, rid) =>
+            client.send(c, ids, {
+              ...(ch ? { channel: ch } : {}),
+              ...(rid ? { replyToId: rid } : {}),
+            }),
         };
 
         await runSend(
@@ -101,6 +114,7 @@ export function makeSendCommand(): Command {
             documents: opts.file ?? [],
             conn: cfg,
             channel,
+            replyToId: opts.reply,
           },
           deps,
         );

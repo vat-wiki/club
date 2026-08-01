@@ -34,7 +34,7 @@
  * ```
  */
 
-import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
+import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageEditedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
 import { jitteredBackoff, parseRetryAfterMs, sleep } from "@club/shared";
 
 import { type ClubConn, listChannels,listMessages } from "./transport.js";
@@ -72,6 +72,12 @@ function isPresenceEvent(v: unknown): v is PresenceEvent {
 function isMessageDeletedEvent(v: unknown): v is MessageDeletedEvent {
   if (!isObj(v)) return false;
   return typeof v.id === "string" && typeof v.channel === "string";
+}
+
+function isMessageEditedEvent(v: unknown): v is MessageEditedEvent {
+  if (!isObj(v)) return false;
+  if (typeof v.channel !== "string") return false;
+  return isMessage(v.message);
 }
 
 function isReaction(v: unknown): v is { emoji: string; count: number } {
@@ -140,6 +146,8 @@ export interface StreamOptions {
   onPresence?: (e: PresenceEvent) => void;
   /** Fired when a message is recalled (`message_deleted` event). */
   onMessageDeleted?: (e: MessageDeletedEvent) => void;
+  /** Fired when a message is edited (`message_edited` event); swap by id. */
+  onMessageEdited?: (e: MessageEditedEvent) => void;
   /** Fired when a reaction is toggled (`message_reaction` event). */
   onReaction?: (e: MessageReactionEvent) => void;
   /** Subscribe to a single channel only (channel-scoped stream). */
@@ -339,6 +347,8 @@ export function streamMessages(
             opts.onPresence?.(obj);
           } else if (eventName === "message_deleted" && isMessageDeletedEvent(obj)) {
             opts.onMessageDeleted?.(obj);
+          } else if (eventName === "message_edited" && isMessageEditedEvent(obj)) {
+            opts.onMessageEdited?.(obj);
           } else if (eventName === "message_reaction" && isMessageReactionEvent(obj)) {
             opts.onReaction?.(obj);
           } else if (eventName === "message" && isMessage(obj)) {

@@ -5,6 +5,7 @@ import type {
   AgentThinkingEvent,
   Message,
   MessageDeletedEvent,
+  MessageEditedEvent,
   MessageReactionEvent,
   PresenceEvent,
 } from '@club/shared';
@@ -25,6 +26,7 @@ import type {
 type SSEEvent =
   | { event: "presence";              payload: PresenceEvent }
   | { event: "message_deleted";       payload: MessageDeletedEvent }
+  | { event: "message_edited";        payload: MessageEditedEvent }
   | { event: "message_reaction";      payload: MessageReactionEvent }
   | { event: "agent_thinking";        payload: AgentThinkingEvent }
   | { event: "agent_idle";            payload: AgentIdleEvent };
@@ -121,6 +123,14 @@ export function broadcastPresence(e: PresenceEvent): void {
 // rather than dropping the row, so replies/context still read coherently.
 export function broadcastDeleted(e: MessageDeletedEvent): void {
   writeAll(eventToFrame({ event: 'message_deleted', payload: e }), e.channel);
+}
+
+// Push a named `message_edited` event. Clients swap the message in by id
+// (replacing content/editedAt) rather than appending a new row. The event
+// carries the message's channel so the fan-out stays channel-scoped (a client
+// watching another channel never sees the edit), mirroring `message_deleted`.
+export function broadcastEdited(e: MessageEditedEvent): void {
+  writeAll(eventToFrame({ event: 'message_edited', payload: e }), e.channel);
 }
 
 // Push a named `message_reaction` event (refreshed aggregate after a toggle).

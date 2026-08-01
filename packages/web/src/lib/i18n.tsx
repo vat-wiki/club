@@ -175,30 +175,6 @@ const zh: Dict = {
   "recover.busy": "找回中…",
   "recover.failed": "找回失败——昵称或恢复码不正确。",
 
-  // Key reveal (post-create)
-  "keyReveal.title": "请保存你的登录密钥与恢复码",
-  "keyReveal.desc":
-    "登录密钥是你进入频道的凭证；恢复码是密钥丢失后找回身份的唯一后路。请把两个都妥善保存——club 不会替你保存，密钥丢失后只能用恢复码找回。",
-  "keyReveal.label": "你的登录密钥",
-  "keyReveal.formatHint": "密钥由固定前缀 + 随机令牌组成，每次生成都不同，无需对照格式。",
-  "keyReveal.recoverLabel": "你的恢复码",
-  "keyReveal.recoverHint": "密钥丢失时，用它 + 昵称找回身份。一次性，找回后换发新的。",
-  "keyReveal.copied": "已复制",
-  "keyReveal.copy": "复制登录密钥",
-  "keyReveal.copyRecover": "复制恢复码",
-  "keyReveal.copyFailed": "复制失败——请手动选中上方的文本进行复制。",
-  "keyReveal.copyAnnounced": "登录密钥已复制到剪贴板",
-  "keyReveal.copyRecoverAnnounced": "恢复码已复制到剪贴板",
-  "keyReveal.saved": "两个都保存好了，进入聊天室",
-  // Recovery-rotated reveal mode: shown after recovering an identity. The old
-  // key AND old recovery code are both invalidated; these are the brand-new
-  // replacements. Surfaced so the user records the new pair before entering —
-  // the recovery code they just used is single-use and now dead.
-  "keyReveal.recovered.title": "找回成功——请保存新的密钥与恢复码",
-  "keyReveal.recovered.desc":
-    "这是你找回身份后换发的新密钥与新恢复码。旧密钥与旧恢复码均已失效，请把下面两个新凭证妥善保存——下次清缓存、换浏览器或再次丢失密钥时，只能用新的恢复码找回。",
-  "keyReveal.recovered.saved": "两个都保存好了，进入聊天室",
-
   // View key dialog
   "viewKey.trigger.aria": "查看你的登录密钥",
   "viewKey.trigger.title": "你的登录密钥",
@@ -232,6 +208,34 @@ const zh: Dict = {
   "accountCreated.copy": "复制",
   "accountCreated.copied": "已复制",
   "accountCreated.download": "下载",
+
+  // Rotate login key (account settings). Invalidates the current key; the new
+  // key is auto-saved so the user stays logged in, but the new recovery code
+  // must be recorded (shown via the post-creation toast).
+  "rotateKey.open": "轮换密钥",
+  "rotateKey.title": "轮换登录密钥？",
+  "rotateKey.desc":
+    "轮换后当前密钥立即失效，你将获得新的密钥与恢复码。新密钥会自动保存到本机，无需重新登录；但请务必记下新的恢复码--旧恢复码同时失效。",
+  "rotateKey.confirm": "确认轮换",
+  "rotateKey.cancel": "取消",
+  "rotateKey.busy": "轮换中…",
+  "rotateKey.failed": "轮换失败--请重试",
+  "rotateKey.success.title": "密钥已轮换",
+  "rotateKey.success.message": "新密钥已自动保存。请记下下面的新恢复码。",
+
+  // Self-delete account (account settings). Two-factor: the current key is the
+  // password (sent automatically); the recovery code is the second factor.
+  "deleteAccount.open": "删除账号",
+  "deleteAccount.title": "删除账号？",
+  "deleteAccount.desc":
+    "此操作不可撤销。将删除你的账号；已发送的消息会保留。为防止误操作，需输入恢复码作为二次验证（当前登录密钥会自动作为第一步验证）。",
+  "deleteAccount.field.code": "恢复码",
+  "deleteAccount.field.codePlaceholder": "club_recover_…",
+  "deleteAccount.hint": "当前登录密钥作为第一步验证，恢复码作为第二步。",
+  "deleteAccount.confirm": "确认删除账号",
+  "deleteAccount.cancel": "取消",
+  "deleteAccount.busy": "删除中…",
+  "deleteAccount.failed": "删除失败--恢复码不正确",
 
   // Edit profile dialog (edit own bio / self-introduction)
   "profile.editTitle": "编辑简介",
@@ -317,6 +321,15 @@ const zh: Dict = {
   "msg.recall": "撤回",
   "msg.recalled": "已撤回",
   "msg.react": "回应",
+  // Inline edit (own messages). The "edit" verb sits next to "recall" in the
+  // message header; "(edited)" is a subtle muted marker shown when editedAt is set.
+  "msg.edit": "编辑",
+  "msg.edited": "已编辑",
+  "msg.editSave": "保存",
+  "msg.editCancel": "取消",
+  "msg.editSaving": "保存中…",
+  "msg.editEmpty": "内容不能为空",
+  "msg.editFailed": "编辑失败--请重试",
   "search.placeholder": "搜索消息",
   "search.clear": "清除搜索",
   "search.noResults": "没有匹配的消息",
@@ -458,26 +471,6 @@ const en: Dict = {
   "recover.busy": "Recovering…",
   "recover.failed": "Recovery failed — wrong nickname or recovery code.",
 
-  // Key reveal (post-create)
-  "keyReveal.title": "Save your login key and recovery code",
-  "keyReveal.desc":
-    "The login key gets you into the channel; the recovery code is your only way back if the key is ever lost. Save both somewhere safe — club doesn't store them for you, and a lost key can only be recovered via the recovery code.",
-  "keyReveal.label": "Your login key",
-  "keyReveal.formatHint": "The key is a fixed prefix plus a random token — every key is freshly generated, so don't worry about matching a format.",
-  "keyReveal.recoverLabel": "Your recovery code",
-  "keyReveal.recoverHint": "Use it + your nickname to recover a lost key. Single-use; rotated after recovery.",
-  "keyReveal.copied": "Copied",
-  "keyReveal.copy": "Copy login key",
-  "keyReveal.copyRecover": "Copy recovery code",
-  "keyReveal.copyFailed": "Copy failed — please select the text above manually to copy it.",
-  "keyReveal.copyAnnounced": "Login key copied to clipboard",
-  "keyReveal.copyRecoverAnnounced": "Recovery code copied to clipboard",
-  "keyReveal.saved": "Saved both — enter the channel",
-  "keyReveal.recovered.title": "Recovery succeeded — save your new key and recovery code",
-  "keyReveal.recovered.desc":
-    "These are the freshly-rotated key and recovery code issued on recovery. Your OLD key and OLD recovery code are both invalidated. Save the new pair below — next time you clear cache, switch browsers, or lose the key, only the new recovery code can get you back in.",
-  "keyReveal.recovered.saved": "Saved both — enter the channel",
-
   // View key dialog
   "viewKey.trigger.aria": "View your login key",
   "viewKey.trigger.title": "Your login key",
@@ -511,6 +504,34 @@ const en: Dict = {
   "accountCreated.copy": "Copy",
   "accountCreated.copied": "Copied",
   "accountCreated.download": "Download",
+
+  // Rotate login key (account settings). Invalidates the current key; the new
+  // key is auto-saved so the user stays logged in, but the new recovery code
+  // must be recorded (shown via the post-creation toast).
+  "rotateKey.open": "Rotate key",
+  "rotateKey.title": "Rotate login key?",
+  "rotateKey.desc":
+    "The current key is invalidated immediately and you'll get a fresh key + recovery code. The new key is saved to this device automatically, so you stay logged in - but make sure to record the new recovery code, since the old one is invalidated too.",
+  "rotateKey.confirm": "Rotate key",
+  "rotateKey.cancel": "Cancel",
+  "rotateKey.busy": "Rotating…",
+  "rotateKey.failed": "Rotation failed - please retry",
+  "rotateKey.success.title": "Key rotated",
+  "rotateKey.success.message": "The new key is saved automatically. Save the new recovery code below.",
+
+  // Self-delete account (account settings). Two-factor: the current key is the
+  // password (sent automatically); the recovery code is the second factor.
+  "deleteAccount.open": "Delete account",
+  "deleteAccount.title": "Delete account?",
+  "deleteAccount.desc":
+    "This can't be undone. Your account will be deleted; messages you've sent are kept. To prevent accidents, enter your recovery code as a second factor (your current login key is sent automatically as the first factor).",
+  "deleteAccount.field.code": "Recovery code",
+  "deleteAccount.field.codePlaceholder": "club_recover_…",
+  "deleteAccount.hint": "Your current login key is the first factor; the recovery code is the second.",
+  "deleteAccount.confirm": "Delete account",
+  "deleteAccount.cancel": "Cancel",
+  "deleteAccount.busy": "Deleting…",
+  "deleteAccount.failed": "Deletion failed - wrong recovery code",
 
   // Edit profile dialog (edit own bio / self-introduction)
   "profile.editTitle": "Edit bio",
@@ -594,6 +615,15 @@ const en: Dict = {
   "msg.recall": "Recall",
   "msg.recalled": "Recalled",
   "msg.react": "React",
+  // Inline edit (own messages). The "edit" verb sits next to "recall" in the
+  // message header; "(edited)" is a subtle muted marker shown when editedAt is set.
+  "msg.edit": "Edit",
+  "msg.edited": "edited",
+  "msg.editSave": "Save",
+  "msg.editCancel": "Cancel",
+  "msg.editSaving": "Saving…",
+  "msg.editEmpty": "Content can't be empty",
+  "msg.editFailed": "Edit failed - please retry",
   "search.placeholder": "Search messages",
   "search.clear": "Clear search",
   "search.noResults": "No matching messages",

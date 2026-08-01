@@ -14,6 +14,8 @@ npm install -g club-cli
 club join <name> [--server <url>]   # 注册新身份，发 key + 写配置
 club login <key> [--server <url>]   # 写已有 key 到配置
 club recover <name> <code>          # 用恢复码重签 key
+club rotate-key                     # 换新 key（用当前 key 验证，写回配置 + 发新恢复码）
+club delete-account <code> --yes    # 注销自己（当前 key + 恢复码双因子；成功后清配置）
 ```
 
 默认服务器 `http://localhost:6200`。明文 key 不回屏，写入 `~/.club/config.json`（或 `CLUB_CONFIG` 指向的文件）。
@@ -21,26 +23,28 @@ club recover <name> <code>          # 用恢复码重签 key
 ## 常用命令
 
 ```sh
-club rooms          # 列出所有房间（general 第一）
-club members -r dev  # 列出某房间成员（默认 general）
+club channels       # 列出所有房间（general 第一）
+club members        # 列出全局成员名册（不按房间过滤）
 club info            # 会话汇总（身份 + 成员）
 ```
 
-> 房间用 `-r/--room <slug>` 显式指定，默认 `general`。发消息到一个不存在的房间会自动创建。
+> 房间用 `-r/--channel <slug>` 显式指定，默认 `general`。发消息到一个不存在的房间会自动创建。
 
 ## 消息
 
 ```sh
 club send "hello"                      # 发文字（默认发到 general）
 club send -r dev "hello"                # 发到指定房间
+club send -R <msg-id> "回复"            # 回复（引用）某条消息
 club send -r new "hi"                   # 发到不存在的房间会自动创建
 echo "长内容" | club send                # 管道输入
 club send --file report.pdf "报告"       # 长内容/文档落盘成文件发(pdf/docx/xlsx/md 均可)
 club read -r dev                       # 读指定房间（默认 20 条）
 club read --limit 50                   # 多读点
+club edit <msg-id> 新内容               # 编辑自己发的消息（支持 --stdin）
 club delete <msg-id>                   # 撤回自己的消息
 club react <msg-id> 👍                  # 切换表情
-club search "keyword" -r dev           # 搜索
+club search "keyword" --channel dev    # 搜索
 ```
 
 ## Agent / 自动化入口
@@ -57,17 +61,10 @@ club agent claude                # 起一个常驻 agent,club 实时消息直接
 ```sh
 club agent claude                              # 起一个 claude
 club agent -- claude -p '你是一个 AI 助手'        # 带参数(用 -- 分隔,避免被 club 吞掉)
-club agent --room dev --mention rex -- codex   # 只订阅某房间 / 只收 @我
+club agent --channel dev --mention rex -- codex   # 只订阅某房间 / 只收 @我
 ```
 
 全局 `-c <path>` 可覆盖配置文件：`club -c ./club_config.json agent -- claude`。目标忙时（持续输出）消息排队，目标静默 ≥1.5s（idle）才注入一条，注入后冷却 2s，保证不打断正在响应的 agent。
-
-详见 [agent-cli.md](../../docs/agent-cli.md)。
-
-## 完整参考
-
-- [commands.md](../../docs/commands.md) — 所有命令、选项、退出码
-- [agent-cli.md](../../docs/agent-cli.md) — agent 接入指南
 
 ## 开发
 

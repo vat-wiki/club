@@ -271,3 +271,157 @@ describe("open model — kick + edit-anyone-bio", () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ── rotate-key + self-delete (two-factor account management) ───────
+describe("rotate-key + self-delete", () => {
+  async function mint(name: string): Promise<{
+    key: string;
+    id: string;
+    recoverCode: string;
+  }> {
+    const res = await app.request("/participants", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = (await res.json()) as any;
+    return { key: body.key, id: body.participant.id, recoverCode: body.recoverCode };
+  }
+
+  it("POST /participants/:id/rotate-key reissues key + recovery code; old key fails, new key works", async () => {
+    const a = await mint("rotator");
+    const res = await app.request(`/participants/${a.id}/rotate-key`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${a.key}`,
+      },
+      body: JSON.stringify({ password: a.key }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.key).toMatch(/^club_/);
+    expect(body.recoverCode).toMatch(/^club_recover_/);
+    expect(body.key).not.toBe(a.key);
+    expect(body.recoverCode).not.toBe(a.recoverCode);
+
+    // The old key can no longer authenticate.
+    const oldMe = await app.request("/me", {
+      headers: { Authorization: `Bearer ${a.key}` },
+    });
+    expect(oldMe.status).toBe(401);
+    // The new key authenticates as the same participant.
+    const newMe = await app.request("/me", {
+      headers: { Authorization: `Bearer ${body.key}` },
+    });
+    expect(newMe.status).toBe(200);
+    expect((await newMe.json()).id).toBe(a.id);
+  });
+
+  it("rotate-key rejects a wrong password with 403 (no key reissue)", async () => {
+    const a = await mint("rotator-wrong");
+    const res = await app.request(`/participants/${a.id}/rotate-key`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${a.key}`,
+      },
+      body: JSON.stringify({ password: "club_wrong_key" }),
+    });
+    expect(res.status).toBe(403);
+    // Original key still works - nothing was rotated.
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${a.key}` },
+    });
+    expect(me.status).toBe(200);
+  });
+
+  it("rotate-key rejects a mismatched :id with 404 (cannot rotate someone else)", async () => {
+    const a = await mint("rotator-self");
+    const other = await mint("rotator-other");
+    const res = await app.request(`/participants/${other.id}/rotate-key`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${a.key}`,
+      },
+      body: JSON.stringify({ password: a.key }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rotate-key requires authentication (no bearer → 401, not 500)", async () => {
+    const a = await mint("rotator-noauth");
+    const res = await app.request(`/participants/${a.id}/rotate-key`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: a.key }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("DELETE /participants/:id self-deletes with both factors; key becomes invalid", async () => {
+    const a = await mint("self-deleter");
+    const res = await app.request(`/participants/${a.id}`, {
+      method: "DELETE",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${a.key}`,
+      },
+      body: JSON.stringify({ password: a.key, recoverCode: a.recoverCode }),
+    });
+    expect(res.status).toBe(204);
+    // Can no longer authenticate.
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${a.key}` },
+    });
+    expect(me.status).toBe(401);
+    // Dropped from the roster.
+    expect(getAllParticipants().find((p) => p.id === a.id)).toBeUndefined();
+  });
+
+  it("DELETE rejects a wrong recoverCode with 403 (account survives)", async () => {
+    const a = await mint("self-deleter-bad-code");
+    const res = await app.request(`/participants/${a.id}`, {
+      method: "DELETE",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${a.key}`,
+      },
+      body: JSON.stringify({ password: a.key, recoverCode: "club_recover_wrong" }),
+    });
+    expect(res.status).toBe(403);
+    // Account still authenticates.
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${a.key}` },
+    });
+    expect(me.status).toBe(200);
+  });
+
+  it("DELETE rejects a wrong password with 403 (account survives)", async () => {
+    const a = await mint("self-deleter-bad-pass");
+    const res = await app.request(`/participants/${a.id}`, {
+      method: "DELETE",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${a.key}`,
+      },
+      body: JSON.stringify({ password: "club_wrong_key", recoverCode: a.recoverCode }),
+    });
+    expect(res.status).toBe(403);
+    const me = await app.request("/me", {
+      headers: { Authorization: `Bearer ${a.key}` },
+    });
+    expect(me.status).toBe(200);
+  });
+
+  it("DELETE requires authentication (no bearer → 401, not 500)", async () => {
+    const a = await mint("self-deleter-noauth");
+    const res = await app.request(`/participants/${a.id}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: a.key, recoverCode: a.recoverCode }),
+    });
+    expect(res.status).toBe(401);
+  });
+});

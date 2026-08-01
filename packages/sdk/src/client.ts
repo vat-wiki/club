@@ -2,6 +2,7 @@ import type {
   Channel,
   CreateParticipantRequest,
   CreateParticipantResponse,
+  DeleteAccountRequest,
   ListMessagesQuery,
   Mention,
   Message,
@@ -9,6 +10,7 @@ import type {
   Reaction,
   RecoverParticipantRequest,
   RecoverParticipantResponse,
+  RotateKeyResponse,
   UploadFileResponse,
 } from "@club/shared";
 
@@ -19,8 +21,10 @@ import {
   type ClubConn,
   createChannel as createChannelFn,
   createParticipant as createParticipantFn,
+  deleteAccount as deleteAccountFn,
   deleteChannel as deleteChannelFn,
   deleteMessage as deleteMessageFn,
+  editMessage as editMessageFn,
   getFile,
   getMe,
   kickParticipant as kickParticipantFn,
@@ -33,6 +37,7 @@ import {
   recoverParticipant as recoverParticipantFn,
   reportAgentIdle as reportAgentIdleFn,
   reportAgentThinking as reportAgentThinkingFn,
+  rotateKey as rotateKeyFn,
   searchMessages as searchMessagesFn,
   sendMessage,
   toggleMessageReaction as toggleMessageReactionFn,
@@ -119,7 +124,7 @@ export class ClubClient {
   }
 
   /** POST /participants/:id/kick — remove any participant (open model: anyone may
-   *  kick anyone). Revokes the target's key and soft-deletes their messages. */
+   *  kick anyone). Deactivates their account (messages preserved). */
   kickParticipant(id: string): Promise<void> {
     return kickParticipantFn(this.conn(), id, { timeoutMs: this.timeoutMs });
   }
@@ -264,6 +269,21 @@ export class ClubClient {
     return recoverParticipantFn(this.conn(), input, { timeoutMs: this.timeoutMs });
   }
 
+  /** POST /participants/:id/rotate-key { password } - rotate the current
+   *  participant's key. `password` must be the key you authenticated with.
+   *  Returns a fresh key + fresh recovery code (each returned once). The old
+   *  key is invalidated; update your stored key with the returned one. */
+  rotateKey(id: string, password: string): Promise<RotateKeyResponse> {
+    return rotateKeyFn(this.conn(), id, password, { timeoutMs: this.timeoutMs });
+  }
+
+  /** DELETE /participants/:id { password, recoverCode } - self-delete the
+   *  current participant's account (two-factor: current key + recovery code).
+   *  Soft-deletes the account; authored messages are preserved. */
+  deleteAccount(id: string, input: DeleteAccountRequest): Promise<void> {
+    return deleteAccountFn(this.conn(), id, input, { timeoutMs: this.timeoutMs });
+  }
+
   /** GET /messages/stream — live feed with auto-reconnect + catch-up. Pass
    *  `opts.channel` / `opts.channels` to subscribe to one or more channels (the server
    *  then filters channel-scoped events so a focused client doesn't pay for other
@@ -298,6 +318,14 @@ export class ClubClient {
    *  may delete their own messages. Throws on 404 (not found or not yours). */
   deleteMessage(id: string): Promise<void> {
     return deleteMessageFn(this.conn(), id, { timeoutMs: this.timeoutMs });
+  }
+
+  /** PATCH /messages/:id { content } - edit one of your own messages. The
+   *  server re-sanitizes content and rejects empty/whitespace. Returns the
+   *  refreshed Message (with editedAt). Throws on 404 (not found / not yours /
+   *  already recalled). */
+  editMessage(id: string, content: string): Promise<Message> {
+    return editMessageFn(this.conn(), id, content, { timeoutMs: this.timeoutMs });
   }
 
   /** POST /messages/:id/reactions { emoji } — toggle a reaction on a message.

@@ -1,4 +1,4 @@
-// club mentions [--read] [--json]
+// club mentions [--no-read] [--json]
 //
 // List YOUR unread @-mentions, oldest first. This is the direct way to answer
 // "did anyone @ me?" without scanning history by eye.

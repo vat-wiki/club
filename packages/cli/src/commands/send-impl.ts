@@ -17,8 +17,16 @@ export interface SendDeps {
   uploadVideo: (conn: ClubConn, path: string) => Promise<{ id: string }>;
   /** Upload one local document path → attachment id. Throws on any pre-flight failure. */
   uploadDocument: (conn: ClubConn, path: string) => Promise<{ id: string }>;
-  /** Send the composed message (text + attachment ids) into `channel`. */
-  send: (content: string, attachmentIds?: string[], channel?: string) => Promise<Message>;
+  /** Send the composed message (text + attachment ids) into `channel`, optionally
+   *  quoting `replyToId` (threaded reply). Mirrors the SDK `send(content,
+   *  attachmentIds, opts)` call site, but keeps `channel` positional to stay
+   *  backward-compatible with existing callers/tests; `replyToId` is the 4th arg. */
+  send: (
+    content: string,
+    attachmentIds?: string[],
+    channel?: string,
+    replyToId?: string,
+  ) => Promise<Message>;
 }
 
 export interface SendInput {
@@ -29,6 +37,8 @@ export interface SendInput {
   conn: ClubConn;
   /** Channel to post into; resolved by the caller (flag → config default → general). */
   channel?: string;
+  /** Optional id of the message this one quotes (threaded reply). */
+  replyToId?: string;
 }
 
 export interface SendResult {
@@ -78,6 +88,7 @@ export async function runSend(
     content,
     attachmentIds.length > 0 ? attachmentIds : undefined,
     input.channel,
+    input.replyToId,
   );
   return { attachmentIds };
 }

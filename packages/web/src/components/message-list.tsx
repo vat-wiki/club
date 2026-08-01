@@ -157,7 +157,13 @@ type MessageListProps = {
   loadingMore?: boolean;
   onReply?: (m: Message) => void;
   onDelete?: (id: string) => void;
+  /** Edit one of the current user's own messages (inline edit UI). */
+  onEdit?: (id: string, content: string) => Promise<void>;
   onReact?: (messageId: string, emoji: string) => void;
+  /** Fired when a highlight target isn't in the loaded history window; the
+   *  caller fetches context via messages({ around: id }) so the target can be
+   *  scrolled to + highlighted (G6 deep-link). */
+  onNeedAround?: (id: string) => void;
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
@@ -189,6 +195,7 @@ function MessageRow({
   onReply,
   replyTo,
   onDelete,
+  onEdit,
   onReact,
 }: {
   m: Message;
@@ -210,11 +217,64 @@ function MessageRow({
   replyTo?: Message;
   /** Recall (delete) this message — only callable on the author's own rows. */
   onDelete?: (id: string) => void;
+  /** Edit this message's text — only callable on the author's own rows.
+   *  Resolves on success (the caller swaps the message locally); rejects on
+   *  server error so the inline editor can surface it and keep editing. */
+  onEdit?: (id: string, content: string) => Promise<void>;
   /** Toggle an emoji reaction on this message. */
   onReact?: (messageId: string, emoji: string) => void;
 }) {
   const { locale, t } = useI18n();
   const pinged = mentionsSelf(m.content, selfName);
+  // Inline edit state (own messages only). Local to the row: entering edit mode
+  // swaps the bubble content for a <textarea> pre-filled with the message text;
+  // Save calls onEdit (which PATCHes and swaps the message locally), Cancel /
+  // Escape reverts. The empty/whitespace case is caught client-side; a server
+  // rejection surfaces as an inline error and keeps editing.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  const startEdit = () => {
+    setDraft(m.content);
+    setEditError(null);
+    setEditing(true);
+    requestAnimationFrame(() => {
+      const el = editRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    });
+  };
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditError(null);
+  };
+  const saveEdit = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      setEditError(t("msg.editEmpty"));
+      return;
+    }
+    if (trimmed === m.content) {
+      setEditing(false);
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await onEdit?.(m.id, trimmed);
+      setEditing(false);
+    } catch {
+      setEditError(t("msg.editFailed"));
+    } finally {
+      setEditSaving(false);
+    }
+  };
   // The precise (to-the-second) time, surfaced on hover via the native title
   // tooltip AND as the row's accessible description (aria-label) so SR users get
   // the exact time without hovering. The inline header timestamp stays HH:MM.
@@ -274,6 +334,9 @@ function MessageRow({
                 {sanitizeDisplayString(m.authorName)}
               </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground/90">{fmtTime(m.createdAt, locale)}</span>
+              {m.editedAt && (
+                <span className="font-mono text-[10px] lowercase text-muted-foreground/50">({t("msg.edited")})</span>
+              )}
               {onReply && (
                 <button
                   type="button"
@@ -284,7 +347,17 @@ function MessageRow({
                   {t("msg.reply")}
                 </button>
               )}
-              {self && !m.deleted && !m.status && onDelete && (
+              {self && !m.deleted && !m.status && !editing && onEdit && (
+                <button
+                  type="button"
+                  data-testid={`edit-${m.id}`}
+                  onClick={startEdit}
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground"
+                >
+                  {t("msg.edit")}
+                </button>
+              )}
+              {self && !m.deleted && !m.status && !editing && onDelete && (
                 <button
                   type="button"
                   data-testid={`recall-${m.id}`}
@@ -318,6 +391,57 @@ function MessageRow({
             )}
             {m.deleted ? (
               <span className="italic text-muted-foreground">{t("msg.recalled")}</span>
+            ) : editing ? (
+              <div className="space-y-1.5">
+                <textarea
+                  ref={editRef}
+                  value={draft}
+                  disabled={editSaving}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    setEditError(null);
+                    const el = e.currentTarget;
+                    el.style.height = "auto";
+                    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void saveEdit();
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEdit();
+                    }
+                  }}
+                  aria-label={t("msg.edit")}
+                  className="block w-full resize-none rounded-md border border-border bg-background px-2 py-1 text-sm leading-snug focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-h-[200px]"
+                  rows={1}
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveEdit()}
+                    disabled={editSaving}
+                    className="rounded bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {editSaving ? t("msg.editSaving") : t("msg.editSave")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    disabled={editSaving}
+                    className="rounded px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                  >
+                    {t("msg.editCancel")}
+                  </button>
+                  {editError && (
+                    <span role="alert" className="font-mono text-[10px] text-destructive">
+                      {editError}
+                    </span>
+                  )}
+                </div>
+              </div>
             ) : (
               <>
                 {m.content.length > 0 && renderContent(m.content, known, selfName)}
@@ -372,7 +496,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onReact },
+  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onEdit, onReact, onNeedAround },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -468,18 +592,43 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const highlightConsumedRef = useRef(false);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirror loadingChannel + onNeedAround into refs so the highlight effect can
+  // read the latest values without joining the deps (which would re-subscribe).
+  const loadingChannelRef = useRef(false);
+  loadingChannelRef.current = !!loadingChannel;
+  const onNeedAroundRef = useRef(onNeedAround);
+  onNeedAroundRef.current = onNeedAround;
+  // Tracks the highlight target we've already requested context for, so the
+  // around fetch fires at most once per target (avoids hammering the server on
+  // every items-growth re-run while the fetch is in flight).
+  const aroundFetchedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!highlightMessageId) {
       // No active target — arm for the next one, but leave any in-flight wash
       // alone so it finishes its 1.2s naturally.
       highlightConsumedRef.current = false;
+      aroundFetchedRef.current = null;
       return;
     }
     if (highlightConsumedRef.current) return;
     const idx = itemsRef.current.findIndex(
       (it) => it.kind === "msg" && it.m.id === highlightMessageId,
     );
-    if (idx < 0) return; // not loaded yet — re-runs when items grow
+    if (idx < 0) {
+      // Target not in the loaded window. Once the channel's initial history has
+      // settled (not still loading) and we haven't already requested context for
+      // THIS target, fetch around it so the highlight can land. The effect
+      // re-runs as items grow (the around fetch merges new messages in), at
+      // which point idx >= 0 and the highlight proceeds below.
+      if (
+        !loadingChannelRef.current &&
+        aroundFetchedRef.current !== highlightMessageId
+      ) {
+        aroundFetchedRef.current = highlightMessageId;
+        onNeedAroundRef.current?.(highlightMessageId);
+      }
+      return;
+    }
     highlightConsumedRef.current = true;
     virtualizer.scrollToIndex(idx, { align: "center", behavior: "smooth" });
     setHighlightedId(highlightMessageId);
@@ -644,6 +793,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     onReply={onReply}
                     replyTo={item.replyTo}
                     onDelete={onDelete}
+                    onEdit={onEdit}
                     onReact={onReact}
                   />
                 )}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ClubClient, type ClubConn } from '@club/sdk';
-import type { AgentIdleEvent, AgentThinkingEvent, Message } from '@club/shared';
+import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageEditedEvent } from '@club/shared';
 
 type Status = 'connecting' | 'connected' | 'lost';
 
@@ -23,6 +23,10 @@ export interface UseMessageStreamOptions {
   /** Fired for EVERY incoming message regardless of channel — drives per-channel
    *  unread counts and cross-channel mention toasts (see use-channels). */
   onIncoming?: (m: Message) => void;
+  /** Fired for `message_edited` SSE events in the focused channel - the caller
+   *  swaps the matching message by id (content/attachments/editedAt). Channel-
+   *  scoped like the other message events; other channels are filtered here. */
+  onMessageEdited?: (e: MessageEditedEvent) => void;
 }
 
 /**
@@ -70,6 +74,8 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
   thinkingRef.current = opts.onAgentThinking;
   const idleRef = useRef(opts.onAgentIdle);
   idleRef.current = opts.onAgentIdle;
+  const editedRef = useRef(opts.onMessageEdited);
+  editedRef.current = opts.onMessageEdited;
 
   useEffect(() => {
     if (!conn) return;
@@ -142,6 +148,12 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
             setMessages((prev) =>
               prev.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m))
             );
+          },
+          onMessageEdited: (e) => {
+            // Only the focused channel's messages are in the visible list; the
+            // caller swaps the matching message by id (content/attachments/editedAt).
+            if (e.channel !== currentChannelRef.current) return;
+            editedRef.current?.(e);
           },
         }
       );

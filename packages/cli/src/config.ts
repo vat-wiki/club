@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -62,6 +62,15 @@ export function saveConfig(cfg: ClubConfig): void {
   const p = configPath();
   if (!existsSync(dirname(p))) mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+}
+
+// Remove the config file, logging the caller out. Used after a self-delete
+// (club delete-account): the account is gone, so the stored key is worthless
+// and leaving it would make every subsequent command 401. No-op when the file
+// is already absent so the caller doesn't have to pre-check.
+export function clearConfig(): void {
+  const p = configPath();
+  if (existsSync(p)) unlinkSync(p);
 }
 
 // Like loadConfig but throws when not logged in. Used by commands that require auth.

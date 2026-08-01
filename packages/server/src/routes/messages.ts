@@ -42,7 +42,7 @@ import { getChannelQuery, jsonErr, parseJsonBody, parseLimit, requireValidChanne
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
 import { clientIpKey, rateLimit } from "../rate-limit.js";
-import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastReaction, markThinkingIdle } from "../stream.js";
+import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastEdited, broadcastReaction, markThinkingIdle } from "../stream.js";
 
 export const messages = new Hono();
 
@@ -156,6 +156,10 @@ function toMessage(
   if (attachments) msg.attachments = attachments;
   if (r.reply_to_id) msg.replyToId = r.reply_to_id;
   if (r.deleted) msg.deleted = true;
+  // `edited_at` is NULL until the author edits; mirroring the conditional set
+  // used for `replyToId` / `deleted` keeps an unedited message free of the
+  // field rather than serializing `editedAt: null` to the API/SSE payload.
+  if (r.edited_at) msg.editedAt = r.edited_at;
   // Batched list/search paths pre-fetched reactions via getReactionsForMessages().
   // Keys absent from the map have no reactions (empty); when the map is
   // omitted, fall back to the per-message query. The `?? []` guard keeps
@@ -424,9 +428,10 @@ messages.patch("/:id", requireJson, writeGuard, async (c) => {
   const row = getMessageById(id);
   if (!row) return jsonErr(c, "not found", 500);
   const msg: Message = toMessage(row);
-  // SSE stream carries no native `message_edited` event yet; clients will
-  // pick up the change on their next history poll or when the author's SSE
-  // page lands and refreshes the channel history. TODO: broadcast edited event.
+  // Broadcast the edit live so every SSE subscriber in the channel swaps the
+  // message in by id (replacing content/editedAt) rather than waiting for a
+  // history poll. The event carries the channel so the fan-out stays scoped.
+  broadcastEdited({ message: msg, channel: msg.channel });
   return c.json(msg, 200);
 });
 
@@ -464,7 +469,7 @@ messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
 
 // GET /messages/stream  (SSE) — live message feed, optionally channel-scoped.
 // `?channel=<slug>` subscribes to a single channel; `?channels=a,b` to several; omitted
-// subscribes to all channels. Channel-scoped events (message / message_deleted /
+// subscribes to all channels. Channel-scoped events (message / message_edited / message_deleted /
 // message_reaction / agent_thinking / agent_idle) are filtered server-side so a
 // client focused on channel A never pays for channel B's traffic (MR10). Presence
 // stays global (PRD §8.7) — a roster is connection-level, not per-channel.

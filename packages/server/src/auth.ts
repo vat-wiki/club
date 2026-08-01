@@ -41,7 +41,9 @@ declare module "hono" {
  * (default 30 requests per minute) via `checkKeyRateLimit`. A valid key that
  * fires rapidly from many IPs is almost certainly compromised; the global
  * per-IP rate limiter (`rate-limit.ts`) cannot catch cross-IP replay of a
- * leaked credential. The per-key limiter does.
+ * leaked credential. The per-key limiter does. The SSE stream endpoint
+ * (`GET /messages/stream`) is exempt: its long-lived, reconnect-prone
+ * connections would otherwise exhaust the budget and block real sends.
  *
  * The middleware is used as `app.use("/", requireAuth)` in every route module
  * (participants, messages, channels, …), so a single change here propagates to
@@ -71,8 +73,15 @@ export const requireAuth = createMiddleware(async (c, next) => {
   // Disabled in test mode (NODE_ENV=test) so suites that fire dozens of
   // authenticated requests in a single minute don't trip the 30/min ceiling;
   // mirrors the isTest gating in the per-IP and write-path limiters.
+  // Also exempted for the SSE stream endpoint (GET /messages/stream): each
+  // connection is long-lived and reconnects on network jitter / multi-tab
+  // usage, so charging 30/min per key would let a few reconnects exhaust the
+  // budget and block real sends. The global per-IP limiter still bounds
+  // abuse on the stream path.
   const isTest = process.env.NODE_ENV === "test";
-  const exceeded = isTest ? null : checkKeyRateLimit(c, key);
+  const isSSEStream =
+    c.req.method === "GET" && c.req.path.endsWith("/messages/stream");
+  const exceeded = isTest || isSSEStream ? null : checkKeyRateLimit(c, key);
   if (exceeded) return jsonErr(c, exceeded.error, exceeded.status as 429);
 
   const row = getParticipantByKeyHash(hashKey(key));

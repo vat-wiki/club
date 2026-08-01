@@ -131,18 +131,31 @@ describe("POST /messages/:id/reactions — strict control-char reject", () => {
     expect(res.status).toBe(400);
   });
 
-  it("reacting to a non-existent message id does not return 204 (DB never mutated)", async () => {
+  it("reacting to a non-existent message id returns 404 (DB never mutated)", async () => {
     const before = getReactionsForMessage("nonexistent");
     const res = await app.request("/messages/nonexistent/reactions", {
       method: "POST",
       headers: auth(key),
       body: JSON.stringify({ emoji: "🔥" }),
     });
-    // Implementation detail: the FK guard in the DB layer throws before the
-    // 404 path is reached. The contract-relevant assertion is that the reaction
-    // is never stored — which is what we verify here.
-    expect(res.status).not.toBe(204);
+    expect(res.status).toBe(404);
     expect(getReactionsForMessage("nonexistent")).toEqual(before);
+  });
+
+  it("reacting to a soft-deleted message returns 404 (DB never mutated)", async () => {
+    // Soft-delete (recall) the message, then attempt to react to it.
+    const del = await app.request(`/messages/${msgId}`, {
+      method: "DELETE",
+      headers: auth(key),
+    });
+    expect(del.status).toBe(204);
+    const res = await app.request(`/messages/${msgId}/reactions`, {
+      method: "POST",
+      headers: auth(key),
+      body: JSON.stringify({ emoji: "🔥" }),
+    });
+    expect(res.status).toBe(404);
+    expect(getReactionsForMessage(msgId)).toHaveLength(0);
   });
 
   it("unauthenticated request gets 401", async () => {

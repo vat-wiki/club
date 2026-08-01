@@ -1,6 +1,6 @@
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import { Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { ClubConn } from "@club/sdk";
@@ -33,18 +33,22 @@ export function SearchBar({
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Message[]>([]);
   const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (!conn || !q.trim()) {
       setResults([]);
+      setSearching(false);
       return;
     }
+    setSearching(true);
     const h = setTimeout(async () => {
       try {
         setResults(await api.search(conn, q, channel));
       } catch {
         setResults([]);
       }
+      setSearching(false);
     }, 300);
     return () => clearTimeout(h);
   }, [conn, q, channel]);
@@ -70,6 +74,7 @@ export function SearchBar({
             onClick={() => {
               setQ("");
               setResults([]);
+              setSearching(false);
               setOpen(false);
             }}
             aria-label={t("search.clear")}
@@ -80,8 +85,12 @@ export function SearchBar({
         )}
       </div>
       {open && q.trim() && (
-        <div className="absolute left-0 right-0 top-full z-30 max-h-72 overflow-y-auto border-b border-border bg-popover shadow-lg scrollbar-thin">
-          {results.length === 0 ? (
+        <div className="absolute left-0 right-0 top-full z-30 max-h-72 overflow-y-auto border-b border-border bg-popover shadow-lg scrollbar-thin" aria-busy={searching}>
+          {searching ? (
+            <div className="flex items-center gap-1.5 px-4 py-3 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            </div>
+          ) : results.length === 0 ? (
             <div className="px-4 py-3 text-xs text-muted-foreground">{t("search.noResults")}</div>
           ) : (
             results.map((m) => (

@@ -43,11 +43,20 @@ export interface SpawnOptions {
  * @returns text 是否成功写入(提交键异步跟上)
  */
 const SUBMIT_DELAY_MS = 80;
-export function writeToPty(child: pty.IPty): InjectFn {
-  return (text: string): boolean => {
+export function writeToPty(child: pty.IPty): InjectFn & { dispose: () => void } {
+  // 跟踪 pending 的提交键定时器:dispose/子进程退出后清掉,避免陈旧的 \r
+  // 仍挂在事件循环里延迟进程退出(最多 SUBMIT_DELAY_MS)。writeToPty 可能被
+  // 连续多次调用,每次新设 timer 前先清旧的,只保留最新一次的提交键。
+  let submitTimer: ReturnType<typeof setTimeout> | null = null;
+  const inject = ((text: string): boolean => {
     try {
+      if (submitTimer) {
+        clearTimeout(submitTimer);
+        submitTimer = null;
+      }
       child.write(text);
-      setTimeout(() => {
+      submitTimer = setTimeout(() => {
+        submitTimer = null;
         try {
           child.write("\r");
         } catch {
@@ -58,7 +67,14 @@ export function writeToPty(child: pty.IPty): InjectFn {
     } catch {
       return false;
     }
+  }) as InjectFn & { dispose: () => void };
+  inject.dispose = () => {
+    if (submitTimer) {
+      clearTimeout(submitTimer);
+      submitTimer = null;
+    }
   };
+  return inject;
 }
 
 /**
@@ -107,8 +123,11 @@ export async function runAgent(
   // onInjected 接到 QueuedInjector 的状态回调:状态转 idle→busy 即注入了一条,
   // 用队列深度差推断“这次注入了什么”过于脆弱,因此这里改为在 inject 函数里
   // 直接回调(注入发生在 writeToPty 的成功路径)。
+  // writer 只创建一次:提交键定时器跟踪在它的闭包里,反复创建会丢掉对旧
+  // timer 的引用、无法在 cleanup 里清理。
+  const writer = writeToPty(child);
   const qi = new QueuedInjector((text: string): boolean => {
-    const ok = writeToPty(child)(text);
+    const ok = writer(text);
     if (ok) onInjected?.(text);
     return ok;
   });
@@ -139,18 +158,33 @@ export async function runAgent(
 
   // ── 退出清理 ──
   const cleanup = () => {
+    try { writer.dispose(); } catch { /* */ }
     try { qi.dispose(); } catch { /* */ }
     try { stopFeed(); } catch { /* */ }
     try { process.stdin.setRawMode(false); } catch { /* */ }
+    // 杀掉子进程:父进程退出时 PTY master 关闭会发 SIGHUP,但某些 TUI
+    // 应用忽略 SIGHUP 会变孤儿。显式 kill 确保子进程跟着退出。
+    try { child.kill(); } catch { /* 已退出 */ }
+  };
+
+  // SIGINT/SIGTERM/SIGHUP 共用清理 + 退出逻辑,避免重复代码。
+  // 退出码遵循 shell 约定 128 + signal(SIGHUP=1 -> 129, SIGINT=2 -> 130,
+  // SIGTERM=15 -> 143)。
+  const signalHandler = (exitCode: number) => {
+    cleanup();
+    process.exit(exitCode);
   };
 
   return new Promise<number>((resolve) => {
-    child.onExit(({ exitCode }) => {
+    child.onExit(({ exitCode, signal }) => {
       cleanup();
-      resolve(exitCode ?? 0);
+      // 被信号杀死时 exitCode 为 null/0,必须看 signal 才不致误报成功。
+      // shell 约定:信号终止 -> 128 + signal。
+      resolve(signal ? 128 + signal : (exitCode ?? 0));
     });
-    process.on("SIGINT", () => { cleanup(); process.exit(130); });
-    process.on("SIGTERM", () => { cleanup(); process.exit(143); });
+    process.on("SIGINT", () => signalHandler(130));
+    process.on("SIGTERM", () => signalHandler(143));
+    process.on("SIGHUP", () => signalHandler(129));
   });
 }
 

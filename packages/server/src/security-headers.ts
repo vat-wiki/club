@@ -28,7 +28,7 @@ import { createMiddleware } from "hono/factory";
  *   - Cross-Origin headers (CORP / COEP / COOP): isolate the web app from
  *     foreign origins, enabling Origin-Clean headers (cross-origin read
  *     blocking) and narrowing Spectre-style side-channel surface on the
- *     chat SPA's SSE/WebSocket data plane.
+ *     chat SPA's SSE data plane.
  *
  * Cache-Control: no-store, no-cache, must-revalidate is applied globally as a
  * safe default. Static assets served by serveStatic() (web app) and the
@@ -49,7 +49,7 @@ export const securityHeaders = createMiddleware(async (c, next) => {
       "style-src 'self'",
       "img-src 'self' data: blob:",
       "font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
-      "connect-src 'self' ws: wss:",
+      "connect-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -75,8 +75,8 @@ export const securityHeaders = createMiddleware(async (c, next) => {
   // Cross-Origin isolation: CORP same-origin + COEP require-corp + COOP
   // same-origin-origin-when-cross-origin. Together they enable Origin-Clean
   // headers (read blocking for cross-origin fetch/XHR/XMLHttpRequest) and
-  // reduce Spectre-style side-channel surface on the chat SPA's SSE/WebSocket
-  // data plane, where user messages and mentions are streamed.
+  // reduce Spectre-style side-channel surface on the chat SPA's SSE data
+  // plane, where user messages and mentions are streamed.
   c.header("Cross-Origin-Resource-Policy", "same-origin");
   c.header("Cross-Origin-Embedder-Policy", "require-corp");
   c.header("Cross-Origin-Opener-Policy", "same-origin-origin-when-cross-origin");

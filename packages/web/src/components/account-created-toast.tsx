@@ -1,6 +1,8 @@
+import { useCopy } from "@/hooks/use-copy";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { Check, Copy, Download, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
  * Non-blocking toast shown after successful account creation.
@@ -22,7 +24,9 @@ export function AccountCreatedToast({
   message?: string;
 }) {
   const t = useT();
-  const [copied, setCopied] = useState(false);
+  const { state: copyState, copy } = useCopy();
+  const copied = copyState === "copied";
+  const failed = copyState === "failed";
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-dismiss after 10 seconds
@@ -46,11 +50,9 @@ export function AccountCreatedToast({
     }, 10000);
   };
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(recoverCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [recoverCode]);
+  const handleCopy = () => {
+    void copy(recoverCode);
+  };
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([`Club Backup Code: ${recoverCode}`], { type: "text/plain" });
@@ -93,7 +95,10 @@ export function AccountCreatedToast({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors hover:bg-accent",
+                  failed && "text-destructive",
+                )}
               >
                 {copied ? (
                   <>

@@ -3,6 +3,7 @@ import { MentionPopup } from "@/components/mention-popup";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { sanitizeDisplayString } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import {
   applyMention,
@@ -547,7 +548,7 @@ export function Composer({
           <span className="min-w-0 truncate text-muted-foreground">
             {t("msg.replyingTo", { name: replyTo.authorName })}
             <span className="ml-1 text-foreground/80">
-              {replyTo.content.slice(0, 80) || "…"}
+              {sanitizeDisplayString(replyTo.content).slice(0, 80) || "…"}
             </span>
           </span>
           <button

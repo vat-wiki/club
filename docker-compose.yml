@@ -27,6 +27,11 @@ services:
       # X-Forwarded-For 的可信反向代理（nginx/caddy，通常也负责 HTTPS）之后时才开启；
       # 否则攻击者可伪造该头绕过 per-IP 限流。裸 Docker 端口映射不产生 XFF，开启无效。
       TRUSTED_PROXY: "true"
+      # ALLOWED_ORIGINS：生产环境若前端与 API 不同源，必须显式配置允许跨域的源
+      # （逗号分隔，如 https://club.example.com）。留空时生产默认拒绝所有跨域请求
+      # （见 server index.ts 的 CORS 逻辑），保证任意第三方网站无法跨域调用 API。
+      # 同源部署（SPA 与 API 共用 club:6500）则无需设置。
+      # ALLOWED_ORIGINS: "https://club.example.com"
     volumes:
       - club-data-prod:/data
     networks:
@@ -53,6 +58,9 @@ services:
       # X-Forwarded-For 的可信反向代理（nginx/caddy，通常也负责 HTTPS）之后时才开启；
       # 否则攻击者可伪造该头绕过 per-IP 限流。裸 Docker 端口映射不产生 XFF，开启无效。
       TRUSTED_PROXY: "true"
+      # ALLOWED_ORIGINS：同 prod，若 staging 前端与 API 不同源需显式配置。
+      # 留空时生产默认拒绝跨域（见 server index.ts 的 CORS 逻辑）。
+      # ALLOWED_ORIGINS: "https://staging.club.example.com"
     volumes:
       - club-data-test:/data
     networks:

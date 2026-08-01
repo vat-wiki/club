@@ -42,13 +42,15 @@
  * ```
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
 import { type ChannelSlugType,escapeLike, type Reaction } from '@club/shared';
+
+import { filesDir } from './files-dir.js';
 
 const dbPath = process.env.CLUB_DB ?? resolve(process.cwd(), 'club.db');
 
@@ -780,14 +782,17 @@ export function getReactionsForMessages(messageIds: string[]): Map<string, React
  *  `message_reaction` broadcast without a second `SELECT channel FROM messages`
  *  round-trip on the hot path.
  *
- *  @returns `{ reactions, channel }` — channel is always populated for a known id.
+ *  @returns `{ reactions, channel }` on success, or `null` if the message is
+ *    unknown / deleted. The caller maps `null` to a 404.
  */
 export function toggleReaction(
   messageId: string,
   participantId: string,
   emoji: string
-): { reactions: Reaction[]; channel: string | undefined } {
-  const channel = getMessageChannel(messageId);
+): { reactions: Reaction[]; channel: string | undefined } | null {
+  const msg = getMessageById(messageId);
+  if (!msg || msg.deleted) return null;
+  const channel = msg.channel;
   const removed = removeReactionStmt.run(messageId, participantId, emoji).changes > 0;
   if (!removed) addReactionStmt.run(messageId, participantId, emoji);
   return { reactions: getReactionsForMessage(messageId), channel };
@@ -1542,31 +1547,82 @@ export function updateChannelDisplayName(slug: string, displayName: string | nul
   return updateChannelDisplayNameStmt.run(displayName, slug).changes > 0;
 }
 
+// Prepared statement for collecting attachment file ids from a channel's
+// messages before they are deleted. The `attachments` column is a JSON array
+// of objects with an `id` field matching `files.id`; NULL/empty means none.
+const channelAttachmentsStmt = db.prepare<[string], { attachments: string }>(
+  `SELECT attachments FROM messages WHERE channel = ? AND attachments IS NOT NULL AND attachments != ''`
+);
+const deleteFileByIdStmt = db.prepare<[string]>(`DELETE FROM files WHERE id = ?`);
+
 // Cascade-delete everything owned by a channel, in FK-safe order, then the channel
 // row itself. Runs in one transaction so a partial failure can't leave orphans.
 // `reactions.message_id` REFERENCES messages(id) (FK on, db.ts pragma), so
 // reactions must go before messages; mentions have no FK to messages but reference
 // the channel slug textually, so they are scoped by `channel = ?`.
-const deleteChannelTx = db.transaction((slug: string) => {
+//
+// Before deleting messages, collects attachment file ids from the `attachments`
+// JSON column so the corresponding `files` table rows can be cleaned up (the
+// files table has no FK to messages - attachments are stored as JSON). Returns
+// the file ids so the caller can delete the on-disk blobs after the transaction
+// commits (disk I/O failures must not roll back the committed DB state).
+const deleteChannelTx = db.transaction((slug: string): string[] => {
+  // Collect attachment file ids before the messages are deleted.
+  const attachmentRows = channelAttachmentsStmt.all(slug);
+  const fileIds: string[] = [];
+  for (const row of attachmentRows) {
+    try {
+      const attachments = JSON.parse(row.attachments);
+      if (Array.isArray(attachments)) {
+        for (const a of attachments) {
+          if (a && typeof a.id === 'string') fileIds.push(a.id);
+        }
+      }
+    } catch {
+      // Malformed JSON in attachments - skip; the message row is still deleted.
+    }
+  }
+
   db.prepare(
     `DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE channel = ?)`
   ).run(slug);
   db.prepare(`DELETE FROM mentions WHERE channel = ?`).run(slug);
   db.prepare(`DELETE FROM messages WHERE channel = ?`).run(slug);
   db.prepare(`DELETE FROM channels WHERE slug = ?`).run(slug);
+
+  // Clean up files table metadata for the collected attachment ids.
+  for (const id of fileIds) {
+    deleteFileByIdStmt.run(id);
+  }
+
+  return fileIds;
 });
 
-/** Delete a channel and cascade-clean its messages, mentions, and reactions. The
- *  seeded `general` channel is protected and never deleted (returns false); every
- *  other channel may be removed by any participant (open-CRUD model). Returns
- *  whether the channel was deleted (false ⇒ it was `general` or unknown). The
- *  caller must invalidate the channel caches afterwards. */
+/** Delete a channel and cascade-clean its messages, mentions, reactions, and
+ *  attachment file metadata. The seeded `general` channel is protected and never
+ *  deleted (returns false); every other channel may be removed by any participant
+ *  (open-CRUD model). Returns whether the channel was deleted (false => it was
+ *  `general` or unknown). On-disk files for the channel's attachments are deleted
+ *  best-effort after the transaction commits; failures are logged but do not undo
+ *  the committed DB state. The caller must invalidate the channel caches
+ *  afterwards. */
 export function deleteChannel(slug: string): boolean {
   if (slug === 'general') return false;
   // Existence probe before the cascade so the return value is truthful without a
   // post-delete re-read (the cascade DELETE itself reports changes, but mixing it
   // with the FK-ordered multi-statement tx would muddy the signal).
   if (channelBySlugStmt.get(slug) === undefined) return false;
-  deleteChannelTx(slug);
+  const fileIds = deleteChannelTx(slug);
+  // Best-effort disk file cleanup after the transaction has committed. A failure
+  // here (file already gone, permission error) must not undo the DB work; the
+  // files table rows are already gone, so any remaining on-disk orphans are
+  // harmless (unreachable by id) and can be swept by a future GC pass.
+  for (const id of fileIds) {
+    try {
+      unlinkSync(resolve(filesDir(), id));
+    } catch {
+      // File already removed or inaccessible - DB metadata is cleaned.
+    }
+  }
   return true;
 }

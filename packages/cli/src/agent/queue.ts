@@ -28,6 +28,7 @@ export type OnStateChange = (
 /** 配置常量(按需调,默认值偏保守)。 */
 export const IDLE_QUIET_MS = 1500; // 静默多久算 idle。claude spinner 帧间隔远小于此
 export const POST_INJECT_COOLDOWN_MS = 2000; // 注入后强制 busy 多久,等目标"接住"输入
+export const MAX_QUEUE_DEPTH = 1000; // 队列上限:agent 长时间 busy + 高流量时防 OOM
 
 /**
  * 活动追踪 + 排队注入器。
@@ -63,6 +64,14 @@ export class QueuedInjector {
   /** 外部事件来了,排队等注入。busy 时不会立刻注入,等 idle。 */
   enqueue(text: string): void {
     this.queue.push(text);
+    // 队列上限:agent 长时间 busy + 高流量频道时避免无界增长 OOM。
+    // 超过上限丢弃最旧的(shift),新消息优先(更可能还有时效)。
+    if (this.queue.length > MAX_QUEUE_DEPTH) {
+      this.queue.shift();
+      process.stderr.write(
+        `[club agent] 注入队列超过 ${MAX_QUEUE_DEPTH} 上限,丢弃最旧消息\n`,
+      );
+    }
     // 即便 idle,也走 timer 路径注入,避免重入 + 跟输出观察争用
     this.armTimer();
   }
@@ -132,8 +141,14 @@ export class QueuedInjector {
           this.timer = setTimeout(() => this.onTick(), POST_INJECT_COOLDOWN_MS);
           return;
         }
-        // 注入失败(目标已退?):把消息放回队头,不丢。下次再试。
+        // 注入失败(目标已退?):把消息放回队头,不丢。
+        // 必须重新 arm timer:此时 timer 已触发不会再来,若不 arm 消息会
+        // 无限期卡死(只能等下次 enqueue/observeOutput 才有机会重试)。
+        // 用 IDLE_QUIET_MS 间隔延迟重试:此时已判定 idle,armTimer() 算出
+        // wait=0 会立即重试,失败时形成紧密空转循环,故显式延迟。
         this.queue.unshift(text);
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.onTick(), IDLE_QUIET_MS);
         return;
       }
       // 队列空 + idle:无需再定时,等下次 observeOutput/enqueue 重新 arm

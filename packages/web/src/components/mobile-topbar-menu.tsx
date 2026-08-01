@@ -87,7 +87,7 @@ export function MobileTopbarMenu({
       {/* Language switcher */}
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70"
+        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70 min-h-[44px]"
         onClick={cycleLang}
         aria-label={t("topbar.menu.lang.aria", { lang: LANG_LABEL[lang] })}
       >
@@ -101,7 +101,7 @@ export function MobileTopbarMenu({
       {/* Roster */}
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70"
+        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70 min-h-[44px]"
         onClick={() => {
           setMenuOpen(false);
           onOpenRoster();
@@ -117,7 +117,7 @@ export function MobileTopbarMenu({
       {/* View key */}
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70"
+        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70 min-h-[44px]"
         onClick={() => {
           setMenuOpen(false);
           setViewKeyOpen(true);
@@ -132,7 +132,7 @@ export function MobileTopbarMenu({
       {onRotateKeyRequest && (
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70"
+          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent/70 min-h-[44px]"
           onClick={() => {
             setMenuOpen(false);
             onRotateKeyRequest();
@@ -149,7 +149,7 @@ export function MobileTopbarMenu({
       {onDeleteAccountRequest && (
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10 min-h-[44px]"
           onClick={() => {
             setMenuOpen(false);
             onDeleteAccountRequest();
@@ -165,7 +165,7 @@ export function MobileTopbarMenu({
       {/* Sign out */}
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10 min-h-[44px]"
         onClick={() => {
           setMenuOpen(false);
           onSignOutRequest();

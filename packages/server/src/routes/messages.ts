@@ -18,6 +18,7 @@ import {
 import { parseAttachments } from "./attachment-cache.js";
 import { requireAuth } from "../auth.js";
 import {
+  db,
   deleteMessage,
   ensureChannel,
   getAllParticipantNames,
@@ -30,9 +31,8 @@ import {
   getReactionsForMessage,
   getReactionsForMessages,
   getRecentMessages,
-  insertMentions,
+  insertMention,
   insertMessage,
-  type MentionInsert,
   type MessageRow,
   searchMessages,
   toggleReaction,
@@ -256,38 +256,34 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   // non-existent-but-valid channel builds it — "build" and "enter" are the same
   // action in the open model). "general" always already exists from the
   // migration seed, so the common path is a no-op.
-  ensureChannel(channel, createdAt);
-  insertMessage(
-    id,
-    me.id,
-    cleanContent,
-    createdAt,
-    attachments.length > 0 ? JSON.stringify(attachments) : null,
-    replyToId ?? null,
-    channel,
-  );
+  db.transaction(() => {
+    ensureChannel(channel, createdAt);
+    insertMessage(
+      id,
+      me.id,
+      cleanContent,
+      createdAt,
+      attachments.length > 0 ? JSON.stringify(attachments) : null,
+      replyToId ?? null,
+      channel,
+    );
 
-  // Persist a per-participant inbox row for everyone @-mentioned in the text.
-  // The recipient list is computed server-side (see mention.ts) so it is the
-  // single source of truth — clients no longer have to each re-derive it, and
-  // an offline recipient still finds the mention on next poll. We do NOT
-  // exclude the author: the client-side `listen --mention` matcher doesn't
-  // either, so the inbox must agree with what a live listen would have caught.
-  // Each mention carries `channel` so a cross-channel @mention can deep-link the
-  // recipient to the source channel + message (MR11).
-  const mentioned = extractMentionedParticipants(
-    cleanContent,
-    getAllParticipantNames(),
-  );
-  const mentionRows: MentionInsert[] = mentioned.map((m) => ({
-    id: ulid(),
-    messageId: id,
-    participantId: m.id,
-    authorId: me.id,
-    channel,
-    createdAt,
-  }));
-  if (mentionRows.length > 0) insertMentions(mentionRows);
+    // Persist a per-participant inbox row for everyone @-mentioned in the text.
+    // The recipient list is computed server-side (see mention.ts) so it is the
+    // single source of truth - clients no longer have to each re-derive it, and
+    // an offline recipient still finds the mention on next poll. We do NOT
+    // exclude the author: the client-side `listen --mention` matcher doesn't
+    // either, so the inbox must agree with what a live listen would have caught.
+    // Each mention carries `channel` so a cross-channel @mention can deep-link the
+    // recipient to the source channel + message (MR11).
+    const mentioned = extractMentionedParticipants(
+      cleanContent,
+      getAllParticipantNames(),
+    );
+    for (const m of mentioned) {
+      insertMention(ulid(), id, m.id, me.id, channel, createdAt);
+    }
+  })();
 
   const msg: Message = {
     id,
@@ -463,7 +459,9 @@ messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   }
   const trimmed = emoji.trim();
   if (!trimmed) return jsonErr(c, "bad emoji");
-  const { reactions, channel } = toggleReaction(id, me.id, trimmed);
+  const result = toggleReaction(id, me.id, trimmed);
+  if (!result) return jsonErr(c, "not found", 404);
+  const { reactions, channel } = result;
   broadcastReaction({ messageId: id, reactions: reactions as Reaction[], channel: channel ?? DEFAULT_CHANNEL } satisfies MessageReactionEvent);
   return c.body(null, 204);
 });

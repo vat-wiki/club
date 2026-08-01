@@ -8,7 +8,7 @@
 // Philosophy: every step is best-effort and fails open. A flaky network, missing global
 // write permission, or a non-global install must never block the user's real command.
 
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -16,7 +16,28 @@ import { configPath } from "./config.js";
 import pkg from "../package.json" with { type: "json" };
 
 // The published package lives at `club-cli` on npm (bin: `club`).
-const REGISTRY_URL = "https://registry.npmjs.org/club-cli/latest";
+const FALLBACK_REGISTRY_URL = "https://registry.npmjs.org/club-cli/latest";
+
+/**
+ * Resolve the registry URL for the latest club-cli version. Reads the user's
+ * configured npm registry (`npm config get registry`, honoring ~/.npmrc mirrors)
+ * so version checks work in regions where registry.npmjs.org is unreachable -
+ * matching `runSelfUpdate`, which uses `npm i -g` and already respects the
+ * mirror. Falls back to registry.npmjs.org when npm is unavailable.
+ */
+let _registryUrl: string | undefined;
+function resolveRegistryUrl(): string {
+  if (_registryUrl !== undefined) return _registryUrl;
+  try {
+    const registry = execSync("npm config get registry", { encoding: "utf8" })
+      .trim()
+      .replace(/\/+$/, "");
+    _registryUrl = `${registry}/club-cli/latest`;
+  } catch {
+    _registryUrl = FALLBACK_REGISTRY_URL;
+  }
+  return _registryUrl;
+}
 const FETCH_TIMEOUT_MS = 5_000;
 const TTL_MS = 24 * 60 * 60 * 1000; // re-fetch at most once per day
 const INSTALL_BACKOFF_MS = 60 * 60 * 1000; // after a failed install, don't retry for 1h
@@ -105,7 +126,7 @@ export async function fetchLatestVersion(): Promise<string | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(REGISTRY_URL, { signal: ctrl.signal });
+    const res = await fetch(resolveRegistryUrl(), { signal: ctrl.signal });
     if (!res.ok) return null;
     const json = (await res.json()) as { version?: string };
     const v = json?.version;

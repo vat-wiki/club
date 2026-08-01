@@ -99,6 +99,7 @@ function isMessage(v: unknown): v is Message {
   if (v.attachments !== undefined && !Array.isArray(v.attachments)) return false;
   if (v.replyToId !== undefined && typeof v.replyToId !== "string") return false;
   if (v.deleted !== undefined && typeof v.deleted !== "boolean") return false;
+  if (v.editedAt !== undefined && typeof v.editedAt !== "number") return false;
   if (v.reactions !== undefined && !Array.isArray(v.reactions)) return false;
   if (v.status !== undefined && v.status !== "sending" && v.status !== "failed") return false;
   return true;

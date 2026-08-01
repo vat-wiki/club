@@ -22,7 +22,7 @@ import { useI18n } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ClubApiError, ClubClient, type ClubConn } from "@club/sdk";
-import { DEFAULT_CHANNEL, type ImageMime, type Message, type MessageEditedEvent, type Participant } from "@club/shared";
+import { DEFAULT_CHANNEL, type Message, type MessageEditedEvent, type Participant } from "@club/shared";
 
 export default function App() {
   const { t } = useI18n();
@@ -412,17 +412,10 @@ export default function App() {
       channel: channels.currentChannel,
       status: "sending",
       ...(replyToId ? { replyToId } : {}),
-      // Only the upload id is known client-side, so synthesize a displayable
-      // attachment shape from /files/{id}; the confirmed copy carries the real
-      // mime/size. The <img> only needs the url to render.
-      attachments: attachmentIds.length
-        ? attachmentIds.map((id) => ({
-            id,
-            url: `/files/${id}`,
-            mime: "image/jpeg" as ImageMime,
-            size: 0,
-          }))
-        : undefined,
+      // Omit attachments from the optimistic row: the client only knows the
+      // upload id, not the real mime/size, and a wrong mime (e.g. image/jpeg
+      // for a video) would briefly render the wrong attachment type. The
+      // confirmed copy from the server replaces this row with accurate metadata.
     };
     setMessages((prev) => [...prev, optimistic]);
     void refreshMembers();
@@ -497,6 +490,14 @@ export default function App() {
         around: id,
         channel: currentChannelRef.current,
       });
+      // If the target message wasn't found (empty result or absent from the
+      // returned context), clear the highlight so it doesn't persist and
+      // re-trigger the around API on every channel switch (the MessageList
+      // remounts and resets aroundFetchedRef on each switch).
+      if (ctx.length === 0 || !ctx.some((m) => m.id === id)) {
+        setHighlightMessageId(null);
+        return;
+      }
       setMessages((prev) => {
         const existing = new Set(prev.map((m) => m.id));
         const fresh = ctx.filter((m) => !existing.has(m.id));
@@ -506,7 +507,7 @@ export default function App() {
         );
       });
     } catch {
-      /* target may not exist / transient - the highlight just won't land */
+      setHighlightMessageId(null);
     }
   };
 

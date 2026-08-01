@@ -342,7 +342,7 @@ function MessageRow({
                   type="button"
                   data-testid={`reply-${m.id}`}
                   onClick={() => onReply(m)}
-                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground"
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground min-h-[36px] px-1 md:min-h-0"
                 >
                   {t("msg.reply")}
                 </button>
@@ -352,7 +352,7 @@ function MessageRow({
                   type="button"
                   data-testid={`edit-${m.id}`}
                   onClick={startEdit}
-                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground"
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground min-h-[36px] px-1 md:min-h-0"
                 >
                   {t("msg.edit")}
                 </button>
@@ -362,7 +362,7 @@ function MessageRow({
                   type="button"
                   data-testid={`recall-${m.id}`}
                   onClick={() => onDelete(m.id)}
-                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-destructive"
+                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-destructive min-h-[36px] px-1 md:min-h-0"
                 >
                   {t("msg.recall")}
                 </button>
@@ -381,9 +381,13 @@ function MessageRow({
             {m.replyToId && (
               <div className="mb-1 border-l-2 border-border/60 pl-2 text-xs text-muted-foreground">
                 {replyTo ? (
-                  <span className="truncate">
-                    <span className="font-medium">{sanitizeDisplayString(replyTo.authorName)}</span>: {sanitizeDisplayString(replyTo.content).slice(0, 80) || "…"}
-                  </span>
+                  replyTo.deleted ? (
+                    <span className="italic">{t("msg.recalled")}</span>
+                  ) : (
+                    <span className="truncate">
+                      <span className="font-medium">{sanitizeDisplayString(replyTo.authorName)}</span>: {sanitizeDisplayString(replyTo.content).slice(0, 80) || "…"}
+                    </span>
+                  )
                 ) : (
                   t("msg.replyNotFound")
                 )}

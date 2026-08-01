@@ -98,6 +98,34 @@ export function addSubscriber(
         subscribers.delete(entry);
       });
   }
+  // Seed the newcomer with everyone currently thinking. An agent that started
+  // thinking before this connection broadcast agent_thinking then, so the
+  // newcomer missed it and would never see the typing indicator - and
+  // markThinking TTL refreshes return fresh=false without re-broadcasting, so a
+  // late joiner sees nothing until the agent next reports a fresh entry. Replay
+  // each live thinking entry (scoped to channels the newcomer wants) into the
+  // newcomer's own stream only - not re-broadcast to everyone. `entry` here is
+  // the newcomer (Subscriber); `t` is the ThinkingEntry from the composite-key
+  // map. On write failure the newcomer is marked dead and dropped, mirroring
+  // the presence seeding above.
+  for (const [, t] of thinking) {
+    if (!wantsChannel(entry, t.channel)) continue;
+    void s
+      .writeSSE(
+        eventToFrame({
+          event: 'agent_thinking',
+          payload: {
+            participantId: t.participantId,
+            name: t.name,
+            ...(t.channel ? { channel: t.channel } : {}),
+          },
+        })
+      )
+      .catch(() => {
+        entry.dead = true;
+        subscribers.delete(entry);
+      });
+  }
   return () => {
     entry.dead = true;
     subscribers.delete(entry);
@@ -169,35 +197,32 @@ export function broadcastAgentIdle(e: AgentIdleEvent): void {
 }
 
 // Underlying fan-out: write one SSE frame to every live subscriber whose channel
-// filter matches `channel` (null = unscoped event → everyone). Failures mark the
-// subscriber dead and drop it. Collect dead subscribers synchronously in an
-// array so the traversal of `subscribers` is not mutated concurrently; remove
-// them after the loop in one pass. This avoids a subtle race where a later
-// iteration would still see a subscriber that an earlier iteration's `.catch()`
-// already marked dead but not yet removed.
+// filter matches `channel` (null = unscoped event -> everyone). On write failure
+// the subscriber is marked dead and removed from the set directly inside the
+// `.catch()` callback. That callback runs as a microtask AFTER this synchronous
+// loop, so a post-loop dead-collector would always see an empty array and never
+// fire - the removal must happen in the callback itself. Set.delete is safe
+// around a for...of iteration: already-visited deletions are no-ops, and a
+// not-yet-visited entry that gets deleted is skipped (both correct). This
+// mirrors addSubscriber's own `.catch`.
 //
-// Performance: dead-collector uses a plain array with an early-return guard so
-// we never allocate or iterate the dead-set on a clean broadcast where nothing
-// died. (Note: the frame object is passed by reference per call — we cannot
-// reuse a shared buffer because writeSSE reads the frame asynchronously, so
-// every subscriber must get its own stable reference.)
+// (Note: the frame object is passed by reference per call - we cannot reuse a
+// shared buffer because writeSSE reads the frame asynchronously, so every
+// subscriber must get its own stable reference.)
 function writeAll(
   frame: { event?: string; data: string },
   channel: string | null
 ): void {
-  const dead: Subscriber[] = [];
   for (const sub of subscribers) {
     if (sub.dead) continue;
     if (!wantsChannel(sub, channel)) continue;
     void sub.stream.writeSSE(frame).catch(() => {
+      // Runs as a microtask after this synchronous loop, so a post-loop
+      // dead-collector would always see an empty array. Delete directly here -
+      // Set.delete is safe around a for...of iteration (matches addSubscriber).
       sub.dead = true;
-      dead.push(sub);
+      subscribers.delete(sub);
     });
-  }
-  // Dead-cleanup only runs when something actually died; skip the loop entirely
-  // on a clean broadcast.
-  if (dead.length > 0) {
-    for (const sub of dead) subscribers.delete(sub);
   }
 }
 

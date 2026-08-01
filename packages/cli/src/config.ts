@@ -55,7 +55,15 @@ export function parseConfig(raw: string): ClubConfig | null {
 export function loadConfig(): ClubConfig | null {
   const p = configPath();
   if (!existsSync(p)) return null;
-  return parseConfig(readFileSync(p, "utf8"));
+  let raw: string;
+  try {
+    raw = readFileSync(p, "utf8");
+  } catch {
+    throw new ConfigError(
+      `config file exists but could not be read: ${p}. run: club recover`,
+    );
+  }
+  return parseConfig(raw);
 }
 
 export function saveConfig(cfg: ClubConfig): void {
@@ -82,7 +90,15 @@ export class ConfigError extends Error {
 }
 
 export function requireConfig(): ClubConfig {
+  const p = configPath();
   const cfg = loadConfig();
-  if (!cfg) throw new ConfigError("not logged in. run: club login <key>");
-  return cfg;
+  if (cfg) return cfg;
+  // loadConfig returned null: either the file is missing (not logged in) or
+  // it exists but failed schema validation (corrupted). Distinguish so a user
+  // whose config is merely corrupted isn't told to re-login - that would
+  // overwrite their stored key and lose their identity.
+  if (existsSync(p)) {
+    throw new ConfigError(`config file is corrupted: ${p}. run: club recover`);
+  }
+  throw new ConfigError("not logged in. run: club login <key>");
 }

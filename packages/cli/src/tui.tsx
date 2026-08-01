@@ -57,7 +57,35 @@ function App({ cfg }: Props) {
         setMessages((prev) => [...prev, m].slice(-200));
         setLines((prev) => [...prev, formatMessage(m, { server: cfg.server })].slice(-200));
       },
-      { channel: currentChannel },
+      {
+        channel: currentChannel,
+        onMessageDeleted: (e) => {
+          if (e.channel !== currentChannel) return;
+          setMessages((prev) => {
+            const next = prev.map((m) => (m.id === e.id ? { ...m, deleted: true } : m));
+            setLines(next.map((m) => formatMessage(m, { server: cfg.server })).slice(-200));
+            return next;
+          });
+        },
+        onMessageEdited: (e) => {
+          if (e.channel !== currentChannel) return;
+          setMessages((prev) => {
+            const next = prev.map((m) => (m.id === e.message.id ? e.message : m));
+            setLines(next.map((m) => formatMessage(m, { server: cfg.server })).slice(-200));
+            return next;
+          });
+        },
+        onReaction: (e) => {
+          if (e.channel !== currentChannel) return;
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === e.messageId ? { ...m, reactions: e.reactions } : m,
+            );
+            setLines(next.map((m) => formatMessage(m, { server: cfg.server })).slice(-200));
+            return next;
+          });
+        },
+      },
     );
     return () => sub.stop();
   }, [cfg, currentChannel]);

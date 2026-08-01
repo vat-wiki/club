@@ -46,14 +46,22 @@ app.use("*", securityHeaders);
 app.use("*", bodySizeGuard());
 
 // CORS: the chat UI, CLI, and MCP all hit this backend. Restrict origins
-// via ALLOWED_ORIGINS (comma-separated) when set; falls back to open "*"
-// for dev/internal LAN use (where TLS is typically not present).
+// via ALLOWED_ORIGINS (comma-separated) when set. In development (no
+// ALLOWED_ORIGINS) the policy falls back to open "*" for LAN/localhost use
+// (where TLS is typically not present). In production with no ALLOWED_ORIGINS,
+// cross-origin requests are denied (empty origin list) so an arbitrary
+// third-party site can't call the API - configure ALLOWED_ORIGINS to the real
+// frontend origin(s) to allow the web UI through.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter((s) => s.length > 0 && s[0] !== "#") // reject comments and whitespace-only entries
   .filter((s) => /^https?:\/\//.test(s)); // reject non-URL strings (prevents accidental wildcard "*" slip-in)
-const corsOpts = allowedOrigins.length > 0 ? { origin: allowedOrigins, credentials: true } : undefined;
+const corsOpts = allowedOrigins.length > 0
+  ? { origin: allowedOrigins, credentials: true }
+  : process.env.NODE_ENV === "production"
+    ? { origin: [] }
+    : undefined;
 app.use("*", cors(corsOpts));
 
 // Key-issuance page: mint a key + copy the CLI/MCP onboarding snippets.
@@ -71,11 +79,13 @@ app.route("/files", files);
 app.route("/agents", agents);
 app.route("/channels", channels);
 
-// Health check endpoint. Returns 200 with basic server status. This endpoint
-// is intentionally lightweight (no DB queries) so it can be used for liveness
-// probes without adding load. For a fuller "readiness" check, clients should
-// hit an authenticated endpoint like GET /me.
-app.get("/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
+// Health check endpoint. Returns 200 with a minimal body. This endpoint is
+// intentionally lightweight (no DB queries) so it can be used for liveness
+// probes without adding load. Only `{ ok: true }` is returned - no uptime or
+// other server-internal timing, which would leak the last restart time. For a
+// fuller "readiness" check, clients should hit an authenticated endpoint like
+// GET /me.
+app.get("/health", (c) => c.json({ ok: true }));
 
 // Production: serve the built web UI at the same origin so the SPA ships
 // without a separate host. In dev the Vite app runs on :6100 and proxies API

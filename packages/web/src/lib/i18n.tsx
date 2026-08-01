@@ -82,21 +82,10 @@ const zh: Dict = {
   "app.skipToChat": "跳到聊天",
   "app.h1": "club — #{channel} 聊天室",
 
-  // Topbar / connection status
-  "status.connected": "已连接",
-  "status.connecting": "连接中",
-  "status.reconnecting": "重新连接中",
-  "topbar.signOut.aria": "退出登录（{name}）",
-  "topbar.signOut.switchIdentity": "切换身份",
-  "topbar.signOut.title": "退出登录",
-  "topbar.signOut.short": "切换",
-  "topbar.signOut.label": "退出",
+  // Topbar
   "topbar.lang.aria": "切换语言",
   "topbar.menu.aria": "更多选项",
   "topbar.menu.title": "更多",
-  "topbar.menu.lang": "语言",
-  "topbar.menu.lang.aria": "当前语言：{lang}，点击切换",
-  "topbar.menu.roster": "成员",
 
   // Roster
   "roster.you": "（你）",
@@ -104,13 +93,10 @@ const zh: Dict = {
   // The aside now holds channels (top) + online members (bottom); this labels the
   // whole complementary region for SR landmark navigation.
   "roster.label": "频道与在线成员",
-  "roster.mobile.aria": "成员——{count} 人在线",
-  "roster.mobile.title": "成员",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "编辑简介",
   // Open model: anyone may edit anyone's bio, anyone may kick anyone.
   "roster.editBio": "编辑 {name} 的简介",
-  "roster.editBioPrompt": "为 {name} 设置简介",
   "roster.kick": "踢出 {name}",
   "roster.kickConfirm": "确定踢出 {name} 吗？这将删除其账号和消息。",
 
@@ -176,13 +162,6 @@ const zh: Dict = {
   "recover.failed": "找回失败——昵称或恢复码不正确。",
 
   // View key dialog
-  "viewKey.trigger.aria": "查看你的登录密钥",
-  "viewKey.trigger.title": "你的登录密钥",
-  "viewKey.open": "查看我的密钥",
-  "viewKey.title": "你的登录密钥",
-  "viewKey.desc":
-    "这是你当前身份的登录凭证，换浏览器或清理缓存后需要用它回到这里。万一丢失，可以用恢复码 + 昵称找回；但如果恢复码也丢了，club 无法替你找回——请把两者都妥善保存。",
-  "viewKey.label": "登录密钥",
   "viewKey.copied": "已复制",
   "viewKey.copy": "复制登录密钥",
   "viewKey.copyFailed": "复制失败——请手动选中上方的密钥进行复制。",
@@ -246,6 +225,32 @@ const zh: Dict = {
   "profile.cancel": "取消",
   "profile.save": "保存",
   "profile.saving": "保存中…",
+
+  // Settings (full-screen management hub). Channel/member management, account
+  // (bio/key/sign-out) and language all live here; the sidebar lists go back to
+  // pure navigation. See components/settings-dialog.tsx.
+  "settings.open.aria": "打开设置",
+  "settings.title": "设置",
+  "settings.account": "账号",
+  "settings.channels": "频道",
+  "settings.members": "成员",
+  "settings.language": "语言",
+  "settings.account.bio": "我的简介",
+  "settings.account.noBio": "未设置简介",
+  "settings.account.key": "登录密钥",
+  "settings.account.signOut": "退出登录",
+  "settings.channel.system": "系统频道，不可删除",
+
+  // Reusable inline bio editor (account self + member rows share it).
+  "bio.edit": "编辑简介",
+  "bio.empty": "未设置",
+
+  // Reusable destructive confirm dialog (delete channel / kick member).
+  "common.cancel": "取消",
+  "common.delete": "删除",
+  "common.kick": "踢出",
+  "confirm.deleteChannel.title": "删除频道",
+  "confirm.kick.title": "踢出成员",
 
   // Composer
   "composer.label": "给 #{channel} 发消息",
@@ -382,33 +387,19 @@ const en: Dict = {
   "app.skipToChat": "Skip to chat",
   "app.h1": "club — #{channel} chat channel",
 
-  // Topbar / connection status
-  "status.connected": "Connected",
-  "status.connecting": "Connecting",
-  "status.reconnecting": "Reconnecting",
-  "topbar.signOut.aria": "Sign out ({name})",
-  "topbar.signOut.switchIdentity": "Switch identity",
-  "topbar.signOut.title": "Sign out",
-  "topbar.signOut.short": "Switch",
-  "topbar.signOut.label": "Sign out",
+  // Topbar
   "topbar.lang.aria": "Switch language",
   "topbar.menu.aria": "More options",
   "topbar.menu.title": "More",
-  "topbar.menu.lang": "Language",
-  "topbar.menu.lang.aria": "Current language: {lang}, tap to switch",
-  "topbar.menu.roster": "Members",
 
   // Roster
   "roster.you": "(you)",
   "roster.onlineLabel": "Online members",
   "roster.label": "Channels and online members",
-  "roster.mobile.aria": "Members — {count} online",
-  "roster.mobile.title": "Members",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "Edit bio",
   // Open model: anyone may edit anyone's bio, anyone may kick anyone.
   "roster.editBio": "Edit {name}'s bio",
-  "roster.editBioPrompt": "Set a bio for {name}",
   "roster.kick": "Kick {name}",
   "roster.kickConfirm": "Kick {name}? This deletes their account and messages.",
 
@@ -472,13 +463,6 @@ const en: Dict = {
   "recover.failed": "Recovery failed — wrong nickname or recovery code.",
 
   // View key dialog
-  "viewKey.trigger.aria": "View your login key",
-  "viewKey.trigger.title": "Your login key",
-  "viewKey.open": "View my key",
-  "viewKey.title": "Your login key",
-  "viewKey.desc":
-    "This is the login credential for your current identity — you'll need it to come back after switching browsers or clearing cache. If you ever lose it, you can recover with your recovery code + nickname; but if the recovery code is also lost, club can't restore access — keep both safe.",
-  "viewKey.label": "Login key",
   "viewKey.copied": "Copied",
   "viewKey.copy": "Copy login key",
   "viewKey.copyFailed": "Copy failed — please select the key above manually to copy it.",
@@ -542,6 +526,30 @@ const en: Dict = {
   "profile.cancel": "Cancel",
   "profile.save": "Save",
   "profile.saving": "Saving…",
+
+  // Settings (full-screen management hub).
+  "settings.open.aria": "Open settings",
+  "settings.title": "Settings",
+  "settings.account": "Account",
+  "settings.channels": "Channels",
+  "settings.members": "Members",
+  "settings.language": "Language",
+  "settings.account.bio": "My bio",
+  "settings.account.noBio": "No bio set",
+  "settings.account.key": "Login key",
+  "settings.account.signOut": "Sign out",
+  "settings.channel.system": "System channel, can't delete",
+
+  // Reusable inline bio editor.
+  "bio.edit": "Edit bio",
+  "bio.empty": "Not set",
+
+  // Reusable destructive confirm dialog.
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.kick": "Kick",
+  "confirm.deleteChannel.title": "Delete channel",
+  "confirm.kick.title": "Kick member",
 
   // Composer
   "composer.label": "Send a message to #{channel}",

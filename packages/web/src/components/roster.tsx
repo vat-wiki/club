@@ -5,7 +5,6 @@ import type { ChannelUnread } from "@/hooks/use-channels";
 import { useT } from "@/lib/i18n";
 import { sanitizeDisplayString } from "@/lib/sanitize";
 import { cn } from "@/lib/utils";
-import { Pencil, UserMinus } from "lucide-react";
 
 import type { Channel,Participant } from "@club/shared";
 
@@ -13,39 +12,26 @@ function Row({
   p,
   self,
   online,
-  onEditProfile,
-  onEditBio,
-  onKick,
 }: {
   p: Participant;
   self: boolean;
   online: boolean;
-  /** When provided AND this is the self row, the row becomes a button that opens the bio editor. */
-  onEditProfile?: () => void;
-  /** Edit this member's bio (open model: anyone may edit anyone). Non-self rows only. */
-  onEditBio?: () => void;
-  /** Kick this member (open model: anyone may kick anyone). Non-self rows only. */
-  onKick?: () => void;
 }) {
   const t = useT();
   // Single-line, control-char-stripped bio for the secondary line. Empty bio
   // ("" = unset) renders nothing so the roster stays compact. CSS `truncate`
   // caps the visual width; the full text is server-capped at MAX_BIO.
   const bio = sanitizeDisplayString(p.bio);
-  const editable = self && !!onEditProfile;
-  const hasActions = !self && (!!onEditBio || !!onKick);
-  const className = cn(
-    "flex min-h-[44px] w-full items-center gap-2 rounded-md px-4 py-1.5 text-left text-sm transition-colors hover:bg-accent/70 active:bg-accent",
-    editable &&
-      "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring/40",
-  );
-  // Name + optional bio stacked in a min-w-0 column so `truncate` can clip.
-  const inner = (
-    <>
+  return (
+    <div
+      className={cn(
+        "flex min-h-[44px] w-full items-center gap-2 rounded-md px-4 py-1.5 text-left text-sm",
+      )}
+    >
       {/* Offline (no live SSE connection) members read as "who's here now" via
           the dimmer avatar; the name keeps a contrast-safe muted color rather
           than an opacity multiplier, which previously dropped it below AA
-          (opacity-50 on muted-foreground → 2.87:1). */}
+          (opacity-50 on muted-foreground -> 2.87:1). */}
       <Avatar name={p.name} className={cn("h-7 w-7 text-xs", !online && "opacity-50")} />
       <div className="min-w-0 flex-1">
         <span
@@ -63,83 +49,25 @@ function Row({
         </span>
         {bio && <p className="truncate text-xs text-muted-foreground">{bio}</p>}
       </div>
-    </>
+    </div>
   );
-  // The self row is the only entry point to edit your own bio, so it becomes a
-  // real <button> (keyboard-focusable, Enter/Space activation) when an editor
-  // is wired up. Everyone else stays a plain div (with hover-revealed actions).
-  if (editable) {
-    return (
-      <button
-        type="button"
-        className={className}
-        onClick={onEditProfile}
-        aria-label={t("roster.editProfile")}
-        title={t("roster.editProfile")}
-      >
-        {inner}
-      </button>
-    );
-  }
-  if (hasActions) {
-    return (
-      <div className={cn("group relative", className)}>
-        {inner}
-        <div className="absolute right-1 hidden items-center gap-0.5 rounded-md bg-chrome/95 p-0.5 group-hover:flex group-focus-within:flex">
-          {onEditBio && (
-            <button
-              type="button"
-              onClick={onEditBio}
-              aria-label={t("roster.editBio", { name: p.name })}
-              title={t("roster.editBio", { name: p.name })}
-              data-testid={`edit-bio-${p.id}`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none"
-            >
-              <Pencil aria-hidden className="h-3 w-3" />
-            </button>
-          )}
-          {onKick && (
-            <button
-              type="button"
-              onClick={onKick}
-              aria-label={t("roster.kick", { name: p.name })}
-              title={t("roster.kick", { name: p.name })}
-              data-testid={`kick-${p.id}`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none"
-            >
-              <UserMinus aria-hidden className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-  return <div className={className}>{inner}</div>;
 }
 
-// Shared roster body — rendered inside the desktop aside and the mobile sheet.
+// Shared roster body - rendered inside the desktop aside and the mobile sheet.
 // Category-blind: a single flat list in server (registration) order. club does
-// NOT split humans from agents — there is no such distinction in the data model
+// NOT split humans from agents - there is no such distinction in the data model
 // (see .pd-docs/requirements/category-blind.md).
 //
 // Online members are sorted to the top so it's easy to see who's available.
+// Bio edits and kicks live in the Settings overlay; this is read-only presence.
 export function RosterSections({
   members,
   selfId,
   onlineIds,
-  onEditProfile,
-  onEditBio,
-  onKick,
 }: {
   members: Participant[];
   selfId?: string;
   onlineIds?: Set<string>;
-  /** Opens the bio editor for the self row. Optional: only the self row uses it. */
-  onEditProfile?: () => void;
-  /** Edit any member's bio (open model). Bound per-member for non-self rows. */
-  onEditBio?: (p: Participant) => void;
-  /** Kick any member (open model). Bound per-member for non-self rows. */
-  onKick?: (p: Participant) => void;
 }) {
   // Split into online and offline, then sort each group.
   // Online members go first, sorted by name (case-insensitive).
@@ -177,26 +105,10 @@ export function RosterSections({
   return (
     <div className="space-y-1">
       {online.map((p) => (
-        <Row
-          key={p.id}
-          p={p}
-          self={p.id === selfId}
-          online={true}
-          onEditProfile={onEditProfile}
-          onEditBio={onEditBio ? () => onEditBio(p) : undefined}
-          onKick={onKick ? () => onKick(p) : undefined}
-        />
+        <Row key={p.id} p={p} self={p.id === selfId} online={true} />
       ))}
       {offline.map((p) => (
-        <Row
-          key={p.id}
-          p={p}
-          self={p.id === selfId}
-          online={false}
-          onEditProfile={onEditProfile}
-          onEditBio={onEditBio ? () => onEditBio(p) : undefined}
-          onKick={onKick ? () => onKick(p) : undefined}
-        />
+        <Row key={p.id} p={p} self={p.id === selfId} online={false} />
       ))}
     </div>
   );
@@ -211,11 +123,6 @@ export function Roster({
   unread,
   onSelectChannel,
   onCreateChannel,
-  onRenameChannel,
-  onDeleteChannel,
-  onEditProfile,
-  onEditBio,
-  onKick,
 }: {
   members: Participant[];
   selfId?: string;
@@ -225,14 +132,6 @@ export function Roster({
   unread: Record<string, ChannelUnread>;
   onSelectChannel: (slug: string) => void;
   onCreateChannel: (name: string) => Promise<void>;
-  onRenameChannel?: (slug: string, displayName: string | null) => Promise<void>;
-  onDeleteChannel?: (slug: string) => Promise<void>;
-  /** Opens the bio editor for the self row. */
-  onEditProfile?: () => void;
-  /** Edit any member's bio (open model). */
-  onEditBio?: (p: Participant) => void;
-  /** Kick any member (open model). */
-  onKick?: (p: Participant) => void;
 }) {
   const t = useT();
   return (
@@ -252,19 +151,10 @@ export function Roster({
         unread={unread}
         onSelect={onSelectChannel}
         onCreate={onCreateChannel}
-        onRename={onRenameChannel}
-        onDelete={onDeleteChannel}
       />
       <Separator />
       <div aria-label={t("roster.onlineLabel")}>
-        <RosterSections
-          members={members}
-          selfId={selfId}
-          onlineIds={onlineIds}
-          onEditProfile={onEditProfile}
-          onEditBio={onEditBio}
-          onKick={onKick}
-        />
+        <RosterSections members={members} selfId={selfId} onlineIds={onlineIds} />
       </div>
     </aside>
   );

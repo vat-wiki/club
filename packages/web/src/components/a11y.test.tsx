@@ -14,13 +14,14 @@ import { ChannelList } from "./channel-list";
 import { Composer } from "./composer";
 import { MentionToasts } from "./mention-toast";
 import { MessageList } from "./message-list";
-import { MobileRoster } from "./mobile-roster";
+import { MobileNavSheet } from "./mobile-nav-sheet";
 import { RecoverDialog } from "./recover-dialog";
 import { Roster } from "./roster";
+import { SettingsDialog } from "./settings-dialog";
 import { SignOutConfirmDialog } from "./sign-out-confirm-dialog";
 import { Topbar } from "./topbar";
 import { TypingIndicator } from "./typing-indicator";
-import { ViewKeyDialog } from "./view-key-dialog";
+import { ConfirmDialog } from "./ui/confirm-dialog";
 
 const TEST_KEY = "club_human_test_0123456789abcdef";
 
@@ -129,13 +130,10 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   it("Topbar has no violations", async () => {
     await expectNoViolations(
       <Topbar
-        meName="alice"
-        status="connected"
         members={members}
         selfId={me.id}
-        key_={TEST_KEY}
         {...channelNav}
-        onSignOutRequest={() => {}}
+        onOpenSettings={() => {}}
       />,
     );
   });
@@ -299,64 +297,74 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     );
   });
 
-  it("ViewKeyDialog has no violations (closed trigger)", async () => {
-    await expectNoViolations(<ViewKeyDialog key_={TEST_KEY} />);
+  it("SettingsDialog has no violations (open)", async () => {
+    await expectNoViolationsPortal(
+      <SettingsDialog
+        open
+        onOpenChange={() => {}}
+        me={me}
+        members={members}
+        selfId={me.id}
+        channels={channels}
+        key_={TEST_KEY}
+        onSaveMyBio={async () => {}}
+        onSaveMemberBio={async () => {}}
+        onSignOutRequest={() => {}}
+        onRenameChannel={async () => {}}
+        onDeleteChannel={async () => {}}
+        onKickMember={async () => {}}
+      />,
+    );
   });
 
-  it("MobileRoster trigger meets the mobile tap-target minimum (44px)", async () => {
-    const { container } = render(
-      withI18n(<MobileRoster members={members} selfId={me.id} onlineCount={members.length} key_={TEST_KEY} />),
+  it("ConfirmDialog has no violations (open)", async () => {
+    await expectNoViolationsPortal(
+      <ConfirmDialog
+        open
+        onOpenChange={() => {}}
+        title="Delete channel"
+        description="Delete #deploy-debug? Its messages will be removed too."
+        confirmLabel="Delete"
+        onConfirm={() => {}}
+      />,
     );
-    const trigger = container.querySelector("button");
+  });
+
+  it("MobileNavSheet trigger meets the mobile tap-target minimum (44px)", async () => {
+    const { container } = render(
+      withI18n(
+        <MobileNavSheet
+          members={members}
+          selfId={me.id}
+          {...channelNav}
+          onOpenSettings={() => {}}
+        />,
+      ),
+    );
+    const trigger = container.querySelector('[data-testid="mobile-menu-trigger"]');
     expect(trigger).toBeTruthy();
     // The .tap-target utility enforces min-h/min-w 44px on touch viewports.
     // jsdom has no layout engine, so assert the class as a regression guard.
     expect(trigger?.className).toContain("tap-target");
   });
 
-  it("Topbar sign-out button meets the mobile tap-target minimum (44px)", async () => {
+  it("Topbar settings gear meets the mobile tap-target minimum (44px)", async () => {
     const { container } = render(
       withI18n(
         <Topbar
-          meName="alice"
-          status="connected"
           members={members}
           selfId={me.id}
-          key_={TEST_KEY}
           {...channelNav}
-          onSignOutRequest={() => {}}
+          onOpenSettings={() => {}}
         />,
       ),
     );
-    // Locate the sign-out button by its stable testid (the visible/aria text is
-    // now language-dependent, so we don't key off a localized string).
-    const signOut = container.querySelector<HTMLButtonElement>(
-      '[data-testid="sign-out-button"]',
+    // The gear is the single management entry point on desktop (lang/key/sign-out
+    // moved behind it). Assert it's present and touch-sized.
+    const gear = container.querySelector<HTMLButtonElement>(
+      '[data-testid="settings-trigger"]',
     );
-    expect(signOut).toBeTruthy();
-    expect(signOut?.className).toContain("tap-target");
-  });
-
-  it("Topbar view-key button has an accessible name and tap-target sizing", async () => {
-    const { container } = render(
-      withI18n(
-        <Topbar
-          meName="alice"
-          status="connected"
-          members={members}
-          selfId={me.id}
-          key_={TEST_KEY}
-          {...channelNav}
-          onSignOutRequest={() => {}}
-        />,
-      ),
-    );
-    // The view-key trigger carries a stable testid; its accessible name is
-    // localized (zh here) and asserted implicitly via axe in the ViewKey test.
-    const viewKey = container.querySelector<HTMLButtonElement>(
-      '[data-testid="view-key-trigger"]',
-    );
-    expect(viewKey).toBeTruthy();
-    expect(viewKey?.className).toContain("tap-target");
+    expect(gear).toBeTruthy();
+    expect(gear?.className).toContain("tap-target");
   });
 });

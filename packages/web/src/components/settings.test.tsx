@@ -71,6 +71,8 @@ describe("SettingsDialog", () => {
     onSaveMyBio: vi.fn().mockResolvedValue(undefined),
     onSaveMemberBio: vi.fn().mockResolvedValue(undefined),
     onSignOutRequest: vi.fn(),
+    onRotateKeyRequest: vi.fn(),
+    onDeleteAccountRequest: vi.fn(),
     onRenameChannel: vi.fn().mockResolvedValue(undefined),
     onDeleteChannel: vi.fn().mockResolvedValue(undefined),
     onKickMember: vi.fn().mockResolvedValue(undefined),

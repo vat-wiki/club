@@ -422,7 +422,6 @@ export default function App() {
 
       {me && (
         <Topbar
-          status={status}
           members={members}
           selfId={me.id}
           onlineIds={onlineIds}

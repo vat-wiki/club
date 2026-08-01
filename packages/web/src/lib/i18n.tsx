@@ -82,21 +82,10 @@ const zh: Dict = {
   "app.skipToChat": "跳到聊天",
   "app.h1": "club — #{channel} 聊天室",
 
-  // Topbar / connection status
-  "status.connected": "已连接",
-  "status.connecting": "连接中",
-  "status.reconnecting": "重新连接中",
-  "topbar.signOut.aria": "退出登录（{name}）",
-  "topbar.signOut.switchIdentity": "切换身份",
-  "topbar.signOut.title": "退出登录",
-  "topbar.signOut.short": "切换",
-  "topbar.signOut.label": "退出",
+  // Topbar
   "topbar.lang.aria": "切换语言",
   "topbar.menu.aria": "更多选项",
   "topbar.menu.title": "更多",
-  "topbar.menu.lang": "语言",
-  "topbar.menu.lang.aria": "当前语言：{lang}，点击切换",
-  "topbar.menu.roster": "成员",
 
   // Roster
   "roster.you": "（你）",
@@ -104,13 +93,10 @@ const zh: Dict = {
   // The aside now holds channels (top) + online members (bottom); this labels the
   // whole complementary region for SR landmark navigation.
   "roster.label": "频道与在线成员",
-  "roster.mobile.aria": "成员——{count} 人在线",
-  "roster.mobile.title": "成员",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "编辑简介",
   // Open model: anyone may edit anyone's bio, anyone may kick anyone.
   "roster.editBio": "编辑 {name} 的简介",
-  "roster.editBioPrompt": "为 {name} 设置简介",
   "roster.kick": "踢出 {name}",
   "roster.kickConfirm": "确定踢出 {name} 吗？这将删除其账号和消息。",
 
@@ -200,13 +186,6 @@ const zh: Dict = {
   "keyReveal.recovered.saved": "两个都保存好了，进入聊天室",
 
   // View key dialog
-  "viewKey.trigger.aria": "查看你的登录密钥",
-  "viewKey.trigger.title": "你的登录密钥",
-  "viewKey.open": "查看我的密钥",
-  "viewKey.title": "你的登录密钥",
-  "viewKey.desc":
-    "这是你当前身份的登录凭证，换浏览器或清理缓存后需要用它回到这里。万一丢失，可以用恢复码 + 昵称找回；但如果恢复码也丢了，club 无法替你找回——请把两者都妥善保存。",
-  "viewKey.label": "登录密钥",
   "viewKey.copied": "已复制",
   "viewKey.copy": "复制登录密钥",
   "viewKey.copyFailed": "复制失败——请手动选中上方的密钥进行复制。",
@@ -395,33 +374,19 @@ const en: Dict = {
   "app.skipToChat": "Skip to chat",
   "app.h1": "club — #{channel} chat channel",
 
-  // Topbar / connection status
-  "status.connected": "Connected",
-  "status.connecting": "Connecting",
-  "status.reconnecting": "Reconnecting",
-  "topbar.signOut.aria": "Sign out ({name})",
-  "topbar.signOut.switchIdentity": "Switch identity",
-  "topbar.signOut.title": "Sign out",
-  "topbar.signOut.short": "Switch",
-  "topbar.signOut.label": "Sign out",
+  // Topbar
   "topbar.lang.aria": "Switch language",
   "topbar.menu.aria": "More options",
   "topbar.menu.title": "More",
-  "topbar.menu.lang": "Language",
-  "topbar.menu.lang.aria": "Current language: {lang}, tap to switch",
-  "topbar.menu.roster": "Members",
 
   // Roster
   "roster.you": "(you)",
   "roster.onlineLabel": "Online members",
   "roster.label": "Channels and online members",
-  "roster.mobile.aria": "Members — {count} online",
-  "roster.mobile.title": "Members",
   // Clickable self row in the roster opens the bio editor.
   "roster.editProfile": "Edit bio",
   // Open model: anyone may edit anyone's bio, anyone may kick anyone.
   "roster.editBio": "Edit {name}'s bio",
-  "roster.editBioPrompt": "Set a bio for {name}",
   "roster.kick": "Kick {name}",
   "roster.kickConfirm": "Kick {name}? This deletes their account and messages.",
 
@@ -505,13 +470,6 @@ const en: Dict = {
   "keyReveal.recovered.saved": "Saved both — enter the channel",
 
   // View key dialog
-  "viewKey.trigger.aria": "View your login key",
-  "viewKey.trigger.title": "Your login key",
-  "viewKey.open": "View my key",
-  "viewKey.title": "Your login key",
-  "viewKey.desc":
-    "This is the login credential for your current identity — you'll need it to come back after switching browsers or clearing cache. If you ever lose it, you can recover with your recovery code + nickname; but if the recovery code is also lost, club can't restore access — keep both safe.",
-  "viewKey.label": "Login key",
   "viewKey.copied": "Copied",
   "viewKey.copy": "Copy login key",
   "viewKey.copyFailed": "Copy failed — please select the key above manually to copy it.",

@@ -15,7 +15,7 @@ import { Composer } from "./composer";
 import { KeyRevealDialog } from "./key-reveal-dialog";
 import { MentionToasts } from "./mention-toast";
 import { MessageList } from "./message-list";
-import { MobileTopbarMenu } from "./mobile-topbar-menu";
+import { MobileNavSheet } from "./mobile-nav-sheet";
 import { RecoverDialog } from "./recover-dialog";
 import { Roster } from "./roster";
 import { SettingsDialog } from "./settings-dialog";
@@ -131,7 +131,6 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
   it("Topbar has no violations", async () => {
     await expectNoViolations(
       <Topbar
-        status="connected"
         members={members}
         selfId={me.id}
         {...channelNav}
@@ -358,13 +357,13 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     );
   });
 
-  it("MobileTopbarMenu trigger meets the mobile tap-target minimum (44px)", async () => {
+  it("MobileNavSheet trigger meets the mobile tap-target minimum (44px)", async () => {
     const { container } = render(
       withI18n(
-        <MobileTopbarMenu
-          status="connected"
+        <MobileNavSheet
           members={members}
-          onOpenRoster={() => {}}
+          selfId={me.id}
+          {...channelNav}
           onOpenSettings={() => {}}
         />,
       ),
@@ -380,7 +379,6 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     const { container } = render(
       withI18n(
         <Topbar
-          status="connected"
           members={members}
           selfId={me.id}
           {...channelNav}
@@ -388,7 +386,7 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         />,
       ),
     );
-    // The gear is the single management entry point now (lang/key/sign-out
+    // The gear is the single management entry point on desktop (lang/key/sign-out
     // moved behind it). Assert it's present and touch-sized.
     const gear = container.querySelector<HTMLButtonElement>(
       '[data-testid="settings-trigger"]',

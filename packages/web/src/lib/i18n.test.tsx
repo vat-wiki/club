@@ -17,7 +17,7 @@ function Probe() {
     <div>
       <span data-testid="lang">{lang}</span>
       <span data-testid="msg">{t("composer.send")}</span>
-      <span data-testid="interp">{t("roster.mobile.aria", { count: 3 })}</span>
+      <span data-testid="interp">{t("channels.unread.aria", { count: 3 })}</span>
       <span data-testid="missing">{t("does.not.exist")}</span>
       <button onClick={() => setLang(lang === "zh" ? "en" : "zh")}>switch</button>
     </div>
@@ -98,8 +98,8 @@ describe("useI18n", () => {
         <Probe />
       </I18nProvider>,
     );
-    // zh: "成员——{count} 人在线" with count 3
-    expect(screen.getByTestId("interp").textContent).toBe("成员——3 人在线");
+    // zh: "{count} 条未读" with count 3
+    expect(screen.getByTestId("interp").textContent).toBe("3 条未读");
   });
 
   it("falls back to the key itself for unknown keys (visible, not empty)", () => {

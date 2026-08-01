@@ -1,7 +1,7 @@
 // club send [text...] [--stdin] [--image <path>] [--video <path>] [--file <path>] [--channel <slug>] [--reply <id>]
 //
 // Send a message into the current channel (or --channel <slug>). Accepts a literal
-// string, or reads from stdin when piped / --stdin. Attach up to 8 images,
+// string, or reads from stdin when piped / --stdin. Attach up to 10 images,
 // videos, or document files via --image / --video / --file (repeatable). Quote a
 // message with --reply <id> (threaded reply). Delegates the upload+send
 // orchestration to send-impl so the commander action stays thin and unit-testable.
@@ -24,7 +24,7 @@ const collect = (v: string, acc: string[]) => [...acc, v];
  * Build the `club send` commander sub-command.
  *
  * Accepts a literal text argument, or reads from stdin when piped / `--stdin`.
- * Attach up to 8 images, videos, or documents via repeatable `--image` / `--video`
+ * Attach up to 10 images, videos, or documents via repeatable `--image` / `--video`
  * / `--file <path>` flags, optionally target a specific channel with `--channel`,
  * and optionally quote a message with `--reply <id>` (threaded reply). Delegates
  * the upload+send orchestration to `send-impl` so this action stays thin and
@@ -35,25 +35,25 @@ const collect = (v: string, acc: string[]) => [...acc, v];
 export function makeSendCommand(): Command {
   return new Command("send")
     .description(
-      'send a message — `club send "hi"`, `echo hi | club send` (auto-detects pipe), attach files with `--image` / `--video` / `--file <path>` (repeatable, ≤8 total), or target a channel with `--channel <slug>`',
+      'send a message — `club send "hi"`, `echo hi | club send` (auto-detects pipe), attach files with `--image` / `--video` / `--file <path>` (repeatable, ≤10 total), or target a channel with `--channel <slug>`',
     )
     .argument("[text...]", "message text (omit if piping or sending files only)")
     .option("--stdin", "read message body from stdin (auto-detected when piped)")
     .option(
       "--image <path>",
-      "attach an image (png/jpeg/gif/webp, ≤10MB); repeatable up to 8 total",
+      "attach an image (png/jpeg/gif/webp, ≤10MB); repeatable up to 10 total",
       collect,
       [] as string[],
     )
     .option(
       "--video <path>",
-      "attach a video (mp4/webm, ≤50MB); repeatable up to 8 total",
+      "attach a video (mp4/webm, ≤50MB); repeatable up to 10 total",
       collect,
       [] as string[],
     )
     .option(
       "--file <path>",
-      "attach a document (pdf/docx/xlsx/md, ≤25MB); repeatable up to 8 total",
+      "attach a document (pdf/docx/xlsx/md, ≤25MB); repeatable up to 10 total",
       collect,
       [] as string[],
     )

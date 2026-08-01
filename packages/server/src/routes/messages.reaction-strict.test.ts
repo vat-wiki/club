@@ -101,7 +101,12 @@ describe("POST /messages/:id/reactions — strict control-char reject", () => {
       headers: auth(key),
       body: JSON.stringify({ emoji: "🔥" }),
     });
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toContainEqual(
+      expect.objectContaining({ emoji: "🔥", count: 1 }),
+    );
     const reactions = getReactionsForMessage(msgId);
     expect(reactions).toContainEqual(
       expect.objectContaining({ emoji: "🔥", count: 1 }),
@@ -114,7 +119,9 @@ describe("POST /messages/:id/reactions — strict control-char reject", () => {
       headers: auth(key),
       body: JSON.stringify({ emoji: "  👍  " }),
     });
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
     const reactions = getReactionsForMessage(msgId);
     const r = reactions.find((x) => x.emoji === "👍");
     expect(r).toBeDefined();

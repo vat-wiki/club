@@ -237,6 +237,13 @@ function MessageRow({
   const [editError, setEditError] = useState<string | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
 
+  // If the message is deleted via SSE while the user is editing it, exit edit
+  // mode - otherwise the edit/recall buttons stay hidden (they're gated on
+  // !m.deleted && !editing) and the user can't dismiss the now-stale editor.
+  useEffect(() => {
+    if (m.deleted) setEditing(false);
+  }, [m.deleted]);
+
   const startEdit = () => {
     setDraft(m.content);
     setEditError(null);

@@ -310,6 +310,8 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
         onSaveMyBio={async () => {}}
         onSaveMemberBio={async () => {}}
         onSignOutRequest={() => {}}
+        onRotateKeyRequest={() => {}}
+        onDeleteAccountRequest={() => {}}
         onRenameChannel={async () => {}}
         onDeleteChannel={async () => {}}
         onKickMember={async () => {}}

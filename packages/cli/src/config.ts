@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -68,8 +68,14 @@ export function loadConfig(): ClubConfig | null {
 
 export function saveConfig(cfg: ClubConfig): void {
   const p = configPath();
-  if (!existsSync(dirname(p))) mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+  // The config file stores the API key, so both the directory and file must be
+  // owner-only. mkdirSync mode applies only when the directory is newly created
+  // (existing dirs keep their permissions) - acceptable: this protects new
+  // installs. writeFileSync mode applies only on file creation; chmodSync
+  // guarantees 0600 even when overwriting an existing file.
+  if (!existsSync(dirname(p))) mkdirSync(dirname(p), { recursive: true, mode: 0o700 });
+  writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  chmodSync(p, 0o600);
 }
 
 // Remove the config file, logging the caller out. Used after a self-delete

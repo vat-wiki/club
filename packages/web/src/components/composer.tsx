@@ -23,7 +23,7 @@ import { type KeyboardEvent,useCallback, useEffect, useMemo, useRef, useState } 
 
 import type { ClubConn } from "@club/sdk";
 import type { Message,Participant } from "@club/shared";
-import { MAX_IMAGES_PER_MESSAGE } from "@club/shared";
+import { MAX_IMAGES_PER_MESSAGE, MAX_MESSAGE_CONTENT } from "@club/shared";
 
 export function Composer({
   onSend,
@@ -667,6 +667,11 @@ export function Composer({
           id="composer-input"
           value={value}
           rows={1}
+          // Client-side length cap matching the server's MAX_MESSAGE_CONTENT
+          // (shared/types.ts): without it, an over-long draft is only rejected
+          // by the server as a generic "send failed". Capping here surfaces the
+          // limit immediately (the textarea stops accepting input).
+          maxLength={MAX_MESSAGE_CONTENT}
           disabled={disabled}
           data-testid="composer-input"
           placeholder={t("composer.placeholder", { channel: channel ?? "general" })}

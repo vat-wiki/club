@@ -42,15 +42,25 @@ export function SearchBar({
       return;
     }
     setSearching(true);
+    // Guard against stale results: a slow search for an earlier query must not
+    // overwrite the results of a newer one. `cancelled` lets the in-flight
+    // promise no-op when a later keystroke has superseded it.
+    let cancelled = false;
     const h = setTimeout(async () => {
       try {
-        setResults(await api.search(conn, q, channel));
+        const r = await api.search(conn, q, channel);
+        if (cancelled) return;
+        setResults(r);
       } catch {
+        if (cancelled) return;
         setResults([]);
       }
-      setSearching(false);
+      if (!cancelled) setSearching(false);
     }, 300);
-    return () => clearTimeout(h);
+    return () => {
+      cancelled = true;
+      clearTimeout(h);
+    };
   }, [conn, q, channel]);
 
   return (

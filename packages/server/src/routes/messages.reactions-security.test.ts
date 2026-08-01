@@ -104,7 +104,7 @@ describe("messages route — emoji sanitization (security)", () => {
         body: JSON.stringify({ emoji: "🔥" }),
       },
     );
-    expect(resp.status).toBe(204);
+    expect(resp.status).toBe(200);
   });
 
   it("trims whitespace and stores the clean emoji", async () => {
@@ -116,7 +116,7 @@ describe("messages route — emoji sanitization (security)", () => {
         body: JSON.stringify({ emoji: "  👍  " }),
       },
     );
-    expect(resp.status).toBe(204);
+    expect(resp.status).toBe(200);
     // Toggle again → removed.
     const resp2 = await app.request(
       `/messages/${msgId}/reactions`,
@@ -126,7 +126,7 @@ describe("messages route — emoji sanitization (security)", () => {
         body: JSON.stringify({ emoji: "👍" }),
       },
     );
-    expect(resp2.status).toBe(204);
+    expect(resp2.status).toBe(200);
   });
 
   it("rejects empty-only payload", async () => {

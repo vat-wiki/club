@@ -90,8 +90,9 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
     let stopped = false;
     let sub: { stop: () => void } | null = null;
     let reconnect: ReturnType<typeof setTimeout>;
-    // Reconnect attempt count since the last successful connection — drives the
-    // exponential backoff below. Reset to 0 each time a connection is opened.
+    // Reconnect attempt count since the last successful connection - drives the
+    // exponential backoff below. Reset to 0 when the first message arrives (a
+    // message proves the connection is live; stream() returns before connecting).
     let reconnectTries = 0;
 
     const connect = () => {
@@ -102,6 +103,12 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
           // Track the newest id across ALL channels so a later reconnect can
           // backfill the focused channel's gap (since is a global cursor).
           lastIdRef.current = m.id;
+          // A message arriving proves the connection is actually live: stream()
+          // returns synchronously before the transport connects, so resetting
+          // the backoff counter right after stream() would reset it on every
+          // (immediately-failing) attempt and the backoff would never grow.
+          // THIS is the point a connection is confirmed alive.
+          reconnectTries = 0;
           // Every message refreshes unread/activity tracking (all channels).
           incomingRef.current?.(m);
           // Only the focused channel is appended to the visible tail; other channels
@@ -180,7 +187,6 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
         }
       );
       setStatus('connected');
-      reconnectTries = 0;
       // H1: backfill messages missed while disconnected. The SDK's catchUp is
       // skipped (reconnect:false + a fresh streamMessages whose lastId starts
       // undefined), so without this the gap is lost forever. Pull the focused

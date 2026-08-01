@@ -22,6 +22,7 @@ import { requireAuth } from "../auth.js";
 import { getFile, insertFile } from "../db.js";
 import { filePath, filesDir } from "../files-dir.js";
 import { jsonErr, requireValidId } from "../lib.js";
+import { clientIpKey, rateLimit } from "../rate-limit.js";
 
 /**
  * Build a safe `Content-Disposition: attachment` header value from the
@@ -148,10 +149,26 @@ export function detectAndVerifyMime(
 
 export const files = new Hono();
 
+// Tighter limiter on the upload write path, mirroring the write guard on
+// POST /messages, DELETE /messages/:id, and POST /messages/:id/reactions.
+// 15/min per IP keeps legitimate uploads unaffected while making scripted
+// upload abuse impractical. Disabled in test mode (NODE_ENV=test) so e2e
+// suites don't hit the ceiling. `key: clientIpKey` is mandatory: without it
+// the limiter keys on "unknown" and the 15/min cap collapses to a single
+// site-wide bucket (concurrent users trip 429s).
+const isTest = process.env.NODE_ENV === "test";
+const writeLimiter = isTest
+  ? undefined
+  : rateLimit({ max: 15, windowMs: 60_000, key: clientIpKey });
+const identityMiddleware: import("hono").MiddlewareHandler = async (_c, next) =>
+  next();
+const writeGuard: import("hono").MiddlewareHandler =
+  writeLimiter ?? identityMiddleware;
+
 // All mutations (upload) require auth; GET /files/:id is intentionally open
 // (see plan §3): <img src> can't carry a bearer header, and club's single channel
 // is already visible to every member — an unguessable id is sufficient.
-files.post("/", requireAuth, async (c) => {
+files.post("/", requireAuth, writeGuard, async (c) => {
   let body: Record<string, unknown>;
   try {
     body = await c.req.parseBody();

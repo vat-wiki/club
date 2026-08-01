@@ -30,6 +30,7 @@ import { jsonErr, parseJsonBody, requireValidId, withOptionalMiddleware } from "
 import { requireJson } from "../lib/json-content-type.js";
 import { invalidateParticipantNameMap } from "../mention.js";
 import { clientIpKey, rateLimit } from "../rate-limit.js";
+import { disconnectParticipant } from "../stream.js";
 
 export const participants = new Hono();
 
@@ -223,6 +224,11 @@ participants.post("/:id/rotate-key", requireAuth, requireJson, async (c) => {
 // authorization, not the effect.
 function deactivateParticipant(id: string): void {
   softDeleteParticipant(id);
+  // Close the deactivated participant's live SSE connections so they stop
+  // receiving real-time events immediately - otherwise a kicked / self-deleted
+  // account keeps streaming until its client happens to disconnect. Both the
+  // kick (POST /:id/kick) and self-delete (DELETE /:id) paths go through here.
+  disconnectParticipant(id);
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
 }

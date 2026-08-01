@@ -1522,6 +1522,14 @@ export function ensureChannel(
   }
   const id = ulid();
   insertChannelStmt.run(id, slug, createdAt);
+  // A brand-new channel must invalidate the list + per-slug caches so the next
+  // GET /channels / getChannelBySlug re-reads the new row from the DB.
+  // ensureChannel's own channelCache is repopulated below for the hot path.
+  // This is pure JS memory-cache invalidation (Map delete/clear, no DB I/O),
+  // so it is safe to call inside the db.transaction that POST /messages wraps
+  // ensureChannel in: on rollback the DB row is undone, and the cleared caches
+  // simply re-read the rolled-back (absent) state on next access.
+  invalidateChannelsCache();
   const row = { id, slug, created_at: createdAt, display_name: null as string | null };
   channelCache.set(slug, row);
   return { ...row, created: true };
@@ -1555,6 +1563,17 @@ const channelAttachmentsStmt = db.prepare<[string], { attachments: string }>(
 );
 const deleteFileByIdStmt = db.prepare<[string]>(`DELETE FROM files WHERE id = ?`);
 
+// Check whether a file id is still referenced by a message in a *different*
+// channel before deleting its files row + on-disk blob during channel teardown.
+// Attachments are stored as JSON in messages.attachments (no FK to files), so
+// the same file id can be attached to messages across multiple channels; a
+// blind DELETE would orphan the other channel's attachment. The LIKE pattern
+// matches the "id":"<fileId>" field in the JSON array - ulids contain no LIKE
+// metacharacters (% or _), so no escaping is needed.
+const fileReferencedElsewhereStmt = db.prepare<[string, string], { c: number }>(
+  `SELECT COUNT(*) AS c FROM messages WHERE channel != ? AND attachments LIKE ?`
+);
+
 // Cascade-delete everything owned by a channel, in FK-safe order, then the channel
 // row itself. Runs in one transaction so a partial failure can't leave orphans.
 // `reactions.message_id` REFERENCES messages(id) (FK on, db.ts pragma), so
@@ -1563,9 +1582,12 @@ const deleteFileByIdStmt = db.prepare<[string]>(`DELETE FROM files WHERE id = ?`
 //
 // Before deleting messages, collects attachment file ids from the `attachments`
 // JSON column so the corresponding `files` table rows can be cleaned up (the
-// files table has no FK to messages - attachments are stored as JSON). Returns
-// the file ids so the caller can delete the on-disk blobs after the transaction
-// commits (disk I/O failures must not roll back the committed DB state).
+// files table has no FK to messages - attachments are stored as JSON). A file
+// id still referenced by a message in *another* channel is kept (attachments
+// can span channels), so only orphaned files are removed. Returns the ids whose
+// DB rows were actually deleted so the caller can delete the matching on-disk
+// blobs after the transaction commits (disk I/O failures must not roll back the
+// committed DB state).
 const deleteChannelTx = db.transaction((slug: string): string[] => {
   // Collect attachment file ids before the messages are deleted.
   const attachmentRows = channelAttachmentsStmt.all(slug);
@@ -1590,12 +1612,22 @@ const deleteChannelTx = db.transaction((slug: string): string[] => {
   db.prepare(`DELETE FROM messages WHERE channel = ?`).run(slug);
   db.prepare(`DELETE FROM channels WHERE slug = ?`).run(slug);
 
-  // Clean up files table metadata for the collected attachment ids.
+  // Clean up files table metadata for the collected attachment ids, but only
+  // for files not still referenced by messages in other channels. Attachments
+  // are stored as JSON in messages.attachments with no FK to the files table,
+  // so the same file id can be attached to messages in multiple channels;
+  // deleting it here would orphan the other channel's attachment. Return only
+  // the ids whose DB rows were actually deleted so the caller skips the disk
+  // blob for files still in use elsewhere.
+  const deletedFileIds: string[] = [];
   for (const id of fileIds) {
+    const { c } = fileReferencedElsewhereStmt.get(slug, `%"id":"${id}"%`) ?? { c: 0 };
+    if (c > 0) continue; // still referenced by another channel - keep row + blob
     deleteFileByIdStmt.run(id);
+    deletedFileIds.push(id);
   }
 
-  return fileIds;
+  return deletedFileIds;
 });
 
 /** Delete a channel and cascade-clean its messages, mentions, reactions, and

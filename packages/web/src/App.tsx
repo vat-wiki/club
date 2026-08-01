@@ -166,12 +166,11 @@ export default function App() {
         // S8: merge instead of replace. Between the setMessages([]) above and
         // this resolution, the live SSE stream may have pushed new messages for
         // the just-switched-to channel; a bare setMessages(history) would wipe
-        // them. Keep history as the base and overlay any same-window SSE
-        // arrivals (deduped by id) so nothing is lost.
+        // them. history is the authoritative base (server's latest page);
+        // append only the SSE arrivals not already in history, deduped by id.
         setMessages((prev) => {
-          const existing = new Set(prev.map((m) => m.id));
-          const fresh = history.filter((m) => !existing.has(m.id));
-          return fresh.length ? [...history, ...fresh] : history;
+          const historyIds = new Set(history.map((m) => m.id));
+          return [...history, ...prev.filter((m) => !historyIds.has(m.id))];
         });
       } catch {
         /* transient — the live stream keeps delivering new messages */
@@ -445,7 +444,12 @@ export default function App() {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: true } : m)));
     try {
       await api.deleteMessage(conn, id);
-    } catch {
+    } catch (err) {
+      // 404 means someone else already deleted it via SSE (server's deleteStmt
+      // has `AND deleted=0`); stay deleted. Only roll back on network/5xx so
+      // the row isn't stuck recalled when the delete truly failed.
+      const status = (err as { status?: number }).status;
+      if (status === 404) return; // already deleted by someone else (SSE will/did confirm) - stay deleted
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: false } : m)));
     }
   };

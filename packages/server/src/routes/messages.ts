@@ -42,7 +42,7 @@ import { getChannelQuery, jsonErr, parseJsonBody, parseLimit, requireValidChanne
 import { requireJson } from "../lib/json-content-type.js";
 import { extractMentionedParticipants } from "../mention.js";
 import { clientIpKey, rateLimit } from "../rate-limit.js";
-import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastEdited, broadcastReaction, markThinkingIdle } from "../stream.js";
+import { addSubscriber, broadcast, broadcastAgentIdle, broadcastDeleted, broadcastEdited, broadcastReaction, markThinkingIdle, MAX_SSE_PER_KEY, sseConnectionCount } from "../stream.js";
 
 export const messages = new Hono();
 
@@ -432,9 +432,12 @@ messages.patch("/:id", requireJson, writeGuard, async (c) => {
   return c.json(msg, 200);
 });
 
-// POST /messages/:id/reactions { emoji } -> 204 (toggles). Broadcasts
-// `message_reaction` with the refreshed aggregate so all clients update. The
-// event carries the message's channel so the fan-out stays channel-scoped.
+// POST /messages/:id/reactions { emoji } -> 200 + Reaction[] (toggles).
+// Broadcasts `message_reaction` with the refreshed aggregate so all clients
+// update. The event carries the message's channel so the fan-out stays
+// channel-scoped. Returns the refreshed reaction list as JSON (not 204) so the
+// SDK's `check<T>()` parses the body and the CLI can `.map()` over it - a 204
+// makes `check()` yield `null`, crashing `reactions.map(...)` in react.ts.
 messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   const me = c.get("participant");
   const id = c.req.param("id");
@@ -463,7 +466,7 @@ messages.post("/:id/reactions", requireJson, writeGuard, async (c) => {
   if (!result) return jsonErr(c, "not found", 404);
   const { reactions, channel } = result;
   broadcastReaction({ messageId: id, reactions: reactions as Reaction[], channel: channel ?? DEFAULT_CHANNEL } satisfies MessageReactionEvent);
-  return c.body(null, 204);
+  return c.json(reactions, 200);
 });
 
 // GET /messages/stream  (SSE) — live message feed, optionally channel-scoped.
@@ -499,8 +502,30 @@ messages.get("/stream", (c) => {
     }
     channelSet = names.length > 0 ? new Set(names) : null;
   }
+  // Per-key concurrency cap: the SSE endpoint is exempt from the per-key rate
+  // limiter, so without this a single account can open an unbounded number of
+  // streams and exhaust server fds/memory. Check BEFORE streamSSE commits the
+  // SSE response so we can return a clean 429 + Retry-After (once inside the
+  // streamSSE callback the response status is already 200/text-event-stream).
+  const me = c.get("participant");
+  if (sseConnectionCount(me.id) >= MAX_SSE_PER_KEY) {
+    c.header("Retry-After", "5");
+    return jsonErr(c, "too many concurrent connections", 429);
+  }
   return streamSSE(c, async (stream) => {
-    const unsubscribe = addSubscriber(stream, c.get("participant"), channelSet);
+    const unsubscribe = addSubscriber(stream, me, channelSet);
+    // addSubscriber refuses (returns null) only if the cap was reached in the
+    // TOCTOU window between the pre-check above and the subscribe. Write an
+    // error frame and let the connection close.
+    if (unsubscribe === null) {
+      void stream
+        .writeSSE({
+          event: "error",
+          data: JSON.stringify({ error: "too many concurrent connections" }),
+        })
+        .catch(() => {});
+      return;
+    }
     stream.onAbort(() => {
       unsubscribe();
     });

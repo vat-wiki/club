@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { bodySizeGuard,DEFAULT_MAX_BODY_BYTES } from "./body-size-guard.js";
+import { bodySizeGuard,DEFAULT_MAX_BODY_BYTES,MULTIPART_MAX_BODY_BYTES } from "./body-size-guard.js";
 
 // bodySizeGuard streams-consumes the request body (fast-pathing on a sane
 // Content-Length header, slow-pathing chunked/unbounded transfers) to verify
@@ -26,7 +26,7 @@ function mkApp(limiter: ReturnType<typeof bodySizeGuard>): Hono {
 // A passthrough handler that does NOT parse the body, used to assert the
 // guard called next() (200) instead of 413-ing a multipart upload. The files
 // route enforces its own per-kind cap on the parsed File, so the guard must
-// let the multipart body through untouched.
+// let a multipart body under the 60MB cap through untouched.
 function mkUploadApp(limiter: ReturnType<typeof bodySizeGuard>): Hono {
   const app = new Hono();
   app.use("/upload", limiter, async (c) => {
@@ -110,21 +110,22 @@ describe("body-size-guard", () => {
     expect(res.status).toBe(413);
   });
 
-  // ── multipart/form-data exemption ───────────────────────────────────
+  // ── multipart/form-data higher cap ──────────────────────────────────
   //
   // The files route enforces a per-kind cap (video 50MB / document 25MB /
   // image 10MB) on the parsed File, far above this guard's 5MB default.
-  // Without an exemption, the guard's fast-path (Content-Length) and
-  // slow-path (stream-consume) both 413 a legitimate large upload before it
-  // reaches the files handler. These tests pin the exemption so the
-  // regression cannot silently return.
+  // Multipart bodies are therefore held to a higher 60MB cap
+  // (MULTIPART_MAX_BODY_BYTES) instead of the 5MB default, so legitimate
+  // uploads pass while an OOM DoS (unbounded multipart body buffered by
+  // parseBody before the per-kind check) is still blocked. These tests pin
+  // both the pass-through (under 60MB) and the rejection (over 60MB).
 
-  it("exempts multipart/form-data above the limit (fast-path Content-Length bypassed)", async () => {
+  it("allows multipart/form-data above the 5MB default but under the 60MB cap (fast-path Content-Length)", async () => {
     const limiter = bodySizeGuard(SMALL_MAX);
     const app = mkUploadApp(limiter);
-    // Body is well over the 100-byte cap, so Hono auto-sets a Content-Length
-    // > SMALL_MAX. Pre-fix, the fast-path would 413 here; post-fix the
-    // multipart exemption fires first.
+    // Body is well over the 100-byte non-multipart cap, so Hono auto-sets a
+    // Content-Length > SMALL_MAX. The multipart 60MB cap applies instead of
+    // the 100-byte default, so the fast-path passes it through.
     const body = multipartBody("----testboundary", "X".repeat(500));
     const res = await app.request("/upload", {
       method: "POST",
@@ -135,12 +136,12 @@ describe("body-size-guard", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
-  it("exempts multipart/form-data sent as a ReadableStream (slow-path bypassed)", async () => {
+  it("allows multipart/form-data sent as a ReadableStream (slow-path under 60MB cap)", async () => {
     const limiter = bodySizeGuard(SMALL_MAX);
     const app = mkUploadApp(limiter);
-    // Streamed body -> no Content-Length (chunked). Pre-fix the slow-path
-    // would stream-consume past SMALL_MAX and 413; post-fix the exemption
-    // passes it through unread.
+    // Streamed body -> no Content-Length (chunked). The slow-path
+    // stream-consumes but the 60MB multipart cap (not the 100-byte default)
+    // applies, so 500 bytes passes through.
     const body = multipartBody("----testboundary", "X".repeat(500));
     const stream = new ReadableStream({
       start(controller) {
@@ -157,7 +158,7 @@ describe("body-size-guard", () => {
     expect(res.status).toBe(200);
   });
 
-  it("exempts multipart/form-data regardless of Content-Type casing", async () => {
+  it("allows multipart/form-data regardless of Content-Type casing", async () => {
     const limiter = bodySizeGuard(SMALL_MAX);
     const app = mkUploadApp(limiter);
     const body = multipartBody("----testboundary", "X".repeat(500));
@@ -169,10 +170,11 @@ describe("body-size-guard", () => {
     expect(res.status).toBe(200);
   });
 
-  it("exempts a >5MB multipart upload at the default cap (the reported B2 regression)", async () => {
-    // Default guard is 5MB. A >5MB multipart body would be 413'd by the
-    // fast-path without the exemption. Use a 6MB payload so the test mirrors
-    // the real-world video upload scenario (50MB allowed per-kind cap).
+  it("allows a >5MB multipart upload at the default cap (the reported B2 regression)", async () => {
+    // Default guard is 5MB for non-multipart. A >5MB multipart body would be
+    // 413'd by the fast-path if the 5MB limit applied. The 60MB multipart cap
+    // lets it through, mirroring the real-world video upload scenario (50MB
+    // allowed per-kind cap).
     const limiter = bodySizeGuard();
     const app = mkUploadApp(limiter);
     const body = multipartBody("----testboundary", "X".repeat(6 * 1024 * 1024));
@@ -185,7 +187,7 @@ describe("body-size-guard", () => {
   });
 
   it("still 413s an oversized application/json body (guard remains active for JSON)", async () => {
-    // Regression guard: the exemption is multipart-only. A JSON body over the
+    // Regression guard: the higher cap is multipart-only. A JSON body over the
     // limit must still be rejected.
     const limiter = bodySizeGuard(SMALL_MAX);
     const app = mkApp(limiter);
@@ -194,6 +196,31 @@ describe("body-size-guard", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: big,
+    });
+    expect(res.status).toBe(413);
+  });
+
+  it("rejects a multipart body exceeding MULTIPART_MAX_BODY_BYTES (60MB cap, slow-path)", async () => {
+    // A multipart body larger than 60MB must be rejected with 413. Uses a
+    // pull-based ReadableStream so chunks are allocated on demand (not all
+    // upfront); the guard reads one chunk at a time and 413s as soon as the
+    // cumulative size exceeds the cap, so peak memory stays bounded.
+    const limiter = bodySizeGuard();
+    const app = mkUploadApp(limiter);
+    const overSize = MULTIPART_MAX_BODY_BYTES + 1; // 60MB + 1 byte
+    const stream = new ReadableStream({
+      start(controller) {
+        // Single chunk just over the cap: the guard reads it, detects
+        // size > effectiveMax, and returns 413 without buffering it.
+        controller.enqueue(new Uint8Array(overSize));
+        controller.close();
+      },
+    });
+    const res = await app.request("/upload", {
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data; boundary=----testboundary" },
+      body: stream,
+      duplex: "half",
     });
     expect(res.status).toBe(413);
   });

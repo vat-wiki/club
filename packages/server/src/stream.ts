@@ -56,6 +56,24 @@ function wantsChannel(sub: Subscriber, channel: string | null): boolean {
   return sub.channels.has(channel);
 }
 
+// Per-key cap on concurrent SSE connections. The SSE endpoint is exempt from the
+// per-key rate limiter, so without this a single account can open an unbounded
+// number of streams and exhaust server fds/memory (DoS). Exceeded -> the
+// /messages/stream route returns 429 (Retry-After) and addSubscriber refuses.
+export const MAX_SSE_PER_KEY = 5;
+
+// Count a participant's live SSE connections. Used by addSubscriber
+// (authoritative refusal, closes the TOCTOU window) and by the /messages/stream
+// route (pre-check for a clean 429 before the SSE response is committed).
+// `dead` subscribers are already gone from the fan-out and don't count.
+export function sseConnectionCount(participantId: string): number {
+  let n = 0;
+  for (const s of subscribers) {
+    if (!s.dead && s.participant.id === participantId) n++;
+  }
+  return n;
+}
+
 // Register an SSE subscriber and announce their presence to the channel. `channels`
 // scopes which channel-scoped events this connection receives (null = all). Returns
 // the unsubscribe fn (called on abort) which removes them and broadcasts
@@ -66,7 +84,15 @@ export function addSubscriber(
   s: SSEStreamingApi,
   participant: { id: string; name: string },
   channels: Set<string> | null
-): () => void {
+): (() => void) | null {
+  // Refuse past the per-key concurrency cap. The /messages/stream route also
+  // pre-checks sseConnectionCount for a clean 429 before the SSE response is
+  // committed; this is the authoritative backstop that closes the TOCTOU window
+  // between that pre-check and the actual subscribe (two concurrent requests
+  // can both pass the pre-check, but only one can win the final slot here).
+  if (sseConnectionCount(participant.id) >= MAX_SSE_PER_KEY) {
+    return null;
+  }
   const entry = { stream: s, participant, channels, dead: false };
   subscribers.add(entry);
   const presence = (p: typeof participant, online: boolean) => ({
@@ -140,6 +166,29 @@ export function addSubscriber(
       broadcastPresence(presence(entry.participant, false));
     }
   };
+}
+
+// Force-close every live SSE connection for `participantId`. Used when an
+// account is deactivated (kick / self-delete): without this the deactivated
+// participant keeps receiving real-time events until their client happens to
+// disconnect, which can be indefinitely. We mark each connection dead, drop it
+// from the fan-out set so no further events are routed, and write a best-effort
+// `error` frame so a well-behaved client closes promptly. Set.delete inside a
+// for...of is safe (matches writeAll's .catch pattern).
+export function disconnectParticipant(participantId: string): void {
+  for (const sub of subscribers) {
+    if (sub.dead || sub.participant.id !== participantId) continue;
+    sub.dead = true;
+    subscribers.delete(sub);
+    void sub.stream
+      .writeSSE({
+        event: "error",
+        data: JSON.stringify({ error: "account deactivated" }),
+      })
+      .catch(() => {
+        /* connection already gone - nothing to do */
+      });
+  }
 }
 
 // Type-safe bridge: turn a named SSEEvent into the raw frame that writeAll
@@ -346,7 +395,6 @@ function reapExpiredThinking(): void {
 // state. One timer does double duty (no need for a second scheduler).
 export const heartbeatInterval = setInterval(() => {
   if (subscribers.size === 0) return;
-  const dead: Subscriber[] = [];
   for (const sub of subscribers) {
     if (sub.dead) {
       subscribers.delete(sub);
@@ -355,13 +403,17 @@ export const heartbeatInterval = setInterval(() => {
     void sub.stream
       .writeSSE({ data: '' }) // empty data line doubles as a heartbeat comment-safe ping
       .catch(() => {
+        // Runs as a microtask AFTER this synchronous loop, so a post-loop
+        // dead-collector would always see an empty array (the previous
+        // `dead.push(sub)` + post-loop `if (dead.length)` cleanup was dead
+        // code - `dead` was always [] by the time the check ran, so dead
+        // connections lingered until the next heartbeat's `sub.dead` branch).
+        // Delete directly here instead, mirroring writeAll's .catch.
+        // Set.delete is safe around a for...of iteration: already-visited
+        // deletions are no-ops, not-yet-visited deletions skip the entry.
         sub.dead = true;
-        dead.push(sub);
+        subscribers.delete(sub);
       });
-  }
-  // Dead-cleanup only runs when at least one subscriber actually died.
-  if (dead.length > 0) {
-    for (const sub of dead) subscribers.delete(sub);
   }
   reapExpiredThinking();
 }, 15000).unref();

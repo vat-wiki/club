@@ -34,7 +34,7 @@
  * ```
  */
 
-import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageDeletedEvent, MessageEditedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
+import type { AgentIdleEvent, AgentThinkingEvent, Message, MessageAttachment, MessageDeletedEvent, MessageEditedEvent, MessageReactionEvent,PresenceEvent } from "@club/shared";
 import { jitteredBackoff, parseRetryAfterMs, sleep } from "@club/shared";
 
 import { type ClubConn, listChannels,listMessages } from "./transport.js";
@@ -91,16 +91,24 @@ function isMessageReactionEvent(v: unknown): v is MessageReactionEvent {
   return v.reactions.every(isReaction);
 }
 
+function isAttachment(v: unknown): v is MessageAttachment {
+  if (!isObj(v)) return false;
+  if (typeof v.id !== "string" || typeof v.url !== "string" || typeof v.mime !== "string") return false;
+  if (typeof v.size !== "number") return false;
+  if (v.filename !== undefined && typeof v.filename !== "string") return false;
+  return true;
+}
+
 function isMessage(v: unknown): v is Message {
   if (!isObj(v)) return false;
   if (typeof v.id !== "string" || typeof v.participantId !== "string") return false;
   if (typeof v.authorName !== "string" || typeof v.content !== "string") return false;
   if (typeof v.createdAt !== "number" || typeof v.channel !== "string") return false;
-  if (v.attachments !== undefined && !Array.isArray(v.attachments)) return false;
+  if (v.attachments !== undefined && !(Array.isArray(v.attachments) && v.attachments.every(isAttachment))) return false;
   if (v.replyToId !== undefined && typeof v.replyToId !== "string") return false;
   if (v.deleted !== undefined && typeof v.deleted !== "boolean") return false;
   if (v.editedAt !== undefined && typeof v.editedAt !== "number") return false;
-  if (v.reactions !== undefined && !Array.isArray(v.reactions)) return false;
+  if (v.reactions !== undefined && !(Array.isArray(v.reactions) && v.reactions.every(isReaction))) return false;
   if (v.status !== undefined && v.status !== "sending" && v.status !== "failed") return false;
   return true;
 }

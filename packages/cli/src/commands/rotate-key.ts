@@ -61,11 +61,19 @@ export async function runRotateKey(
 ): Promise<void> {
   const me = await deps.me();
   const res = await deps.rotateKey(me.id, input.currentKey);
-  deps.saveConfig({ server: input.server, key: res.key });
+  // The server has ALREADY invalidated the old key + old recovery code and
+  // issued fresh ones by the time we get here. Print the new credentials
+  // BEFORE persisting to config: if saveConfig throws (disk full / bad
+  // permissions / deleted config dir) withCatchExit will exit the process,
+  // but the user can still recover manually from what is already on stdout
+  // - otherwise they would be permanently locked out with no recovery path.
   console.log(`rotated key for ${me.name} (id=${me.id}).`);
-  console.log(`new key saved to config.`);
+  console.log(`new key (save it now - the old one is now invalid):`);
+  console.log(`  ${res.key}`);
   console.log(`new recovery code (save it - the old one is now invalid):`);
   console.log(`  ${res.recoverCode}`);
+  deps.saveConfig({ server: input.server, key: res.key });
+  console.log(`new key saved to config.`);
   console.log(`try: club whoami`);
 }
 

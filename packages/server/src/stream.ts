@@ -101,7 +101,16 @@ export function addSubscriber(
   return () => {
     entry.dead = true;
     subscribers.delete(entry);
-    broadcastPresence(presence(entry.participant, false));
+    // 只有当该 participant 没有其他活跃连接时才广播离线。同一参与者开两个
+    // 标签页时，关掉其中一个不应让全体误判其离线：先删除本 entry，再扫描
+    // 剩余 subscribers 是否还有同一 participant.id 的活跃连接，仅当没有时
+    // 才广播 online:false。
+    const stillOnline = [...subscribers].some(
+      (s) => !s.dead && s.participant.id === entry.participant.id
+    );
+    if (!stillOnline) {
+      broadcastPresence(presence(entry.participant, false));
+    }
   };
 }
 
@@ -225,23 +234,34 @@ interface ThinkingEntry {
   expiresAt: number;
 }
 
-// participantId -> entry. One outstanding thinking state per agent: a second
-// report while already thinking refreshes the TTL (an agent pinged again simply
-// stays thinking, we don't double-broadcast).
+// Composite key `participantId|channel` -> entry. An agent can be thinking in
+// MORE THAN ONE channel at once (e.g. it picked up @mentions in A then B before
+// finishing either). Keying by participantId alone would let the second report
+// overwrite the first entry's channel, so the first channel's indicator could
+// never be cleared (markThinkingIdle returned the surviving entry's channel and
+// the idle broadcast went to the wrong room). The composite key keeps each
+// channel's state independent: a refresh on the same channel is a no-op on the
+// wire (fresh=false), while a report on a different channel is a new entry that
+// lights up that channel's subscribers. `|` is a safe separator - neither
+// participant ids (`[A-Za-z0-9_-]+`) nor channel slugs (`[a-z0-9][a-z0-9-]*`)
+// contain it, so `a|b` can't collide with another participant's key.
 const thinking = new Map<string, ThinkingEntry>();
 
 /** Record (or refresh) that `participantId` is thinking. Returns whether this
  *  is a NEW entry (true) vs a TTL refresh of an existing one (false). Callers
  *  only broadcast `agent_thinking` on a fresh entry to avoid noisy re-broadcasts
  *  when an already-thinking agent is re-mentioned. `channel` scopes the indicator
- *  to that channel's stream when provided; null/omitted = unscoped (global). */
+ *  to that channel's stream when provided; null/omitted = unscoped (global).
+ *  The key is `participantId|channel`, so the same agent thinking in two channels
+ *  tracks two independent entries rather than one overwriting the other. */
 export function markThinking(
   participantId: string,
   name: string,
   channel: string | null = null
 ): boolean {
-  const fresh = !thinking.has(participantId);
-  thinking.set(participantId, {
+  const key = `${participantId}|${channel ?? ""}`;
+  const fresh = !thinking.has(key);
+  thinking.set(key, {
     participantId,
     name,
     channel,
@@ -250,19 +270,32 @@ export function markThinking(
   return fresh;
 }
 
-/** Clear the thinking state for `participantId`, returning the entry (so the
- *  caller can broadcast `agent_idle` into the right channel) or null if it wasn't
- *  thinking. A redundant idle report is thus a no-op on the wire. */
-export function markThinkingIdle(participantId: string): ThinkingEntry | null {
-  const entry = thinking.get(participantId);
-  if (!entry) return null;
-  thinking.delete(participantId);
-  return entry;
+/** Clear EVERY thinking entry for `participantId` (across all channels),
+ *  returning the removed entries so the caller can broadcast `agent_idle` into
+ *  each one's channel. Posting a reply means the agent is done thinking
+ *  regardless of channel, so all of its entries are cleared - and each channel
+ *  that saw the indicator must get its own idle event, otherwise the indicator
+ *  sticks in the rooms that never got cleared. Returns an empty array (no-op on
+ *  the wire) when the participant wasn't thinking anywhere. */
+export function markThinkingIdle(participantId: string): ThinkingEntry[] {
+  const prefix = `${participantId}|`;
+  const removed: ThinkingEntry[] = [];
+  for (const [key, entry] of thinking) {
+    if (key.startsWith(prefix)) {
+      removed.push(entry);
+      thinking.delete(key);
+    }
+  }
+  return removed;
 }
 
-/** Is `participantId` currently in the thinking set? */
+/** Is `participantId` currently thinking in ANY channel? */
 export function isThinking(participantId: string): boolean {
-  return thinking.has(participantId);
+  const prefix = `${participantId}|`;
+  for (const key of thinking.keys()) {
+    if (key.startsWith(prefix)) return true;
+  }
+  return false;
 }
 
 // Reap expired thinking entries, broadcasting agent_idle for each so a dead
@@ -271,11 +304,13 @@ export function isThinking(participantId: string): boolean {
 // reaches the same channel-scoped subscribers.
 function reapExpiredThinking(): void {
   const now = Date.now();
-  for (const [id, entry] of thinking) {
+  for (const [key, entry] of thinking) {
     if (entry.expiresAt <= now) {
-      thinking.delete(id);
+      thinking.delete(key);
+      // The map key is now a `participantId|channel` composite; use the
+      // entry's stored participantId (not the key) for the idle payload.
       broadcastAgentIdle({
-        participantId: id,
+        participantId: entry.participantId,
         ...(entry.channel ? { channel: entry.channel } : {}),
       });
     }

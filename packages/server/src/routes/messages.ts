@@ -148,7 +148,7 @@ function toMessage(
     id: r.id,
     participantId: r.participant_id,
     authorName: r.author_name,
-    content: r.content,
+    content: r.deleted ? "" : r.content,
     createdAt: r.created_at,
     channel: r.channel,
   };
@@ -306,10 +306,11 @@ messages.post("/", requireJson, writeGuard, async (c) => {
   // reports idle. Category-blind: any participant who reported thinking (an
   // agent processing a @mention OR a human typing) is cleared on post — the
   // safety net for a client that crashes right after posting, so its own idle
-  // report never fires. The idle event carries the channel they were thinking in
-  // (if any) so the clear reaches the same channel-scoped subscribers that saw it.
-  const entry = markThinkingIdle(me.id);
-  if (entry) {
+  // report never fires. An agent may have been thinking in more than one channel,
+  // so we clear ALL of its entries and broadcast an idle into each one's channel
+  // - otherwise the indicator sticks in the rooms whose idle was never sent.
+  const entries = markThinkingIdle(me.id);
+  for (const entry of entries) {
     broadcastAgentIdle({
       participantId: me.id,
       ...(entry.channel ? { channel: entry.channel } : {}),

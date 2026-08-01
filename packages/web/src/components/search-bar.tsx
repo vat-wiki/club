@@ -20,7 +20,15 @@ import type { Message } from "@club/shared";
  *
  * @module @club/web/components/search-bar
  */
-export function SearchBar({ conn, channel }: { conn: ClubConn | null; channel?: string }) {
+export function SearchBar({
+  conn,
+  channel,
+  onSelectMessage,
+}: {
+  conn: ClubConn | null;
+  channel?: string;
+  onSelectMessage?: (m: Message) => void;
+}) {
   const t = useT();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Message[]>([]);
@@ -77,7 +85,23 @@ export function SearchBar({ conn, channel }: { conn: ClubConn | null; channel?: 
             <div className="px-4 py-3 text-xs text-muted-foreground">{t("search.noResults")}</div>
           ) : (
             results.map((m) => (
-              <div key={m.id} className="border-t border-border/40 px-4 py-1.5 text-xs hover:bg-accent/70">
+              <div
+                key={m.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  onSelectMessage?.(m);
+                  setOpen(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    onSelectMessage?.(m);
+                    setOpen(false);
+                  }
+                }}
+                className="border-t border-border/40 px-4 py-1.5 text-xs hover:bg-accent/70 cursor-pointer"
+              >
                 <span className="font-mono font-medium text-foreground">{m.authorName}</span>
                 <span className="ml-2 truncate text-muted-foreground">{m.content || "…"}</span>
               </div>

@@ -23,8 +23,9 @@ describe("thinking state management", () => {
 
   it("markThinkingIdle returns the entry and removes it", () => {
     Stream.markThinking("p3", "bob", "build");
-    const entry = Stream.markThinkingIdle("p3");
-    expect(entry).toMatchObject({
+    const entries = Stream.markThinkingIdle("p3");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
       participantId: "p3",
       name: "bob",
       channel: "build",
@@ -32,9 +33,9 @@ describe("thinking state management", () => {
     expect(Stream.isThinking("p3")).toBe(false);
   });
 
-  it("markThinkingIdle returns null when not thinking", () => {
-    const entry = Stream.markThinkingIdle("p999");
-    expect(entry).toBeNull();
+  it("markThinkingIdle returns empty array when not thinking", () => {
+    const entries = Stream.markThinkingIdle("p999");
+    expect(entries).toEqual([]);
   });
 
   it("isThinking reflects current state", () => {
@@ -47,9 +48,38 @@ describe("thinking state management", () => {
   it("thinking entries carry correct TTL", () => {
     const before = Date.now();
     Stream.markThinking("p5", "dave");
-    const entry = Stream.markThinkingIdle("p5");
-    expect(entry!.expiresAt).toBeGreaterThanOrEqual(before + 44000);
-    expect(entry!.expiresAt).toBeLessThanOrEqual(before + 46000);
+    const entries = Stream.markThinkingIdle("p5");
+    expect(entries[0].expiresAt).toBeGreaterThanOrEqual(before + 44000);
+    expect(entries[0].expiresAt).toBeLessThanOrEqual(before + 46000);
+  });
+
+  it("tracks thinking per channel independently (multi-channel fix)", () => {
+    // Agent reports thinking in channel A, then in channel B. Both must coexist:
+    // the old single-key Map let B overwrite A's entry's channel, so A's
+    // indicator could never be cleared (markThinkingIdle returned only the
+    // surviving B entry and broadcast idle solely to B).
+    expect(Stream.markThinking("p6", "eve", "alpha")).toBe(true); // fresh
+    expect(Stream.markThinking("p6", "eve", "beta")).toBe(true); // fresh (other channel)
+    expect(Stream.isThinking("p6")).toBe(true);
+    // Re-reporting on the SAME channel is a TTL refresh, not a new entry.
+    expect(Stream.markThinking("p6", "eve", "alpha")).toBe(false);
+    // markThinkingIdle clears ALL channels for the participant and returns
+    // every removed entry, so each channel can get its own idle broadcast.
+    const entries = Stream.markThinkingIdle("p6");
+    expect(entries).toHaveLength(2);
+    expect(entries.map((e) => e.channel).sort()).toEqual(["alpha", "beta"]);
+    expect(Stream.isThinking("p6")).toBe(false);
+  });
+
+  it("isThinking is per-participant across channels", () => {
+    Stream.markThinking("p7", "frank", "alpha");
+    Stream.markThinking("p8", "grace", "alpha");
+    expect(Stream.isThinking("p7")).toBe(true);
+    expect(Stream.isThinking("p8")).toBe(true);
+    Stream.markThinkingIdle("p7");
+    expect(Stream.isThinking("p7")).toBe(false);
+    expect(Stream.isThinking("p8")).toBe(true);
+    Stream.markThinkingIdle("p8");
   });
 });
 

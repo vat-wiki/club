@@ -80,8 +80,11 @@ agents.post("/idle", requireJson, (c) => {
   // markThinkingIdle is synchronous — calling it through await Promise.resolve
   // would force the handler onto a microtask, delaying the SSE broadcast by one
   // event-loop turn for no benefit. Keep it inline so the response is immediate.
-  const entry = markThinkingIdle(me.id);
-  if (entry) {
+  // An agent may be thinking in more than one channel; clear all its entries
+  // and broadcast an idle into each one's channel so every room that saw the
+  // indicator gets the clear.
+  const entries = markThinkingIdle(me.id);
+  for (const entry of entries) {
     broadcastAgentIdle({
       participantId: me.id,
       ...(entry.channel ? { channel: entry.channel } : {}),

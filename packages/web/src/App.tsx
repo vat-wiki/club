@@ -167,7 +167,16 @@ export default function App() {
       try {
         setMessages([]);
         const history = await api.messages(c, undefined, channel);
-        setMessages(history);
+        // S8: merge instead of replace. Between the setMessages([]) above and
+        // this resolution, the live SSE stream may have pushed new messages for
+        // the just-switched-to channel; a bare setMessages(history) would wipe
+        // them. Keep history as the base and overlay any same-window SSE
+        // arrivals (deduped by id) so nothing is lost.
+        setMessages((prev) => {
+          const existing = new Set(prev.map((m) => m.id));
+          const fresh = history.filter((m) => !existing.has(m.id));
+          return fresh.length ? [...history, ...fresh] : history;
+        });
       } catch {
         /* transient — the live stream keeps delivering new messages */
       } finally {
@@ -181,6 +190,9 @@ export default function App() {
     (channel: string) => {
       if (!conn || channel === channels.currentChannel) return;
       channels.switchChannel(channel);
+      // S9: drop any in-progress reply quote - it belongs to the old channel,
+      // and sending it in the new channel would 400 (reply target mismatch).
+      setReplyTo(null);
       void loadChannelHistory(conn, channel);
     },
     [conn, channels, loadChannelHistory],
@@ -270,8 +282,34 @@ export default function App() {
       handleSwitchChannel(toast.channel);
       setHighlightMessageId(toast.messageId);
       channels.dismissToastsForChannel(toast.channel);
+      // S5: mark the mention as read on the server so it leaves the inbox
+      // (GET /me/mentions). The toast carries only the messageId, so resolve
+      // the mention id from the unread inbox first, then mark it read.
+      // Fire-and-forget - never blocks the channel jump.
+      if (conn) {
+        void new ClubClient(conn)
+          .mentions()
+          .then((list) => {
+            const mention = list.find((x) => x.messageId === toast.messageId);
+            if (mention) return new ClubClient(conn).markMentionRead(mention.id);
+          })
+          .catch(() => {
+            /* best-effort - inbox stays unread, not a critical path */
+          });
+      }
     },
-    [handleSwitchChannel, channels],
+    [handleSwitchChannel, channels, conn],
+  );
+
+  // S10: jump to a search result's channel + highlight the message. Mirrors
+  // handleToastActivate but works from a Message (search results carry the
+  // channel + id directly, no mention resolution needed).
+  const handleSelectSearchResult = useCallback(
+    (m: Message) => {
+      handleSwitchChannel(m.channel);
+      setHighlightMessageId(m.id);
+    },
+    [handleSwitchChannel],
   );
 
   // boot: validate stored key (initial + on every retry nonce bump).
@@ -396,10 +434,15 @@ export default function App() {
         // the client. If so, just drop the placeholder; otherwise swap it in.
         // Either way avoid leaving the temp id next to the real one, which
         // would render the message twice.
-        if (prev.some((m) => m.id === real.id)) {
-          return prev.filter((m) => m.id !== tempId);
+        //
+        // S7: also purge stale "failed" optimistic rows. A retry creates a
+        // new tempId + optimistic row but leaves the old failed row behind;
+        // without this cleanup the red rows accumulate and never clear.
+        const withoutFailed = prev.filter((m) => m.status !== "failed");
+        if (withoutFailed.some((m) => m.id === real.id)) {
+          return withoutFailed.filter((m) => m.id !== tempId);
         }
-        return prev.map((m) => (m.id === tempId ? real : m));
+        return withoutFailed.map((m) => (m.id === tempId ? real : m));
       });
     } catch (e) {
       setMessages((prev) =>
@@ -581,7 +624,7 @@ export default function App() {
             <BootScreen status={bootStatus} retryNonce={bootRetryNonce} onRetry={retryBoot} onSwitch={abandonBootKey} />
           ) : (
             <>
-              <SearchBar conn={conn} channel={channels.currentChannel} />
+              <SearchBar conn={conn} channel={channels.currentChannel} onSelectMessage={handleSelectSearchResult} />
               {/* key={channel} forces a remount on switch → 180ms cross-fade. */}
               <MessageList
                 key={channels.currentChannel}
@@ -606,6 +649,11 @@ export default function App() {
                 <TypingIndicator agents={typing.agents} />
               )}
               <Composer
+                // S9: key by channel forces a remount on switch, clearing any
+                // in-progress draft + pending uploads so they don't leak across
+                // channels (loses an upload-in-flight, but avoids cross-channel
+                // pollution - an acceptable tradeoff).
+                key={channels.currentChannel}
                 onSend={handleSend}
                 disabled={!me}
                 members={members}

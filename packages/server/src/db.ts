@@ -614,11 +614,11 @@ export function getMessagesAround(aroundId: string, channel: ChannelSlugType, li
 }
 
 const searchAllStmt = db.prepare<[string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' ORDER BY m.rowid DESC LIMIT ?`
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\' AND m.deleted = 0 ORDER BY m.rowid DESC LIMIT ?`
 );
 
 const searchChannelStmt = db.prepare<[string, string, number], MessageRow>(
-  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\\\' AND m.channel = ? ORDER BY m.rowid DESC LIMIT ?`
+  `${messageProjectionSql} WHERE m.content LIKE ? ESCAPE '\\' AND m.deleted = 0 AND m.channel = ? ORDER BY m.rowid DESC LIMIT ?`
 );
 
 /** Messages whose content contains `q` (substring via LIKE), newest first.
@@ -1094,7 +1094,7 @@ export function insertMentions(rows: MentionInsert[]): number {
 const unreadMentionsStmt = db.prepare<[string, number], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
            p.name AS author_name,
-           m.content AS content, m.created_at AS message_created_at,
+           CASE WHEN m.deleted = 1 THEN '' ELSE m.content END AS content, m.created_at AS message_created_at,
            mn.read_at, mn.channel
     FROM mentions mn
     JOIN messages m ON m.id = mn.message_id
@@ -1136,7 +1136,7 @@ export function getMentionById(id: string): MentionByIdRow | undefined {
 const mentionFullStmt = db.prepare<[string], MentionRow>(
   `SELECT mn.id, mn.message_id, mn.participant_id, mn.author_id,
           p.name AS author_name,
-          m.content AS content, m.created_at AS message_created_at,
+          CASE WHEN m.deleted = 1 THEN '' ELSE m.content END AS content, m.created_at AS message_created_at,
           mn.read_at, mn.channel
    FROM mentions mn
    JOIN messages m ON m.id = mn.message_id

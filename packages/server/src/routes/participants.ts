@@ -15,6 +15,7 @@ import {
 import { requireAuth } from "../auth.js";
 import { hashKey } from "../crypto.js";
 import {
+  db,
   getParticipantByKeyHash,
   getParticipantByName,
   getParticipantForRecover,
@@ -133,11 +134,15 @@ function recoverParticipant(name: string, recoverCode: string) {
     return { ok: false } as const;
   }
 
-  // Reissue both credentials, reusing the original id + name.
+  // Reissue both credentials, reusing the original id + name. Both writes go in
+  // one transaction so a crash between them can't leave the old recover_hash
+  // active (which would break single-use rotation).
   const newPlainKey = newKey();
   const newCode = newRecoverCode();
-  updateParticipantKey(row.id, hashKey(newPlainKey));
-  updateParticipantRecover(row.id, hashKey(newCode));
+  db.transaction(() => {
+    updateParticipantKey(row.id, hashKey(newPlainKey));
+    updateParticipantRecover(row.id, hashKey(newCode));
+  })();
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
 
@@ -198,8 +203,12 @@ participants.post("/:id/rotate-key", requireAuth, requireJson, async (c) => {
   }
   const newPlainKey = newKey();
   const newCode = newRecoverCode();
-  updateParticipantKey(me.id, hashKey(newPlainKey));
-  updateParticipantRecover(me.id, hashKey(newCode));
+  // Both writes in one transaction so a crash between them can't leave the old
+  // recover_hash active (which would break single-use rotation).
+  db.transaction(() => {
+    updateParticipantKey(me.id, hashKey(newPlainKey));
+    updateParticipantRecover(me.id, hashKey(newCode));
+  })();
   invalidateParticipantNamesCache();
   invalidateParticipantNameMap();
   return c.json({ key: newPlainKey, recoverCode: newCode }, 200);

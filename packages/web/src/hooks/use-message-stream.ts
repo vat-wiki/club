@@ -12,7 +12,9 @@ export interface UseMessageStreamOptions {
    * a participant thinking in a channel the user isn't viewing. */
   onAgentThinking?: (e: AgentThinkingEvent) => void;
   /** Fired for `agent_idle` SSE events — clears a participant from the typing
-   * indicator. Channel-scoped like `onAgentThinking`. */
+   * indicator. NOT channel-filtered: idle is keyed by participantId, so an idle
+   * from any channel must clear the indicator (otherwise it sticks when the
+   * user switches channels). Contrast with `onAgentThinking`, which is scoped. */
   onAgentIdle?: (e: AgentIdleEvent) => void;
   /** The channel currently in focus. Only its messages are appended to the visible
    *  `messages` tail; other channels' messages are routed to `onIncoming` for
@@ -76,6 +78,12 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
   idleRef.current = opts.onAgentIdle;
   const editedRef = useRef(opts.onMessageEdited);
   editedRef.current = opts.onMessageEdited;
+  // H1: the last message id observed on the stream, persisted across reconnects.
+  // The SDK's built-in catchUp is skipped here (reconnect:false + a fresh
+  // streamMessages per connect whose internal lastId starts undefined), so a
+  // network drop would permanently lose the messages that arrived while
+  // disconnected. We backfill that gap ourselves from this cursor on reconnect.
+  const lastIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!conn) return;
@@ -91,6 +99,9 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
       setStatus('connecting');
       sub = new ClubClient(conn).stream(
         (m) => {
+          // Track the newest id across ALL channels so a later reconnect can
+          // backfill the focused channel's gap (since is a global cursor).
+          lastIdRef.current = m.id;
           // Every message refreshes unread/activity tracking (all channels).
           incomingRef.current?.(m);
           // Only the focused channel is appended to the visible tail; other channels
@@ -116,7 +127,11 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
             // client rate-limits itself (and, behind a shared-IP proxy,
             // everyone).
             const retryAfterMs = (err as { retryAfterMs?: number | null })?.retryAfterMs;
-            const delay = retryAfterMs ?? Math.min(15_000, 1000 * 2 ** reconnectTries);
+            let delay = retryAfterMs ?? Math.min(15_000, 1000 * 2 ** reconnectTries);
+            // Jitter the backoff (0.5x..1x) so a cohort of clients dropped by
+            // the same network/server event doesn't all reconnect in lockstep
+            // and thunder the server (thundering herd).
+            delay = delay * (0.5 + Math.random() * 0.5);
             reconnectTries += 1;
             reconnect = setTimeout(connect, delay);
           },
@@ -127,7 +142,14 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
             thinkingRef.current?.(e);
           },
           onAgentIdle: (e) => {
-            if (e.channel && e.channel !== currentChannelRef.current) return;
+            // idle is NOT channel-filtered (unlike onAgentThinking above). The
+            // typing set is keyed by participantId, not channel, so an idle from
+            // ANY channel must clear that participant's indicator. Filtering by
+            // the focused channel would drop the clear while the user is viewing
+            // a different channel, leaving a stuck indicator when they switch
+            // back. The server (post multi-channel fix) clears every channel for
+            // the participant and broadcasts an idle into each, so processing all
+            // of them here is correct and idempotent.
             idleRef.current?.(e);
           },
           onPresence: (e) => {
@@ -159,6 +181,36 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
       );
       setStatus('connected');
       reconnectTries = 0;
+      // H1: backfill messages missed while disconnected. The SDK's catchUp is
+      // skipped (reconnect:false + a fresh streamMessages whose lastId starts
+      // undefined), so without this the gap is lost forever. Pull the focused
+      // channel's messages since the last id we saw; since is open-interval
+      // (excludes the cursor), so dedup + append only the new ones. Fire
+      // onIncoming for each so unread counts etc. stay in sync. A failed
+      // backfill is silent - it must not block the live connection.
+      const sinceId = lastIdRef.current;
+      if (sinceId != null) {
+        new ClubClient(conn)
+          .messages({ since: sinceId, channel: currentChannelRef.current })
+          .then((missed) => {
+            if (stopped || missed.length === 0) return;
+            for (const m of missed) incomingRef.current?.(m);
+            setMessages((prev) => {
+              const existing = new Set(prev.map((m) => m.id));
+              const fresh = missed.filter((m) => !existing.has(m.id));
+              return fresh.length ? [...prev, ...fresh] : prev;
+            });
+            // Advance the cursor only if no newer live message has landed since
+            // the request fired (otherwise leave it - dedup covers the overlap
+            // on the next reconnect).
+            if (lastIdRef.current === sinceId) {
+              lastIdRef.current = missed[missed.length - 1].id;
+            }
+          })
+          .catch(() => {
+            /* silent: a failed backfill must not block the live connection */
+          });
+      }
     };
 
     hasMoreRef.current = true;
@@ -186,6 +238,14 @@ export function useMessageStream(conn: ClubConn | null, opts: UseMessageStreamOp
   // Assume older history exists until a `before` fetch returns empty — keeps
   // the UI from hammering the server once we've scrolled to the top of the channel.
   const hasMoreRef = useRef(true);
+
+  // H2: reset history pagination when switching channels. hasMoreRef is only
+  // set true in the conn effect (on connect), so without this, exhausting
+  // channel A's older history (hasMoreRef=false) would permanently block
+  // channel B's older history from ever loading.
+  useEffect(() => {
+    hasMoreRef.current = true;
+  }, [opts.currentChannel]);
 
   /** Load one page of older history for the focused channel (scroll-up pagination).
    *  Prepend de-duped messages before the current tail. Does nothing if there

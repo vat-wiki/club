@@ -29,6 +29,20 @@ describe("mentionMatches", () => {
     expect(mentionMatches("msg @wangwen", "wang")).toBe(false);
   });
 
+  it("does NOT match when @ is glued to a preceding name char (leading boundary)", () => {
+    // "foo@alice": the @ is preceded by "o" (a name char), so this is NOT a
+    // mention of alice. Mirrors collectCandidateNames in server/mention.ts;
+    // before the fix shared matched here while the server did not.
+    expect(mentionMatches("foo@alice", "alice")).toBe(false);
+    expect(mentionMatches("bar@alice", "alice")).toBe(false);
+    expect(mentionMatches("user@alice hi", "alice")).toBe(false);
+    // A real @-mention later in the same content still matches.
+    expect(mentionMatches("foo@alice and @alice", "alice")).toBe(true);
+    // Non-name char before @ is fine.
+    expect(mentionMatches("hey @alice", "alice")).toBe(true);
+    expect(mentionMatches(".@alice", "alice")).toBe(true);
+  });
+
   it("still matches the full name when a shorter prefix name also exists", () => {
     expect(mentionMatches("msg @wangwen", "wangwen")).toBe(true);
     // A standalone shorter tag still matches even if a longer one appears too.

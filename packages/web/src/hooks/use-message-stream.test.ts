@@ -188,7 +188,7 @@ describe("useMessageStream", () => {
       expect(onThinking).toHaveBeenCalledTimes(1);
     });
 
-    it("forwards agent_idle only for the focused channel", () => {
+    it("forwards agent_idle for every channel (idle is unconditional to avoid stuck indicators)", () => {
       const onIdle = vi.fn();
       renderHook(() =>
         useMessageStream(conn, { currentChannel: "general", onAgentIdle: onIdle }),
@@ -197,7 +197,12 @@ describe("useMessageStream", () => {
         mockStream?.onAgentIdle({ participantId: "p1", channel: "general" });
         mockStream?.onAgentIdle({ participantId: "p2", channel: "engineering" });
       });
-      expect(onIdle).toHaveBeenCalledTimes(1);
+      // Unlike agent_thinking (which is channel-scoped so the indicator only
+      // shows who is thinking in the focused channel), agent_idle must clear a
+      // participant's typing state regardless of channel. Otherwise an idle
+      // event that arrives while the user is viewing another channel would be
+      // dropped and the indicator would stay stuck when they switch back.
+      expect(onIdle).toHaveBeenCalledTimes(2);
     });
 
     it("marks a message deleted only in the focused channel", () => {

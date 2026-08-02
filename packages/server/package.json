@@ -1,6 +1,6 @@
 {
   "name": "club-serve",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "description": "club backend — Hono + SQLite + SPA host. Run a full club with `npx club-serve`.",
   "repository": {

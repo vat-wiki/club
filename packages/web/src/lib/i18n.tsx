@@ -325,6 +325,8 @@ const zh: Dict = {
   "msg.replyNotFound": "回复了一条消息",
   "msg.recall": "撤回",
   "msg.recalled": "已撤回",
+  "msg.recalling": "你撤回了一条消息",
+  "msg.undo": "撤销",
   "msg.react": "回应",
   // Inline edit (own messages). The "edit" verb sits next to "recall" in the
   // message header; "(edited)" is a subtle muted marker shown when editedAt is set.
@@ -622,6 +624,8 @@ const en: Dict = {
   "msg.replyNotFound": "Replied to a message",
   "msg.recall": "Recall",
   "msg.recalled": "Recalled",
+  "msg.recalling": "You recalled a message",
+  "msg.undo": "Undo",
   "msg.react": "React",
   // Inline edit (own messages). The "edit" verb sits next to "recall" in the
   // message header; "(edited)" is a subtle muted marker shown when editedAt is set.

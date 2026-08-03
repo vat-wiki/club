@@ -157,6 +157,10 @@ type MessageListProps = {
   loadingMore?: boolean;
   onReply?: (m: Message) => void;
   onDelete?: (id: string) => void;
+  /** Undo a pending recall inside the 5s window (before the API delete fires). */
+  onUndoRecall?: (id: string) => void;
+  /** Ids of the current user's messages mid-recall (showing the undo placeholder). */
+  pendingRecalls?: Set<string>;
   /** Edit one of the current user's own messages (inline edit UI). */
   onEdit?: (id: string, content: string) => Promise<void>;
   onReact?: (messageId: string, emoji: string) => void;
@@ -195,6 +199,8 @@ function MessageRow({
   onReply,
   replyTo,
   onDelete,
+  onUndoRecall,
+  pendingRecalls,
   onEdit,
   onReact,
 }: {
@@ -217,6 +223,10 @@ function MessageRow({
   replyTo?: Message;
   /** Recall (delete) this message — only callable on the author's own rows. */
   onDelete?: (id: string) => void;
+  /** Undo a pending recall inside the 5s window. */
+  onUndoRecall?: (id: string) => void;
+  /** Ids mid-recall (showing the undo placeholder). */
+  pendingRecalls?: Set<string>;
   /** Edit this message's text — only callable on the author's own rows.
    *  Resolves on success (the caller swaps the message locally); rejects on
    *  server error so the inline editor can surface it and keep editing. */
@@ -287,7 +297,11 @@ function MessageRow({
   // the exact time without hovering. The inline header timestamp stays HH:MM.
   const preciseTime = fmtTimePrecise(m.createdAt, locale);
   const sentAtLabel = t("msg.sentAt", { time: preciseTime });
-  const showPicker = !grouped && !m.deleted && !!onReact;
+  // True while this row's recall is in the 5s undo window (the API delete hasn't
+  // fired yet). The bubble collapses into a "you recalled a message · undo"
+  // placeholder; undoing clears this and restores the row.
+  const recalling = !!pendingRecalls?.has(m.id) && !m.deleted;
+  const showPicker = !grouped && !m.deleted && !recalling && !!onReact;
   // Bubble + alignment scheme (the standard chat-app mental model):
   //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
   //   - others: left-aligned, body in a raised-surface bubble (bg-card)
@@ -344,7 +358,7 @@ function MessageRow({
               {m.editedAt && (
                 <span className="font-mono text-[10px] lowercase text-muted-foreground/50">({t("msg.edited")})</span>
               )}
-              {onReply && (
+              {onReply && !recalling && (
                 <button
                   type="button"
                   data-testid={`reply-${m.id}`}
@@ -354,7 +368,7 @@ function MessageRow({
                   {t("msg.reply")}
                 </button>
               )}
-              {self && !m.deleted && !m.status && !editing && onEdit && (
+              {self && !m.deleted && !m.status && !editing && !recalling && onEdit && (
                 <button
                   type="button"
                   data-testid={`edit-${m.id}`}
@@ -364,7 +378,7 @@ function MessageRow({
                   {t("msg.edit")}
                 </button>
               )}
-              {self && !m.deleted && !m.status && !editing && onDelete && (
+              {self && !m.deleted && !m.status && !editing && !recalling && onDelete && (
                 <button
                   type="button"
                   data-testid={`recall-${m.id}`}
@@ -400,7 +414,25 @@ function MessageRow({
                 )}
               </div>
             )}
-            {m.deleted ? (
+            {recalling ? (
+              // Undo window: the row hasn't been deleted server-side yet. Show a
+              // muted placeholder + an inline "undo" action (Gmail/Slack style)
+              // instead of vanishing instantly. A subtle fade/slide makes the
+              // collapse read as deliberate, not a flicker.
+              <div className="animate-in fade-in slide-in-from-bottom-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="italic">{t("msg.recalling")}</span>
+                {onUndoRecall && (
+                  <button
+                    type="button"
+                    data-testid={`undo-recall-${m.id}`}
+                    onClick={() => onUndoRecall(m.id)}
+                    className="rounded px-1 py-0.5 font-medium text-primary underline-offset-2 transition-colors hover:bg-primary/10 hover:underline"
+                  >
+                    {t("msg.undo")}
+                  </button>
+                )}
+              </div>
+            ) : m.deleted ? (
               <span className="italic text-muted-foreground">{t("msg.recalled")}</span>
             ) : editing ? (
               <div className="space-y-1.5">
@@ -474,7 +506,7 @@ function MessageRow({
               </span>
             )}
           </div>
-          {!m.deleted && (onReact ?? (false || (m.reactions && m.reactions.length > 0))) && (
+          {!m.deleted && !recalling && (onReact ?? (false || (m.reactions && m.reactions.length > 0))) && (
             <div className={cn("mt-1 flex flex-wrap items-center gap-1", self && "justify-end")}>
               {m.reactions?.map((r) => (
                 <span
@@ -507,7 +539,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onEdit, onReact, onNeedAround },
+  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onUndoRecall, pendingRecalls, onEdit, onReact, onNeedAround },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -804,6 +836,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     onReply={onReply}
                     replyTo={item.replyTo}
                     onDelete={onDelete}
+                    onUndoRecall={onUndoRecall}
+                    pendingRecalls={pendingRecalls}
                     onEdit={onEdit}
                     onReact={onReact}
                   />

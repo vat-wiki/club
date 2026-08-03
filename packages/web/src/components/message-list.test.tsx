@@ -218,3 +218,93 @@ describe("MessageList — scroll-up pagination", () => {
     expect(onLoadMore).not.toHaveBeenCalled();
   });
 });
+
+describe("MessageList - recall with inline undo", () => {
+  // Recall-with-undo: clicking recall doesn't delete immediately. The id lands
+  // in pendingRecalls, the bubble collapses into a "you recalled · undo"
+  // placeholder, and only after the caller's 5s timer fires is the API hit.
+  // Here we drive MessageList directly with a pendingRecalls set, so we assert
+  // the placeholder + undo affordance render and that undo/recall call back.
+
+  it("renders a 'recalled · undo' placeholder for a pending recall (own message)", () => {
+    const messages = [mk(me, "whoops will delete this", "own1")];
+    const pendingRecalls = new Set(["own1"]);
+    const { container } = renderWithI18n(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        pendingRecalls={pendingRecalls}
+        onUndoRecall={vi.fn()}
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    // The original content is hidden in the undo window; locate the row by id.
+    const row = container.querySelector('[data-message-id="own1"]')!;
+    // placeholder text present
+    expect(row.textContent).toContain("你撤回了一条消息");
+    // undo button present + reachable by testid
+    expect(screen.getByTestId("undo-recall-own1")).toBeTruthy();
+    // the edit/recall header actions are hidden while mid-recall
+    expect(row.querySelector('[data-testid="edit-own1"]')).toBeNull();
+    expect(row.querySelector('[data-testid="recall-own1"]')).toBeNull();
+  });
+
+  it("calls onUndoRecall when the undo button is clicked", () => {
+    const messages = [mk(me, "take it back", "own2")];
+    const onUndoRecall = vi.fn();
+    renderWithI18n(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        pendingRecalls={new Set(["own2"])}
+        onUndoRecall={onUndoRecall}
+        onDelete={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("undo-recall-own2"));
+    expect(onUndoRecall).toHaveBeenCalledWith("own2");
+  });
+
+  it("shows the recall action and calls onDelete when not yet recalling", () => {
+    const messages = [mk(me, "still here", "own3")];
+    const onDelete = vi.fn();
+    renderWithI18n(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        onDelete={onDelete}
+      />,
+    );
+    const recallBtn = screen.getByTestId("recall-own3");
+    fireEvent.click(recallBtn);
+    expect(onDelete).toHaveBeenCalledWith("own3");
+  });
+
+  it("renders the server-confirmed recalled state (deleted, not recalling)", () => {
+    // Once the delete actually fires (server confirms via SSE -> m.deleted),
+    // the row shows the plain recalled marker with NO undo affordance.
+    const messages: Message[] = [{ ...mk(me, "gone for good", "own4"), deleted: true }];
+    const { container } = renderWithI18n(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        pendingRecalls={new Set(["own4"])}
+        onUndoRecall={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    const row = container.querySelector('[data-message-id="own4"]')!;
+    expect(row.textContent).toContain("已撤回");
+    // m.deleted takes precedence over recalling: no undo button
+    expect(row.querySelector('[data-testid="undo-recall-own4"]')).toBeNull();
+  });
+});

@@ -54,6 +54,16 @@ export default function App() {
   // The message being replied to (puts the composer in "reply" mode with a
   // quote preview); null in normal compose mode.
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  // Recall-with-undo: when the user recalls their own message we don't hit the
+  // API immediately. Instead the id lands in this set, the row collapses into a
+  // "you recalled a message · undo" placeholder, and a 5s timer fires the real
+  // delete. Undoing clears the id + timer and restores the row (the server copy
+  // was never touched, so this is safe). Pure client state - no shared-contract
+  // change. See [[recall-undo]].
+  const [pendingRecalls, setPendingRecalls] = useState<Set<string>>(() => new Set());
+  // Timers backing pendingRecalls, keyed by message id. Held in a ref (not
+  // state) so the delete/undo handlers can read/clear them without re-rendering.
+  const recallTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // First-load gate state. "loading" while validating a stored key against /me
   // (and pulling the first history batch); "error" when that validation fails —
   // which used to silently clearConn() and bounce the user to onboarding with no
@@ -327,6 +337,16 @@ export default function App() {
   // BootScreen resets its attempt counter.
   const retryBoot = useCallback(() => setBootRetryNonce((n) => n + 1), []);
 
+  // Clear any pending recall timers on unmount so they never fire delete calls
+  // against an unmounted App (and never leak a 5s timer holding the closure).
+  useEffect(() => {
+    const timers = recallTimersRef.current;
+    return () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
   // Abandon the stored key from the boot-failure screen. Unlike retryBoot
   // (which keeps the key), this wipes it and reopens the auth dialog - the
   // only way out when the key is structurally fine but wrong for this server
@@ -437,10 +457,42 @@ export default function App() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!conn) return;
-    // Optimistically mark recalled; the server's message_deleted broadcast
-    // confirms and syncs everyone else. Revert on failure so the row isn't stuck.
+    // Recall-with-undo (see [[recall-undo]]): don't call the API yet. Collapse
+    // the row locally by adding the id to pendingRecalls (MessageRow renders the
+    // "recalled · undo" placeholder for ids in this set) and arm a 5s timer that
+    // performs the actual delete. The optimistic `deleted:true` + server confirm
+    // happens only when the timer fires (or never, if the user undoes).
+    setPendingRecalls((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    const existing = recallTimersRef.current.get(id);
+    if (existing) clearTimeout(existing);
+    recallTimersRef.current.set(
+      id,
+      setTimeout(() => {
+        recallTimersRef.current.delete(id);
+        void commitRecall(id);
+      }, 5000),
+    );
+  };
+
+  // Perform the real delete after the undo window elapses. Mirrors the original
+  // optimistic-delete flow: mark deleted, call the API, roll back on network/5xx
+  // (404 = someone else already deleted it via SSE, stay deleted). The id is
+  // dropped from pendingRecalls either way so the placeholder clears.
+  const commitRecall = async (id: string) => {
+    if (!conn) return;
+    setPendingRecalls((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: true } : m)));
     try {
       await api.deleteMessage(conn, id);
@@ -452,6 +504,23 @@ export default function App() {
       if (status === 404) return; // already deleted by someone else (SSE will/did confirm) - stay deleted
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: false } : m)));
     }
+  };
+
+  // User clicked "undo" inside the recall window. Cancel the pending delete and
+  // restore the row - the server was never contacted, so this is a pure local
+  // revert.
+  const handleUndoRecall = (id: string) => {
+    const timer = recallTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      recallTimersRef.current.delete(id);
+    }
+    setPendingRecalls((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   const handleReact = async (messageId: string, emoji: string) => {
@@ -628,6 +697,8 @@ export default function App() {
                 loadingMore={loadingMore}
                 onReply={setReplyTo}
                 onDelete={handleDelete}
+                onUndoRecall={handleUndoRecall}
+                pendingRecalls={pendingRecalls}
                 onEdit={handleEdit}
                 onReact={handleReact}
                 onNeedAround={handleNeedAround}

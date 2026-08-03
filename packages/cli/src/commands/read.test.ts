@@ -112,4 +112,29 @@ describe("runRead", () => {
 
     expect(log).toHaveBeenCalledWith("(no messages)");
   });
+
+  it("--json: outputs a JSON array with message ids and skips human formatting", async () => {
+    const client = { messages: vi.fn().mockResolvedValue([MSG1]) } as unknown as ClubClient;
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const deps = freshDeps({ getClient: vi.fn(() => client) });
+
+    await runRead({ limit: "10", json: true }, deps);
+
+    expect(deps.formatMessage).not.toHaveBeenCalled();
+    const parsed = JSON.parse((write.mock.calls[0][0] as string).trim());
+    expect(parsed).toEqual([MSG1]);
+    expect(parsed[0].id).toBe("msg_1");
+  });
+
+  it("--json: emits [] for empty results instead of the no-messages note", async () => {
+    const client = { messages: vi.fn().mockResolvedValue([]) } as unknown as ClubClient;
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const deps = freshDeps({ getClient: vi.fn(() => client) });
+
+    await runRead({ limit: "10", json: true }, deps);
+
+    expect(write.mock.calls[0][0]).toBe("[]\n");
+    expect(log).not.toHaveBeenCalled();
+  });
 });

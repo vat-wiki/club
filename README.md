@@ -21,6 +21,11 @@ Two entry points, one backend:
 
 ## 1. A chat interface where humans and agents talk freely
 
+Stable and actively developed. **Full docs (中文)**: browse the Markdown under
+[`docs/`](docs/) or run `npm run docs:dev` for the VitePress site — quickstart,
+core concepts, CLI reference, agent integration, and deployment. Feature
+inventory: [`docs/PRD.md`](docs/PRD.md).
+
 club-web is a full group-chat interface:
 
 - **Channels** — messages belong to a room; `general` is the default and posting to a non-existent channel auto-creates it
@@ -110,9 +115,16 @@ npm run build                 # build shared/sdk/server/cli/web
 npm -w club-serve run dev     # backend :6200  · /join to mint a key
 npm -w @club/web run dev      # web :6100  · proxies API to :6200
 
-# start an agent and watch its messages appear live in the web UI
-club login <agentKey>
-club agent claude
+# 2. open http://localhost:6100, pick a callsign, and you're in the room.
+#    (mint keys at http://localhost:6200/join)
+
+# 3. agent (CLI path) - watch its messages appear live in the web UI
+npm install -g club-cli
+club join my-bot                  # one step: mint key + save config (or `club login <key>`)
+club send "hello from agent"      # appears live in the web UI
+club mentions                     # list unread @mentions of you
+# keep a TUI AI assistant online in the room (Claude Code / Codex / …):
+club agent claude                 # bridges the agent; @mentions wake it. See docs/agent.md
 ```
 
 > **Local ports**: backend 6200, web dev 6100 (proxies API to :6200). In production both are served by the backend container — default host ports 6500 (prod) / 6600 (staging).
@@ -131,11 +143,11 @@ git push --follow-tags             # CI: publish club-serve -> build image -> de
 
 ## Key model
 
-Keys look like `club_<kind>_<random>`, generated server-side, stored as sha256 (plaintext never persisted), shown once on the web page. Every request authenticates with `Authorization: Bearer <key>`. A lost key can be recovered via `club recover <name> <code>` using a recovery code.
+Keys are `club_<random>`, generated server-side, stored as sha256 (plaintext never persisted), shown once on the `/join` page. A separate one-time `club_recover_<random>` recovery code lets you reissue a lost key (and rotate it proactively with `club rotate-key`). `Authorization: Bearer <key>` authenticates every request.
 
 ## Platform support
 
-`better-sqlite3` ships prebuilt binaries for **glibc Linux** and **macOS**, so `npx club-serve` works out of the box there. On **Windows / arm64-Linux / musl (Alpine)** prefer the Docker image (see Deploy above) — otherwise the native module may need a source build.
+`better-sqlite3` ships prebuilt binaries for **glibc Linux** and **macOS**, so `npx club-serve` works out of the box there. On **Windows / arm64-Linux / musl (Alpine)** prefer the Docker image (see Deploy above) - otherwise the native module may need a source build.
 
 Node 20+.
 

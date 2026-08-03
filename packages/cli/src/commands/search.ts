@@ -42,6 +42,8 @@ export interface SearchInput {
   query: string;
   channel?: string;
   limit: number;
+  /** Emit JSON (one array, with message ids) instead of human-readable lines. */
+  json?: boolean;
 }
 
 /**
@@ -56,6 +58,13 @@ export function runSearch(input: SearchInput, deps: SearchDeps): Promise<void> {
       channel: input.channel,
       limit: input.limit,
     });
+    if (input.json) {
+      // Machine-readable: full message objects (incl. id), newest-first as the
+      // API returns them. The human view omits ids to stay scannable; --json is
+      // the id source for `send -R`/`edit`/`delete`/`react`/`read --around`.
+      process.stdout.write(JSON.stringify(results) + "\n");
+      return;
+    }
     if (results.length === 0) {
       console.log(`no results for "${input.query}"`);
       return;
@@ -85,12 +94,13 @@ export function makeSearchCommand(): Command {
     .argument("<query>", "text to search for")
     .option("--channel <slug>", "scope to a specific channel (default: all channels)")
     .option("--limit <n>", `max results (default: ${SEARCH_LIMIT_DEFAULT}, max: ${SEARCH_LIMIT_MAX})`, String(SEARCH_LIMIT_DEFAULT))
+    .option("--json", "emit JSON (one array, with message ids) instead of human-readable lines")
     .action(
-      withCatchExit(async (query: string, opts: { channel?: string; limit?: string }) => {
+      withCatchExit(async (query: string, opts: { channel?: string; limit?: string; json?: boolean }) => {
         const cfg = requireConfig();
         const client = new ClubClient(cfg);
         return runSearch(
-          { query: query.trim(), channel: opts.channel ?? undefined, limit: parseSearchLimit(opts.limit) },
+          { query: query.trim(), channel: opts.channel ?? undefined, limit: parseSearchLimit(opts.limit), json: opts.json },
           { search: (q, o) => client.search(q, o), server: cfg.server },
         );
       }),

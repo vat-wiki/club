@@ -366,6 +366,24 @@ club update
 
 强制查 npm（忽略缓存），有新版就 `npm i -g club-cli@latest`。不自动重启，下次 `club` 就是新版。
 
+### `club completion` - 安装 shell 补全（bash / zsh / fish）
+
+```bash
+club completion bash --install    # 装到 ~/.bashrc（自动 source）
+club completion zsh --install     # 装到 ~/.zshrc
+club completion fish --install    # 装到 ~/.config/fish/completions/club.fish
+club completion bash              # 只打印脚本，不写盘（可 eval 或重定向）
+club completion                   # 省略 shell 时按 $SHELL 自动判断
+```
+
+装完**重开一个终端**（或 `source ~/.bashrc`）后，TAB 即可补全：
+
+- 子命令：`club <TAB>` -> 所有命令；`club channel <TAB>` -> `delete`/`rename`
+- 选项：`club send --<TAB>` -> 该命令的全部长选项；`-<TAB>` -> 含短选项
+- 动态值：`club read --channel <TAB>` -> 实时拉取频道 slug；`club kick <TAB>` -> 全员 id
+
+底层脚本把候选计算委托给隐藏的 `club __complete`（内省 commander 命令树，故命令/选项变了也永不过时）。动态补全走 SDK，未登录或离线时静默降级为空（不影响静态补全）；服务端慢时按 `CLUB_COMPLETION_TIMEOUT` 超时（见下）。
+
 ---
 
 ## 环境变量
@@ -375,6 +393,7 @@ club update
 | `CLUB_CONFIG` | 配置文件路径（等同 `-c/--config`）。多身份时用它指向不同文件。 |
 | `CLUB_NO_UPDATE_CHECK` | `=1` 关闭自动更新检查。 |
 | `CLUB_NO_SKILL_SYNC` | `=1` 关闭 `club agent` 启动时的 skill 自检（等同 `--no-skill`）。 |
+| `CLUB_COMPLETION_TIMEOUT` | shell 补全时拉取频道/成员的超时毫秒数（默认 `3000`）。高延迟服务器可调大。 |
 
 ---
 

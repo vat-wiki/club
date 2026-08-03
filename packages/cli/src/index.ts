@@ -5,6 +5,7 @@ import { makeBioCommand } from "./commands/bio.js";
 import { makeCatCommand } from "./commands/cat.js";
 import { makeChannelCommand } from "./commands/channel.js";
 import { makeChannelsCommand } from "./commands/channels.js";
+import { makeCompletionCommand } from "./commands/completion.js";
 import { makeDeleteCommand } from "./commands/delete.js";
 import { makeDeleteAccountCommand } from "./commands/delete-account.js";
 import { makeEditCommand } from "./commands/edit.js";
@@ -24,6 +25,7 @@ import { makeSendCommand } from "./commands/send.js";
 import { makeSkillCommand } from "./commands/skill.js";
 import { makeUpdateCommand } from "./commands/update.js";
 import { makeWhoamiCommand } from "./commands/whoami.js";
+import { runCompleteAndPrint } from "./completion/complete.js";
 import { loadConfig } from "./config.js";
 import { runTui } from "./tui.js";
 import { autoUpdateAndRelaunch, checkForUpdate, isDevRun } from "./update.js";
@@ -77,6 +79,7 @@ const cmds = [
   makeCatCommand(),
   makeSkillCommand(),
   makeUpdateCommand(),
+  makeCompletionCommand(),
 ];
 cmds.forEach((c) => program.addCommand(c));
 
@@ -103,6 +106,7 @@ program.hook("preAction", async (_thisCmd, actionCmd) => {
   try {
     if (process.env.CLUB_NO_UPDATE_CHECK === "1") return; // relaunched child / user opt-out
     if (actionCmd.name() === "update") return; // `club update` manages itself
+    if (actionCmd.name() === "completion") return; // prints a static script; never needs a relaunch
     if (isDevRun()) return; // running from source via tsx
     // (note: --version/--help short-circuit before the action and never reach this hook)
 
@@ -121,4 +125,17 @@ program.action(() => {
   runTui(cfg);
 });
 
-program.parseAsync(process.argv).catch((err) => die(err as Error));
+// Shell completion dispatcher (hidden). Intercepted BEFORE commander parses so
+// it stays out of `club --help`, skips the auto-update preAction hook, and
+// starts fast (no auth, no network for static subcommand/flag completion). The
+// scripts emitted by `club completion` call `club __complete <words...>` and
+// read `value[\tdescription]` candidate lines from stdout.
+const completionArgs = process.argv.slice(2);
+if (completionArgs[0] === "__complete") {
+  process.env.CLUB_NO_UPDATE_CHECK = "1";
+  // Run, print, and let the process exit naturally so stdout flushes (an eager
+  // process.exit can truncate piped output). Nothing else keeps the loop alive.
+  void runCompleteAndPrint(program, completionArgs.slice(1));
+} else {
+  program.parseAsync(process.argv).catch((err) => die(err as Error));
+}

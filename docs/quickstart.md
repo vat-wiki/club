@@ -109,9 +109,12 @@ club agent claude              # 在 PTY 里跑 claude，把 club 消息作为�
 | 列成员 | `club members` |
 | 搜历史 | `club search <关键词>` |
 | 进交互式 TUI | `club`（已登录后，无子命令） |
+| 装 shell 补全 | `club completion bash --install`（也支持 `zsh`/`fish`） |
 | 任何命令的帮助 | `club <命令> -h` |
 
 完整命令参考见 [`CLI 命令参考`](./cli)。
+
+> 装完补全重开终端后，`club <TAB>` 补命令、`club send --<TAB>` 补选项、`club read --channel <TAB>` 实时补频道名。详见 [CLI 参考 · `club completion`](./cli#club-completion-安装-shell-补全-bash-zsh-fish)。
 
 ---
 

@@ -25,7 +25,7 @@ describe("runMembers", () => {
   it("prints each participant with bio (when set) in order", async () => {
     const deps: MembersDeps = { members: vi.fn().mockResolvedValue([alice, bob]) };
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    await runMembers(deps);
+    await runMembers({}, deps);
     expect(deps.members).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledTimes(2);
     expect(log).toHaveBeenCalledWith("alice  bio: 运维");
@@ -35,7 +35,7 @@ describe("runMembers", () => {
   it("prints the empty-channel footer when there are no members", async () => {
     const deps: MembersDeps = { members: vi.fn().mockResolvedValue([]) };
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    await runMembers(deps);
+    await runMembers({}, deps);
     expect(deps.members).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith("(no members)");
@@ -44,7 +44,7 @@ describe("runMembers", () => {
   it("does not print the empty-channel footer when there is at least one member", async () => {
     const deps: MembersDeps = { members: vi.fn().mockResolvedValue([alice]) };
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    await runMembers(deps);
+    await runMembers({}, deps);
     expect(log).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith("alice  bio: 运维");
     expect(log).not.toHaveBeenCalledWith("(no members)");
@@ -54,6 +54,16 @@ describe("runMembers", () => {
     const deps: MembersDeps = {
       members: vi.fn().mockRejectedValue(new Error("network unreachable")),
     };
-    await expect(runMembers(deps)).rejects.toThrow("network unreachable");
+    await expect(runMembers({}, deps)).rejects.toThrow("network unreachable");
+  });
+
+  it("--json: outputs a JSON array with participant ids and skips human formatting", async () => {
+    const deps: MembersDeps = { members: vi.fn().mockResolvedValue([alice, bob]) };
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runMembers({ json: true }, deps);
+    expect(log).not.toHaveBeenCalled();
+    const parsed = JSON.parse((write.mock.calls[0][0] as string).trim());
+    expect(parsed.map((p: { id: string }) => p.id)).toEqual(["p_1", "p_2"]);
   });
 });

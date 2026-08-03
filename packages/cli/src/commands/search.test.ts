@@ -97,4 +97,15 @@ describe("runSearch", () => {
       "server offline",
     );
   });
+
+  it("--json: outputs a JSON array with ids and skips human formatting", async () => {
+    const deps = makeDeps({
+      search: vi.fn().mockResolvedValue([msg("m1"), msg("m2")]),
+    });
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await runSearch({ query: "q", limit: 10, json: true }, deps);
+    expect(console.log).not.toHaveBeenCalled();
+    const parsed = JSON.parse((write.mock.calls[0][0] as string).trim());
+    expect(parsed.map((m: { id: string }) => m.id)).toEqual(["m1", "m2"]);
+  });
 });

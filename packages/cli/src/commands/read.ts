@@ -1,9 +1,14 @@
-// club read [--channel <slug>] [--since <id>] [--before <id>] [--around <id>] [--limit <n>]
+// club read [--channel <slug>] [--since <id>] [--before <id>] [--around <id>] [--limit <n>] [--json]
 //
 // Fetch and print messages. --since anchors to a message id (newer history),
 // --before goes older, --around returns context around an id (a few before +
 // the anchor + a few after), --limit caps the response (1-500, default 20).
 // Defaults to general unless -r/--channel is explicit.
+//
+// --json emits the raw message objects (one JSON array, incl. each message's
+// id) instead of human-readable lines. Use it to obtain the message ids that
+// --since/--around and `send -R`/`edit`/`delete`/`react` need — the default
+// human output intentionally omits ids to stay scannable.
 
 import { Command } from "commander";
 
@@ -25,6 +30,8 @@ export interface ReadOpts {
   limit: string;
   /** Channel slug; defaults to general (DEFAULT_CHANNEL) when omitted. */
   channel?: string;
+  /** Emit JSON (one array, with message ids) instead of human-readable lines. */
+  json?: boolean;
 }
 
 export interface ReadDeps {
@@ -56,6 +63,13 @@ export async function runRead(
     limit: deps.parseLimit(opts.limit),
     channel: opts.channel ?? deps.defaultChannel(),
   });
+  if (opts.json) {
+    // Machine-readable: full message objects (incl. id) so callers can feed
+    // --since/--around and `send -R`/`edit`/`delete`/`react` without eyeballing
+    // ids. The human view omits ids to stay scannable; --json is the id source.
+    process.stdout.write(JSON.stringify(msgs) + "\n");
+    return;
+  }
   for (const m of msgs) console.log(deps.formatMessage(m));
   if (msgs.length === 0) console.log("(no messages)");
 }
@@ -80,6 +94,7 @@ export function makeReadCommand(): Command {
       "-r, --channel <slug>",
       "read from this channel (default: general)",
     )
+    .option("--json", "emit JSON (one array, with message ids) instead of human-readable lines")
     .action(
       withCatchExit(
         async (opts: ReadOpts) => {

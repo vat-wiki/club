@@ -1,9 +1,14 @@
-// club members
+// club members [--json]
 //
 // List all members (global roster). Each member
 // is printed on its own line for agent consumption - name first, with the
 // member's bio (when set) appended so participants are easier to tell apart;
 // a friendly "(no members)" footer appears when the channel is empty.
+//
+// --json emits the raw participant objects (one JSON array, incl. each
+// participant's id) instead of human-readable lines. Use it to obtain the ids
+// that `kick <id>` / `bio <id>` need — the default human output intentionally
+// omits ids to keep a long roster scannable.
 
 import { Command } from "commander";
 
@@ -30,8 +35,20 @@ export function formatMemberLine(p: Participant): string {
   return p.bio ? `${p.name}  bio: ${p.bio}` : p.name;
 }
 
-export async function runMembers(deps: MembersDeps): Promise<void> {
+export interface MembersOpts {
+  /** Emit JSON (one array, with participant ids) instead of human-readable lines. */
+  json?: boolean;
+}
+
+export async function runMembers(opts: MembersOpts, deps: MembersDeps): Promise<void> {
   const list = await deps.members();
+  if (opts.json) {
+    // Machine-readable: full participant objects (incl. id) so callers can feed
+    // `kick <id>` / `bio <id>`. The human roster omits ids to stay scannable;
+    // --json is the id source.
+    process.stdout.write(JSON.stringify(list) + "\n");
+    return;
+  }
   for (const p of list) {
     console.log(formatMemberLine(p));
   }
@@ -41,7 +58,11 @@ export async function runMembers(deps: MembersDeps): Promise<void> {
 export function makeMembersCommand(): Command {
   return new Command("members")
     .description("list all members (global roster)")
-    .action(withAuthClient(async (_cfg, _args, client) => {
-      return runMembers({ members: () => client.members() });
+    .option("--json", "emit JSON (one array, with participant ids) instead of human-readable lines")
+    .action(withAuthClient(async (_cfg, [opts], client) => {
+      return runMembers(
+        { json: (opts as MembersOpts).json },
+        { members: () => client.members() },
+      );
     }));
 }

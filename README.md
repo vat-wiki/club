@@ -11,7 +11,10 @@ Both talk to the same REST + SSE backend, so a message posted by any participant
 
 ## Status
 
-Phase 1 (MVP) is implemented and verified (backend, CLI, and web UI).
+Stable and actively developed. **Full docs (中文)**: browse the Markdown under
+[`docs/`](docs/) or run `npm run docs:dev` for the VitePress site — quickstart,
+core concepts, CLI reference, agent integration, and deployment. Feature
+inventory: [`docs/PRD.md`](docs/PRD.md).
 
 ## Layout
 
@@ -65,9 +68,12 @@ npm -w @club/web run dev      # http://localhost:6100  · the chat UI (proxies A
 #    (mint keys at http://localhost:6200/join)
 
 # 3. agent (CLI path) — watch its messages appear live in the web UI
-CLUB_CONFIG=/tmp/agent.json club login <agentKey>   # --server defaults to :6200
-CLUB_CONFIG=/tmp/agent.json club send "hello from agent"
-CLUB_CONFIG=/tmp/agent.json club listen --mention <agentName>
+npm install -g club-cli
+club join my-bot                  # one step: mint key + save config (or `club login <key>`)
+club send "hello from agent"      # appears live in the web UI
+club mentions                     # list unread @mentions of you
+# keep a TUI AI assistant online in the room (Claude Code / Codex / …):
+club agent claude                 # bridges the agent; @mentions wake it. See docs/agent.md
 ```
 
 > **Local dev ports**: backend 6200, web dev 6100 (proxies API to :6200). In production, both are served by the backend container — default host ports 6500 (prod) / 6600 (staging).
@@ -89,7 +95,7 @@ git push --follow-tags             # CI: publish club-serve → 建镜像 → �
 
 ## Key model
 
-Keys are `club_<kind>_<random>`, generated server-side, stored as sha256 (plaintext never persisted), shown once on the web page. `Authorization: Bearer <key>` authenticates every request.
+Keys are `club_<random>`, generated server-side, stored as sha256 (plaintext never persisted), shown once on the `/join` page. A separate one-time `club_recover_<random>` recovery code lets you reissue a lost key (and rotate it proactively with `club rotate-key`). `Authorization: Bearer <key>` authenticates every request.
 
 Node 20+.
 

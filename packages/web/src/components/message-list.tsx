@@ -2,6 +2,7 @@ import { Avatar } from "@/components/avatar";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { FileCard } from "@/components/file-card";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { Button } from "@/components/ui/button";
 import { fmtDay, fmtTime, fmtTimePrecise, mentionsSelf,renderContent,sanitizeDisplayString } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -474,6 +475,9 @@ function MessageRow({
               grouped ? "mt-0" : "mt-0.5",
               m.status === "sending" && "opacity-60",
               m.status === "failed" && "border border-destructive/50 bg-destructive/10",
+              // Editing: a subtle ring distinguishes the inline editor bubble from
+              // a normal read bubble, so the active-edit state reads clearly.
+              editing && "ring-1 ring-ring/40",
             )}
           >
             {m.replyToId && (
@@ -512,7 +516,7 @@ function MessageRow({
             ) : m.deleted ? (
               <span className="italic text-muted-foreground">{t("msg.recalled")}</span>
             ) : editing ? (
-              <div className="space-y-1.5">
+              <div className="animate-in fade-in slide-in-from-bottom-1 duration-fast space-y-1.5">
                 <textarea
                   ref={editRef}
                   value={draft}
@@ -539,24 +543,20 @@ function MessageRow({
                   rows={1}
                 />
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void saveEdit()}
-                    disabled={editSaving}
-                    className="rounded bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-                  >
+                  <Button type="button" size="sm" onClick={() => void saveEdit()} disabled={editSaving}>
                     {editSaving ? t("msg.editSaving") : t("msg.editSave")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    disabled={editSaving}
-                    className="rounded px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                  >
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={cancelEdit} disabled={editSaving}>
                     {t("msg.editCancel")}
-                  </button>
+                  </Button>
+                  {/* Keyboard hint + inline error share the trailing space. */}
+                  {!editError && (
+                    <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
+                      {t("msg.editHint")}
+                    </span>
+                  )}
                   {editError && (
-                    <span role="alert" className="font-mono text-[10px] text-destructive">
+                    <span role="alert" className="ml-auto font-mono text-[10px] text-destructive">
                       {editError}
                     </span>
                   )}
@@ -583,19 +583,33 @@ function MessageRow({
               </span>
             )}
           </div>
-          {/* Existing reaction chips (display-only here; adding a reaction is via
-              the toolbar's emoji picker). Step 3 makes these clickable toggles. */}
+          {/* Reaction chips: clickable toggles (re-reacting with the same emoji
+              toggles it off server-side). Each chip zooms in on first appearance
+              and lifts on hover. Adding a NEW reaction is via the toolbar picker. */}
           {!m.deleted && !recalling && (m.reactions && m.reactions.length > 0) && (
             <div className={cn("mt-1 flex flex-wrap items-center gap-1", self && "justify-end")}>
-              {m.reactions.map((r) => (
-                <span
-                  key={r.emoji}
-                  className="inline-flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[11px]"
-                >
-                  {r.emoji}
-                  <span className="tabular-nums text-muted-foreground">{r.count}</span>
-                </span>
-              ))}
+              {m.reactions.map((r) => {
+                const reacted = (r.count ?? 0) > 0;
+                return (
+                  <button
+                    key={r.emoji}
+                    type="button"
+                    data-testid={`reaction-${m.id}-${r.emoji}`}
+                    onClick={onReact ? () => onReact(m.id, r.emoji) : undefined}
+                    disabled={!onReact}
+                    aria-label={`${r.emoji} ${r.count}`}
+                    className={cn(
+                      "inline-flex animate-in zoom-in-75 duration-fast items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] transition-transform hover:scale-110 disabled:cursor-default",
+                      reacted
+                        ? "bg-accent text-foreground"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {r.emoji}
+                    <span className="tabular-nums text-muted-foreground">{r.count}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

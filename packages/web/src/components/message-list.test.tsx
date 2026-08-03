@@ -368,3 +368,36 @@ describe("MessageList - hover action toolbar", () => {
     expect(onReply).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("MessageList - inline edit + reaction chips", () => {
+  it("enters edit mode via the toolbar edit button and shows save/cancel + keyboard hint", () => {
+    const messages = [mk(me, "edit me please", "ownE")];
+    const onEdit = vi.fn(async () => {});
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" onEdit={onEdit} />,
+    );
+    // click the toolbar's edit button -> inline editor swaps in
+    fireEvent.click(screen.getByTestId("edit-ownE"));
+    const row = container.querySelector('[data-message-id="ownE"]')!;
+    expect(row.querySelector("textarea")).toBeTruthy();
+    // the design-system Save/Cancel buttons render (role=button, enabled)
+    expect(row.textContent).toContain("保存");
+    expect(row.textContent).toContain("取消");
+    // keyboard hint surfaced
+    expect(row.textContent).toContain("Esc");
+  });
+
+  it("renders existing reactions as clickable toggle chips that call onReact", () => {
+    const messages: Message[] = [{ ...mk(bot, "react to me", "r1"), reactions: [{ emoji: "👍", count: 2 }] }];
+    const onReact = vi.fn();
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" onReact={onReact} />,
+    );
+    const chip = container.querySelector('[data-testid="reaction-r1-👍"]') as HTMLButtonElement;
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain("👍");
+    expect(chip.textContent).toContain("2");
+    fireEvent.click(chip);
+    expect(onReact).toHaveBeenCalledWith("r1", "👍");
+  });
+});

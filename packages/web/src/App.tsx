@@ -701,6 +701,7 @@ export default function App() {
                 pendingRecalls={pendingRecalls}
                 onEdit={handleEdit}
                 onReact={handleReact}
+                onJumpTo={setHighlightMessageId}
                 onNeedAround={handleNeedAround}
               />
               {typing.agents.length > 0 && (

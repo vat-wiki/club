@@ -1,4 +1,4 @@
-import { Avatar } from "@/components/avatar";
+import { Avatar, avatarColor } from "@/components/avatar";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { FileCard } from "@/components/file-card";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -165,6 +165,9 @@ type MessageListProps = {
   /** Edit one of the current user's own messages (inline edit UI). */
   onEdit?: (id: string, content: string) => Promise<void>;
   onReact?: (messageId: string, emoji: string) => void;
+  /** Jump to + highlight a message (used by reply-quote clicks to scroll to the
+   *  original). Reuses the highlightMessageId scroll/around mechanism. */
+  onJumpTo?: (id: string) => void;
   /** Fired when a highlight target isn't in the loaded history window; the
    *  caller fetches context via messages({ around: id }) so the target can be
    *  scrolled to + highlighted (G6 deep-link). */
@@ -272,6 +275,55 @@ function MessageActions({
   );
 }
 
+// Inline reply-quote shown inside a bubble when a message is a reply. The left
+// bar is tinted with the original author's avatar hue (visual association), and
+// clicking the quote jumps to + highlights the original message. When no jump
+// handler is wired, it degrades to a plain non-interactive quote.
+function QuoteBar({
+  replyTo,
+  replyToId,
+  onJumpTo,
+  recalledLabel,
+  notFoundLabel,
+  jumpLabel,
+}: {
+  replyTo?: Message;
+  replyToId?: string;
+  onJumpTo?: (id: string) => void;
+  recalledLabel: string;
+  notFoundLabel: string;
+  jumpLabel: string;
+}) {
+  const barColor = replyTo ? avatarColor(replyTo.authorName) : "var(--border)";
+  const body = replyTo ? (
+    replyTo.deleted ? (
+      <span className="italic">{recalledLabel}</span>
+    ) : (
+      <span className="truncate">
+        <span className="font-medium">{sanitizeDisplayString(replyTo.authorName)}</span>: {sanitizeDisplayString(replyTo.content).slice(0, 80) || "…"}
+      </span>
+    )
+  ) : (
+    <span className="italic">{notFoundLabel}</span>
+  );
+  const cls = "mb-1 flex max-w-full items-center gap-1.5 border-l-2 pl-2 text-xs text-muted-foreground";
+  if (!onJumpTo || !replyToId) {
+    return <div className={cls} style={{ borderLeftColor: barColor }}>{body}</div>;
+  }
+  return (
+    <button
+      type="button"
+      data-testid={`quote-jump-${replyToId}`}
+      onClick={() => onJumpTo(replyToId)}
+      aria-label={jumpLabel}
+      className={cn(cls, "text-left transition-colors hover:text-foreground")}
+      style={{ borderLeftColor: barColor }}
+    >
+      {body}
+    </button>
+  );
+}
+
 function MessageRow({
   m,
   self,
@@ -288,6 +340,7 @@ function MessageRow({
   pendingRecalls,
   onEdit,
   onReact,
+  onJumpTo,
 }: {
   m: Message;
   self: boolean;
@@ -321,6 +374,8 @@ function MessageRow({
   onEdit?: (id: string, content: string) => Promise<void>;
   /** Toggle an emoji reaction on this message. */
   onReact?: (messageId: string, emoji: string) => void;
+  /** Jump to + highlight a message (reply-quote click -> original). */
+  onJumpTo?: (id: string) => void;
 }) {
   const { locale, t } = useI18n();
   const pinged = mentionsSelf(m.content, selfName);
@@ -481,19 +536,19 @@ function MessageRow({
             )}
           >
             {m.replyToId && (
-              <div className="mb-1 border-l-2 border-border/60 pl-2 text-xs text-muted-foreground">
-                {replyTo ? (
-                  replyTo.deleted ? (
-                    <span className="italic">{t("msg.recalled")}</span>
-                  ) : (
-                    <span className="truncate">
-                      <span className="font-medium">{sanitizeDisplayString(replyTo.authorName)}</span>: {sanitizeDisplayString(replyTo.content).slice(0, 80) || "…"}
-                    </span>
-                  )
-                ) : (
-                  t("msg.replyNotFound")
-                )}
-              </div>
+              // Reply quote: author-tinted left bar (same hue as the author's
+              // avatar) for visual association, and the whole quote is a button
+              // that jumps to + highlights the original (reusing the deep-link
+              // scroll/around machinery). Falls back to a non-interactive div
+              // when no onJumpTo is wired (read-only / a11y renders).
+              <QuoteBar
+                replyTo={replyTo}
+                replyToId={m.replyToId}
+                onJumpTo={onJumpTo}
+                recalledLabel={t("msg.recalled")}
+                notFoundLabel={t("msg.replyNotFound")}
+                jumpLabel={t("msg.jumpToOriginal")}
+              />
             )}
             {recalling ? (
               // Undo window: the row hasn't been deleted server-side yet. Show a
@@ -619,7 +674,7 @@ function MessageRow({
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onUndoRecall, pendingRecalls, onEdit, onReact, onNeedAround },
+  { messages, me, members, status, channel, loadingChannel, highlightMessageId, onHighlightConsumed, onLoadMore, loadingMore, onReply, onDelete, onUndoRecall, pendingRecalls, onEdit, onReact, onJumpTo, onNeedAround },
   ref,
 ) {
   const { locale, t } = useI18n();
@@ -929,6 +984,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     pendingRecalls={pendingRecalls}
                     onEdit={onEdit}
                     onReact={onReact}
+                    onJumpTo={onJumpTo}
                   />
                 )}
               </div>

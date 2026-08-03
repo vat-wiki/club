@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 // avatar color without storing or uploading anything — hash the name to a hue.
 // Picked HSL with fixed S/L so the palette reads as one system (no clashing
 // neon); the initial is the only personalized bit.
-function avatarColor(name: string): string {
+export function avatarColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return `hsl(${h % 360} 55% 45%)`;

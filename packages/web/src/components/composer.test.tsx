@@ -117,6 +117,29 @@ describe("Composer — image input", () => {
     // And the hint explains why (uploading status, live region).
     expect(screen.getByText("附件上传中…")).toBeTruthy();
   });
+});
+
+describe("Composer - reply quote bar", () => {
+  it("renders the reply quote with the author + content and a cancel button", () => {
+    const replyTo = {
+      id: "orig",
+      participantId: "p2",
+      authorName: "bot",
+      content: "the original message",
+      createdAt: Date.now(),
+      channel: "general",
+    };
+    const onReplyClear = vi.fn();
+    renderWithI18n(<Composer onSend={async () => {}} conn={conn} replyTo={replyTo} onReplyClear={onReplyClear} />);
+    // author name + quoted content shown
+    expect(screen.getByText(/bot/)).toBeTruthy();
+    expect(screen.getByText(/the original message/)).toBeTruthy();
+    // cancel button has an accessible name (icon-only)
+    const cancel = screen.getByLabelText("取消回复");
+    expect(cancel.tagName).toBe("BUTTON");
+    fireEvent.click(cancel);
+    expect(onReplyClear).toHaveBeenCalledTimes(1);
+  });
 
   it("rejects an over-size file with a message naming the limit and the actual size", async () => {
     const onSend = vi.fn().mockResolvedValue(undefined);

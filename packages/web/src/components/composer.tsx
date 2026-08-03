@@ -1,3 +1,4 @@
+import { avatarColor } from "@/components/avatar";
 import { type AttachmentDraft,MediaPreviewChip } from "@/components/media-preview-chip";
 import { MentionPopup } from "@/components/mention-popup";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import {
   validateMediaFile,
 } from "@/lib/upload";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Paperclip, Send } from "lucide-react";
+import { AlertTriangle, Paperclip, Send, X } from "lucide-react";
 import { type KeyboardEvent,useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClubConn } from "@club/sdk";
@@ -469,6 +470,13 @@ export function Composer({
     if (!focused) closeMention();
   }, [focused, closeMention]);
 
+  // Entering reply mode (replyTo set) should hand focus to the input so the
+  // user can type immediately - matching the "I clicked reply, now I type"
+  // expectation without an extra click.
+  useEffect(() => {
+    if (replyTo) ref.current?.focus();
+  }, [replyTo]);
+
   const popupOpen = !!mention;
 
   // The "Enter to send · shift+enter for newline" hint is useful for first-time
@@ -542,9 +550,15 @@ export function Composer({
         adjacent chrome), so a glow would be over-design.
       */}
       {/* Reply quote bar sits ABOVE the input bar so it spans the full width
-          and isn't horizontally squeezed to the textarea column. */}
+          and isn't horizontally squeezed to the textarea column. Slides in on
+          enter; the author's avatar hue tints the leading bar for association. */}
       {replyTo && (
-        <div className="flex items-center gap-2 border-b border-border/60 px-3 py-1.5 text-xs">
+        <div className="flex animate-in fade-in slide-in-from-bottom-2 duration-fast items-center gap-2 border-b border-border/60 px-3 py-1.5 text-xs">
+          <span
+            aria-hidden
+            className="h-3.5 w-1 flex-none rounded-full"
+            style={{ backgroundColor: avatarColor(replyTo.authorName) }}
+          />
           <span className="min-w-0 truncate text-muted-foreground">
             {t("msg.replyingTo", { name: replyTo.authorName })}
             <span className="ml-1 text-foreground/80">
@@ -554,10 +568,10 @@ export function Composer({
           <button
             type="button"
             onClick={onReplyClear}
-            aria-label={t("msg.reply")}
-            className="ml-auto flex-none rounded p-0.5 text-muted-foreground hover:text-foreground"
+            aria-label={t("msg.cancelReply")}
+            className="ml-auto flex-none rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            ✕
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

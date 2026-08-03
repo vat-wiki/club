@@ -401,3 +401,37 @@ describe("MessageList - inline edit + reaction chips", () => {
     expect(onReact).toHaveBeenCalledWith("r1", "👍");
   });
 });
+
+describe("MessageList - reply quote jump", () => {
+  it("clicking the reply quote calls onJumpTo with the original message id", () => {
+    const original = mk(bot, "the original", "orig");
+    const reply: Message = { ...mk(me, "a reply", "rep"), replyToId: "orig" };
+    const onJumpTo = vi.fn();
+    const { container } = renderWithI18n(
+      <MessageList
+        messages={[original, reply]}
+        me={me}
+        members={members}
+        status="connected"
+        onJumpTo={onJumpTo}
+      />,
+    );
+    const quoteBtn = container.querySelector('[data-testid="quote-jump-orig"]') as HTMLButtonElement;
+    expect(quoteBtn).toBeTruthy();
+    expect(quoteBtn.textContent).toContain("bot");
+    expect(quoteBtn.textContent).toContain("the original");
+    fireEvent.click(quoteBtn);
+    expect(onJumpTo).toHaveBeenCalledWith("orig");
+  });
+
+  it("renders the quote as a non-interactive div when no onJumpTo is wired", () => {
+    const original = mk(bot, "the original", "orig");
+    const reply: Message = { ...mk(me, "a reply", "rep"), replyToId: "orig" };
+    const { container } = renderWithI18n(
+      <MessageList messages={[original, reply]} me={me} members={members} status="connected" />,
+    );
+    // no jump button, but the quote text still renders
+    expect(container.querySelector('[data-testid="quote-jump-orig"]')).toBeNull();
+    expect(container.querySelector('[data-message-id="rep"]')?.textContent).toContain("the original");
+  });
+});

@@ -46,6 +46,8 @@ club join alice -b "infra on-call"
 
 ### `club login` — 用已有 key 登录
 
+写盘前**先连服务器验证 key**（`GET /me`）：通过才存盘并打印身份，key 无效或服务器不可达则报错退出、**不写盘**。
+
 ```bash
 club login <key> [-s <server>]
 ```

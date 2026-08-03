@@ -68,22 +68,27 @@ jobs:
           echo "✓ Publishing club-cli $L"
           npm publish --access public --provenance
 
-  # 用「刚刚 publish 的 club-serve npm 包」构建镜像并推到 staging。needs: publish
-  # 保证 club-serve@$VER 已上 registry，镜像里 `npm install -g` 才不会 404
-  # （旧版 deploy.yml 与 publish 并行跑，有竞态）。
-  deploy:
-    needs: publish
-    runs-on: self-hosted
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # clean: false 保留 self-hosted 工作区里 gitignore 的 .env（prod/test 镜像
-          # tag）；默认 clean 的 -ffdx 会连带删掉它，使每次 build 把 PROD_TAG 兜底成
-          # 当前版本、丢失 prod/test 区分。
-          clean: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - name: Build & deploy (test)
-        run: ./scripts/deploy.sh build
+  # ── 已禁用（2026-08-03）：docker staging 双容器部署（prod :6500 / test :6600）
+  # 退役，改走 npm 自托管单包 `npx club-serve`（见 CLAUDE.md / club-deployment）。
+  # 原 deploy job 会 rebuild 镜像并 `docker compose up -d club-test` 拉起 :6600，与
+  # 「卸载容器」冲突，故整体注释保留；恢复时去掉下列行首 `#` 即可。
+  #
+  # # 用「刚刚 publish 的 club-serve npm 包」构建镜像并推到 staging。needs: publish
+  # # 保证 club-serve@$VER 已上 registry，镜像里 `npm install -g` 才不会 404
+  # # （旧版 deploy.yml 与 publish 并行跑，有竞态）。
+  # deploy:
+  #   needs: publish
+  #   runs-on: self-hosted
+  #   timeout-minutes: 20
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         # clean: false 保留 self-hosted 工作区里 gitignore 的 .env（prod/test 镜像
+  #         # tag）；默认 clean 的 -ffdx 会连带删掉它，使每次 build 把 PROD_TAG 兜底成
+  #         # 当前版本、丢失 prod/test 区分。
+  #         clean: false
+  #     - uses: actions/setup-node@v7
+  #       with:
+  #         node-version: "24"
+  #     - name: Build & deploy (test)
+  #       run: ./scripts/deploy.sh build

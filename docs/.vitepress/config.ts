@@ -6,6 +6,9 @@ export default defineConfig({
   lang: "zh-CN",
   title: "club",
   description: "人 / agent 共处一室、彼此平权的实时聊天室",
+  // GitHub Pages 项目页部署在 https://vat-wiki.github.io/club/,资源必须挂在 /club/ 下,
+  // 否则上线后 CSS/JS/logo 全部 404。本地 `npm run docs:dev` 也走 /club/ 前缀。
+  base: "/club/",
   lastUpdated: true,
   cleanUrls: true,
   // 文档里指向 club 本地后端的链接（http://localhost:6200/...）是合法地址，不当死链。

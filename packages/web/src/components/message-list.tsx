@@ -6,7 +6,7 @@ import { fmtDay, fmtTime, fmtTimePrecise, mentionsSelf,renderContent,sanitizeDis
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Reply, Trash2 } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import type { Message, MessageAttachment, Participant } from "@club/shared";
@@ -171,8 +171,6 @@ type MessageListProps = {
 };
 
 // A flattened virtual item: either a day separator or a message row. Day
-const REACTION_EMOJIS = ["👍", "❤️", "😂"] as const;
-
 type Item =
   | { kind: "day"; ms: number; key: string }
   | { kind: "msg"; m: Message; self: boolean; grouped: boolean; replyTo?: Message; key: string };
@@ -188,6 +186,91 @@ function DayRule({ ms }: { ms: number }) {
   );
 }
 
+// Unified hover/tap action toolbar for a message: react (emoji palette),
+// reply, edit (own), recall (own). Replaces the old scattered header text
+// buttons + the duplicated inline reaction buttons, so every per-message
+// action lives in one discoverable place.
+//
+// Visibility: faded in by the parent MessageRow via `group-hover/msg` +
+// `focus-within` (keyboard) on desktop, and by a `pressed` flag (row tap) on
+// touch devices where hover doesn't exist. Each button is icon-only, so every
+// one carries an aria-label (the a11y suite asserts this with callbacks wired).
+function MessageActions({
+  m,
+  self,
+  pressed,
+  onReply,
+  onEdit,
+  onDelete,
+  onReact,
+  startEdit,
+}: {
+  m: Message;
+  self: boolean;
+  /** Touch toggle: forces the toolbar visible on tap (no hover on touch). */
+  pressed: boolean;
+  onReply?: (m: Message) => void;
+  onEdit?: (id: string, content: string) => Promise<void>;
+  onDelete?: (id: string) => void;
+  onReact?: (messageId: string, emoji: string) => void;
+  startEdit: () => void;
+}) {
+  const { t } = useI18n();
+  const canEdit = self && onEdit;
+  const canRecall = self && onDelete;
+  // Nothing to show if no callbacks at all (e.g. read-only / a11y render w/o handlers).
+  if (!onReply && !canEdit && !canRecall && !onReact) return null;
+  return (
+    <div
+      // `pressed` (touch) OR group-hover/focus-within (desktop) reveals the bar.
+      // pointer-events-none while hidden so it never blocks the bubble, but
+      // auto when visible so the buttons are clickable. stopPropagation keeps
+      // toolbar clicks from bubbling to the row's tap-to-toggle handler.
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        "pointer-events-none absolute top-0 z-10 flex items-center gap-0.5 rounded-lg border border-border/60 bg-card/95 p-0.5 shadow-sm backdrop-blur transition-opacity duration-fast",
+        self ? "left-0" : "right-0",
+        pressed ? "pointer-events-auto opacity-100" : "opacity-0 group-hover/msg:pointer-events-auto group-hover/msg:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100",
+      )}
+    >
+      {onReact && <EmojiPicker messageId={m.id} reactions={m.reactions} onReact={onReact} />}
+      {onReply && (
+        <button
+          type="button"
+          data-testid={`reply-${m.id}`}
+          onClick={() => onReply(m)}
+          aria-label={t("msg.reply")}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <Reply className="h-4 w-4" />
+        </button>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          data-testid={`edit-${m.id}`}
+          onClick={startEdit}
+          aria-label={t("msg.edit")}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+      )}
+      {canRecall && (
+        <button
+          type="button"
+          data-testid={`recall-${m.id}`}
+          onClick={() => onDelete?.(m.id)}
+          aria-label={t("msg.recall")}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MessageRow({
   m,
   self,
@@ -196,6 +279,7 @@ function MessageRow({
   showDay,
   grouped,
   highlighted,
+  canHover,
   onReply,
   replyTo,
   onDelete,
@@ -217,6 +301,9 @@ function MessageRow({
   grouped?: boolean;
   /** Briefly tinted after a cross-channel @mention deep-link lands here. */
   highlighted?: boolean;
+  /** Whether the device supports hover (desktop). When false (touch), the
+   *  action toolbar is revealed by tapping the row (pressed) instead of hover. */
+  canHover?: boolean;
   /** Click "reply" → enter composer reply mode quoting this message. */
   onReply?: (m: Message) => void;
   /** The message this one replies to (quote preview), if known locally. */
@@ -246,6 +333,9 @@ function MessageRow({
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
+  // Touch-only: tapping the row toggles the action toolbar open (no hover on
+  // touch). Ignored on hover-capable devices, where group-hover reveals it.
+  const [pressed, setPressed] = useState(false);
 
   // If the message is deleted via SSE while the user is editing it, exit edit
   // mode - otherwise the edit/recall buttons stay hidden (they're gated on
@@ -301,7 +391,6 @@ function MessageRow({
   // fired yet). The bubble collapses into a "you recalled a message · undo"
   // placeholder; undoing clears this and restores the row.
   const recalling = !!pendingRecalls?.has(m.id) && !m.deleted;
-  const showPicker = !grouped && !m.deleted && !recalling && !!onReact;
   // Bubble + alignment scheme (the standard chat-app mental model):
   //   - own messages: right-aligned, body in a mint-tinted bubble (bg-primary/15)
   //   - others: left-aligned, body in a raised-surface bubble (bg-card)
@@ -321,10 +410,13 @@ function MessageRow({
         // row's text content, so the label focuses on the time precision).
         title={sentAtLabel}
         aria-label={sentAtLabel}
+        // group/msg + relative anchor the floating action toolbar (MessageActions),
+        // which fades in on hover/focus (desktop) or `pressed` (touch tap).
+        onClick={() => {
+          if (!canHover) setPressed((v) => !v);
+        }}
         className={cn(
-          // grouped rows tighten their top padding (no header to space under)
-          // and drop the hover bg so a run reads as one continuous block.
-          "flex gap-x-2.5 rounded-md px-4 animate-slide-in transition-colors sm:px-6",
+          "group/msg relative flex gap-x-2.5 rounded-md px-4 animate-slide-in transition-colors sm:px-6",
           grouped ? "pt-0.5 pb-1.5" : "py-1.5",
           self && "flex-row-reverse",
           pinged && "border-l-2 border-l-primary/40 bg-primary/5",
@@ -338,12 +430,11 @@ function MessageRow({
               (opacity-0) but kept for column alignment — the header above already
               names the author, so a repeat would be noise. */}
           <Avatar name={m.authorName} className={cn("h-6 w-6 text-[10px]", grouped && "opacity-0")} />
-          {showPicker && (
-            <EmojiPicker messageId={m.id} reactions={m.reactions} onReact={onReact} />
-          )}
         </div>
-        <div className={cn("min-w-0 flex-1", self && "flex flex-col items-end")}>
-          {/* Header (author + HH:MM) only on the FIRST row of a run. */}
+        <div className={cn("relative min-w-0 flex-1", self && "flex flex-col items-end")}>
+          {/* Header (author + HH:MM) only on the FIRST row of a run. Per-message
+              actions (reply/edit/recall/react) no longer live here - they moved to
+              the floating MessageActions toolbar that fades in on hover/tap. */}
           {!grouped && (
             <div
               className={cn(
@@ -358,37 +449,23 @@ function MessageRow({
               {m.editedAt && (
                 <span className="font-mono text-[10px] lowercase text-muted-foreground/50">({t("msg.edited")})</span>
               )}
-              {onReply && !recalling && (
-                <button
-                  type="button"
-                  data-testid={`reply-${m.id}`}
-                  onClick={() => onReply(m)}
-                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground min-h-[36px] px-1 md:min-h-0"
-                >
-                  {t("msg.reply")}
-                </button>
-              )}
-              {self && !m.deleted && !m.status && !editing && !recalling && onEdit && (
-                <button
-                  type="button"
-                  data-testid={`edit-${m.id}`}
-                  onClick={startEdit}
-                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-foreground min-h-[36px] px-1 md:min-h-0"
-                >
-                  {t("msg.edit")}
-                </button>
-              )}
-              {self && !m.deleted && !m.status && !editing && !recalling && onDelete && (
-                <button
-                  type="button"
-                  data-testid={`recall-${m.id}`}
-                  onClick={() => onDelete(m.id)}
-                  className="font-mono text-[10px] lowercase text-muted-foreground/50 transition-colors hover:text-destructive min-h-[36px] px-1 md:min-h-0"
-                >
-                  {t("msg.recall")}
-                </button>
-              )}
             </div>
+          )}
+          {/* Floating action toolbar: react / reply / edit (own) / recall (own).
+              Fades in on hover/focus (desktop) or `pressed` (touch). Gated on
+              !recalling && !m.deleted && !editing so it never competes with the
+              undo placeholder, the recalled marker, or the inline editor. */}
+          {!recalling && !m.deleted && !editing && (
+            <MessageActions
+              m={m}
+              self={self}
+              pressed={pressed}
+              onReply={onReply}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onReact={onReact}
+              startEdit={startEdit}
+            />
           )}
           <div
             className={cn(
@@ -506,9 +583,11 @@ function MessageRow({
               </span>
             )}
           </div>
-          {!m.deleted && !recalling && (onReact ?? (false || (m.reactions && m.reactions.length > 0))) && (
+          {/* Existing reaction chips (display-only here; adding a reaction is via
+              the toolbar's emoji picker). Step 3 makes these clickable toggles. */}
+          {!m.deleted && !recalling && (m.reactions && m.reactions.length > 0) && (
             <div className={cn("mt-1 flex flex-wrap items-center gap-1", self && "justify-end")}>
-              {m.reactions?.map((r) => (
+              {m.reactions.map((r) => (
                 <span
                   key={r.emoji}
                   className="inline-flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[11px]"
@@ -517,19 +596,6 @@ function MessageRow({
                   <span className="tabular-nums text-muted-foreground">{r.count}</span>
                 </span>
               ))}
-              {onReact &&
-                REACTION_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    data-testid={`react-${m.id}-${emoji}`}
-                    onClick={() => onReact(m.id, emoji)}
-                    aria-label={t("msg.react")}
-                    className="rounded px-1 py-0.5 text-xs hover:bg-accent"
-                  >
-                    {emoji}
-                  </button>
-                ))}
             </div>
           )}
         </div>
@@ -556,6 +622,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   const known = [...members.map((m) => m.name), me?.name].filter(Boolean) as string[];
   const selfName = me?.name;
+  // Whether the device supports hover. Computed once; passed to every row so the
+  // action toolbar is revealed by hover (desktop) or tap (touch) accordingly.
+  const [canHover, setCanHover] = useState(true);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      setCanHover(window.matchMedia("(hover: hover)").matches);
+    }
+  }, []);
   // Grouping window: consecutive messages from the same author within this gap
   // merge into one run (header shown only on the first). 5 min is the common
   // chat-app threshold — short enough that a resumed conversation re-shows the
@@ -833,6 +907,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                     showDay={false}
                     grouped={item.grouped}
                     highlighted={item.m.id === highlightedId}
+                    canHover={canHover}
                     onReply={onReply}
                     replyTo={item.replyTo}
                     onDelete={onDelete}

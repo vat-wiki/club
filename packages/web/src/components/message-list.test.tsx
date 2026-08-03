@@ -308,3 +308,63 @@ describe("MessageList - recall with inline undo", () => {
     expect(row.querySelector('[data-testid="undo-recall-own4"]')).toBeNull();
   });
 });
+
+describe("MessageList - hover action toolbar", () => {
+  // The unified toolbar consolidates reply/edit/recall/react into one floating
+  // bar. These assert the right buttons render for own vs others' messages and
+  // that each fires its callback. (Visibility is opacity-driven; the buttons are
+  // always in the DOM so getByTestId reaches them without simulating hover.)
+
+  it("renders reply + react for others' messages (no edit/recall)", () => {
+    const messages = [mk(bot, "others' text", "other1")];
+    const { container } = renderWithI18n(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        onReply={vi.fn()}
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+        onReact={vi.fn()}
+      />,
+    );
+    const row = container.querySelector('[data-message-id="other1"]')!;
+    expect(row.querySelector('[data-testid="reply-other1"]')).toBeTruthy();
+    expect(row.querySelector('[data-testid="react-trigger"]')).toBeTruthy();
+    // edit + recall are own-only -> absent on others' rows
+    expect(row.querySelector('[data-testid="edit-other1"]')).toBeNull();
+    expect(row.querySelector('[data-testid="recall-other1"]')).toBeNull();
+  });
+
+  it("renders reply/edit/recall/react for own messages", () => {
+    const messages = [mk(me, "my text", "ownA")];
+    const { container } = renderWithI18n(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        onReply={vi.fn()}
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+        onReact={vi.fn()}
+      />,
+    );
+    const row = container.querySelector('[data-message-id="ownA"]')!;
+    expect(row.querySelector('[data-testid="reply-ownA"]')).toBeTruthy();
+    expect(row.querySelector('[data-testid="edit-ownA"]')).toBeTruthy();
+    expect(row.querySelector('[data-testid="recall-ownA"]')).toBeTruthy();
+    expect(row.querySelector('[data-testid="react-trigger"]')).toBeTruthy();
+  });
+
+  it("toolbar reply button calls onReply", () => {
+    const messages = [mk(bot, "reply me", "other2")];
+    const onReply = vi.fn();
+    const { container } = renderWithI18n(
+      <MessageList messages={messages} me={me} members={members} status="connected" onReply={onReply} />,
+    );
+    fireEvent.click(container.querySelector('[data-testid="reply-other2"]')!);
+    expect(onReply).toHaveBeenCalledTimes(1);
+  });
+});

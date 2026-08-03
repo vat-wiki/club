@@ -144,6 +144,25 @@ describe("a11y (axe-core, WCAG 2.1 AA)", () => {
     );
   });
 
+  it("MessageList has no violations with the action toolbar wired (icon-only buttons need aria-labels)", async () => {
+    // m1 is alice's own message -> the toolbar renders edit + recall (own) plus
+    // reply + react; all four are icon-only, so each MUST carry an aria-label or
+    // axe flags them as nameless buttons. This guards the Step-2 toolbar refactor.
+    await expectNoViolations(
+      <MessageList
+        messages={messages}
+        me={me}
+        members={members}
+        status="connected"
+        channel="general"
+        onReply={() => {}}
+        onDelete={() => {}}
+        onEdit={async () => {}}
+        onReact={() => {}}
+      />,
+    );
+  });
+
   it("ChannelList has no violations", async () => {
     await expectNoViolations(
       <ChannelList

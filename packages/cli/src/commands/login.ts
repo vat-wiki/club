@@ -44,6 +44,20 @@ export interface LoginDeps {
  * `server` is assumed to be trailing-slash-trimmed; `key` must be non-empty.
  */
 export function runLogin(input: LoginInput, deps: LoginDeps): void {
+  // Guard against the most common footgun: passing the server URL as the key
+  // (`club login https://club.example` instead of `club login <key> -s ...`).
+  // Keys are `club_…` tokens (see server routes/participants.ts) and never
+  // start with a scheme, so an http(s):// prefix is unambiguous. Refuse
+  // before we silently store a URL as a key and "succeed" - which is exactly
+  // the trap that leaves a working-looking config pointing at localhost.
+  if (/^https?:\/\//i.test(input.key)) {
+    const url = stripTrailingSlash(input.key);
+    throw new Error(
+      `"${input.key}" looks like a server URL, not a key.\n`
+        + `  to log in:    club login <key> -s ${url}\n`
+        + `  no key yet?   club join <name> -s ${url}`,
+    );
+  }
   deps.saveConfig({ server: input.server, key: input.key });
   console.log(`saved. server=${input.server}`);
   console.log(`try: club whoami`);
